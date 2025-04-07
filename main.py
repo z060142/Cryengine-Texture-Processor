@@ -101,51 +101,89 @@ def main():
     
     # Create and initialize main window
     app = MainWindow(root)
-    
-    # Define batch processing function
-    def start_batch_processing():
+
+    # Define batch processing function (now accepts optional settings)
+    def start_batch_processing(texture_groups=None, export_settings=None):
+        """
+        Starts the batch processing for textures.
+
+        Args:
+            texture_groups (list, optional): List of TextureGroup objects to process.
+                                            If None, uses all groups from TextureManager.
+            export_settings (dict, optional): Dictionary of export settings.
+                                             If None, retrieves settings from the UI panel.
+        """
+        print(f"start_batch_processing called with {len(texture_groups) if texture_groups else 'all'} groups and {'provided' if export_settings else 'no'} settings.")
+
         # Use the texture manager from texture import panel
-        # This ensures we're using the same manager that has the imported textures
         texture_manager = app.texture_import_panel.texture_manager
-        
+        if not texture_manager:
+             messagebox.showerror(get_text("export.error", "Error"), "Cannot access Texture Manager.")
+             return
+
         # Create batch processor using this texture manager
         batch_processor = BatchProcessor(texture_manager)
-        
-        # Get texture groups directly from the texture manager
-        texture_groups = texture_manager.get_all_groups()
-        
-        # Get export settings
-        settings = app.export_settings_panel.get_settings()
-        
-        # Get output directory
-        output_dir = settings.get("output_directory", "")
+
+        # Get texture groups if not provided
+        if texture_groups is None:
+            texture_groups = texture_manager.get_all_groups()
+            print(f"Retrieved {len(texture_groups)} groups from TextureManager.")
+
+        # Get export settings if not provided, otherwise use the provided ones
+        settings = export_settings if export_settings is not None else app.export_settings_panel.get_settings()
+        print(f"Using settings: {settings}")
+
+        # Get output directory - PRIORITIZE provided settings, then UI, then prompt
+        output_dir = settings.get("texture_output_directory", "") # Use the correct key
+        print(f"Output directory from settings: '{output_dir}'")
+
         if not output_dir:
-            # Ask for output directory
-            output_dir = filedialog.askdirectory(
-                title=get_text("export.select_directory", "Select Output Directory"),
-                initialdir=os.getcwd()
-            )
-            if not output_dir:
-                return  # Cancelled
-            
-            # Save output directory in settings
-            settings["output_directory"] = output_dir
-            app.export_settings_panel.set_settings(settings)
+             # If not in provided settings (or settings were None), check UI panel directly
+             output_dir = app.export_settings_panel.texture_output_dir_var.get()
+             print(f"Output directory from UI variable: '{output_dir}'")
+             if not output_dir:
+                 # Only prompt if BOTH provided settings AND UI field are empty
+                 print("Output directory is empty, prompting user...")
+                 output_dir = filedialog.askdirectory(
+                     title=get_text("export.select_texture_directory", "Select Texture Output Directory"), # Use correct text key
+                     initialdir=os.getcwd()
+                 )
+                 if not output_dir:
+                     print("User cancelled directory selection.")
+                     return  # Cancelled
+
+                 # If user selected a directory via prompt, update the UI and settings
+                 print(f"User selected directory: {output_dir}")
+                 settings["texture_output_directory"] = output_dir
+                 app.export_settings_panel.set_settings(settings) # Update panel to reflect selection
+             else:
+                 # If directory was found in UI var but not settings dict, update settings dict
+                 settings["texture_output_directory"] = output_dir
+
+        # Ensure the final output_dir is used (and exists)
+        final_output_dir = settings.get("texture_output_directory")
+        if not final_output_dir:
+             messagebox.showerror(get_text("export.error", "Error"), "Output directory could not be determined.")
+             return
         
-        # Check if output directory exists
-        if not os.path.exists(output_dir):
+        # Check if the final output directory exists and create if needed
+        if not os.path.exists(final_output_dir):
             try:
-                os.makedirs(output_dir)
+                print(f"Creating output directory: {final_output_dir}")
+                os.makedirs(final_output_dir)
+                # Update UI status if possible (might need a reference back)
+                if hasattr(app.export_settings_panel, "_update_texture_dir_status"):
+                     app.export_settings_panel._update_texture_dir_status()
             except Exception as e:
-                messagebox.showerror(
-                    get_text("export.error", "Error"),
-                    get_text("export.create_dir_error", "Failed to create output directory: {0}").format(str(e))
-                )
-                return
-        
-        # Set batch processor settings
-        batch_processor.set_output_dir(output_dir)
-        batch_processor.set_settings(settings)
+                 messagebox.showerror(
+                     get_text("export.error", "Error"),
+                     get_text("export.create_texture_dir_error", "Failed to create texture output directory: {0}").format(str(e)) # Use correct text key
+                 )
+                 return
+
+        # Set batch processor settings using the final determined settings and directory
+        batch_processor.set_output_dir(final_output_dir)
+        batch_processor.set_settings(settings) # Pass the potentially updated settings
         
         # Check if we have texture groups to process
         if len(texture_groups) == 0:
@@ -256,19 +294,9 @@ def main():
         # Start monitoring
         check_processing()
     
-    # Override the start_batch_processing method in app
+    # Assign the updated batch processing function to the main window instance
+    # This allows ui/export_settings.py to call it via root.main_window.start_batch_processing()
     app.start_batch_processing = start_batch_processing
-    
-    # Now also update the export_textures method to use the same texture manager
-    original_export_textures = app.export_settings_panel.export_textures
-    
-    def updated_export_textures(texture_groups=None):
-        if texture_groups is None:
-            # Use the texture groups from the texture import panel's texture manager
-            texture_groups = app.texture_import_panel.texture_manager.get_all_groups()
-        return original_export_textures(texture_groups)
-    
-    app.export_settings_panel.export_textures = updated_export_textures
     
     # Run application event loop
     try:

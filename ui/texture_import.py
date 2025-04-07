@@ -253,16 +253,23 @@ class TextureImportPanel:
                 continue
             # --- End Check ---
 
-            # Add to the manager which handles classification and grouping
+            # Add to the manager which handles classification, grouping, and duplicate checking
             texture = self.texture_manager.add_texture(path)
-            if texture: # Check if texture manager successfully added it
-                textures_added.append(texture)
-                
-                # Add to list display
-                self.texture_list.insert(tk.END, os.path.basename(path))
-                
-                # Add to existing paths set to prevent adding same file twice in one import
-                existing_paths.add(path) 
+
+            if texture is None: # TextureManager indicated it's a duplicate
+                print(f"Skipping duplicate texture (already managed): {path}")
+                duplicates_skipped += 1
+                continue # Skip the rest of the loop for this path
+            
+            # If texture is not None, it's a new texture
+            textures_added.append(texture)
+            
+            # Add to list display
+            self.texture_list.insert(tk.END, os.path.basename(path))
+            
+            # Add the original path to the set for this import session's check
+            # Note: The manager now handles persistent duplicate checking via absolute paths
+            existing_paths.add(path)
         
         # Store newly added textures
         self.all_textures.extend(textures_added)

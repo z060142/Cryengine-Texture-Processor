@@ -161,6 +161,7 @@ class TextureManager:
         """
         self.texture_groups = []
         self.name_parser = TextureNameParser()
+        self.all_texture_paths = set() # Keep track of all added texture paths to avoid duplicates
         self.settings = {
             "process_metallic": True  # Whether to convert metallic to albedo+reflection
         }
@@ -186,11 +187,19 @@ class TextureManager:
             texture_type: Optional texture type override
             
         Returns:
-            The added texture object
+            The added texture object, or None if the texture path already exists.
         """
+        # --- Check for duplicates based on absolute path ---
+        abs_file_path = os.path.abspath(file_path)
+        if abs_file_path in self.all_texture_paths:
+            print(f"Texture already managed: {file_path}")
+            return None # Indicate duplicate
+        # --- End Check ---
+
         # Create texture object (simplified for placeholder)
         texture = {
-            "path": file_path,
+            "path": file_path, # Store original path for reference if needed
+            "abs_path": abs_file_path, # Store absolute path for reliable checking
             "filename": os.path.basename(file_path)
         }
         
@@ -210,6 +219,9 @@ class TextureManager:
         # Find or create appropriate group
         group = self._find_or_create_group(base_name)
         group.add_texture(texture_type, texture)
+
+        # Add the absolute path to the set of managed paths
+        self.all_texture_paths.add(abs_file_path)
         
         return texture
     

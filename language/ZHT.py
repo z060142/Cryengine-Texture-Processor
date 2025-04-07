@@ -75,8 +75,16 @@ LANGUAGE_DICT = {
     },
     "export": {
         "title": "導出設定",
-        "output_dir": "輸出目錄:",
-        "browse": "瀏覽...",
+        "texture_output_directory": "貼圖輸出目錄:", # 重命名
+        "model_output_directory": "模型輸出目錄:",   # 新增
+        "select_texture_directory": "選取貼圖輸出目錄", # 重命名
+        "select_model_directory": "選取模型輸出目錄",   # 新增
+        "no_directory_selected": "尚未選取目錄。將在匯出時提示。", # 新增通用版本
+        "directory_valid": "目錄有效且可寫入。", # 新增通用版本
+        "directory_not_writable": "警告：目錄不可寫入！", # 新增通用版本
+        "directory_not_exist": "目錄不存在。將在匯出時建立。", # 新增通用版本
+        "create_texture_dir_error": "建立貼圖輸出目錄失敗：{0}", # 重命名
+        "create_model_dir_error": "建立模型輸出目錄失敗：{0}",     # 新增
         "diff_format": "漫反射格式:",
         "normal_flip": "翻轉法線圖綠色通道",
         "spec_generate": "生成缺失的高光貼圖",
@@ -89,13 +97,28 @@ LANGUAGE_DICT = {
         "displ": "位移 (_displ)",
         "emissive": "自發光 (_emissive)",
         "sss": "次表面散射 (_sss)",
-        "export_button": "導出貼圖",
+        "export_textures": "匯出貼圖", # 鍵名稍微更改以更清晰
+        "export_model": "匯出模型", # 新增
         "save_settings": "儲存設定",
-        "settings_saved": "導出設定已儲存。",
-        "error_no_dir": "未設定輸出目錄。",
-        "error_create_dir": "無法創建輸出目錄: {0}",
+        "settings_saved_title": "設定已儲存", # 新增標題鍵
+        "settings_saved_message": "匯出設定已儲存。", # 新增訊息鍵 (修改現有 settings_saved)
+        "error_no_texture_dir": "未設定貼圖輸出目錄。", # 重命名
+        "error_no_model_dir": "未設定模型輸出目錄。", # 新增
         "warning_no_groups": "沒有可導出的貼圖組。",
-        "export_preview_title": "導出預覽"
+        "export_preview_title": "導出預覽",
+        "preview_message": "將使用以下設定匯出 {0} 個貼圖群組：", # 新增鍵
+        "preview_texture_dir": "貼圖輸出目錄: {0}", # 新增鍵
+        "preview_diff": "漫反射格式: {0}", # 新增鍵
+        "preview_flip": "翻轉法線圖綠色通道: {0}", # 新增鍵
+        "preview_spec": "生成缺失的高光貼圖: {0}", # 新增鍵
+        "preview_metallic": "轉換金屬度貼圖: {0}", # 新增鍵 (簡化翻譯)
+        "preview_format": "輸出格式: {0}", # 新增鍵
+        "preview_resolution": "輸出解析度: {0}", # 新增鍵
+        "preview_types": "啟用的貼圖類型: {0}", # 新增鍵
+        "model_export_not_implemented": "模型匯出（包含 MTL 生成）已規劃但尚未完全實作。選取的模型目錄：{0}", # 新增
+        "no_model_dir": "請先選取模型輸出目錄。", # 新增警告
+        "not_implemented": "尚未實作", # 新增通用鍵
+        "batch_not_available": "批次處理尚不可用。" # 新增鍵
     },
     "suffix_settings": {
         "title": "貼圖後綴設定",

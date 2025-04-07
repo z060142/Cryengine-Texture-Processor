@@ -75,8 +75,16 @@ LANGUAGE_DICT = {
     },
     "export": {
         "title": "Export Settings",
-        "output_dir": "Output Directory:",
-        "browse": "Browse...",
+        "texture_output_directory": "Texture Output Directory", # Renamed
+        "model_output_directory": "Model Output Directory",   # Added
+        "select_texture_directory": "Select Texture Output Directory", # Renamed
+        "select_model_directory": "Select Model Output Directory",   # Added
+        "no_directory_selected": "No directory selected. Will prompt when exporting.", # Added generic version
+        "directory_valid": "Directory is valid and writable.", # Added generic version
+        "directory_not_writable": "Warning: Directory is not writable!", # Added generic version
+        "directory_not_exist": "Directory does not exist. It will be created when exporting.", # Added generic version
+        "create_texture_dir_error": "Failed to create texture output directory: {0}", # Renamed
+        "create_model_dir_error": "Failed to create model output directory: {0}",     # Added
         "diff_format": "Diffuse Format:",
         "normal_flip": "Flip Normal Map Green Channel",
         "spec_generate": "Generate Missing Specular Maps",
@@ -90,13 +98,28 @@ LANGUAGE_DICT = {
         "displ": "Displacement (_displ)",
         "emissive": "Emissive (_emissive)",
         "sss": "Subsurface Scattering (_sss)",
-        "export_button": "Export Textures",
+        "export_textures": "Export Textures", # Key changed slightly for clarity
+        "export_model": "Export Model", # Added
         "save_settings": "Save Settings",
-        "settings_saved": "Export settings have been saved.",
-        "error_no_dir": "Output directory is not set.",
-        "error_create_dir": "Failed to create output directory: {0}",
+        "settings_saved_title": "Settings Saved", # Added title key
+        "settings_saved_message": "Export settings have been saved.", # Added message key
+        "error_no_texture_dir": "Texture output directory is not set.", # Renamed
+        "error_no_model_dir": "Model output directory is not set.", # Added
         "warning_no_groups": "No texture groups to export.",
-        "export_preview_title": "Export Preview"
+        "export_preview_title": "Export Preview",
+        "preview_message": "Would export {0} texture groups with the following settings:", # Added key
+        "preview_texture_dir": "Texture Output Directory: {0}", # Added key
+        "preview_diff": "Diffuse Format: {0}", # Added key
+        "preview_flip": "Flip Normal Green Channel: {0}", # Added key
+        "preview_spec": "Generate Missing Specular: {0}", # Added key
+        "preview_metallic": "Convert Metallic to Albedo+Reflection: {0}", # Added key
+        "preview_format": "Output Format: {0}", # Added key
+        "preview_resolution": "Output Resolution: {0}", # Added key
+        "preview_types": "Enabled Texture Types: {0}", # Added key
+        "model_export_not_implemented": "Model export (including MTL generation) is planned but not yet fully implemented. Selected Model Directory: {0}", # Added
+        "no_model_dir": "Please select a Model Output Directory first.", # Added warning
+        "not_implemented": "Not Implemented", # Added generic key
+        "batch_not_available": "Batch processing is not available yet." # Added key
     },
     "suffix_settings": {
         "title": "Texture Suffix Settings",
