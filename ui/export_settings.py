@@ -11,7 +11,7 @@ import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from language.language_manager import get_text
-# Import ProgressDialog
+from ui.progress_dialog import ProgressDialog
 # No longer need direct imports for MTL export logic here
 # from output_formats.mtl_exporter import export_mtl 
 # from model_processing.texture_extractor import TextureExtractor
@@ -393,40 +393,128 @@ class ExportSettingsPanel:
 
     def _on_export_model(self):
         """
-        Handler for Export Model button. Calls the dedicated MTL export function from main.py.
+        Handler for Export Model button. Calls the MTL and FBX export functions from main.py.
+        Exports both MTL materials and FBX models with correctly configured shader nodes.
         """
         settings = self.get_settings()
         model_output_dir = settings.get("model_output_directory")
+        texture_output_dir = settings.get("texture_output_directory")
 
+        # Validation checks
         if not model_output_dir:
-            messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.no_model_dir", "Please select a Model Output Directory first."))
+            messagebox.showwarning(get_text("export.warning", "Warning"), 
+                                  get_text("export.no_model_dir", "Please select a Model Output Directory first."))
+            return
+            
+        if not texture_output_dir:
+            messagebox.showwarning(get_text("export.warning", "Warning"), 
+                                  get_text("export.no_texture_dir", "Please select a Texture Output Directory first."))
             return
 
+        # Get main window reference
         root = self.parent.winfo_toplevel()
         main_window = getattr(root, "main_window", None)
-        if not main_window or not hasattr(main_window, "run_model_mtl_export"):
-             messagebox.showerror(get_text("export.error", "Error"), "Model export function not found in main application.")
-             return
+        if not main_window:
+            messagebox.showerror(get_text("export.error", "Error"), "Cannot access main application window.")
+            return
+            
+        # Check for required export functions
+        if not hasattr(main_window, "run_model_mtl_export") or not hasattr(main_window, "run_model_fbx_export"):
+            messagebox.showerror(get_text("export.error", "Error"), 
+                                "Required model export functions not found in main application.")
+            return
 
         # --- Ensure Model Output Directory Exists ---
         try:
             if not os.path.exists(model_output_dir):
-                 print(f"Creating model output directory: {model_output_dir}")
-                 os.makedirs(model_output_dir)
-                 self._update_model_dir_status()
+                print(f"Creating model output directory: {model_output_dir}")
+                os.makedirs(model_output_dir)
+                self._update_model_dir_status()
         except Exception as e:
-             messagebox.showerror(get_text("export.error", "Error"), f"Failed to create model output directory: {e}")
-             return
+            messagebox.showerror(get_text("export.error", "Error"), 
+                                f"Failed to create model output directory: {e}")
+            return
 
-        # --- Call the Export Function (which handles its own progress/summary) ---
-        print("Export Model button clicked. Calling run_model_mtl_export...")
+        # --- Create Progress Dialog ---
+        progress_dialog = ProgressDialog(
+            root,
+            title=get_text("export.model_export_title", "Exporting Models..."),
+            allow_cancel=True
+        )
+
+        # --- Export MTL files first ---
+        print("Starting model export process...")
+        print("Step 1: Exporting MTL files...")
         try:
-            # This function now handles showing messages or its own progress dialog
-            main_window.run_model_mtl_export(settings=settings)
+            mtl_exported, mtl_errors, mtl_error_msgs = main_window.run_model_mtl_export(
+                settings=settings, 
+                progress_dialog=progress_dialog
+            )
         except Exception as e:
-            messagebox.showerror(get_text("export.error", "Error"), f"An unexpected error occurred during model export: {e}")
+            progress_dialog.close()
+            messagebox.showerror(get_text("export.error", "Error"), 
+                                f"An unexpected error occurred during MTL export: {e}")
             import traceback
             traceback.print_exc()
+            return
+
+        # Check if user cancelled during MTL export
+        if progress_dialog.is_cancelled():
+            progress_dialog.close()
+            messagebox.showinfo(get_text("export.cancelled", "Export Cancelled"), 
+                               get_text("export.process_cancelled", "Export process was cancelled."))
+            return
+
+        # --- Now export FBX models ---
+        print("Step 2: Exporting FBX models with updated materials...")
+        try:
+            fbx_exported, fbx_errors, fbx_error_msgs = main_window.run_model_fbx_export(
+                settings=settings, 
+                progress_dialog=progress_dialog
+            )
+        except Exception as e:
+            progress_dialog.close()
+            messagebox.showerror(get_text("export.error", "Error"), 
+                                f"An unexpected error occurred during FBX export: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+
+        # Close progress dialog
+        progress_dialog.close()
+
+        # --- Display Summary Results ---
+        total_exported = mtl_exported + fbx_exported
+        total_errors = mtl_errors + fbx_errors
+        
+        summary_title = get_text("export.export_complete", "Export Complete")
+        summary_message = get_text("export.summary", "Export Summary:") + "\n\n"
+        summary_message += get_text("export.mtl_files", "MTL Files:") + f" {mtl_exported}" + "\n"
+        summary_message += get_text("export.fbx_models", "FBX Models:") + f" {fbx_exported}" + "\n"
+        
+        if total_errors > 0:
+            summary_message += "\n" + get_text("export.errors", "Errors:") + f" {total_errors}" + "\n"
+            if mtl_error_msgs:
+                summary_message += "\n" + get_text("export.mtl_errors", "MTL Errors:") + "\n"
+                # Limit to first 5 errors to avoid very large message boxes
+                for msg in mtl_error_msgs[:5]:
+                    summary_message += f"- {msg}\n"
+                if len(mtl_error_msgs) > 5:
+                    summary_message += f"  (+ {len(mtl_error_msgs) - 5} more errors)\n"
+                    
+            if fbx_error_msgs:
+                summary_message += "\n" + get_text("export.fbx_errors", "FBX Errors:") + "\n"
+                # Limit to first 5 errors
+                for msg in fbx_error_msgs[:5]:
+                    summary_message += f"- {msg}\n"
+                if len(fbx_error_msgs) > 5:
+                    summary_message += f"  (+ {len(fbx_error_msgs) - 5} more errors)\n"
+                    
+            # Show warning if there were errors
+            messagebox.showwarning(summary_title, summary_message)
+        else:
+            # Show information if everything succeeded
+            messagebox.showinfo(summary_title, summary_message)
 
     def _save_settings(self):
         """

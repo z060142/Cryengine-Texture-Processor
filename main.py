@@ -324,11 +324,262 @@ def main():
         # Return the final success status
         return processing_successful
     
+    # --- New Function for FBX Export ---
+    def run_model_fbx_export(settings, progress_dialog=None):
+        """
+        Exports FBX files with properly configured materials for all imported models.
+        Removes original shader nodes and creates new ones with diff and ddna textures.
+        每個模型導出時會單獨處理，確保每個FBX文件只包含一個模型。
+        
+        Args:
+            settings (dict): Export settings dictionary.
+            progress_dialog (ProgressDialog, optional): Dialog to update.
+            
+        Returns:
+            tuple: (exported_count, error_count, error_messages)
+        """
+        from model_processing.fbx_exporter import FbxExporter
+        from model_processing.model_loader import ModelLoader  # 引入ModelLoader以重新加載模型
+        
+        model_output_dir = settings.get("model_output_directory")
+        texture_output_dir = settings.get("texture_output_directory")
+        texture_rel_dir = "textures"  # Relative directory path for textures
+        
+        # --- Get Managers and Model Data ---
+        model_import_panel = getattr(app, "model_import_panel", None)
+        texture_manager = getattr(app, "texture_import_panel", None).texture_manager if hasattr(app, "texture_import_panel") else None
+        
+        if not model_import_panel or not hasattr(model_import_panel, "imported_models_info"):
+            messagebox.showerror(get_text("export.error", "Error"), "Cannot access model import panel data.")
+            return 0, 1, ["Cannot access model import panel data."]
+        if not texture_manager:
+            messagebox.showerror(get_text("export.error", "Error"), "Cannot access Texture Manager.")
+            return 0, 1, ["Cannot access Texture Manager."]
+            
+        all_imported_models = model_import_panel.imported_models_info
+        if not all_imported_models:
+            messagebox.showinfo(get_text("export.info", "Info"), "No models have been imported yet.")
+            return 0, 0, []
+        
+        # 創建模型加載器和FBX導出器
+        model_loader = ModelLoader()
+        fbx_exporter = FbxExporter()
+        
+        # 檢查初始化是否成功
+        if not fbx_exporter.initialized or not model_loader.bpy:
+            error_msg = "FBX exporter or model loader could not be initialized. Blender Python API (bpy) is not available."
+            print(f"ERROR: {error_msg}")
+            print("This usually means that either:")
+            print("1. Blender is not installed on this system, or")
+            print("2. The Python environment doesn't have access to the Blender Python modules")
+            print("3. There might be a version incompatibility between Python and Blender")
+            
+            messagebox.showerror(
+                get_text("export.error", "Error"), 
+                error_msg + "\n\nPlease ensure Blender is installed and the Python environment has access to bpy."
+            )
+            return 0, 1, ["Blender Python API (bpy) is not available. Cannot export FBX."]
+            
+        # --- Process Each Model ---
+        texture_extractor = TextureExtractor()
+        exported_count = 0
+        error_count = 0
+        error_messages = []
+        total_models = len(all_imported_models)
+        
+        # Update progress dialog if provided
+        if progress_dialog:
+            if hasattr(progress_dialog, 'update_stage'):
+                progress_dialog.update_stage("Exporting Models (FBX)")
+            progress_dialog.update_progress(0.0, "Starting FBX export...", f"Found {total_models} models")
+            
+        for i, model_info in enumerate(all_imported_models):
+            # Check for cancellation
+            if progress_dialog and progress_dialog.is_cancelled():
+                error_messages.append("FBX export cancelled by user.")
+                error_count += (total_models - i)  # Count remaining as errors/skipped
+                break
+                
+            model_path = model_info.get("path", "")
+            model_filename = model_info.get("filename", "unknown_model")
+            base_filename = os.path.splitext(model_filename)[0]
+            fbx_filename = f"{base_filename}.fbx"
+            fbx_output_path = os.path.join(model_output_dir, fbx_filename)
+            
+            # Update progress
+            current_progress = (i + 1) / total_models
+            if progress_dialog:
+                progress_dialog.update_progress(
+                    current_progress, 
+                    f"Processing: {model_filename}", 
+                    f"Model {i+1} of {total_models}"
+                )
+                root.update()  # Keep UI responsive
+            
+            # 檢查路徑是否有效
+            if not model_path or not os.path.exists(model_path):
+                print(f"Skipping FBX export - invalid model path: {model_path}")
+                error_count += 1
+                error_messages.append(f"Invalid model path: {model_path}")
+                continue
+            
+            # 跳過不能處理的模型類型
+            if model_info.get("is_dummy", False):
+                print(f"Skipping FBX export for dummy model: {model_filename}")
+                continue
+            
+            if model_info.get("is_import_only", False):
+                print(f"Skipping FBX export for import-only model: {model_filename}")
+                print(f"This model was loaded with the alternative import method for texture extraction only.")
+                continue
+            
+            print(f"Processing model for FBX export: {model_filename}")
+            
+            # 清除場景並重新加載當前模型
+            try:
+                print(f"Clearing scene and loading model: {model_filename}")
+                # 使用 model_loader 的 _clear_scene 方法清除場景
+                model_loader._clear_scene()  
+                
+                # 重新加載當前模型
+                reloaded_model = model_loader.load(model_path)
+                
+                if not reloaded_model or reloaded_model.get("is_dummy", False):
+                    print(f"Failed to reload model: {model_filename}")
+                    error_count += 1
+                    error_messages.append(f"Failed to reload model: {model_filename}")
+                    continue
+                
+                print(f"Successfully reloaded model: {model_filename}")
+                
+                # 確保模型輸出目錄中的紋理子目錄存在
+                model_texture_dir = os.path.join(model_output_dir, texture_rel_dir)
+                os.makedirs(model_texture_dir, exist_ok=True)
+                
+                # 處理材質和導出FBX
+                materials_texture_data = {}
+                
+                # 獲取所有材質
+                original_materials = reloaded_model.get("materials", [])
+                if not original_materials:
+                    print(f"Model {model_filename} has no materials. Skipping.")
+                    continue
+                
+                # 提取紋理引用
+                all_orig_refs = texture_extractor.extract(reloaded_model)
+                
+                # 處理每個材質
+                for orig_mat in original_materials:
+                    mat_name = orig_mat.get('name', 'UnnamedMaterial')
+                    # 跳過默認Blender材質
+                    if mat_name in ["Material", "Dots Stroke"]:
+                        continue
+                    
+                    # 獲取該材質的紋理引用
+                    material_orig_refs = [ref for ref in all_orig_refs if ref.material_name == mat_name]
+                    
+                    # 確定用於查找已處理紋理的基本名稱
+                    output_format = settings.get("output_format", "tif")
+                    base_name = None
+                    
+                    # 嘗試從紋理管理器獲取基本名稱
+                    for orig_ref in material_orig_refs:
+                        if orig_ref.path and os.path.exists(orig_ref.path):
+                            try:
+                                _, potential_base = texture_manager.classify_texture(orig_ref.path)
+                                if potential_base:
+                                    base_name = potential_base
+                                    break
+                            except Exception:
+                                pass
+                    
+                    # 如果無法獲取基本名稱，使用回退方法
+                    if not base_name and material_orig_refs and material_orig_refs[0].path:
+                        filename_no_ext = os.path.splitext(os.path.basename(material_orig_refs[0].path))[0]
+                        common_suffixes = ['_diff', '_color', '_albedo', '_n', '_normal', '_spec', '_specular']
+                        potential_base = filename_no_ext
+                        for common_suffix in common_suffixes:
+                            if potential_base.lower().endswith(common_suffix):
+                                potential_base = potential_base[:-len(common_suffix)]
+                                break
+                        base_name = potential_base
+                    
+                    # 如果沒有基本名稱，跳過該材質
+                    if not base_name:
+                        print(f"Warning: Could not determine base name for material '{mat_name}'.")
+                        continue
+                    
+                    # 查找已處理的紋理
+                    texture_data = {}
+                    
+                    # 查找diff紋理
+                    diff_path = os.path.join(texture_output_dir, f"{base_name}_diff.{output_format}")
+                    if os.path.exists(diff_path):
+                        texture_data['diff'] = diff_path
+                    
+                    # 查找ddna紋理
+                    ddna_path = os.path.join(texture_output_dir, f"{base_name}_ddna.{output_format}")
+                    if os.path.exists(ddna_path):
+                        texture_data['ddna'] = ddna_path
+                    
+                    # 如果找到了有效的紋理數據，則存儲該材質的紋理數據
+                    if texture_data:
+                        materials_texture_data[mat_name] = texture_data
+                
+                # 如果沒有有效的材質紋理數據，跳過導出
+                if not materials_texture_data:
+                    print(f"No processed textures found for model {model_filename}. Skipping FBX export.")
+                    continue
+                
+                print(f"Found texture data for {len(materials_texture_data)} materials in {model_filename}")
+                
+                # 調用FBX導出器導出模型
+                print(f"Calling fbx_exporter.export for {model_filename}")
+                print(f"- Output path: {fbx_output_path}")
+                print(f"- Texture directory: {texture_rel_dir}")
+                print(f"- Materials data: {list(materials_texture_data.keys())}")
+                
+                result = fbx_exporter.export(
+                    reloaded_model,
+                    fbx_output_path,
+                    texture_dir=texture_rel_dir,
+                    texture_data=materials_texture_data
+                )
+                
+                if result:
+                    exported_count += 1
+                    print(f"Successfully exported FBX: {fbx_output_path}")
+                else:
+                    error_count += 1
+                    error_msg = f"Failed to export FBX for {model_filename}"
+                    error_messages.append(error_msg)
+                    print(error_msg)
+                
+            except Exception as e:
+                error_count += 1
+                error_msg = f"Unexpected error exporting FBX for {model_filename}: {e}"
+                print(error_msg)
+                traceback.print_exc()
+                error_messages.append(error_msg)
+        
+        # 最終進度更新
+        if progress_dialog:
+            final_progress = 1.0 if not progress_dialog.is_cancelled() else current_progress
+            final_message = "FBX export complete" if not progress_dialog.is_cancelled() else "FBX export cancelled"
+            progress_dialog.update_progress(
+                final_progress, 
+                final_message, 
+                f"Exported: {exported_count}, Errors: {error_count}"
+            )
+        
+        return exported_count, error_count, error_messages
+        
     # --- New Function for Model (MTL) Export ---
     def run_model_mtl_export(settings, progress_dialog=None):
         """
         Exports MTL files for all imported models based on provided settings.
         Updates the provided progress dialog if available.
+        每個模型導出時會單獨處理，確保每個MTL文件只包含一個模型的材質信息。
 
         Args:
             settings (dict): Export settings dictionary.
@@ -337,6 +588,8 @@ def main():
         Returns:
             tuple: (exported_count, error_count, error_messages)
         """
+        from model_processing.model_loader import ModelLoader  # 引入ModelLoader以重新加載模型
+        
         model_output_dir = settings.get("model_output_directory")
         texture_output_dir = settings.get("texture_output_directory") # Needed for finding processed textures
 
@@ -355,6 +608,11 @@ def main():
         if not all_imported_models:
             messagebox.showinfo(get_text("export.info", "Info"), "No models have been imported yet.")
             return 0, 0, []
+            
+        # 創建模型加載器
+        model_loader = ModelLoader()
+        if not model_loader.bpy:
+            print("Warning: Blender Python API not available, but continuing with MTL export as it doesn't require BPY.")
 
         # --- Process Each Model ---
         texture_extractor = TextureExtractor()
@@ -376,7 +634,7 @@ def main():
                  error_count += (total_models - i) # Count remaining as errors/skipped
                  break
 
-            model_obj = model_info.get("model_obj")
+            model_path = model_info.get("path", "")
             model_filename = model_info.get("filename", "unknown_model")
             mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
 
@@ -385,12 +643,28 @@ def main():
             if progress_dialog:
                  progress_dialog.update_progress(current_progress, f"Processing: {model_filename}", f"Model {i+1} of {total_models}")
                  root.update() # Keep UI responsive
-
-            if not model_obj or model_obj.get("is_dummy"):
-                print(f"Skipping MTL export for failed/dummy model: {model_filename}")
+                 
+            # 檢查路徑是否有效
+            if not model_path or not os.path.exists(model_path):
+                print(f"Skipping MTL export - invalid model path: {model_path}")
+                error_count += 1
+                error_messages.append(f"Invalid model path: {model_path}")
                 continue
 
+            # 跳過不能處理的模型類型
+            if model_info.get("is_dummy", False) or model_info.get("is_import_only", False):
+                print(f"Skipping MTL export for failed/dummy/import-only model: {model_filename}")
+                continue
+                
+            # MTL導出不需要完整的Blender場景，所以不必重新加載模型
+            # 但我們需要准備只將當前一個模型的材質加入MTL文件
             print(f"Processing model for MTL export: {model_filename}")
+            model_obj = model_info.get("model_obj")
+            if not model_obj:
+                print(f"Warning: No model object data available for {model_filename}, trying to extract materials from path")
+                continue
+
+            # 為當前模型初始化材質數據列表            
             materials_data_for_mtl = []
             try:
                 original_materials = model_obj.get("materials", [])
@@ -398,12 +672,15 @@ def main():
                      print(f"Model {model_filename} has no materials. Skipping.")
                      continue
 
+                # 自已存在的模型數據提取所有材質信息
                 for orig_mat in original_materials:
                     mat_name = orig_mat.get('name', 'UnnamedMaterial')
-                    # Filter out default Blender materials if needed (already done in mtl_exporter?)
-                    # if mat_name in ["Material", "Dots Stroke"]: continue
+                    # 如果需要，遍過默認Blender材質
+                    if mat_name in ["Material", "Dots Stroke"]: 
+                        continue
 
                     processed_textures = {}
+                    # 只提取該模型的紋理引用
                     all_orig_refs = texture_extractor.extract(model_obj)
                     material_orig_refs = [ref for ref in all_orig_refs if ref.material_name == mat_name]
 
@@ -462,9 +739,11 @@ def main():
                 success, result_path_or_msg = export_mtl(materials_data_for_mtl, model_output_dir, texture_output_dir, mtl_filename)
                 if success:
                     exported_count += 1
+                    print(f"Successfully exported MTL: {result_path_or_msg}")
                 else:
                     error_count += 1
                     error_messages.append(f"{model_filename}: {result_path_or_msg}")
+                    print(f"Failed to export MTL: {result_path_or_msg}")
             except Exception as e:
                  error_count += 1
                  error_msg = f"Unexpected error exporting MTL for {model_filename}: {e}"
@@ -483,7 +762,8 @@ def main():
 
     # Assign the functions to the main window instance
     app.start_batch_processing = start_batch_processing
-    app.run_model_mtl_export = run_model_mtl_export # Assign new function
+    app.run_model_mtl_export = run_model_mtl_export
+    app.run_model_fbx_export = run_model_fbx_export
 
     # Run application event loop
     try:
