@@ -8,7 +8,7 @@ the interaction between different UI components.
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, messagebox
 from .texture_import import TextureImportPanel
 from .model_import import ModelImportPanel
 from .preview_panel import PreviewPanel

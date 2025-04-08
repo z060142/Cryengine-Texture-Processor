@@ -45,6 +45,15 @@ class ProgressDialog:
         self.main_frame = ttk.Frame(self.dialog, padding=20)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         
+        # Stage label (New)
+        self.stage_var = tk.StringVar(value="")
+        self.stage_label = ttk.Label(
+            self.main_frame,
+            textvariable=self.stage_var,
+            font=("TkDefaultFont", 10, "bold") # Make stage stand out
+        )
+        self.stage_label.pack(fill=tk.X, pady=(0, 5))
+
         # Progress bar
         self.progress_var = tk.DoubleVar(value=0.0)
         self.progress_bar = ttk.Progressbar(
@@ -107,6 +116,16 @@ class ProgressDialog:
         
         # Update UI
         self.dialog.update()
+
+    def update_stage(self, stage_text):
+        """
+        Update the stage description text.
+
+        Args:
+            stage_text: Text to display for the current stage
+        """
+        self.stage_var.set(stage_text)
+        self.dialog.update() # Ensure immediate update
     
     def _center_window(self):
         """

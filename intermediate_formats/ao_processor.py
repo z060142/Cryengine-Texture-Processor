@@ -29,7 +29,7 @@ class AOProcessor:
         Returns:
             Processed AO texture object
         """
-        print(f"Processing ambient occlusion map")
+        print("Processing ambient occlusion map")
         
         # Load AO image if needed
         if "image" not in ao_texture:
@@ -121,7 +121,7 @@ class AOProcessor:
         Returns:
             Inverted AO texture object
         """
-        print(f"Inverting ambient occlusion map")
+        print("Inverting ambient occlusion map")
         
         # Load AO image if needed
         if "image" not in ao_texture:

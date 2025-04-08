@@ -8,7 +8,7 @@ albedo intermediate format (pure color without lighting information).
 """
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image
 from utils.image_processing import ImageProcessor
 
 class AlbedoProcessor:
@@ -41,7 +41,7 @@ class AlbedoProcessor:
         
         # Simply use diffuse as albedo without applying AO
         # AO will be applied in diff_exporter if needed
-        print(f"Using diffuse as albedo (without AO)")
+        print("Using diffuse as albedo (without AO)")
         
         # Create a copy of the texture object
         albedo_texture = dict(diffuse_texture)
@@ -61,7 +61,7 @@ class AlbedoProcessor:
         Returns:
             Albedo texture object
         """
-        print(f"Using basecolor as albedo")
+        print("Using basecolor as albedo")
         
         # Load basecolor image if needed
         if "image" not in basecolor_texture:
@@ -89,7 +89,7 @@ class AlbedoProcessor:
         Returns:
             Generated albedo texture object
         """
-        print(f"Generating albedo from diffuse and metallic")
+        print("Generating albedo from diffuse and metallic")
         
         # Load diffuse image if needed
         if "image" not in diffuse_texture:

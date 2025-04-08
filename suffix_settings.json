@@ -1,0 +1,81 @@
+{
+    "diffuse": [
+        "diff",
+        "diffuse",
+        "albedo",
+        "basecolor",
+        "color",
+        "col",
+        "_d"
+    ],
+    "normal": [
+        "normal",
+        "nrm",
+        "norm",
+        "_n",
+        "nm",
+        "ddn",
+        "ddna",
+        "nor",
+        "nor_dx",
+        "nor_gl",
+        "Normal",
+        "nor"
+    ],
+    "specular": [
+        "spec",
+        "specular",
+        "_s"
+    ],
+    "glossiness": [
+        "gloss",
+        "glossiness",
+        "smoothness",
+        "_g",
+        "Glossy"
+    ],
+    "roughness": [
+        "rough",
+        "roughness",
+        "_r"
+    ],
+    "displacement": [
+        "disp",
+        "displacement",
+        "height",
+        "bump",
+        "_h",
+        "displ"
+    ],
+    "metallic": [
+        "metal",
+        "metallic",
+        "metalness",
+        "_m"
+    ],
+    "ao": [
+        "ao",
+        "ambient",
+        "occlusion"
+    ],
+    "alpha": [
+        "alpha",
+        "opacity",
+        "transparency",
+        "_a"
+    ],
+    "emissive": [
+        "emissive",
+        "emission",
+        "glow",
+        "_e"
+    ],
+    "sss": [
+        "sss",
+        "subsurface"
+    ],
+    "removable_suffixes": [
+        "dx",
+        "gl"
+    ]
+}

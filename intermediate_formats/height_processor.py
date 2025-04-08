@@ -29,7 +29,7 @@ class HeightProcessor:
         Returns:
             Processed height texture object
         """
-        print(f"Processing height/displacement map")
+        print("Processing height/displacement map")
         
         # Load height image if needed
         if "image" not in height_texture:
@@ -58,7 +58,7 @@ class HeightProcessor:
         Returns:
             Normalized height texture object
         """
-        print(f"Normalizing height map")
+        print("Normalizing height map")
         
         # Load height image if needed
         if "image" not in height_texture:
@@ -98,7 +98,7 @@ class HeightProcessor:
         Returns:
             Inverted height texture object
         """
-        print(f"Inverting height map")
+        print("Inverting height map")
         
         # Load height image if needed
         if "image" not in height_texture:

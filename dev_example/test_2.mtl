@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<Material MtlFlags="524544" vertModifType="0">
+ <SubMaterials>
+  <Material Name="beamC" MtlFlags="524416" Shader="Illum" SurfaceType="" MatTemplate="" Diffuse="1,1,1" Specular="1,1,1" Emittance="0,0,0,0" Opacity="1" Shininess="255" AlphaTest="0.5" GenMask="1125899907366944" StringGenMask="%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING">
+   <Textures>
+    <Texture Map="Diffuse" File="./textures/KB3D_DKF_beamC_diff.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Bumpmap" File="./textures/KB3D_DKF_beamC_ddna.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Specular" File="./textures/KB3D_DKF_beamC_spec.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+   </Textures>
+   <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+  </Material>
+  <Material Name="Dots Stroke" MtlFlags="524416" Shader="Illum" SurfaceType="" MatTemplate="" Diffuse="1,1,1" Specular="1,1,1" Emittance="0,0,0,0" Opacity="1" Shininess="255" AlphaTest="0.5" GenMask="32" StringGenMask="%SUBSURFACE_SCATTERING">
+   <Textures/>
+   <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+  </Material>
+  <Material Name="Material" MtlFlags="524416" Shader="Illum" SurfaceType="" MatTemplate="" Diffuse="1,1,1" Specular="1,1,1" Emittance="0,0,0,0" Opacity="1" Shininess="255" AlphaTest="0.5" GenMask="32" StringGenMask="%SUBSURFACE_SCATTERING">
+   <Textures/>
+   <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+  </Material>
+  <Material Name="shingleA" MtlFlags="524416" Shader="Illum" SurfaceType="" MatTemplate="" Diffuse="1,1,1" Specular="1,1,1" Emittance="0,0,0,0" Opacity="1" Shininess="255" AlphaTest="0.5" GenMask="1125899907366944" StringGenMask="%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING">
+   <Textures>
+    <Texture Map="Diffuse" File="./textures/KB3D_DKF_shingleA_diff.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Bumpmap" File="./textures/KB3D_DKF_shingleA_ddna.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Specular" File="./textures/KB3D_DKF_shingleA_spec.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+   </Textures>
+   <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+  </Material>
+  <Material Name="windowsA" MtlFlags="524416" Shader="Illum" SurfaceType="" MatTemplate="" Diffuse="1,1,1" Specular="1,1,1" Emittance="0,0,0,0" Opacity="1" Shininess="255" AlphaTest="0.5" GenMask="1125899907366944" StringGenMask="%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING">
+   <Textures>
+    <Texture Map="Diffuse" File="./textures/KB3D_DKF_windowsA_diff.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Bumpmap" File="./textures/KB3D_DKF_windowsA_ddna.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+    <Texture Map="Specular" File="./textures/KB3D_DKF_windowsA_spec.dds">
+     <TexMod TexMod_RotateType="0" TexMod_TexGenType="0" TexMod_bTexGenProjected="0"/>
+    </Texture>
+   </Textures>
+   <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+  </Material>
+ </SubMaterials>
+ <PublicParams EmittanceMapGamma="1" SSSIndex="0"/>
+</Material>

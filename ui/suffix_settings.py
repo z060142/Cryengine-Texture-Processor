@@ -191,6 +191,9 @@ class SuffixSettingsDialog:
         Get the path to the suffix settings file.
         
         Returns:
-            Path to the suffix settings file
+            Path to the suffix settings file (in project root directory)
         """
-        return os.path.expanduser("~/.cryengine_texture_processor_suffixes.json")
+        # Use __file__ to locate the project root directory
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))  # ui/ directory
+        project_root = os.path.dirname(current_file_dir)  # Go up one level
+        return os.path.join(project_root, "suffix_settings.json")  # No leading dot for better visibility in file explorers

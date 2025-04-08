@@ -40,7 +40,7 @@ class BatchProcessor:
         self.texture_manager = texture_manager
         self.output_dir = ""
         self.settings = {}
-        self.progress_callback = None
+        self.progress_callback = None # Expected signature: callback(progress, stage_text, current_task, status)
         self.cancel_flag = False
         self.processing_thread = None
         self._temp_dir_path = None # To store the path for cleanup
@@ -88,7 +88,7 @@ class BatchProcessor:
         Set progress callback function.
         
         Args:
-            callback: Callback function taking progress (0.0-1.0), current task, and status
+            callback: Callback function taking progress (0.0-1.0), stage_text, current_task, and status
         """
         self.progress_callback = callback
     
@@ -138,49 +138,62 @@ class BatchProcessor:
             texture_groups = self.texture_manager.get_all_groups()
             total_groups = len(texture_groups)
             
-            # Update progress
-            self._update_progress(0.0, "Starting batch processing", f"Found {total_groups} texture groups")
-            
-            # Exit if no groups
+            # --- Stage 1: Generate Intermediate Formats ---
+            stage1_text = "Stage 1/2: Generating Intermediates"
+            self._update_progress(0.0, stage1_text, "Starting...", f"Found {total_groups} texture groups")
+
             if total_groups == 0:
-                self._update_progress(1.0, "No texture groups to process", "")
+                self._update_progress(1.0, stage1_text, "No texture groups to process", "")
                 return
-                
-            # Process each group
+
             for i, group in enumerate(texture_groups):
-                # Check if cancelled
                 if self.cancel_flag:
-                    self._update_progress(
-                        i / total_groups,
-                        "Processing cancelled",
-                        f"Processed {i} of {total_groups} groups"
-                    )
+                    self._update_progress(i / (total_groups * 2), stage1_text, "Processing cancelled", f"Processed {i} of {total_groups} groups")
                     return
-                    
-                # Update progress
+                
+                progress_stage1 = i / (total_groups * 2) # Progress within 0.0 to 0.5
                 self._update_progress(
-                    i / total_groups,
+                    progress_stage1,
+                    stage1_text,
                     f"Processing {group.base_name}",
                     f"Group {i+1} of {total_groups}"
                 )
-                
-                # Process group
-                self._process_group(group)
-                
-                # Small delay to prevent UI freezing
+                self._generate_intermediate_formats(group)
                 time.sleep(0.01)
-                
+
+            # --- Stage 2: Generate Output Formats ---
+            stage2_text = "Stage 2/2: Exporting Textures"
+            self._update_progress(0.5, stage2_text, "Starting export...", "") # Start stage 2 at 50%
+
+            for i, group in enumerate(texture_groups):
+                if self.cancel_flag:
+                    self._update_progress(0.5 + (i / (total_groups * 2)), stage2_text, "Processing cancelled", f"Processed {i} of {total_groups} groups")
+                    return
+
+                progress_stage2 = 0.5 + (i / (total_groups * 2)) # Progress within 0.5 to 1.0
+                self._update_progress(
+                    progress_stage2,
+                    stage2_text,
+                    f"Exporting {group.base_name}",
+                    f"Group {i+1} of {total_groups}"
+                )
+                self._generate_output_formats(group)
+                time.sleep(0.01)
+
             # Final progress update
             self._update_progress(
                 1.0,
-                "Batch processing complete",
+                "Batch processing complete", # Keep final message simple
+                "Finished",
                 f"Processed {total_groups} texture groups"
             )
-            
+
         except Exception as e:
-            # Update progress with error
+            # Update progress with error - report current stage if possible
+            current_stage = stage2_text if 'stage2_text' in locals() else stage1_text
             self._update_progress(
-                0.0,
+                self.progress_var.get() / 100.0 if hasattr(self, 'progress_var') else 0.0, # Try to get last known progress
+                current_stage,
                 "Error during batch processing",
                 f"Error: {str(e)}"
             )
@@ -396,19 +409,22 @@ class BatchProcessor:
             output_path = self.sss_exporter.export(group, self.settings, self.output_dir)
             if output_path:
                 group.output["sss"] = output_path
-    
-    def _update_progress(self, progress, current=None, status=None):
+
+    # Corrected function definition to accept stage_text
+    def _update_progress(self, progress, stage_text, current=None, status=None):
         """
         Update progress callback if available.
         
         Args:
             progress: Progress value (0.0-1.0)
-            current: Current operation text
-            status: Status text
+            stage_text: Text describing the current major stage
+            current: Current specific operation text
+            status: Status text (e.g., group count)
         """
         if self.progress_callback:
-            self.progress_callback(progress, current, status)
-    
+            # Call with the new signature, ensuring all args are passed
+            self.progress_callback(progress, stage_text, current, status)
+
     def cancel(self):
         """
         Cancel ongoing processing.

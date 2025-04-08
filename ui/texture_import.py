@@ -11,7 +11,7 @@ import json
 import re
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-from core.texture_manager import TextureManager, TextureGroup
+from core.texture_manager import TextureManager
 
 class TextureImportPanel:
     """
@@ -308,7 +308,6 @@ class TextureImportPanel:
         for index in selected_indices:
             if index < len(self.all_textures):
                 texture = self.all_textures[index]
-                old_type = texture.get("type")
                 
                 # Update texture type
                 texture["type"] = new_type

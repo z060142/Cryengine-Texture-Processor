@@ -8,8 +8,7 @@ conversion between different formats (DirectX/OpenGL).
 """
 
 from utils.image_processing import ImageProcessor
-import os
-from PIL import Image, ImageStat
+from PIL import ImageStat
 
 class NormalProcessor:
     """
@@ -73,7 +72,7 @@ class NormalProcessor:
         Returns:
             Normal map texture object with flipped green channel
         """
-        print(f"Flipping green channel of normal map")
+        print("Flipping green channel of normal map")
         
         # Load normal map image if needed
         if "image" not in normal_texture:

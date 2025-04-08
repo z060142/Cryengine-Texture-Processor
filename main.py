@@ -9,6 +9,7 @@ It initializes the UI and connects it to the core processing components.
 
 import os
 import sys
+import time # Import the time module
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from ui.main_window import MainWindow
@@ -16,9 +17,11 @@ from ui.progress_dialog import ProgressDialog
 from language.language_manager import get_instance as get_language_manager
 from language.language_manager import get_text
 from utils.config_manager import ConfigManager
+import traceback # Needed for error reporting
 from core.batch_processor import BatchProcessor
-from core.texture_manager import TextureManager
 from utils.dds_processor import DDSProcessor
+from model_processing.texture_extractor import TextureExtractor # Needed for MTL export
+from output_formats.mtl_exporter import export_mtl # Needed for MTL export
 
 def main():
     """
@@ -215,16 +218,24 @@ def main():
         )
         
         # Set callbacks
-        def progress_callback(progress, current, status):
-            progress_dialog.update_progress(progress, current, status)
+        # Updated progress_callback to handle the new signature from BatchProcessor
+        def progress_callback(progress, stage_text, current_task, status):
+            # Update the stage text in the dialog
+            if hasattr(progress_dialog, 'update_stage'): # Check if method exists
+                 progress_dialog.update_stage(stage_text)
+            # Update the regular progress elements
+            progress_dialog.update_progress(progress, current_task, status)
             
-            # Update application status bar
-            if current:
-                app.update_status(current)
+            # Update application status bar with the current task
+            if current_task:
+                app.update_status(current_task)
         
         def cancel_callback():
             batch_processor.cancel()
             app.update_status(get_text("status.cancelling", "Cancelling..."))
+            # Ensure the dialog reflects cancellation immediately if possible
+            if progress_dialog:
+                 progress_dialog.update_progress(progress_dialog.progress_var.get() / 100.0, "Cancelling...", "")
         
         progress_dialog.set_cancel_callback(cancel_callback)
         batch_processor.set_progress_callback(progress_callback)
@@ -232,72 +243,248 @@ def main():
         # Start processing
         batch_processor.process_all_groups()
         
+        # --- Refactored Monitoring Logic ---
+        # This function now returns True for success, False for failure/cancel
+        processing_successful = True # Assume success initially
+
         # Monitor processing thread
-        def check_processing():
-            if batch_processor.is_processing():
-                # Check again in 100ms
-                root.after(100, check_processing)
-            else:
-                # Processing complete or cancelled
-                if progress_dialog.is_cancelled():
-                    progress_dialog.show_completion(False, True)
-                    app.update_status(get_text("status.processing_cancelled", "Processing cancelled"))
-                else:
-                    # Check if we need to generate DDS files
-                    if settings.get("generate_cry_dds", False):
-                        # Get generated TIF files
-                        tif_files = []
-                        for group in texture_groups:
-                            for output_type, output_path in group.output.items():
-                                if output_path and output_path.lower().endswith(".tif"):
-                                    tif_files.append(output_path)
-                        
-                        # If we have TIF files and the output format is TIF, generate DDS files
-                        if tif_files and settings.get("output_format", "tif").lower() == "tif":
-                            # Update status
-                            app.update_status(get_text("status.generating_dds", "Generating DDS files..."))
-                            progress_dialog.update_progress(0.0, get_text("progress.generating_dds", "Generating CryEngine DDS files"), "")
-                            
-                            # Create DDS processor
-                            dds_processor = DDSProcessor()
-                            
-                            # Set progress callback
-                            dds_processor.set_progress_callback(progress_callback)
-                            
-                            # Start DDS processing
-                            dds_processor.process_tif_files(tif_files)
-                            
-                            # Monitor DDS processing
-                            def check_dds_processing():
-                                if dds_processor.is_processing():
-                                    # Check again in 100ms
-                                    root.after(100, check_dds_processing)
-                                else:
-                                    # DDS processing complete
-                                    progress_dialog.show_completion(True, True)
-                                    app.update_status(get_text("status.processing_complete", 
-                                        f"Processing complete. Processed {len(texture_groups)} texture groups."))
-                            
-                            # Start monitoring DDS processing
-                            check_dds_processing()
-                        else:
-                            # No TIF files or output format is not TIF, just show completion
-                            progress_dialog.show_completion(True, True)
-                            app.update_status(get_text("status.processing_complete", 
-                                f"Processing complete. Processed {len(texture_groups)} texture groups."))
+        while batch_processor.is_processing():
+            # Check for cancellation via dialog
+            if progress_dialog.is_cancelled():
+                 batch_processor.cancel() # Ensure processor knows
+                 processing_successful = False
+                 break
+            root.update() # Keep UI responsive
+            time.sleep(0.1) # Wait a bit
+
+        # Check final status after loop exits
+        if progress_dialog.is_cancelled():
+            processing_successful = False
+            progress_dialog.show_completion(False, True) # Show cancelled state
+            app.update_status(get_text("status.processing_cancelled", "Processing cancelled"))
+        elif batch_processor.cancel_flag: # Check processor flag too
+             processing_successful = False
+             progress_dialog.show_completion(False, True) # Show cancelled state
+             app.update_status(get_text("status.processing_cancelled", "Processing cancelled"))
+        else:
+            # Processing finished (not cancelled), now check for DDS
+            if settings.get("generate_cry_dds", False):
+                # Get generated TIF files
+                tif_files = []
+                for group in texture_groups:
+                    for output_type, output_path in group.output.items():
+                        if output_path and output_path.lower().endswith(".tif"):
+                            tif_files.append(output_path)
+                
+                if tif_files and settings.get("output_format", "tif").lower() == "tif":
+                    # --- DDS Processing Stage ---
+                    dds_stage_text = "Post-Process: Generating DDS"
+                    app.update_status(get_text("status.generating_dds", "Generating DDS files..."))
+                    # Update dialog for DDS stage
+                    if hasattr(progress_dialog, 'update_stage'):
+                         progress_dialog.update_stage(dds_stage_text)
+                    progress_dialog.update_progress(0.0, get_text("progress.generating_dds", "Generating CryEngine DDS files"), "") # Reset progress for DDS
+
+                    dds_processor = DDSProcessor()
+                    
+                    # DDS Progress Callback (simpler, only updates progress/current/status)
+                    def dds_progress_callback(progress, current, status):
+                         progress_dialog.update_progress(progress, current, status)
+                         if current: app.update_status(current)
+
+                    dds_processor.set_progress_callback(dds_progress_callback)
+                    dds_processor.process_tif_files(tif_files)
+                    
+                    # Monitor DDS processing
+                    while dds_processor.is_processing():
+                         if progress_dialog.is_cancelled(): # Allow cancelling DDS too
+                             dds_processor.cancel()
+                             processing_successful = False
+                             break
+                         root.update()
+                         time.sleep(0.1)
+
+                    if progress_dialog.is_cancelled() or dds_processor.cancel_flag:
+                         processing_successful = False
+                         progress_dialog.show_completion(False, True)
+                         app.update_status(get_text("status.dds_cancelled", "DDS generation cancelled"))
                     else:
-                        # No DDS generation needed, just show completion
-                        progress_dialog.show_completion(True, True)
-                        app.update_status(get_text("status.processing_complete", 
-                            f"Processing complete. Processed {len(texture_groups)} texture groups."))
-        
-        # Start monitoring
-        check_processing()
+                         # DDS completed successfully
+                         progress_dialog.show_completion(True, True)
+                         app.update_status(get_text("status.processing_complete", f"Processing complete. Processed {len(texture_groups)} groups, generated DDS."))
+                else:
+                    # No TIF files or output format not TIF, DDS skipped
+                    progress_dialog.show_completion(True, True)
+                    app.update_status(get_text("status.processing_complete", f"Processing complete. Processed {len(texture_groups)} groups."))
+            else:
+                # No DDS generation needed, just show completion
+                progress_dialog.show_completion(True, True)
+                app.update_status(get_text("status.processing_complete", f"Processing complete. Processed {len(texture_groups)} groups."))
+
+        # Return the final success status
+        return processing_successful
     
-    # Assign the updated batch processing function to the main window instance
-    # This allows ui/export_settings.py to call it via root.main_window.start_batch_processing()
+    # --- New Function for Model (MTL) Export ---
+    def run_model_mtl_export(settings, progress_dialog=None):
+        """
+        Exports MTL files for all imported models based on provided settings.
+        Updates the provided progress dialog if available.
+
+        Args:
+            settings (dict): Export settings dictionary.
+            progress_dialog (ProgressDialog, optional): Dialog to update.
+
+        Returns:
+            tuple: (exported_count, error_count, error_messages)
+        """
+        model_output_dir = settings.get("model_output_directory")
+        texture_output_dir = settings.get("texture_output_directory") # Needed for finding processed textures
+
+        # --- Get Managers and Model Data (Access via app instance) ---
+        model_import_panel = getattr(app, "model_import_panel", None)
+        texture_manager = getattr(app, "texture_import_panel", None).texture_manager if hasattr(app, "texture_import_panel") else None
+
+        if not model_import_panel or not hasattr(model_import_panel, "imported_models_info"):
+             messagebox.showerror(get_text("export.error", "Error"), "Cannot access model import panel data.")
+             return 0, 1, ["Cannot access model import panel data."]
+        if not texture_manager:
+             messagebox.showerror(get_text("export.error", "Error"), "Cannot access Texture Manager.")
+             return 0, 1, ["Cannot access Texture Manager."]
+
+        all_imported_models = model_import_panel.imported_models_info
+        if not all_imported_models:
+            messagebox.showinfo(get_text("export.info", "Info"), "No models have been imported yet.")
+            return 0, 0, []
+
+        # --- Process Each Model ---
+        texture_extractor = TextureExtractor()
+        exported_count = 0
+        error_count = 0
+        error_messages = []
+        total_models = len(all_imported_models)
+
+        # Update progress dialog if provided
+        if progress_dialog:
+             if hasattr(progress_dialog, 'update_stage'):
+                 progress_dialog.update_stage("Exporting Models (MTL)")
+             progress_dialog.update_progress(0.0, "Starting MTL export...", f"Found {total_models} models")
+
+        for i, model_info in enumerate(all_imported_models):
+            # Check for cancellation
+            if progress_dialog and progress_dialog.is_cancelled():
+                 error_messages.append("MTL export cancelled by user.")
+                 error_count += (total_models - i) # Count remaining as errors/skipped
+                 break
+
+            model_obj = model_info.get("model_obj")
+            model_filename = model_info.get("filename", "unknown_model")
+            mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
+
+            # Update progress
+            current_progress = (i + 1) / total_models
+            if progress_dialog:
+                 progress_dialog.update_progress(current_progress, f"Processing: {model_filename}", f"Model {i+1} of {total_models}")
+                 root.update() # Keep UI responsive
+
+            if not model_obj or model_obj.get("is_dummy"):
+                print(f"Skipping MTL export for failed/dummy model: {model_filename}")
+                continue
+
+            print(f"Processing model for MTL export: {model_filename}")
+            materials_data_for_mtl = []
+            try:
+                original_materials = model_obj.get("materials", [])
+                if not original_materials:
+                     print(f"Model {model_filename} has no materials. Skipping.")
+                     continue
+
+                for orig_mat in original_materials:
+                    mat_name = orig_mat.get('name', 'UnnamedMaterial')
+                    # Filter out default Blender materials if needed (already done in mtl_exporter?)
+                    # if mat_name in ["Material", "Dots Stroke"]: continue
+
+                    processed_textures = {}
+                    all_orig_refs = texture_extractor.extract(model_obj)
+                    material_orig_refs = [ref for ref in all_orig_refs if ref.material_name == mat_name]
+
+                    output_format = settings.get("output_format", "tif")
+                    output_suffixes = {
+                        "diffuse": f"_diff.{output_format}", "normal": f"_ddna.{output_format}",
+                        "specular": f"_spec.{output_format}", "displacement": f"_displ.{output_format}",
+                        "emissive": f"_emissive.{output_format}", "opacity": f"_opacity.{output_format}",
+                        "sss": f"_sss.{output_format}"
+                    }
+                    base_name = None
+                    for orig_ref in material_orig_refs:
+                        if orig_ref.path and os.path.exists(orig_ref.path):
+                            try:
+                                _, potential_base = texture_manager.classify_texture(orig_ref.path)
+                                if potential_base:
+                                    base_name = potential_base
+                                    break
+                            except Exception: pass
+
+                    if not base_name and material_orig_refs and material_orig_refs[0].path:
+                         filename_no_ext = os.path.splitext(os.path.basename(material_orig_refs[0].path))[0]
+                         common_suffixes_to_remove = ['_diff', '_color', '_albedo', '_n', '_normal', '_spec', '_specular', '_h', '_height', '_disp', '_e', '_emissive']
+                         potential_base = filename_no_ext
+                         for common_suffix in common_suffixes_to_remove:
+                             if potential_base.lower().endswith(common_suffix):
+                                 potential_base = potential_base[:-len(common_suffix)]
+                                 break
+                         base_name = potential_base
+
+                    if base_name:
+                        for type_key, suffix in output_suffixes.items():
+                            expected_filename = f"{base_name}{suffix}"
+                            expected_path = os.path.join(texture_output_dir, expected_filename)
+                            if os.path.exists(expected_path):
+                                processed_textures[type_key] = expected_path
+                    else:
+                        print(f"Warning: Could not determine base name for material '{mat_name}'.")
+
+                    materials_data_for_mtl.append({'name': mat_name, 'textures': processed_textures})
+
+            except Exception as e:
+                 error_msg = f"Error processing material data for {model_filename}: {e}"
+                 print(error_msg)
+                 traceback.print_exc()
+                 error_messages.append(error_msg)
+                 error_count += 1
+                 continue
+
+            if not materials_data_for_mtl:
+                 print(f"No processable material data found for {model_filename}. Skipping MTL export.")
+                 continue
+
+            print(f"Attempting to export MTL: {mtl_filename} to {model_output_dir}")
+            try:
+                success, result_path_or_msg = export_mtl(materials_data_for_mtl, model_output_dir, texture_output_dir, mtl_filename)
+                if success:
+                    exported_count += 1
+                else:
+                    error_count += 1
+                    error_messages.append(f"{model_filename}: {result_path_or_msg}")
+            except Exception as e:
+                 error_count += 1
+                 error_msg = f"Unexpected error exporting MTL for {model_filename}: {e}"
+                 print(error_msg)
+                 traceback.print_exc()
+                 error_messages.append(error_msg)
+
+        # Final progress update
+        if progress_dialog:
+             final_progress = 1.0 if not progress_dialog.is_cancelled() else current_progress
+             final_message = "MTL export complete" if not progress_dialog.is_cancelled() else "MTL export cancelled"
+             progress_dialog.update_progress(final_progress, final_message, f"Exported: {exported_count}, Errors: {error_count}")
+             # Don't close the dialog here, let the caller handle it
+
+        return exported_count, error_count, error_messages
+
+    # Assign the functions to the main window instance
     app.start_batch_processing = start_batch_processing
-    
+    app.run_model_mtl_export = run_model_mtl_export # Assign new function
+
     # Run application event loop
     try:
         root.mainloop()

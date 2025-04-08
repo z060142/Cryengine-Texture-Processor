@@ -11,12 +11,10 @@ import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from language.language_manager import get_text
-# Import the new exporter function
-from output_formats.mtl_exporter import export_mtl
-# Import necessary components for data retrieval
-# Assuming TextureManager is accessible via root.texture_import_panel
-# Assuming ModelImportPanel is accessible via root.model_import_panel
-from model_processing.texture_extractor import TextureExtractor # Needed to re-extract original paths if necessary
+# Import ProgressDialog
+# No longer need direct imports for MTL export logic here
+# from output_formats.mtl_exporter import export_mtl 
+# from model_processing.texture_extractor import TextureExtractor
 
 class ExportSettingsPanel:
     """
@@ -300,353 +298,135 @@ class ExportSettingsPanel:
 
     def _on_batch_process(self):
         """
-        Handler for Batch Process button. Exports textures first, then models (MTL).
+        Handler for Batch Process button. Orchestrates texture export then model export.
         """
         print("Starting Batch Process...")
         settings = self.get_settings()
         texture_output_dir = settings.get("texture_output_directory")
         model_output_dir = settings.get("model_output_directory")
 
-        # 1. Check if directories are set
+        # --- Pre-checks ---
         if not texture_output_dir:
-             messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.error_no_texture_dir", "Texture output directory is not set."))
-             return
+            messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.error_no_texture_dir", "Texture output directory is not set."))
+            return
         if not model_output_dir:
-             messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.no_model_dir", "Please select a Model Output Directory first."))
+            messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.no_model_dir", "Please select a Model Output Directory first."))
+            return
+
+        root = self.parent.winfo_toplevel()
+        main_window = getattr(root, "main_window", None)
+        if not main_window:
+             messagebox.showerror(get_text("export.error", "Error"), "Cannot access main application window.")
+             return
+        if not hasattr(main_window, "start_batch_processing") or not hasattr(main_window, "run_model_mtl_export"):
+             messagebox.showerror(get_text("export.error", "Error"), "Required export functions not found in main application.")
              return
 
         # --- Ensure directories exist ---
         try:
-            if not os.path.exists(texture_output_dir):
-                print(f"Creating texture output directory: {texture_output_dir}")
-                os.makedirs(texture_output_dir)
-                self._update_texture_dir_status()
-            if not os.path.exists(model_output_dir):
-                 print(f"Creating model output directory: {model_output_dir}")
-                 os.makedirs(model_output_dir)
-                 self._update_model_dir_status()
+            if not os.path.exists(texture_output_dir): os.makedirs(texture_output_dir)
+            if not os.path.exists(model_output_dir): os.makedirs(model_output_dir)
+            self._update_texture_dir_status()
+            self._update_model_dir_status()
         except Exception as e:
-             messagebox.showerror(get_text("export.error", "Error"), f"Failed to create output directories: {e}")
-             return
-
-        # --- 2. Export Textures ---
-        print("Batch Process: Exporting Textures...")
-        root = self.parent.winfo_toplevel()
-        main_window = getattr(root, "main_window", None)
-
-        texture_export_success = False # Flag to track success
-        if main_window and hasattr(main_window, "start_batch_processing"):
-            try:
-                # Call the original function directly.
-                # IMPORTANT: This function needs modification in main.py/core to accept and use settings['texture_output_directory']
-                print("Batch Process: Calling main_window.start_batch_processing() for textures.")
-                main_window.start_batch_processing() # Assuming it handles its own settings/paths for now
-                texture_export_success = True
-                print("Batch Process: Texture export call completed (assumed success).")
-            except Exception as e:
-                messagebox.showerror(get_text("export.error", "Error"), f"Failed during batch texture processing: {e}")
-                import traceback
-                traceback.print_exc()
-                return # Stop batch if texture export fails
-        else:
-            messagebox.showerror(get_text("export.error", "Error"), "Texture processing function (start_batch_processing) not found in main application window.")
-            return # Stop batch if function is missing
-
-        if not texture_export_success:
-            print("Batch Process: Halting due to texture export failure or cancellation.")
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed to create output directories: {e}")
             return
 
-        # --- 3. Export Models (MTL) ---
-        print("Batch Process: Exporting Models (MTL)...")
-        # Get panels and managers correctly via main_window
-        model_import_panel = getattr(main_window, "model_import_panel", None)
-        texture_manager = None
-        if main_window and hasattr(main_window, "get_texture_manager"):
-             texture_manager = main_window.get_texture_manager() # Correctly get manager instance
+        # --- Create Progress Dialog ---
+        # Note: start_batch_processing and run_model_mtl_export now create their own dialogs internally.
+        # We need to adapt this. Let's have this function manage ONE dialog for the whole batch.
+        # This requires modifying start_batch_processing and run_model_mtl_export again
+        # to ACCEPT an optional progress_dialog instance instead of creating one.
 
-        if not model_import_panel or not hasattr(model_import_panel, "imported_models_info"):
-             messagebox.showerror(get_text("export.error", "Error"), "Cannot access model import panel data for batch process.")
-             return
-        if not texture_manager:
-             # This check should now correctly use the retrieved manager instance
-             messagebox.showerror(get_text("export.error", "Error"), "Cannot access Texture Manager for batch MTL export.")
-             return
+        # --- TEMPORARY WORKAROUND: Call functions sequentially, they'll show separate dialogs ---
+        # This isn't ideal for UX but avoids further refactoring right now.
+        # TODO: Refactor main.py functions to accept an existing ProgressDialog instance.
 
-        all_imported_models = model_import_panel.imported_models_info
-        if not all_imported_models:
-            print("Batch Process: No models imported, skipping model export.")
-            mtl_exported_count = 0
-            mtl_error_count = 0
-        else:
-            # --- Re-run the MTL export logic from _on_export_model ---
-            # This is duplicated, consider refactoring into a helper method later
-            texture_extractor = TextureExtractor()
-            mtl_exported_count = 0
-            mtl_error_count = 0
-            mtl_error_messages = []
+        # --- Stage 1: Export Textures ---
+        print("Batch Process - Stage 1: Exporting Textures...")
+        texture_export_success = False
+        try:
+            # This will show its own progress dialog
+            texture_export_success = main_window.start_batch_processing(export_settings=settings)
+            print(f"Batch Process: Texture export finished. Success: {texture_export_success}")
+        except Exception as e:
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed during texture export stage: {e}")
+            import traceback
+            traceback.print_exc()
+            return # Stop if texture stage fails critically
 
-            for model_info in all_imported_models:
-                model_obj = model_info.get("model_obj")
-                model_filename = model_info.get("filename", "unknown_model")
-                mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
+        if not texture_export_success:
+            print("Batch Process: Halting because texture export failed or was cancelled.")
+            # No need for message box here, start_batch_processing likely showed one
+            return
 
-                if not model_obj or model_obj.get("is_dummy"): continue
+        # --- Stage 2: Export Models (MTL) ---
+        print("Batch Process - Stage 2: Exporting Models (MTL)...")
+        mtl_exported_count = 0
+        mtl_error_count = 0
+        mtl_error_messages = []
+        try:
+            # This will show its own progress dialog (or just a message box if no models)
+            # We don't pass a dialog here due to the temporary workaround.
+            mtl_exported_count, mtl_error_count, mtl_error_messages = main_window.run_model_mtl_export(settings=settings)
+            print(f"Batch Process: MTL export finished. Exported: {mtl_exported_count}, Errors: {mtl_error_count}")
+        except Exception as e:
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed during model export stage: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue to show summary even if this stage fails
 
-                materials_data_for_mtl = []
-                try:
-                    original_materials = model_obj.get("materials", [])
-                    if not original_materials: continue
-
-                    for orig_mat in original_materials:
-                        mat_name = orig_mat.get('name', 'UnnamedMaterial')
-                        processed_textures = {}
-                        all_orig_refs = texture_extractor.extract(model_obj)
-                        material_orig_refs = [ref for ref in all_orig_refs if ref.material_name == mat_name]
-
-                        output_suffixes = {
-                            "diffuse": "_diff.dds", "normal": "_ddna.dds", "specular": "_spec.dds",
-                            "displacement": "_displ.dds", "emissive": "_emissive.dds", "opacity": "_opacity.dds"
-                        }
-                        base_name = None
-                        for orig_ref in material_orig_refs:
-                            if orig_ref.path and os.path.exists(orig_ref.path):
-                                try:
-                                    _, potential_base = texture_manager.classify_texture(orig_ref.path)
-                                    if potential_base:
-                                        base_name = potential_base
-                                        break
-                                except Exception: pass # Ignore classification errors here
-
-                        if not base_name and material_orig_refs and material_orig_refs[0].path:
-                             base_name = os.path.splitext(os.path.basename(material_orig_refs[0].path))[0]
-
-                        if base_name:
-                            for type_key, suffix in output_suffixes.items():
-                                expected_filename = f"{base_name}{suffix}"
-                                expected_path = os.path.join(texture_output_dir, expected_filename)
-                                if os.path.exists(expected_path):
-                                    processed_textures[type_key] = expected_path
-                        else:
-                             print(f"Batch Warning: Could not determine base name for material '{mat_name}'.")
-
-
-                        materials_data_for_mtl.append({'name': mat_name, 'textures': processed_textures})
-
-                except Exception as e:
-                     mtl_error_messages.append(f"Batch Error processing material data for {model_filename}: {e}")
-                     mtl_error_count += 1
-                     continue
-
-                if not materials_data_for_mtl: continue
-
-                try:
-                    success, result_path_or_msg = export_mtl(materials_data_for_mtl, model_output_dir, texture_output_dir, mtl_filename)
-                    if success:
-                        mtl_exported_count += 1
-                    else:
-                        mtl_error_count += 1
-                        mtl_error_messages.append(f"{model_filename}: {result_path_or_msg}")
-                except Exception as e:
-                     mtl_error_count += 1
-                     mtl_error_messages.append(f"Batch Unexpected error exporting MTL for {model_filename}: {e}")
-
-            print(f"Batch Process: MTL Export finished. Exported: {mtl_exported_count}, Errors: {mtl_error_count}")
-
-        # --- 4. Final Summary ---
-        # Combine results from texture and model export if possible
-        # For now, just show MTL summary
+        # --- Final Summary ---
         summary_title = get_text("export.batch_process", "Batch Process")
         final_message = "Batch process finished.\n\n"
-        # TODO: Get texture export status if possible
+        final_message += f"Texture Export Stage: {'Success' if texture_export_success else 'Failed/Cancelled'}\n"
         final_message += f"MTL Files Exported: {mtl_exported_count}\n"
         final_message += f"MTL Export Errors: {mtl_error_count}"
-        if mtl_error_count > 0:
-             final_message += "\n\nErrors:\n" + "\n".join(mtl_error_messages)
 
         if mtl_error_count > 0:
+             final_message += "\n\nMTL Errors:\n" + "\n".join(mtl_error_messages)
+
+        if not texture_export_success or mtl_error_count > 0:
              messagebox.showwarning(summary_title, final_message)
         else:
              messagebox.showinfo(summary_title, final_message)
 
     def _on_export_model(self):
         """
-        Handler for Export Model button. Exports MTL files for ALL imported models.
+        Handler for Export Model button. Calls the dedicated MTL export function from main.py.
         """
         settings = self.get_settings()
         model_output_dir = settings.get("model_output_directory")
-        texture_output_dir = settings.get("texture_output_directory") # Needed for finding processed textures
 
         if not model_output_dir:
-             messagebox.showwarning(
-                 get_text("export.warning", "Warning"),
-                 get_text("export.no_model_dir", "Please select a Model Output Directory first.")
-             )
-             return
-
-        # --- Get Managers and Model Data ---
-        root = self.parent.winfo_toplevel()
-        main_window = getattr(root, "main_window", None)
-        model_import_panel = getattr(main_window, "model_import_panel", None) # Access via main_window
-        texture_manager = None
-        if main_window and hasattr(main_window, "get_texture_manager"):
-             texture_manager = main_window.get_texture_manager() # Use the getter method
-
-        if not model_import_panel or not hasattr(model_import_panel, "imported_models_info"):
-             messagebox.showerror(get_text("export.error", "Error"), "Cannot access model import panel data.")
-             return
-        if not texture_manager:
-             messagebox.showerror(get_text("export.error", "Error"), "Cannot access Texture Manager.")
-             return
-
-        all_imported_models = model_import_panel.imported_models_info
-        if not all_imported_models:
-            messagebox.showinfo(get_text("export.info", "Info"), "No models have been imported yet.")
+            messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.no_model_dir", "Please select a Model Output Directory first."))
             return
 
-        # --- Process Each Model ---
-        texture_extractor = TextureExtractor() # To get original texture refs if needed
-        exported_count = 0
-        error_count = 0
-        error_messages = []
+        root = self.parent.winfo_toplevel()
+        main_window = getattr(root, "main_window", None)
+        if not main_window or not hasattr(main_window, "run_model_mtl_export"):
+             messagebox.showerror(get_text("export.error", "Error"), "Model export function not found in main application.")
+             return
 
-        for model_info in all_imported_models:
-            model_obj = model_info.get("model_obj")
-            model_filename = model_info.get("filename", "unknown_model")
-            mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
+        # --- Ensure Model Output Directory Exists ---
+        try:
+            if not os.path.exists(model_output_dir):
+                 print(f"Creating model output directory: {model_output_dir}")
+                 os.makedirs(model_output_dir)
+                 self._update_model_dir_status()
+        except Exception as e:
+             messagebox.showerror(get_text("export.error", "Error"), f"Failed to create model output directory: {e}")
+             return
 
-            if not model_obj or model_obj.get("is_dummy"):
-                print(f"Skipping MTL export for failed/dummy model: {model_filename}")
-                continue
-
-            print(f"Processing model for MTL export: {model_filename}")
-
-            # --- Build materials_data with PROCESSED texture paths ---
-            materials_data_for_mtl = []
-            try:
-                # Option 1: Assume model_obj contains original material/texture info
-                original_materials = model_obj.get("materials", [])
-                if not original_materials:
-                     print(f"Model {model_filename} has no materials. Skipping.")
-                     continue
-
-                for orig_mat in original_materials:
-                    mat_name = orig_mat.get('name', 'UnnamedMaterial')
-                    processed_textures = {} # Dict for {type: processed_path}
-
-                    # Get original texture paths associated with this material
-                    # This might require iterating through texture_refs extracted earlier
-                    # or re-extracting specifically for this material.
-                    # Let's assume we can get original paths per material.
-                    # Example: orig_textures = get_original_textures_for_material(model_obj, mat_name)
-                    # For simplicity, let's re-extract all textures and filter by material name
-                    # (This might be inefficient for complex models)
-                    all_orig_refs = texture_extractor.extract(model_obj)
-                    material_orig_refs = [ref for ref in all_orig_refs if ref.material_name == mat_name]
-
-                    # --- Find processed textures by checking expected output filenames (using UI output format) ---
-                    output_format = settings.get("output_format", "tif") # Get format from settings
-                    output_suffixes = {
-                        "diffuse": f"_diff.{output_format}",
-                        "normal": f"_ddna.{output_format}",
-                        "specular": f"_spec.{output_format}",
-                        "displacement": f"_displ.{output_format}",
-                        "emissive": f"_emissive.{output_format}",
-                        "opacity": f"_opacity.{output_format}", # Adjust if opacity has different suffix/format
-                        "sss": f"_sss.{output_format}" # Added SSS
-                    }
-
-                    base_name = None
-                    # Try to get base_name using classify_texture first
-                    for orig_ref in material_orig_refs:
-                        if orig_ref.path and os.path.exists(orig_ref.path):
-                            try:
-                                _, potential_base = texture_manager.classify_texture(orig_ref.path)
-                                if potential_base:
-                                    base_name = potential_base
-                                    print(f"Determined base name '{base_name}' for material '{mat_name}' using texture '{orig_ref.path}'")
-                                    break
-                            except Exception as classify_error:
-                                print(f"Could not classify {orig_ref.path} to get base name: {classify_error}")
-
-                    # Fallback if classify didn't work
-                    if not base_name and material_orig_refs:
-                        first_tex_path = material_orig_refs[0].path
-                        if first_tex_path:
-                            filename_no_ext = os.path.splitext(os.path.basename(first_tex_path))[0]
-                            # Slightly improved fallback: remove common suffixes if classify failed
-                            common_suffixes_to_remove = ['_diff', '_color', '_albedo', '_n', '_normal', '_spec', '_specular', '_h', '_height', '_disp', '_e', '_emissive']
-                            potential_base = filename_no_ext
-                            for common_suffix in common_suffixes_to_remove:
-                                if potential_base.lower().endswith(common_suffix):
-                                    potential_base = potential_base[:-len(common_suffix)]
-                                    break # Assume only one suffix needs removal
-                            base_name = potential_base
-                            print(f"Warning: Using fallback base name '{base_name}' for material '{mat_name}' derived from '{filename_no_ext}'")
-
-                    if base_name:
-                        print(f"Attempting to find textures for base name: '{base_name}' in '{texture_output_dir}'")
-                        # Check for expected output files using the determined base name and output format
-                        for type_key, suffix in output_suffixes.items():
-                            expected_filename = f"{base_name}{suffix}"
-                            expected_path = os.path.join(texture_output_dir, expected_filename)
-                            print(f"  Checking for: {expected_path}") # Debug print
-                            if os.path.exists(expected_path):
-                                processed_textures[type_key] = expected_path
-                                print(f"    Found!") # Debug print
-                            # else:
-                            #    print(f"    Not found.") # Debug print
-                    else:
-                        print(f"Warning: Could not determine base name for material '{mat_name}'. Cannot find processed textures.")
-
-                    materials_data_for_mtl.append({
-                        'name': mat_name,
-                        'textures': processed_textures
-                    })
-
-            except Exception as e:
-                 error_msg = f"Error processing material data for {model_filename}: {e}"
-                 print(error_msg)
-                 error_messages.append(error_msg)
-                 error_count += 1
-                 continue # Skip to next model
-
-            # --- Call the MTL Exporter for this model ---
-            if not materials_data_for_mtl:
-                 print(f"No processable material data found for {model_filename} after checking textures. Skipping MTL export.")
-                 continue
-
-            print(f"Attempting to export MTL: {mtl_filename} to {model_output_dir}")
-            try:
-                success, result_path_or_msg = export_mtl(
-                    materials_data_for_mtl,
-                    model_output_dir,
-                    texture_output_dir, # Pass texture dir for context
-                    mtl_filename
-                )
-                if success:
-                    exported_count += 1
-                else:
-                    error_count += 1
-                    error_messages.append(f"{model_filename}: {result_path_or_msg}")
-            except Exception as e:
-                 error_count += 1
-                 error_msg = f"Unexpected error exporting MTL for {model_filename}: {e}"
-                 print(error_msg)
-                 error_messages.append(error_msg)
-                 import traceback
-                 traceback.print_exc()
-
-        # --- Show Summary Message ---
-        summary_title = get_text("export.export_model", "Export Model")
-        if exported_count > 0 and error_count == 0:
-            messagebox.showinfo(summary_title, f"Successfully exported {exported_count} MTL file(s).")
-        elif exported_count > 0 and error_count > 0:
-             messagebox.showwarning(summary_title, f"Exported {exported_count} MTL file(s) with {error_count} error(s):\n\n" + "\n".join(error_messages))
-        elif exported_count == 0 and error_count > 0:
-             messagebox.showerror(summary_title, f"Failed to export any MTL files. {error_count} error(s) occurred:\n\n" + "\n".join(error_messages))
-        else: # No models processed or no errors but nothing exported
-             messagebox.showinfo(summary_title, "No MTL files were exported (check if models have materials/textures).")
-
+        # --- Call the Export Function (which handles its own progress/summary) ---
+        print("Export Model button clicked. Calling run_model_mtl_export...")
+        try:
+            # This function now handles showing messages or its own progress dialog
+            main_window.run_model_mtl_export(settings=settings)
+        except Exception as e:
+            messagebox.showerror(get_text("export.error", "Error"), f"An unexpected error occurred during model export: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _save_settings(self):
         """
@@ -742,22 +522,37 @@ class ExportSettingsPanel:
         Args:
             texture_groups: Ignored. Uses all groups from TextureManager.
         """
-        # --- Restore original Batch Process logic ---
-        # This button should now behave exactly like the original "Batch Process" button.
-        # It calls start_batch_processing on the main window instance.
-        print("Export Textures button clicked. Triggering main batch processing...")
+        # This button now ONLY triggers the texture processing part.
+        print("Export Textures button clicked. Triggering texture processing...")
+        settings = self.get_settings()
+        texture_output_dir = settings.get("texture_output_directory")
+
+        if not texture_output_dir:
+            messagebox.showwarning(get_text("export.warning", "Warning"), get_text("export.error_no_texture_dir", "Texture output directory is not set."))
+            return
+
         root = self.parent.winfo_toplevel()
         main_window = getattr(root, "main_window", None)
+        if not main_window or not hasattr(main_window, "start_batch_processing"):
+             messagebox.showerror(get_text("export.error", "Error"), "Texture processing function not found in main application.")
+             return
 
-        if main_window and hasattr(main_window, "start_batch_processing"):
-            try:
-                # Call the main batch processing function.
-                # It should internally handle getting settings and the output directory.
-                main_window.start_batch_processing()
-            except Exception as e:
-                messagebox.showerror(get_text("export.error", "Error"), f"Failed to start texture processing: {e}")
-                import traceback
-                traceback.print_exc()
-        else:
-            # This error message should now correctly indicate if the function is missing on MainWindow
-            messagebox.showerror(get_text("export.error", "Error"), "Texture processing function (start_batch_processing) not found in main application window.")
+        # --- Ensure Texture Output Directory Exists ---
+        try:
+            if not os.path.exists(texture_output_dir):
+                 print(f"Creating texture output directory: {texture_output_dir}")
+                 os.makedirs(texture_output_dir)
+                 self._update_texture_dir_status()
+        except Exception as e:
+             messagebox.showerror(get_text("export.error", "Error"), f"Failed to create texture output directory: {e}")
+             return
+
+        # --- Call the Texture Processing Function ---
+        try:
+            # Pass the settings so it uses the correct output dir etc.
+            # This function handles its own progress dialog and completion message.
+            main_window.start_batch_processing(export_settings=settings)
+        except Exception as e:
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed to start texture processing: {e}")
+            import traceback
+            traceback.print_exc()

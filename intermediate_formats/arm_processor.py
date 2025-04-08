@@ -74,57 +74,6 @@ class ARMProcessor:
             "metallic": metallic_texture,
             "source": arm_texture
         }
-    
-    def _extract_ao(self, arm_texture):
-        """
-        Extract AO from the red channel of an ARM texture.
-        
-        Args:
-            arm_texture: ARM texture object
-            
-        Returns:
-            Extracted AO texture object
-        """
-        print(f"Extracting AO from R channel")
-        
-        # Extract the red channel (index 0)
-        ao_texture = self.image_processor.extract_channel(arm_texture, 0)
-        # This method is now replaced by _extract_and_save_channel
-        pass
-    
-    def _extract_roughness(self, arm_texture):
-        """
-        Extract Roughness from the green channel of an ARM texture.
-        
-        Args:
-            arm_texture: ARM texture object
-            
-        Returns:
-            Extracted Roughness texture object
-        """
-        print(f"Extracting Roughness from G channel")
-        
-        # Extract the green channel (index 1)
-        roughness_texture = self.image_processor.extract_channel(arm_texture, 1)
-        # This method is now replaced by _extract_and_save_channel
-        pass 
-    
-    def _extract_metallic(self, arm_texture):
-        """
-        Extract Metallic from the blue channel of an ARM texture.
-        
-        Args:
-            arm_texture: ARM texture object
-            
-        Returns:
-            Extracted Metallic texture object
-        """
-        print(f"Extracting Metallic from B channel")
-        
-        # Extract the blue channel (index 2)
-        metallic_texture = self.image_processor.extract_channel(arm_texture, 2)
-        # This method is now replaced by _extract_and_save_channel
-        pass
         
     def _extract_and_save_channel(self, source_texture_obj, channel_index, output_type, channel_name):
         """
@@ -170,22 +119,16 @@ class ARMProcessor:
             # print(f"ImageMagick STDERR: {result.stderr}") # Can contain warnings
             print(f"Successfully saved intermediate {output_type} to {temp_output_path}")
 
-            # Create a new texture object for the intermediate file
-            # We use PIL here just to get dimensions easily, could use identify too
-            try:
-                 intermediate_img_data = self.image_processor.load_image(str(temp_output_path))
-                 if not intermediate_img_data:
-                      raise ValueError("Failed to load saved intermediate image")
-            except Exception as pil_e:
-                 print(f"Warning: Could not load intermediate {output_type} with PIL: {pil_e}. Using default info.")
-                 intermediate_img_data = {"width": 0, "height": 0, "channels": 1, "mode": "L"}
-
+            # Create a new texture object for the intermediate file, BUT DO NOT LOAD THE IMAGE DATA
+            # We only need the path and potentially dimensions if easily obtainable without loading.
+            # For simplicity, we'll omit dimensions for now, assuming exporters can handle it or get it later.
+            # If dimensions are strictly needed later, we could use `magick identify` in another subprocess.
 
             intermediate_texture = {
                 "path": str(temp_output_path), # CRITICAL: Path to the saved file
-                "image": intermediate_img_data.get("image"), # Keep image in memory if loaded
-                "width": intermediate_img_data.get("width"),
-                "height": intermediate_img_data.get("height"),
+                # "image": None, # Explicitly DO NOT store image data
+                # "width": 0, # Omit or get via identify later if needed
+                # "height": 0, # Omit or get via identify later if needed
                 "channels": 1,
                 "mode": "L",
                 "type": output_type,

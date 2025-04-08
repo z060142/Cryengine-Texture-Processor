@@ -13,8 +13,8 @@ import shutil
 # import atexit   # No longer needed here
 from pathlib import Path
 from utils.image_processing import ImageProcessor # Keep for loading/fallbacks
-# import numpy as np # Not needed for ImageMagick path
-# from PIL import Image # Not needed for ImageMagick path
+import numpy as np # Needed for generate_default_reflection
+from PIL import Image # Needed for generate_default_reflection
 
 # --- Temporary Directory Path Definition ---
 # Define the path, but don't create or manage cleanup here.

@@ -11,9 +11,8 @@ import os
 import subprocess
 import shutil
 # Keep ImageProcessor import for fallback/helper methods if needed later
-from utils.image_processing import ImageProcessor 
-# import numpy as np # Not directly needed for ImageMagick path
-# from PIL import Image, ImageChops # Not directly needed for ImageMagick path
+import numpy as np # Needed for _darker_color_blend fallback
+from PIL import Image, ImageChops # Needed for _darker_color_blend fallback
 
 class DiffExporter:
     """

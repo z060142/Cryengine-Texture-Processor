@@ -9,8 +9,8 @@ visualizing texture processing results.
 
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
-from PIL import Image, ImageTk, ImageOps
+from tkinter import ttk
+from PIL import Image, ImageTk
 
 class PreviewPanel:
     """

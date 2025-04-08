@@ -8,7 +8,7 @@ This module provides a dialog for setting application preferences.
 
 import os
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 from language.language_manager import get_text
 from utils.config_manager import ConfigManager
 

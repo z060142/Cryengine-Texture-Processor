@@ -146,20 +146,15 @@ class GlossinessProcessor:
             result = subprocess.run(command, check=True, capture_output=True, text=True)
             print(f"Successfully created intermediate glossiness: {temp_output_path}")
 
-            # Create result texture object (load info from saved file)
-            try:
-                 intermediate_img_data = self.image_processor.load_image(str(temp_output_path))
-                 if not intermediate_img_data:
-                      raise ValueError("Failed to load saved intermediate glossiness image")
-            except Exception as pil_e:
-                 print(f"Warning: Could not load intermediate glossiness with PIL: {pil_e}. Using default info.")
-                 intermediate_img_data = {"width": 0, "height": 0, "channels": 1, "mode": "L"}
+            # Create result texture object, BUT DO NOT LOAD THE IMAGE DATA
+            # Only return the path and metadata.
+            # Dimensions could be added later if needed, e.g., using `magick identify`.
 
             intermediate_gloss_texture = {
                 "path": str(temp_output_path), # Path to the saved file
-                "image": intermediate_img_data.get("image"), 
-                "width": intermediate_img_data.get("width"),
-                "height": intermediate_img_data.get("height"),
+                # "image": None, # Explicitly DO NOT store image data
+                # "width": 0, # Omit or get via identify later if needed
+                # "height": 0, # Omit or get via identify later if needed
                 "channels": 1,
                 "mode": "L",
                 "type": "glossiness", # Mark as glossiness type
@@ -200,7 +195,7 @@ class GlossinessProcessor:
         Returns:
             Extracted glossiness texture object or None if not applicable
         """
-        print(f"Extracting glossiness from specular texture (using PIL)")
+        print("Extracting glossiness from specular texture (using PIL)")
         
         # Load specular image if needed
         if "image" not in specular_texture:
@@ -222,7 +217,7 @@ class GlossinessProcessor:
         
         # If no alpha channel, we could analyze the specular image to estimate glossiness
         # For now, return None to indicate not applicable
-        print(f"No glossiness information found in specular texture")
+        print("No glossiness information found in specular texture")
         return None
     
     def generate_default_glossiness(self, width=1024, height=1024, value=127):

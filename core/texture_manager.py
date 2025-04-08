@@ -8,7 +8,7 @@ classification, grouping, and processing.
 """
 
 import os
-import re
+import json # Added import
 from .name_parser import TextureNameParser
 
 class TextureGroup:
@@ -165,7 +165,40 @@ class TextureManager:
         self.settings = {
             "process_metallic": True  # Whether to convert metallic to albedo+reflection
         }
-    
+        
+        # --- Load custom suffix patterns ---
+        self._load_custom_suffix_patterns()
+        # --- End Load ---
+        
+    def _load_custom_suffix_patterns(self):
+        """
+        Load custom suffix patterns from the dedicated settings file in the project root.
+        """
+        # Use __file__ to locate the project root directory
+        current_file_dir = os.path.dirname(os.path.abspath(__file__))  # core/ directory
+        project_root = os.path.dirname(current_file_dir)  # Go up one level
+        settings_file = os.path.join(project_root, "suffix_settings.json")
+        
+        print(f"Looking for suffix settings file at: {settings_file}")
+        custom_patterns = {}
+        
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    custom_patterns = json.load(f)
+                
+                # Load the patterns into the name parser
+                self.name_parser.load_patterns(custom_patterns)
+                print(f"Loaded custom suffix patterns from {settings_file}")
+                
+            except Exception as e:
+                print(f"Warning: Failed to load or parse custom suffix settings from {settings_file}: {e}")
+                print("Using default suffix patterns.")
+        else:
+            print("Custom suffix settings file not found. Using default patterns.")
+            # No need to call load_patterns if the file doesn't exist, 
+            # as the parser already loaded defaults in its own __init__.
+
     def classify_texture(self, file_path):
         """
         Classify a texture by its type based on filename.

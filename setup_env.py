@@ -63,10 +63,10 @@ def main():
         # Determine the Python executable in the virtual environment
         if os_name == "Windows":
             python_exe = os.path.join(venv_dir, "Scripts", "python.exe")
-            pip_exe = os.path.join(venv_dir, "Scripts", "pip.exe")
+            # pip_exe = os.path.join(venv_dir, "Scripts", "pip.exe") # Not used
         else:
             python_exe = os.path.join(venv_dir, "bin", "python")
-            pip_exe = os.path.join(venv_dir, "bin", "pip")
+            # pip_exe = os.path.join(venv_dir, "bin", "pip") # Not used
         
         # Upgrade pip
         print("\nUpgrading pip...")

@@ -10,7 +10,6 @@ based on processed texture data and model information.
 import os
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-from language.language_manager import get_text
 
 def _calculate_relative_path(target_path, start_path):
     """
@@ -106,7 +105,16 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
             ET.SubElement(default_mat, "Textures") # Add empty Textures tag
 
         else:
+            # Define materials to ignore
+            ignored_materials = {"Material", "Dots Stroke"} # Use a set for efficient lookup
+
             for mat_info in materials_data:
+                # Check if the material name should be ignored
+                mat_name_check = mat_info.get('name')
+                if mat_name_check in ignored_materials:
+                    print(f"Skipping ignored material: {mat_name_check}") # Optional: Log skipped material
+                    continue # Skip this material
+
                 mat_name = mat_info.get('name', 'UnnamedMaterial')
                 textures = mat_info.get('textures', {})
 
