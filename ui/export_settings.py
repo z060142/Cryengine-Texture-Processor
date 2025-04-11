@@ -39,7 +39,12 @@ class ExportSettingsPanel:
             "generate_missing_spec": True,  # Whether to generate a default spec when missing
             "process_metallic": True,  # Whether to convert metallic to albedo+reflection
             "output_format": "tif",  # Output file format
-            "output_resolution": "original"  # Output resolution
+            "output_resolution": "original",  # Output resolution
+            "delete_after_export": {
+                "tif": False,
+                "fbx": False,
+                "json": True
+            }
         }
         
         # Create frame
@@ -104,8 +109,8 @@ class ExportSettingsPanel:
         model_dir_status_label.pack(side=tk.BOTTOM, fill=tk.X, pady=(5, 0))
         self._update_model_dir_status() # Initial status update
         
-        # Create settings frame
-        settings_frame = ttk.LabelFrame(main_frame, text=get_text("export.settings", "Export Settings"))
+        # Create texture export settings frame
+        settings_frame = ttk.LabelFrame(main_frame, text=get_text("export.settings", "Texture Export Settings"))
         settings_frame.pack(fill=tk.X, padx=5, pady=5)
         
         # Settings content frame with padding
@@ -117,7 +122,8 @@ class ExportSettingsPanel:
         dds_checkbutton = ttk.Checkbutton(
             settings_content,
             text=get_text("export.generate_cry_dds", "Generate CryEngine DDS"),
-            variable=self.generate_dds_var
+            variable=self.generate_dds_var,
+            command=self._update_tif_delete_state
         )
         dds_checkbutton.grid(row=0, column=2, rowspan=1, sticky=tk.W, padx=5, pady=5)
         
@@ -177,7 +183,7 @@ class ExportSettingsPanel:
         
         # Create texture types frame
         types_frame = ttk.LabelFrame(main_frame, text=get_text("export.texture_types", "Output Texture Types"))
-        types_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        types_frame.pack(fill=tk.X, padx=5, pady=5)
         
         # Types content frame with padding
         types_content = ttk.Frame(types_frame, padding=10)
@@ -204,6 +210,58 @@ class ExportSettingsPanel:
                 variable=var
             )
             checkbox.grid(row=i // 3, column=i % 3, sticky=tk.W, padx=10, pady=5)
+        
+        # Create model export settings frame
+        model_settings_frame = ttk.LabelFrame(main_frame, text=get_text("export.model_settings", "Model Export Settings"))
+        model_settings_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Model settings content frame with padding
+        model_settings_content = ttk.Frame(model_settings_frame, padding=10)
+        model_settings_content.pack(fill=tk.X, expand=True)
+        
+        # Model export settings options would go here
+        # For now, we'll just add a placeholder label
+        model_settings_label = ttk.Label(model_settings_content, text=get_text("export.model_settings_note", "Model export settings will be added here."))
+        model_settings_label.pack(padx=5, pady=5)
+        
+        # Create miscellaneous settings frame
+        misc_frame = ttk.LabelFrame(main_frame, text=get_text("export.misc_settings", "Miscellaneous Settings"))
+        misc_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Misc settings content frame with padding
+        misc_content = ttk.Frame(misc_frame, padding=10)
+        misc_content.pack(fill=tk.X, expand=True)
+        
+        # Add "Delete after export" checkboxes
+        delete_label = ttk.Label(misc_content, text=get_text("export.delete_after_export", "Delete after export:"))
+        delete_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        
+        # TIF deletion checkbox
+        self.delete_tif_var = tk.BooleanVar(value=False)
+        self.delete_tif_check = ttk.Checkbutton(
+            misc_content,
+            text="TIF",
+            variable=self.delete_tif_var
+        )
+        self.delete_tif_check.grid(row=0, column=1, sticky=tk.W, padx=5, pady=5)
+        
+        # FBX deletion checkbox
+        self.delete_fbx_var = tk.BooleanVar(value=False)
+        delete_fbx_check = ttk.Checkbutton(
+            misc_content,
+            text="FBX",
+            variable=self.delete_fbx_var
+        )
+        delete_fbx_check.grid(row=0, column=2, sticky=tk.W, padx=5, pady=5)
+        
+        # JSON deletion checkbox (default checked)
+        self.delete_json_var = tk.BooleanVar(value=True)
+        delete_json_check = ttk.Checkbutton(
+            misc_content,
+            text="JSON",
+            variable=self.delete_json_var
+        )
+        delete_json_check.grid(row=0, column=3, sticky=tk.W, padx=5, pady=5)
         
         # Create action buttons frame
         action_frame = ttk.Frame(main_frame)
@@ -247,6 +305,9 @@ class ExportSettingsPanel:
         # Connect output directory entries to update status
         self.texture_output_dir_var.trace_add("write", lambda *args: self._update_texture_dir_status())
         self.model_output_dir_var.trace_add("write", lambda *args: self._update_model_dir_status())
+        
+        # Set initial state of TIF deletion checkbox
+        self._update_tif_delete_state()
 
     def _update_texture_dir_status(self):
         """Update the texture output directory status label."""
@@ -269,6 +330,18 @@ class ExportSettingsPanel:
                 status_var.set(get_text("export.directory_not_writable", "Warning: Directory is not writable!"))
         else:
             status_var.set(get_text("export.directory_not_exist", "Directory does not exist. It will be created when exporting."))
+    
+    def _update_tif_delete_state(self):
+        """Update the TIF deletion checkbox state based on DDS generation state."""
+        if hasattr(self, 'delete_tif_check') and hasattr(self, 'generate_dds_var'):
+            # Enable TIF deletion only when DDS generation is checked
+            dds_enabled = self.generate_dds_var.get()
+            if dds_enabled:
+                self.delete_tif_check.config(state="normal")
+            else:
+                # When DDS is not checked, disable TIF deletion and uncheck it
+                self.delete_tif_check.config(state="disabled")
+                self.delete_tif_var.set(False)
 
     def _select_texture_output_dir(self):
         """Open file dialog to select texture output directory."""
@@ -299,6 +372,7 @@ class ExportSettingsPanel:
     def _on_batch_process(self):
         """
         Handler for Batch Process button. Orchestrates texture export then model export.
+        現在會執行完整的導出工作流程，包括紋理導出、MTL文件生成，以及FBX文件導出。
         """
         print("Starting Batch Process...")
         settings = self.get_settings()
@@ -318,7 +392,7 @@ class ExportSettingsPanel:
         if not main_window:
              messagebox.showerror(get_text("export.error", "Error"), "Cannot access main application window.")
              return
-        if not hasattr(main_window, "start_batch_processing") or not hasattr(main_window, "run_model_mtl_export"):
+        if not hasattr(main_window, "start_batch_processing") or not hasattr(main_window, "run_model_mtl_export") or not hasattr(main_window, "run_model_fbx_export"):
              messagebox.showerror(get_text("export.error", "Error"), "Required export functions not found in main application.")
              return
 
@@ -331,6 +405,22 @@ class ExportSettingsPanel:
         except Exception as e:
             messagebox.showerror(get_text("export.error", "Error"), f"Failed to create output directories: {e}")
             return
+            
+        # --- 記錄導出前目錄中的檔案 ---
+        existing_texture_files = set()
+        existing_model_files = set()
+        
+        # 記錄現有的TIF檔案
+        if os.path.exists(texture_output_dir):
+            for filename in os.listdir(texture_output_dir):
+                if filename.lower().endswith(".tif"):
+                    existing_texture_files.add(filename)
+        
+        # 記錄現有的FBX和JSON檔案
+        if os.path.exists(model_output_dir):
+            for filename in os.listdir(model_output_dir):
+                if filename.lower().endswith(".fbx") or filename.lower().endswith(".json"):
+                    existing_model_files.add(filename)
 
         # --- Create Progress Dialog ---
         # Note: start_batch_processing and run_model_mtl_export now create their own dialogs internally.
@@ -371,7 +461,22 @@ class ExportSettingsPanel:
             mtl_exported_count, mtl_error_count, mtl_error_messages = main_window.run_model_mtl_export(settings=settings)
             print(f"Batch Process: MTL export finished. Exported: {mtl_exported_count}, Errors: {mtl_error_count}")
         except Exception as e:
-            messagebox.showerror(get_text("export.error", "Error"), f"Failed during model export stage: {e}")
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed during MTL export stage: {e}")
+            import traceback
+            traceback.print_exc()
+            # Continue to show summary even if this stage fails
+        
+        # --- Stage 3: Export Models (FBX) ---
+        print("Batch Process - Stage 3: Exporting Models (FBX)...")
+        fbx_exported_count = 0
+        fbx_error_count = 0
+        fbx_error_messages = []
+        try:
+            # This will show its own progress dialog
+            fbx_exported_count, fbx_error_count, fbx_error_messages = main_window.run_model_fbx_export(settings=settings)
+            print(f"Batch Process: FBX export finished. Exported: {fbx_exported_count}, Errors: {fbx_error_count}")
+        except Exception as e:
+            messagebox.showerror(get_text("export.error", "Error"), f"Failed during FBX export stage: {e}")
             import traceback
             traceback.print_exc()
             # Continue to show summary even if this stage fails
@@ -379,17 +484,58 @@ class ExportSettingsPanel:
         # --- Final Summary ---
         summary_title = get_text("export.batch_process", "Batch Process")
         final_message = "Batch process finished.\n\n"
-        final_message += f"Texture Export Stage: {'Success' if texture_export_success else 'Failed/Cancelled'}\n"
+        final_message += f"Texture Export: {'Success' if texture_export_success else 'Failed/Cancelled'}\n"
         final_message += f"MTL Files Exported: {mtl_exported_count}\n"
-        final_message += f"MTL Export Errors: {mtl_error_count}"
+        final_message += f"FBX Files Exported: {fbx_exported_count}\n"
+        final_message += f"MTL Export Errors: {mtl_error_count}\n"
+        final_message += f"FBX Export Errors: {fbx_error_count}"
 
+        # 整合所有錯誤訊息
+        all_errors = []
         if mtl_error_count > 0:
-             final_message += "\n\nMTL Errors:\n" + "\n".join(mtl_error_messages)
+            all_errors.extend([f"MTL: {msg}" for msg in mtl_error_messages[:5]])
+            if len(mtl_error_messages) > 5:
+                all_errors.append(f"... and {len(mtl_error_messages) - 5} more MTL errors")
+                
+        if fbx_error_count > 0:
+            all_errors.extend([f"FBX: {msg}" for msg in fbx_error_messages[:5]])
+            if len(fbx_error_messages) > 5:
+                all_errors.append(f"... and {len(fbx_error_messages) - 5} more FBX errors")
+                
+        if all_errors:
+            final_message += "\n\nErrors:\n" + "\n".join(all_errors)
 
-        if not texture_export_success or mtl_error_count > 0:
-             messagebox.showwarning(summary_title, final_message)
+        if not texture_export_success or mtl_error_count > 0 or fbx_error_count > 0:
+            messagebox.showwarning(summary_title, final_message)
         else:
-             messagebox.showinfo(summary_title, final_message)
+            messagebox.showinfo(summary_title, final_message)
+            
+        # --- 找出本次操作生成的新檔案 ---
+        new_texture_files = set()
+        new_model_files = set()
+        
+        # 檢查新生成的TIF檔案
+        if os.path.exists(texture_output_dir):
+            for filename in os.listdir(texture_output_dir):
+                if filename.lower().endswith(".tif") and filename not in existing_texture_files:
+                    new_texture_files.add(filename)
+        
+        # 檢查新生成的FBX和JSON檔案
+        if os.path.exists(model_output_dir):
+            for filename in os.listdir(model_output_dir):
+                if filename.lower().endswith((".fbx", ".json")) and filename not in existing_model_files:
+                    new_model_files.add(filename)
+                    
+        print(f"Found {len(new_texture_files)} new TIF files and {len(new_model_files)} new model files")
+        
+        # 設置臨時屬性，將本次生成的檔案傳遞給清理函數
+        self._new_generated_files = {
+            "texture": new_texture_files,
+            "model": new_model_files
+        }
+        
+        # 如果設置了刪除選項，處理最終的文件清理
+        self._process_post_export_cleanup(settings)
 
     def _on_export_model(self):
         """
@@ -434,6 +580,15 @@ class ExportSettingsPanel:
             messagebox.showerror(get_text("export.error", "Error"), 
                                 f"Failed to create model output directory: {e}")
             return
+            
+        # --- 記錄導出前目錄中的檔案 ---
+        existing_model_files = set()
+        
+        # 記錄現有的FBX和JSON檔案
+        if os.path.exists(model_output_dir):
+            for filename in os.listdir(model_output_dir):
+                if filename.lower().endswith((".fbx", ".json")):
+                    existing_model_files.add(filename)
 
         # --- Create Progress Dialog ---
         progress_dialog = ProgressDialog(
@@ -487,13 +642,25 @@ class ExportSettingsPanel:
         total_exported = mtl_exported + fbx_exported
         total_errors = mtl_errors + fbx_errors
         
-        summary_title = get_text("export.export_complete", "Export Complete")
-        summary_message = get_text("export.summary", "Export Summary:") + "\n\n"
-        summary_message += get_text("export.mtl_files", "MTL Files:") + f" {mtl_exported}" + "\n"
-        summary_message += get_text("export.fbx_models", "FBX Models:") + f" {fbx_exported}" + "\n"
+        # --- 找出本次操作生成的新檔案 ---
+        new_model_files = set()
         
+        # 檢查新生成的FBX和JSON檔案
+        if os.path.exists(model_output_dir):
+            for filename in os.listdir(model_output_dir):
+                if filename.lower().endswith((".fbx", ".json")) and filename not in existing_model_files:
+                    new_model_files.add(filename)
+                    
+        print(f"Found {len(new_model_files)} new model files")
+        
+        # 只有当有錯誤時才顯示訊息如
         if total_errors > 0:
+            summary_title = get_text("export.export_complete", "Export Complete")
+            summary_message = get_text("export.summary", "Export Summary:") + "\n\n"
+            summary_message += get_text("export.mtl_files", "MTL Files:") + f" {mtl_exported}" + "\n"
+            summary_message += get_text("export.fbx_models", "FBX Models:") + f" {fbx_exported}" + "\n"
             summary_message += "\n" + get_text("export.errors", "Errors:") + f" {total_errors}" + "\n"
+            
             if mtl_error_msgs:
                 summary_message += "\n" + get_text("export.mtl_errors", "MTL Errors:") + "\n"
                 # Limit to first 5 errors to avoid very large message boxes
@@ -510,11 +677,17 @@ class ExportSettingsPanel:
                 if len(fbx_error_msgs) > 5:
                     summary_message += f"  (+ {len(fbx_error_msgs) - 5} more errors)\n"
                     
-            # Show warning if there were errors
+            # 只有当有錯誤時才顯示訊息如
             messagebox.showwarning(summary_title, summary_message)
-        else:
-            # Show information if everything succeeded
-            messagebox.showinfo(summary_title, summary_message)
+            
+        # 設置臨時屬性，將本次生成的檔案傳遞給清理函數
+        self._new_generated_files = {
+            "texture": set(),  # 沒有生成新的紋理檔案
+            "model": new_model_files
+        }
+        
+        # 如果設置了刪除選項，處理最終的文件清理
+        self._process_post_export_cleanup(settings)
 
     def _save_settings(self):
         """
@@ -556,6 +729,13 @@ class ExportSettingsPanel:
         self.settings["output_resolution"] = self.resolution_var.get()
         self.settings["generate_cry_dds"] = self.generate_dds_var.get()
         
+        # Update delete after export settings
+        if not "delete_after_export" in self.settings:
+            self.settings["delete_after_export"] = {}
+        self.settings["delete_after_export"]["tif"] = self.delete_tif_var.get()
+        self.settings["delete_after_export"]["fbx"] = self.delete_fbx_var.get()
+        self.settings["delete_after_export"]["json"] = self.delete_json_var.get()
+        
         # Add enabled texture types
         texture_types = {}
         for type_key, var in self.type_vars.items():
@@ -592,6 +772,19 @@ class ExportSettingsPanel:
         self.format_var.set(self.settings["output_format"])
         self.resolution_var.set(self.settings["output_resolution"])
         self.generate_dds_var.set(self.settings.get("generate_cry_dds", False))
+        
+        # Update delete after export settings if available
+        if "delete_after_export" in self.settings:
+            delete_settings = self.settings["delete_after_export"]
+            if "tif" in delete_settings:
+                self.delete_tif_var.set(delete_settings["tif"])
+            if "fbx" in delete_settings:
+                self.delete_fbx_var.set(delete_settings["fbx"])
+            if "json" in delete_settings:
+                self.delete_json_var.set(delete_settings["json"])
+        
+        # Update TIF deletion checkbox state
+        self._update_tif_delete_state()
 
         # Update directory statuses
         self._update_texture_dir_status()
@@ -625,6 +818,15 @@ class ExportSettingsPanel:
              messagebox.showerror(get_text("export.error", "Error"), "Texture processing function not found in main application.")
              return
 
+        # --- 記錄導出前目錄中的檔案 ---
+        existing_texture_files = set()
+        
+        # 記錄現有的TIF檔案
+        if os.path.exists(texture_output_dir):
+            for filename in os.listdir(texture_output_dir):
+                if filename.lower().endswith(".tif"):
+                    existing_texture_files.add(filename)
+
         # --- Ensure Texture Output Directory Exists ---
         try:
             if not os.path.exists(texture_output_dir):
@@ -644,3 +846,119 @@ class ExportSettingsPanel:
             messagebox.showerror(get_text("export.error", "Error"), f"Failed to start texture processing: {e}")
             import traceback
             traceback.print_exc()
+            return
+            
+        # --- 找出本次操作生成的新檔案 ---
+        new_texture_files = set()
+        
+        # 檢查新生成的TIF檔案
+        if os.path.exists(texture_output_dir):
+            for filename in os.listdir(texture_output_dir):
+                if filename.lower().endswith(".tif") and filename not in existing_texture_files:
+                    new_texture_files.add(filename)
+                    
+        print(f"Found {len(new_texture_files)} new TIF files")
+        
+        # 設置臨時屬性，將本次生成的檔案傳遞給清理函數
+        self._new_generated_files = {
+            "texture": new_texture_files,
+            "model": set()  # 沒有生成新的模型檔案
+        }
+        
+        # 如果設置了刪除選項，處理最終的文件清理
+        self._process_post_export_cleanup(settings)
+            
+    def _process_post_export_cleanup(self, settings):
+        """
+        處理導出後的文件清理，根據設置中的刪除選項刪除相應文件。
+        只刪除本次操作生成的檔案，不會影響之前已存在的檔案。
+        
+        Args:
+            settings (dict): 導出設置字典
+        """
+        # 目錄路徑
+        texture_output_dir = settings.get("texture_output_directory")
+        model_output_dir = settings.get("model_output_directory")
+        
+        # 確保刪除設置存在
+        if not "delete_after_export" in settings:
+            return
+            
+        # 確保我們知道哪些是新生成的檔案
+        if not hasattr(self, "_new_generated_files"):
+            print("No new generated files to clean up")
+            return
+            
+        delete_settings = settings["delete_after_export"]
+        new_files = self._new_generated_files
+        
+        # 累計刪除列表
+        deleted_files = []
+        failed_files = []
+        
+        # 處理TIF刪除 - 只刪除新生成的TIF檔案
+        if delete_settings.get("tif", False) and settings.get("generate_cry_dds", False):
+            for filename in new_files.get("texture", set()):
+                if filename.lower().endswith(".tif"):
+                    try:
+                        file_path = os.path.join(texture_output_dir, filename)
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(f"TIF: {filename}")
+                    except Exception as e:
+                        failed_files.append(f"TIF: {filename} - {str(e)}")
+                        print(f"Error deleting TIF file {filename}: {e}")
+        
+        # 處理FBX刪除 - 只刪除新生成的FBX檔案
+        if delete_settings.get("fbx", False):
+            for filename in new_files.get("model", set()):
+                if filename.lower().endswith(".fbx"):
+                    try:
+                        file_path = os.path.join(model_output_dir, filename)
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(f"FBX: {filename}")
+                    except Exception as e:
+                        failed_files.append(f"FBX: {filename} - {str(e)}")
+                        print(f"Error deleting FBX file {filename}: {e}")
+        
+        # 處理JSON刪除 - 只刪除新生成的JSON檔案
+        if delete_settings.get("json", True):  # JSON預設刪除
+            for filename in new_files.get("model", set()):
+                if filename.lower().endswith(".json"):
+                    try:
+                        file_path = os.path.join(model_output_dir, filename)
+                        if os.path.exists(file_path):
+                            os.remove(file_path)
+                            deleted_files.append(f"JSON: {filename}")
+                    except Exception as e:
+                        failed_files.append(f"JSON: {filename} - {str(e)}")
+                        print(f"Error deleting JSON file {filename}: {e}")
+        
+        # 清理臨時屬性
+        if hasattr(self, "_new_generated_files"):
+            delattr(self, "_new_generated_files")
+        
+        # 顯示儀要的刪除結果消息
+        if deleted_files:
+            total_deleted = len(deleted_files)
+            message = f"已成功刪除 {total_deleted} 個文件"
+            
+            # 當有太多文件時，只顯示前幾個
+            if len(deleted_files) > 5:
+                files_preview = "\n".join(deleted_files[:5])
+                message += f"\n\n包括: {files_preview}\n... 及其他 {len(deleted_files) - 5} 個文件"
+            else:
+                message += "\n\n" + "\n".join(deleted_files)
+                
+            # 顯示失敗的刪除
+            if failed_files:
+                message += f"\n\n有 {len(failed_files)} 個文件無法刪除:\n"
+                if len(failed_files) > 3:
+                    message += "\n".join(failed_files[:3])
+                    message += f"\n... 及其他 {len(failed_files) - 3} 個文件"
+                else:
+                    message += "\n".join(failed_files)
+                    
+            print(message)
+            # 刪除顯示清理結果的訊息對話框

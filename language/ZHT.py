@@ -118,7 +118,14 @@ LANGUAGE_DICT = {
         "model_export_not_implemented": "模型匯出（包含 MTL 生成）已規劃但尚未完全實作。選取的模型目錄：{0}", # 新增
         "no_model_dir": "請先選取模型輸出目錄。", # 新增警告
         "not_implemented": "尚未實作", # 新增通用鍵
-        "batch_not_available": "批次處理尚不可用。" # 新增鍵
+        "batch_not_available": "批次處理尚不可用。", # 新增鍵
+        "settings": "貼圖輸出設定", # 更改為「貼圖輸出設定」
+        "model_settings": "模型輸出設定", # 新增
+        "model_settings_note": "模型輸出設定將在此處添加。", # 新增
+        "misc_settings": "雜項設定", # 新增
+        "delete_after_export": "導出後刪除:", # 新增
+        "cleanup_title": "清理結果", # 新增
+        "batch_process": "批次處理" # 新增
     },
     "suffix_settings": {
         "title": "貼圖後綴設定",

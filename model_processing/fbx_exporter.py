@@ -30,8 +30,8 @@ class FbxExporter:
             self.initialized = True
             print(f"Successfully imported bpy (Blender Python API) version {bpy.app.version_string}")
             
-            # Delete default cube when initializing
-            self._delete_default_cube()
+            # Reset scene to factory settings
+            self._reset_scene()
                 
         except ImportError as e:
             print(f"WARNING: bpy (Blender Python API) is not available: {e}")
@@ -42,33 +42,46 @@ class FbxExporter:
             import traceback
             traceback.print_exc()
             
-    def _delete_default_cube(self):
+    def _reset_scene(self):
         """
-        Delete the default cube that is created in new Blender scenes.
-        This ensures a clean scene for imported models.
+        Clear existing objects, materials and images from the Blender scene.
+        Uses a more conservative approach to avoid crashes.
         """
         if not self.initialized:
             return
             
         bpy = self.bpy
-        
-        # Find objects named "Cube" and delete them
-        default_objects = [obj for obj in bpy.data.objects if obj.name.lower() == "cube"]
-        
-        if default_objects:
-            print(f"Deleting {len(default_objects)} default cube object(s) from the scene")
-            
-            # Select all default objects
-            for obj in bpy.context.selected_objects:
-                obj.select_set(False)  # Deselect everything first
-                
-            for obj in default_objects:
-                obj.select_set(True)  # Select the default object
-                
-            # Delete selected objects
+        try:
+            # 取消所有選擇
+            bpy.ops.object.select_all(action='DESELECT')
+
+            # 清除所有物體 - 先選擇所有物體
+            bpy.ops.object.select_all(action='SELECT')
             bpy.ops.object.delete()
-        else:
-            print("No default cube found in the scene")
+
+            # 清除未使用的材質
+            for material in list(bpy.data.materials):
+                if not material.users:
+                    bpy.data.materials.remove(material)
+
+            # 清除未使用的圖像
+            for image in list(bpy.data.images):
+                if not image.users:
+                    bpy.data.images.remove(image)
+
+            # 清除未使用的材質節點樹
+            for node_group in list(bpy.data.node_groups):
+                if not node_group.users:
+                    bpy.data.node_groups.remove(node_group)
+
+            # 確保場景確實空
+            if len(bpy.data.objects) > 0:
+                print(f"Warning: After cleanup, still found {len(bpy.data.objects)} objects.")
+
+            print("Scene cleanup complete")
+            
+        except Exception as e:
+            print(f"Error during scene cleanup: {e}")
     
     def export(self, model, output_path, texture_dir=None, texture_data=None):
         """

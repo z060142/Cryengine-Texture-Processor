@@ -22,6 +22,9 @@ from core.batch_processor import BatchProcessor
 from utils.dds_processor import DDSProcessor
 from model_processing.texture_extractor import TextureExtractor # Needed for MTL export
 from output_formats.mtl_exporter import export_mtl # Needed for MTL export
+from output_formats.json_exporter import export_json # Added for JSON export
+from utils.rc_processor import RCProcessor # Added for CGF generation
+from utils.thumbnail_generator import generate_thumbnail # Added for thumbnail generation
 
 def main():
     """
@@ -390,8 +393,8 @@ def main():
         # Update progress dialog if provided
         if progress_dialog:
             if hasattr(progress_dialog, 'update_stage'):
-                progress_dialog.update_stage("Exporting Models (FBX)")
-            progress_dialog.update_progress(0.0, "Starting FBX export...", f"Found {total_models} models")
+                progress_dialog.update_stage("Exporting Models (FBX & JSON)")
+            progress_dialog.update_progress(0.0, "Starting model export...", f"Found {total_models} models")
             
         for i, model_info in enumerate(all_imported_models):
             # Check for cancellation
@@ -546,9 +549,55 @@ def main():
                     texture_data=materials_texture_data
                 )
                 
+                # 導出JSON配置文件
+                print(f"Exporting JSON configuration for {model_filename}")
+                # 添加診斷輸出，顯示節點結構
+                if "scene_hierarchy" in reloaded_model:
+                    hierarchy_node_count = len(reloaded_model["scene_hierarchy"])
+                    print(f"  - Found scene hierarchy with {hierarchy_node_count} top-level nodes")
+                    
+                json_success, json_result = export_json(
+                    reloaded_model,
+                    model_filename,
+                    model_output_dir,
+                    texture_output_dir
+                )
+                
+                if not json_success:
+                    print(f"Warning: Failed to export JSON for {model_filename}: {json_result}")
+                    # Don't count as an export failure, just log it
+                else:
+                    print(f"Successfully exported JSON configuration: {json_result}")
+                    # --- Start RC Processing ---
+                    print(f"Initiating RC processing for: {json_result}")
+                    rc_processor = RCProcessor()
+                    # We don't need to wait for it, it runs in the background
+                    rc_processor.process_json_file(json_result) 
+                    # Note: Progress updates for RC are handled internally by RCProcessor if a callback is set,
+                    # but we are not setting one here to keep the main export flow simple.
+                    # Consider adding progress integration later if needed.
+                    
                 if result:
                     exported_count += 1
                     print(f"Successfully exported FBX: {fbx_output_path}")
+                    
+                    # --- Generate Thumbnail ---
+                    thumbnail_filename = f"{base_filename}.cgf.thmb.png"
+                    thumbnail_output_path = os.path.join(model_output_dir, thumbnail_filename)
+                    print(f"Attempting to generate thumbnail: {thumbnail_filename}")
+                    try:
+                        thumb_success = generate_thumbnail(fbx_output_path, thumbnail_output_path)
+                        if thumb_success:
+                            print(f"Successfully generated thumbnail: {thumbnail_output_path}")
+                        else:
+                            print(f"Warning: Thumbnail generation failed for {model_filename}")
+                            # Optionally add to error messages, but don't count as export failure
+                            # error_messages.append(f"Thumbnail generation failed for {model_filename}")
+                    except Exception as thumb_e:
+                        print(f"Error during thumbnail generation call for {model_filename}: {thumb_e}")
+                        traceback.print_exc()
+                        # error_messages.append(f"Thumbnail generation error for {model_filename}: {thumb_e}")
+                        
                 else:
                     error_count += 1
                     error_msg = f"Failed to export FBX for {model_filename}"
@@ -565,11 +614,11 @@ def main():
         # 最終進度更新
         if progress_dialog:
             final_progress = 1.0 if not progress_dialog.is_cancelled() else current_progress
-            final_message = "FBX export complete" if not progress_dialog.is_cancelled() else "FBX export cancelled"
+            final_message = "Model export complete" if not progress_dialog.is_cancelled() else "Model export cancelled"
             progress_dialog.update_progress(
                 final_progress, 
                 final_message, 
-                f"Exported: {exported_count}, Errors: {error_count}"
+                f"Exported: {exported_count} (FBX+JSON), Errors: {error_count}"
             )
         
         return exported_count, error_count, error_messages
@@ -624,8 +673,8 @@ def main():
         # Update progress dialog if provided
         if progress_dialog:
              if hasattr(progress_dialog, 'update_stage'):
-                 progress_dialog.update_stage("Exporting Models (MTL)")
-             progress_dialog.update_progress(0.0, "Starting MTL export...", f"Found {total_models} models")
+                 progress_dialog.update_stage("Exporting Models (MTL & JSON)")
+             progress_dialog.update_progress(0.0, "Starting model export...", f"Found {total_models} models")
 
         for i, model_info in enumerate(all_imported_models):
             # Check for cancellation
@@ -740,6 +789,7 @@ def main():
                 if success:
                     exported_count += 1
                     print(f"Successfully exported MTL: {result_path_or_msg}")
+                    # JSON export removed from MTL flow as requested
                 else:
                     error_count += 1
                     error_messages.append(f"{model_filename}: {result_path_or_msg}")
@@ -754,8 +804,8 @@ def main():
         # Final progress update
         if progress_dialog:
              final_progress = 1.0 if not progress_dialog.is_cancelled() else current_progress
-             final_message = "MTL export complete" if not progress_dialog.is_cancelled() else "MTL export cancelled"
-             progress_dialog.update_progress(final_progress, final_message, f"Exported: {exported_count}, Errors: {error_count}")
+             final_message = "Model export complete" if not progress_dialog.is_cancelled() else "Model export cancelled"
+             progress_dialog.update_progress(final_progress, final_message, f"Exported: {exported_count} (MTL+JSON), Errors: {error_count}")
              # Don't close the dialog here, let the caller handle it
 
         return exported_count, error_count, error_messages

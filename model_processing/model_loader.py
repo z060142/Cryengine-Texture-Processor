@@ -135,7 +135,8 @@ class ModelLoader:
                 "path": file_path,
                 "filename": os.path.basename(file_path),
                 "materials": self._extract_materials(),
-                "meshes": self._extract_meshes()
+                "meshes": self._extract_meshes(),
+                "scene_hierarchy": self._extract_scene_hierarchy()  # 添加場景層次結構
             }
             
             return model
@@ -146,29 +147,46 @@ class ModelLoader:
     
     def _clear_scene(self):
         """
-        Clear existing objects from the Blender scene.
-        Explicitly ensures the default cube is removed.
+        Clear existing objects, materials and images from the Blender scene.
+        Uses a more conservative approach than factory reset to avoid crashing.
         """
         if not self.bpy:
             return
             
-        # Deselect all objects first
-        self.bpy.ops.object.select_all(action='DESELECT')
-        
-        # First, explicitly check for and delete the default cube
-        default_cube = [obj for obj in self.bpy.data.objects if obj.name.lower() == "cube"]
-        if default_cube:
-            print(f"Removing default cube from scene")
-            for obj in default_cube:
-                obj.select_set(True)
-            self.bpy.ops.object.delete()
+        try:
+            bpy = self.bpy
+
+            # 取消所有選擇
+            bpy.ops.object.select_all(action='DESELECT')
+
+            # 清除所有物體 - 先選擇所有物體
+            bpy.ops.object.select_all(action='SELECT')
+            bpy.ops.object.delete()
+
+            # 清除未使用的材質
+            for material in list(bpy.data.materials):
+                if not material.users:
+                    bpy.data.materials.remove(material)
+
+            # 清除未使用的圖像
+            for image in list(bpy.data.images):
+                if not image.users:
+                    bpy.data.images.remove(image)
+
+            # 清除未使用的材質節點樹
+            for node_group in list(bpy.data.node_groups):
+                if not node_group.users:
+                    bpy.data.node_groups.remove(node_group)
+
+            # 確保場景確實空
+            if len(bpy.data.objects) > 0:
+                print(f"Warning: After cleanup, still found {len(bpy.data.objects)} objects.")
+
+            print("Scene cleanup complete")
             
-            # Deselect again after cube deletion
-            self.bpy.ops.object.select_all(action='DESELECT')
-            
-        # Then select and delete all remaining objects
-        self.bpy.ops.object.select_all(action='SELECT')
-        self.bpy.ops.object.delete()
+        except Exception as e:
+            print(f"Error during scene cleanup: {e}")
+            # 不執行備份清理方法，避免重複錯誤
     
     def _extract_materials(self):
         """
@@ -217,6 +235,41 @@ class ModelLoader:
                 meshes.append(mesh_data)
                 
         return meshes
+        
+    def _extract_scene_hierarchy(self):
+        """
+        Extract the hierarchy of objects from the Blender scene.
+        
+        Returns:
+            List of node dictionaries representing the scene hierarchy
+        """
+        if not self.bpy:
+            return []
+            
+        # Get top-level objects (objects without parents)
+        top_level_objects = [obj for obj in self.bpy.data.objects if obj.parent is None]
+        
+        # Function to recursively extract child hierarchy
+        def extract_children(obj):
+            children = []
+            for child in obj.children:
+                child_dict = {
+                    "name": child.name,
+                    "children": extract_children(child)
+                }
+                children.append(child_dict)
+            return children
+        
+        # Start with top-level objects
+        hierarchy = []
+        for obj in top_level_objects:
+            obj_dict = {
+                "name": obj.name,
+                "children": extract_children(obj)
+            }
+            hierarchy.append(obj_dict)
+        
+        return hierarchy
     
     def _create_model_for_texture_extraction(self, file_path):
         """
