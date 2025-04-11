@@ -33,6 +33,7 @@ class MainWindow:
         """
         self.root = root
         self.root.title(get_text("app.title", "CryEngine Texture Processor"))
+        self.root.iconbitmap('main.ico') # 設定程式圖標
         
         # Create menu
         self._create_menu()
