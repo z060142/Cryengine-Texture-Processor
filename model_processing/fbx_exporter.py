@@ -9,7 +9,71 @@ This module provides functionality for exporting models to FBX format using Blen
 import os
 import sys
 import traceback
-from pathlib import Path
+
+
+DIFFUSE_TEXTURE_KEYS = ("diff", "diffuse", "albedo")
+
+
+def resolve_texture_output_dir(fbx_output_path, texture_dir=None):
+    """
+    Resolve the texture output directory used by FBX material paths.
+
+    `texture_dir` may be absolute or relative. Relative paths are anchored to
+    the FBX output directory, matching how the normal model export calls this
+    exporter with texture_dir="textures".
+    """
+    fbx_dir = os.path.dirname(os.path.abspath(fbx_output_path))
+    if not texture_dir:
+        return os.path.join(fbx_dir, "textures")
+
+    texture_dir = os.fspath(texture_dir)
+    if os.path.isabs(texture_dir):
+        return os.path.abspath(texture_dir)
+    return os.path.abspath(os.path.join(fbx_dir, texture_dir))
+
+
+def select_diffuse_texture_path(material_name, texture_data):
+    """
+    Return the processed diffuse texture path for a material, if one is known.
+
+    The current texture resolver emits CryEngine-style keys such as `diff`;
+    older call sites may still provide `diffuse` or `albedo`.
+    """
+    if not texture_data:
+        return None
+
+    material_textures = texture_data.get(material_name)
+    if not isinstance(material_textures, dict):
+        return None
+
+    for texture_key in DIFFUSE_TEXTURE_KEYS:
+        texture_path = material_textures.get(texture_key)
+        if isinstance(texture_path, str) and texture_path:
+            return texture_path
+    return None
+
+
+def relative_blender_texture_path(fbx_output_path, texture_path):
+    """
+    Build a Blender/FBX-friendly relative path from the FBX directory.
+
+    Falls back to a normalized absolute path when Windows cannot calculate a
+    relative path, for example across different drives.
+    """
+    fbx_dir = os.path.dirname(os.path.abspath(fbx_output_path))
+    texture_path = os.path.abspath(os.fspath(texture_path))
+    try:
+        relative_path = os.path.relpath(texture_path, start=fbx_dir)
+    except ValueError:
+        relative_path = texture_path
+    return relative_path.replace("\\", "/")
+
+
+def fallback_diffuse_texture_path(material_name, texture_output_dir):
+    """Compatibility fallback for exports that do not have resolved texture data."""
+    base_name_for_texture = material_name.split(".")[0]
+    return os.path.join(texture_output_dir, f"{base_name_for_texture}_diff.tif")
+
 
 class FbxExporter:
     """
@@ -91,8 +155,8 @@ class FbxExporter:
             model: Model object to export
             output_path: Path to save the FBX file
             texture_dir: Directory where textures are saved, relative to model
-            texture_data: Dictionary mapping texture types to their absolute paths
-                          e.g. {'diff': 'path/to/diff.dds', 'ddna': 'path/to/ddna.dds'}
+            texture_data: Dictionary mapping material names to processed texture
+                          paths, e.g. {'Body': {'diff': 'path/to/Body_diff.tif'}}
             
         Returns:
             Path to the exported FBX file or None if export failed
@@ -122,10 +186,8 @@ class FbxExporter:
             # Ensure output directory exists
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            # *** Setup materials with relative paths for export ***
-            # Assuming texture_dir is the absolute path where textures will be saved
-            absolute_texture_dir = texture_dir if texture_dir else os.path.join(os.path.dirname(output_path), 'textures') # Default guess if not provided
             absolute_output_path = os.path.abspath(output_path)
+            absolute_texture_dir = resolve_texture_output_dir(absolute_output_path, texture_dir)
 
             # Pass texture_data to the setup function
             self._setup_materials_for_export(absolute_output_path, absolute_texture_dir, texture_data)
@@ -175,13 +237,13 @@ class FbxExporter:
     def _setup_materials_for_export(self, fbx_output_path, texture_output_dir, texture_data):
         """
         Clears existing material nodes and creates a simple setup assigning
-        a relative path to a hypothetical '_diff.tif' texture based on material name.
+        a relative diffuse texture path for export.
 
         Args:
             fbx_output_path (str): Absolute path where the FBX file will be saved.
             texture_output_dir (str): Absolute path to the directory where textures are expected.
             texture_data (dict, optional): Maps material names to dicts of
-                                            {texture_type: original_absolute_path}.
+                                            {texture_type: processed_absolute_path}.
                                             See `export` method docstring for details.
         """
         if not self.initialized:
@@ -224,65 +286,17 @@ class FbxExporter:
             # Link BSDF to output
             links.new(bsdf_node.outputs['BSDF'], output_node.inputs['Surface'])
 
-            # --- Diffuse Texture Setup ---
-            # Determine the base name for the output texture file
-            base_name_for_texture = material.name.split('.')[0] # Default/fallback: use material name
-            original_diffuse_path = None
-
-            # Use the correct parameter name 'texture_data' here
-            if texture_data and material.name in texture_data:
-                mat_info = texture_data[material.name]
-                # Prioritize 'diffuse', then 'albedo'
-                if 'diffuse' in mat_info and isinstance(mat_info['diffuse'], str):
-                    original_diffuse_path = mat_info['diffuse']
-                elif 'albedo' in mat_info and isinstance(mat_info['albedo'], str):
-                    original_diffuse_path = mat_info['albedo']
-
-                if original_diffuse_path:
-                    try:
-                        # Extract base name from the original file path
-                        original_filename = os.path.basename(original_diffuse_path)
-                        # Attempt to remove known suffixes to get a cleaner base name
-                        # This part might need refinement based on actual naming conventions used
-                        # For now, just remove the extension
-                        base_name_for_texture = os.path.splitext(original_filename)[0]
-                        # Further cleaning (optional): remove common suffixes like _albedo, _diffuse, _d etc.
-                        # This requires knowledge of the NameParser logic or passing it in.
-                        # Simple example:
-                        suffixes_to_remove = ['_albedo', '_diffuse', '_d', '_basecolor', '_color']
-                        temp_name = base_name_for_texture.lower()
-                        for suffix in suffixes_to_remove:
-                            if temp_name.endswith(suffix):
-                                base_name_for_texture = base_name_for_texture[:-len(suffix)]
-                                break # Remove only one suffix
-                        print(f"  Using base name from original texture '{original_filename}': {base_name_for_texture}")
-                    except Exception as e:
-                        print(f"  Error processing original path '{original_diffuse_path}': {e}. Falling back to material name.")
-                        base_name_for_texture = material.name.split('.')[0]
-                else:
-                    print(f"  No diffuse/albedo found in texture data for {material.name}. Using material name as base.")
+            selected_diffuse_path = select_diffuse_texture_path(material.name, texture_data)
+            if selected_diffuse_path:
+                absolute_diff_texture_path = selected_diffuse_path
+                print(f"  Using processed diffuse texture: {absolute_diff_texture_path}")
             else:
-                 # Also correct the variable name in this print statement
-                 print(f"  Material '{material.name}' not found in texture data or data not provided. Using material name as base.")
-
-
-            # Construct the expected output texture filename
-            diff_texture_filename = f"{base_name_for_texture}_diff.tif"
-            absolute_diff_texture_path = os.path.join(texture_output_dir, diff_texture_filename)
+                absolute_diff_texture_path = fallback_diffuse_texture_path(material.name, texture_output_dir)
+                print(f"  No processed diffuse texture found for {material.name}. Using fallback path.")
 
             # Calculate the relative path from the FBX directory to the texture
-            try:
-                # Use Path objects for more robust relative path calculation
-                fbx_path_obj = Path(fbx_dir)
-                tex_path_obj = Path(absolute_diff_texture_path)
-                relative_diff_path = os.path.relpath(tex_path_obj, start=fbx_path_obj)
-                # Ensure forward slashes for cross-platform compatibility within FBX/Blender
-                relative_diff_path = str(Path(relative_diff_path)).replace("\\", "/") # Convert back to string
-                print(f"  Assigning relative diffuse path: {relative_diff_path}")
-            except ValueError as e:
-                print(f"  Error calculating relative path for {material.name}: {e}. Using absolute path as fallback.")
-                relative_diff_path = str(Path(absolute_diff_texture_path)).replace("\\", "/")
-
+            relative_diff_path = relative_blender_texture_path(fbx_output_path, absolute_diff_texture_path)
+            print(f"  Assigning relative diffuse path: {relative_diff_path}")
 
             # Create the image texture node
             tex_image_node = nodes.new(type='ShaderNodeTexImage')
@@ -307,6 +321,7 @@ class FbxExporter:
                 print(f"  Reusing existing image data-block for: {relative_diff_path}")
             else:
                 # Create a new placeholder image data-block
+                diff_texture_filename = os.path.basename(absolute_diff_texture_path)
                 placeholder_name = diff_texture_filename
                 count = 1
                 while placeholder_name in bpy.data.images:
