@@ -13,58 +13,19 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
 
+from output_formats.cryengine_mtl_schema import (
+    ALPHA_TEXTURE_TYPES,
+    BASE_PUBLIC_PARAMS,
+    CE_TEXTURE_MAP_TYPES,
+    DISPLACEMENT_PUBLIC_PARAMS,
+    SUB_MATERIAL_DEFAULT_ATTRS,
+    exported_gen_mask,
+    exported_string_gen_mask,
+)
 from model_processing.material_index_assigner import (
     assign_material_sub_indices,
     parse_mtl_submaterial_names,
 )
-
-CRYENGINE_MAP_TYPES = {
-    "diffuse": "Diffuse",
-    "specular": "Specular",
-    "normal": "Bumpmap",
-    "glossiness": None,
-    "height": "Heightmap",
-    "displacement": "Heightmap",
-    "emissive": "Emittance",
-    "ao": None,
-    "opacity": "Opacity",
-    "alpha": "Opacity",
-    "transparency": "Opacity",
-    "mask": "Opacity",
-}
-
-ALPHA_TEXTURE_TYPES = {"alpha", "transparency", "opacity", "mask"}
-
-SUB_MATERIAL_DEFAULT_ATTRS = {
-    "MtlFlags": "524416",
-    "Shader": "Illum",
-    "SurfaceType": "",
-    "MatTemplate": "",
-    "Diffuse": "1,1,1",
-    "Specular": "1,1,1",
-    "Emittance": "0,0,0,0",
-    "Opacity": "1",
-    "Shininess": "255",
-}
-
-BASE_PUBLIC_PARAMS = {
-    "EmittanceMapGamma": "1",
-    "SSSIndex": "0",
-}
-
-DISPLACEMENT_PUBLIC_PARAMS = {
-    "TessellationDispBias": "0.5",
-    "TessellationFactor": "1",
-    "TessellationFactorMax": "32",
-    "TessellationFactorMin": "1",
-    "TessellationHeightScale": "1",
-}
-
-GEN_MASK_NORMAL_MAP = 0x4000000000000
-GEN_MASK_SPECULAR_MAP = 0x80000
-GEN_MASK_DISPLACEMENT_MAPPING = 0x200000000000
-GEN_MASK_PHONG_TESSELLATION = 0x10000000000000
-GEN_MASK_SUBSURFACE_SCATTERING = 0x20
 
 
 def _has_alpha_channel(image_path):
@@ -196,7 +157,7 @@ def _sub_material_attrs(material_name, textures):
 
 def _append_texture_entries(textures_elem, textures, model_output_dir, material_name):
     for map_type, abs_texture_path in _normalize_texture_keys(textures).items():
-        ce_map_type = CRYENGINE_MAP_TYPES.get(map_type)
+        ce_map_type = CE_TEXTURE_MAP_TYPES.get(map_type)
         if not ce_map_type or not abs_texture_path:
             continue
 
@@ -220,24 +181,23 @@ def _append_texture_entries(textures_elem, textures, model_output_dir, material_
 
 def _shader_masks_and_public_params(textures):
     textures = _normalize_texture_keys(textures)
-    gen_mask_value = GEN_MASK_SUBSURFACE_SCATTERING
     string_gen_mask_parts = ["%SUBSURFACE_SCATTERING"]
     public_params = dict(BASE_PUBLIC_PARAMS)
 
     if "normal" in textures:
-        gen_mask_value |= GEN_MASK_NORMAL_MAP
         string_gen_mask_parts.append("%NORMAL_MAP")
     if "specular" in textures:
-        gen_mask_value |= GEN_MASK_SPECULAR_MAP
         string_gen_mask_parts.append("%SPECULAR_MAP")
     if "displacement" in textures:
-        gen_mask_value |= GEN_MASK_DISPLACEMENT_MAPPING
         string_gen_mask_parts.append("%DISPLACEMENT_MAPPING")
-        gen_mask_value |= GEN_MASK_PHONG_TESSELLATION
         string_gen_mask_parts.append("%PHONG_TESSELLATION")
         public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
 
-    return gen_mask_value, "".join(sorted(set(string_gen_mask_parts))), public_params
+    return (
+        exported_gen_mask(string_gen_mask_parts),
+        exported_string_gen_mask(string_gen_mask_parts),
+        public_params,
+    )
 
 
 def build_mtl_material_slots(materials_data, existing_submaterial_names=None):
