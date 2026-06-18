@@ -20,6 +20,9 @@ def _record_to_report_item(record):
         "sub_index": record["sub_index"],
         "assignment_reason": record["reason"],
         "deleted": record["deleted"],
+        "polygon_count": record["material"].get("polygon_count"),
+        "used_by_polygons": record["material"].get("used_by_polygons"),
+        "mesh_names": record["material"].get("mesh_names", []),
         "diagnostics": record.get("diagnostics", []),
     }
 
@@ -41,6 +44,9 @@ def build_material_diagnostics_report(
                     "source_order": item["source_order"],
                     "assignment_reason": diagnostic.get("assignment_reason", item["assignment_reason"]),
                     "original_name": item["original_name"],
+                    "polygon_count": item["polygon_count"],
+                    "used_by_polygons": item["used_by_polygons"],
+                    "mesh_names": item["mesh_names"],
                 }
             )
 

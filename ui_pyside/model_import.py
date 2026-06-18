@@ -36,6 +36,9 @@ def collect_model_material_diagnostics(model_data):
                     "source_order": record["source_order"],
                     "assignment_reason": diagnostic.get("assignment_reason", record["reason"]),
                     "original_name": record["original_name"],
+                    "polygon_count": record["material"].get("polygon_count"),
+                    "used_by_polygons": record["material"].get("used_by_polygons"),
+                    "mesh_names": record["material"].get("mesh_names", []),
                 }
             )
     return diagnostics
@@ -93,12 +96,13 @@ class ModelImportPanel(QWidget):
 
         diagnostics_box = QGroupBox(get_text("model_import.material_diagnostics", "Material Slot Diagnostics"))
         diagnostics_layout = QVBoxLayout(diagnostics_box)
-        self.diagnostics_table = QTableWidget(0, 4)
+        self.diagnostics_table = QTableWidget(0, 5)
         self.diagnostics_table.setHorizontalHeaderLabels(
             [
                 get_text("model_import.col_severity", "Severity"),
                 get_text("model_import.col_material", "Material"),
                 get_text("model_import.col_slot", "Slot"),
+                get_text("model_import.col_usage", "Usage"),
                 get_text("model_import.col_message", "Message"),
             ]
         )
@@ -319,7 +323,16 @@ class ModelImportPanel(QWidget):
             self.diagnostics_table.insertRow(row)
             fbx_slot = diagnostic.get("fbx_slot")
             sub_index = diagnostic.get("sub_index")
+            polygon_count = diagnostic.get("polygon_count")
+            used_by_polygons = diagnostic.get("used_by_polygons")
             slot_text = f"FBX {fbx_slot} -> sub {sub_index}"
+            usage_text = "unknown"
+            if polygon_count is not None:
+                usage_text = f"{polygon_count} polygons"
+                if used_by_polygons is False:
+                    usage_text += " (unused)"
+                elif used_by_polygons is True:
+                    usage_text += " (used)"
             self.diagnostics_table.setItem(row, 0, QTableWidgetItem(diagnostic.get("severity", "")))
             self.diagnostics_table.setItem(
                 row,
@@ -327,7 +340,8 @@ class ModelImportPanel(QWidget):
                 QTableWidgetItem(diagnostic.get("material") or diagnostic.get("original_name", "")),
             )
             self.diagnostics_table.setItem(row, 2, QTableWidgetItem(slot_text))
-            self.diagnostics_table.setItem(row, 3, QTableWidgetItem(diagnostic.get("message", "")))
+            self.diagnostics_table.setItem(row, 3, QTableWidgetItem(usage_text))
+            self.diagnostics_table.setItem(row, 4, QTableWidgetItem(diagnostic.get("message", "")))
 
     def _add_to_processing(self):
         paths = [

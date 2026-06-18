@@ -142,6 +142,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - PySide 模型导入页现在会显示所选模型的 material-slot diagnostics，并在需要时用 `[hazard]` 标记已导入模型
 - 一般模型导出现在会写出 `<model>.material_diagnostics.json` sidecar，不会把非 RC 字段塞进 RC request JSON
 - 通过 Blender 载入的模型现在会保留 mesh material slot 顺序与 polygon 使用次数，避免 `bpy.data.materials` placeholder 导致 slot 偏移
+- material diagnostics sidecar 与 PySide diagnostics 表格现在会在已知时显示 polygon 使用次数
 
 ## 许可证
 

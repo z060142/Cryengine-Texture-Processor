@@ -10,7 +10,14 @@ def test_build_material_diagnostics_report_summarizes_hazards():
     report = build_material_diagnostics_report(
         [
             {"name": "Visible", "id": 1},
-            {"name": "Removed", "id": 2, "deleted": True},
+            {
+                "name": "Removed",
+                "id": 2,
+                "deleted": True,
+                "polygon_count": 3,
+                "used_by_polygons": True,
+                "mesh_names": ["ProbeMesh"],
+            },
         ],
         source_model="probe.fbx",
         artifact_kind="fbx",
@@ -25,7 +32,13 @@ def test_build_material_diagnostics_report_summarizes_hazards():
     }
     assert report["materials"][1]["name"] == "Removed"
     assert report["materials"][1]["fbx_slot"] == 1
+    assert report["materials"][1]["polygon_count"] == 3
+    assert report["materials"][1]["used_by_polygons"] is True
+    assert report["materials"][1]["mesh_names"] == ["ProbeMesh"]
     assert report["diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
+    assert report["diagnostics"][0]["polygon_count"] == 3
+    assert report["diagnostics"][0]["used_by_polygons"] is True
+    assert report["diagnostics"][0]["mesh_names"] == ["ProbeMesh"]
 
 
 def test_build_material_diagnostics_report_allows_deleted_known_unused_slot():

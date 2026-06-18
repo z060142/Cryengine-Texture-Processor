@@ -105,6 +105,6 @@ C:\Program Files (x86)\Steam\steamapps\common\Blender\blender.exe
 
 ## Remaining Work
 
-- Surface `polygon_count` and `used_by_polygons` in the PySide diagnostics table or a material details panel.
-- Persist polygon usage details in sidecar reports for all normal exports.
+- Done in phase 18: surface `polygon_count` and `used_by_polygons` in the PySide diagnostics table.
+- Done in phase 18: persist polygon usage details in sidecar reports for all normal exports.
 - Investigate multi-mesh cases where the same material slot index has different material names on different mesh objects.

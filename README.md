@@ -144,6 +144,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - The PySide model import tab surfaces material-slot diagnostics for selected models and marks imported models with `[hazard]` when needed
 - Normal model export now writes `<model>.material_diagnostics.json` sidecars without adding non-RC fields to the RC request JSON
 - Blender-loaded models now preserve mesh material slot order and polygon usage counts, avoiding `bpy.data.materials` placeholder slot drift
+- Material diagnostics sidecars and the PySide diagnostics table now show polygon usage counts when known
 
 ## License
 

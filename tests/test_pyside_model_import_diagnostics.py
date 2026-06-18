@@ -6,7 +6,14 @@ def test_collect_model_material_diagnostics_reports_deleted_known_slot():
         {
             "materials": [
                 {"name": "Visible", "id": 1},
-                {"name": "Removed", "id": 2, "deleted": True},
+                {
+                    "name": "Removed",
+                    "id": 2,
+                    "deleted": True,
+                    "polygon_count": 2,
+                    "used_by_polygons": True,
+                    "mesh_names": ["ProbeMesh"],
+                },
             ]
         }
     )
@@ -15,6 +22,9 @@ def test_collect_model_material_diagnostics_reports_deleted_known_slot():
     assert diagnostics[0]["code"] == "deleted_known_fbx_slot_usage_unknown"
     assert diagnostics[0]["material"] == "Removed"
     assert diagnostics[0]["fbx_slot"] == 1
+    assert diagnostics[0]["polygon_count"] == 2
+    assert diagnostics[0]["used_by_polygons"] is True
+    assert diagnostics[0]["mesh_names"] == ["ProbeMesh"]
 
 
 def test_collect_model_material_diagnostics_is_empty_for_normal_slots():
