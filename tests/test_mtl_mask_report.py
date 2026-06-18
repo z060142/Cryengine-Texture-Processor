@@ -97,3 +97,34 @@ def test_build_mtl_mask_report_matches_common_global_legacy_fix_tokens(tmp_path)
 
     assert material["matches_common_global_legacy_fix_mask"] is True
     assert material["common_global_legacy_fix_mask"]["value"] == 0x2000000000
+
+
+def test_build_mtl_mask_report_uses_generated_common_global_table(tmp_path):
+    shader_dir = tmp_path / "Shaders"
+    shader_dir.mkdir()
+    (shader_dir / "Illum.ext").write_text(
+        """
+        UsesCommonGlobalFlags
+        Property { Name = %SUBSURFACE_SCATTERING }
+        """,
+        encoding="utf-8",
+    )
+    mtl_path = tmp_path / "sample.mtl"
+    write_mtl(
+        mtl_path,
+        [
+            {
+                "Name": "GeneratedStyle",
+                "Shader": "Illum",
+                "GenMask": "1",
+                "StringGenMask": "%SUBSURFACE_SCATTERING",
+            },
+        ],
+    )
+
+    report = build_mtl_mask_report([str(mtl_path)], shader_ext_dir=str(shader_dir))
+    material = report["files"][0]["materials"][1]
+
+    assert report["common_global_flag_source"]["token_count"] == 1
+    assert material["common_global_generated_mask"]["value"] == 1
+    assert material["matches_common_global_generated_mask"] is True
