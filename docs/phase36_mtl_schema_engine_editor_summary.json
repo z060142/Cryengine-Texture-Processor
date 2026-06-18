@@ -1,0 +1,1417 @@
+{
+  "files": [],
+  "summary": {
+    "file_count": 33,
+    "material_count": 33,
+    "multi_material_file_count": 0,
+    "tokenized_material_count": 13
+  },
+  "schema": {
+    "material_tags": [
+      {
+        "name": "Material",
+        "count": 33
+      }
+    ],
+    "child_tags": [
+      {
+        "name": "Textures",
+        "count": 32
+      },
+      {
+        "name": "PublicParams",
+        "count": 20
+      },
+      {
+        "name": "MaterialLayers",
+        "count": 2
+      }
+    ],
+    "material_attributes": [
+      {
+        "name": "Diffuse",
+        "count": 33
+      },
+      {
+        "name": "GenMask",
+        "count": 33
+      },
+      {
+        "name": "MtlFlags",
+        "count": 33
+      },
+      {
+        "name": "Opacity",
+        "count": 33
+      },
+      {
+        "name": "Shader",
+        "count": 33
+      },
+      {
+        "name": "Specular",
+        "count": 33
+      },
+      {
+        "name": "SurfaceType",
+        "count": 33
+      },
+      {
+        "name": "Shininess",
+        "count": 31
+      },
+      {
+        "name": "Emissive",
+        "count": 29
+      },
+      {
+        "name": "MatTemplate",
+        "count": 21
+      },
+      {
+        "name": "StringGenMask",
+        "count": 21
+      },
+      {
+        "name": "LayerAct",
+        "count": 15
+      },
+      {
+        "name": "vertModifType",
+        "count": 6
+      },
+      {
+        "name": "AlphaTest",
+        "count": 2
+      },
+      {
+        "name": "CloakAmount",
+        "count": 2
+      },
+      {
+        "name": "Emittance",
+        "count": 1
+      },
+      {
+        "name": "VoxelCoverage",
+        "count": 1
+      }
+    ],
+    "public_params": [
+      {
+        "name": "IndirectColor",
+        "count": 12
+      },
+      {
+        "name": "SSSIndex",
+        "count": 11
+      },
+      {
+        "name": "EmittanceMapGamma",
+        "count": 3
+      },
+      {
+        "name": "FresnelBias",
+        "count": 3
+      },
+      {
+        "name": "FresnelPower",
+        "count": 3
+      },
+      {
+        "name": "AmbientMultiplier",
+        "count": 2
+      },
+      {
+        "name": "BlendFactor",
+        "count": 2
+      },
+      {
+        "name": "BlendFalloff",
+        "count": 2
+      },
+      {
+        "name": "FresnelScale",
+        "count": 2
+      },
+      {
+        "name": "GlossFromDiffuseAmount",
+        "count": 2
+      },
+      {
+        "name": "GlossFromDiffuseBrightness",
+        "count": 2
+      },
+      {
+        "name": "GlossFromDiffuseContrast",
+        "count": 2
+      },
+      {
+        "name": "GlossFromDiffuseOffset",
+        "count": 2
+      },
+      {
+        "name": "BlendLayer2Specular",
+        "count": 1
+      },
+      {
+        "name": "BlendLayer2Tiling",
+        "count": 1
+      },
+      {
+        "name": "BlendMaskTiling",
+        "count": 1
+      },
+      {
+        "name": "DebugUVScale",
+        "count": 1
+      },
+      {
+        "name": "DetailNormalsScale",
+        "count": 1
+      },
+      {
+        "name": "DetailTextureStrength",
+        "count": 1
+      },
+      {
+        "name": "DetailTilling",
+        "count": 1
+      },
+      {
+        "name": "Displacement",
+        "count": 1
+      },
+      {
+        "name": "FoamAmount",
+        "count": 1
+      },
+      {
+        "name": "FoamCrestAmount",
+        "count": 1
+      },
+      {
+        "name": "FoamSoftIntersectionFactor",
+        "count": 1
+      },
+      {
+        "name": "FoamTilling",
+        "count": 1
+      },
+      {
+        "name": "GradientScale",
+        "count": 1
+      },
+      {
+        "name": "HeightScale",
+        "count": 1
+      },
+      {
+        "name": "NormalsScale",
+        "count": 1
+      },
+      {
+        "name": "RainTilling",
+        "count": 1
+      },
+      {
+        "name": "ReflectionBumpScale",
+        "count": 1
+      },
+      {
+        "name": "ReflectionScale",
+        "count": 1
+      },
+      {
+        "name": "RefractionBumpScale",
+        "count": 1
+      },
+      {
+        "name": "RipplesNormalsScale",
+        "count": 1
+      },
+      {
+        "name": "SoftIntersectionFactor",
+        "count": 1
+      },
+      {
+        "name": "SubSurfaceScatteringScale",
+        "count": 1
+      },
+      {
+        "name": "Tilling",
+        "count": 1
+      }
+    ],
+    "texture_maps": [
+      {
+        "name": "Diffuse",
+        "count": 21
+      },
+      {
+        "name": "Bumpmap",
+        "count": 2
+      },
+      {
+        "name": "Specular",
+        "count": 2
+      },
+      {
+        "name": "Custom",
+        "count": 1
+      }
+    ],
+    "shaders": [
+      {
+        "name": "Illum",
+        "count": 17
+      },
+      {
+        "name": "FogVolume.Box",
+        "count": 1
+      },
+      {
+        "name": "FogVolume.Ellipsoid",
+        "count": 1
+      },
+      {
+        "name": "Helper",
+        "count": 1
+      },
+      {
+        "name": "Lensoptics.Enable",
+        "count": 1
+      },
+      {
+        "name": "ReferenceImage",
+        "count": 1
+      },
+      {
+        "name": "Referenceimage",
+        "count": 1
+      },
+      {
+        "name": "SkyHDR",
+        "count": 1
+      },
+      {
+        "name": "Terrain.Layer",
+        "count": 1
+      },
+      {
+        "name": "Water",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.Into",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.OceanInto",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.OceanIntoLowSpec",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.OceanOutof",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.OceanOutofLowSpec",
+        "count": 1
+      },
+      {
+        "name": "WaterFogVolume.Outof",
+        "count": 1
+      },
+      {
+        "name": "WaterOceanBottom",
+        "count": 1
+      }
+    ],
+    "string_gen_masks": [
+      {
+        "name": "%SUBSURFACE_SCATTERING",
+        "count": 4
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM%SUBSURFACE_SCATTERING",
+        "count": 2
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM",
+        "count": 1
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM%BUMP_MAP%SPEC_MAP%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%BILLBOARD%NORMAL_MAP%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%BLENDLAYER%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%SUBSURFACE_SCATTERING%VERTCOLORS",
+        "count": 1
+      },
+      {
+        "name": "%TEMP_TERRAIN",
+        "count": 1
+      }
+    ],
+    "gen_mask_literals": [
+      {
+        "name": "0",
+        "count": 16
+      },
+      {
+        "name": "80000000",
+        "count": 4
+      },
+      {
+        "name": "1",
+        "count": 2
+      },
+      {
+        "name": "268435456",
+        "count": 2
+      },
+      {
+        "name": "80000001",
+        "count": 2
+      },
+      {
+        "name": "140400000",
+        "count": 1
+      },
+      {
+        "name": "200000000",
+        "count": 1
+      },
+      {
+        "name": "20000002",
+        "count": 1
+      },
+      {
+        "name": "2020000000",
+        "count": 1
+      },
+      {
+        "name": "C0000001",
+        "count": 1
+      },
+      {
+        "name": "C0000081",
+        "count": 1
+      },
+      {
+        "name": "C20",
+        "count": 1
+      }
+    ],
+    "tokens": [
+      {
+        "name": "%SUBSURFACE_SCATTERING",
+        "count": 11
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM",
+        "count": 5
+      },
+      {
+        "name": "%BILLBOARD",
+        "count": 1
+      },
+      {
+        "name": "%BLENDLAYER",
+        "count": 1
+      },
+      {
+        "name": "%BUMP_MAP",
+        "count": 1
+      },
+      {
+        "name": "%NORMAL_MAP",
+        "count": 1
+      },
+      {
+        "name": "%SPECULAR_MAP",
+        "count": 1
+      },
+      {
+        "name": "%SPEC_MAP",
+        "count": 1
+      },
+      {
+        "name": "%TEMP_TERRAIN",
+        "count": 1
+      },
+      {
+        "name": "%VERTCOLORS",
+        "count": 1
+      }
+    ],
+    "attributes_by_shader": {
+      "FogVolume.Box": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "FogVolume.Ellipsoid": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "Helper": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "Illum": [
+        {
+          "name": "Diffuse",
+          "count": 17
+        },
+        {
+          "name": "GenMask",
+          "count": 17
+        },
+        {
+          "name": "MtlFlags",
+          "count": 17
+        },
+        {
+          "name": "Opacity",
+          "count": 17
+        },
+        {
+          "name": "Shader",
+          "count": 17
+        },
+        {
+          "name": "Shininess",
+          "count": 17
+        },
+        {
+          "name": "Specular",
+          "count": 17
+        },
+        {
+          "name": "SurfaceType",
+          "count": 17
+        },
+        {
+          "name": "MatTemplate",
+          "count": 15
+        },
+        {
+          "name": "StringGenMask",
+          "count": 15
+        },
+        {
+          "name": "Emissive",
+          "count": 13
+        },
+        {
+          "name": "LayerAct",
+          "count": 11
+        },
+        {
+          "name": "vertModifType",
+          "count": 6
+        },
+        {
+          "name": "AlphaTest",
+          "count": 2
+        },
+        {
+          "name": "CloakAmount",
+          "count": 2
+        },
+        {
+          "name": "Emittance",
+          "count": 1
+        },
+        {
+          "name": "VoxelCoverage",
+          "count": 1
+        }
+      ],
+      "Lensoptics.Enable": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "LayerAct",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "ReferenceImage": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "Referenceimage": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "LayerAct",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "SkyHDR": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "LayerAct",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "Terrain.Layer": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "LayerAct",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "Water": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.Into": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.OceanInto": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.OceanIntoLowSpec": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.OceanOutof": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.OceanOutofLowSpec": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterFogVolume.Outof": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ],
+      "WaterOceanBottom": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ]
+    },
+    "public_params_by_shader": {
+      "Illum": [
+        {
+          "name": "IndirectColor",
+          "count": 11
+        },
+        {
+          "name": "SSSIndex",
+          "count": 11
+        },
+        {
+          "name": "EmittanceMapGamma",
+          "count": 3
+        },
+        {
+          "name": "AmbientMultiplier",
+          "count": 2
+        },
+        {
+          "name": "FresnelBias",
+          "count": 2
+        },
+        {
+          "name": "FresnelPower",
+          "count": 2
+        },
+        {
+          "name": "FresnelScale",
+          "count": 2
+        },
+        {
+          "name": "GlossFromDiffuseAmount",
+          "count": 2
+        },
+        {
+          "name": "GlossFromDiffuseBrightness",
+          "count": 2
+        },
+        {
+          "name": "GlossFromDiffuseContrast",
+          "count": 2
+        },
+        {
+          "name": "GlossFromDiffuseOffset",
+          "count": 2
+        },
+        {
+          "name": "BlendFactor",
+          "count": 1
+        },
+        {
+          "name": "BlendFalloff",
+          "count": 1
+        },
+        {
+          "name": "BlendLayer2Specular",
+          "count": 1
+        },
+        {
+          "name": "BlendLayer2Tiling",
+          "count": 1
+        },
+        {
+          "name": "BlendMaskTiling",
+          "count": 1
+        },
+        {
+          "name": "DebugUVScale",
+          "count": 1
+        },
+        {
+          "name": "Displacement",
+          "count": 1
+        }
+      ],
+      "Terrain.Layer": [
+        {
+          "name": "BlendFactor",
+          "count": 1
+        },
+        {
+          "name": "BlendFalloff",
+          "count": 1
+        },
+        {
+          "name": "DetailTextureStrength",
+          "count": 1
+        },
+        {
+          "name": "IndirectColor",
+          "count": 1
+        }
+      ],
+      "Water": [
+        {
+          "name": "DetailNormalsScale",
+          "count": 1
+        },
+        {
+          "name": "DetailTilling",
+          "count": 1
+        },
+        {
+          "name": "FoamAmount",
+          "count": 1
+        },
+        {
+          "name": "FoamCrestAmount",
+          "count": 1
+        },
+        {
+          "name": "FoamSoftIntersectionFactor",
+          "count": 1
+        },
+        {
+          "name": "FoamTilling",
+          "count": 1
+        },
+        {
+          "name": "FresnelBias",
+          "count": 1
+        },
+        {
+          "name": "FresnelPower",
+          "count": 1
+        },
+        {
+          "name": "GradientScale",
+          "count": 1
+        },
+        {
+          "name": "HeightScale",
+          "count": 1
+        },
+        {
+          "name": "NormalsScale",
+          "count": 1
+        },
+        {
+          "name": "RainTilling",
+          "count": 1
+        },
+        {
+          "name": "ReflectionBumpScale",
+          "count": 1
+        },
+        {
+          "name": "ReflectionScale",
+          "count": 1
+        },
+        {
+          "name": "RefractionBumpScale",
+          "count": 1
+        },
+        {
+          "name": "RipplesNormalsScale",
+          "count": 1
+        },
+        {
+          "name": "SoftIntersectionFactor",
+          "count": 1
+        },
+        {
+          "name": "SubSurfaceScatteringScale",
+          "count": 1
+        },
+        {
+          "name": "Tilling",
+          "count": 1
+        }
+      ]
+    },
+    "texture_maps_by_shader": {
+      "Helper": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        }
+      ],
+      "Illum": [
+        {
+          "name": "Diffuse",
+          "count": 17
+        },
+        {
+          "name": "Bumpmap",
+          "count": 2
+        },
+        {
+          "name": "Specular",
+          "count": 2
+        },
+        {
+          "name": "Custom",
+          "count": 1
+        }
+      ],
+      "Lensoptics.Enable": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        }
+      ],
+      "Referenceimage": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        }
+      ],
+      "Terrain.Layer": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        }
+      ]
+    }
+  }
+}

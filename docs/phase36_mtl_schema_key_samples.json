@@ -1,0 +1,704 @@
+{
+  "files": [
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Editor\\Objects\\mtlobjects.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "tag": "Material",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "C0000001",
+            "value": 3221225473,
+            "base": 16,
+            "ambiguous": false,
+            "decimal_value": null,
+            "hex_value": 3221225473
+          },
+          "string_gen_mask": "%ALLOW_SILHOUETTE_POM%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+          "tokens": [
+            "%ALLOW_SILHOUETTE_POM",
+            "%SPECULAR_MAP",
+            "%SUBSURFACE_SCATTERING"
+          ],
+          "attributes": {
+            "Diffuse": "1,1,1",
+            "Emissive": "0,0,0",
+            "GenMask": "C0000001",
+            "LayerAct": "1",
+            "MatTemplate": "",
+            "MtlFlags": "524288",
+            "Opacity": "1",
+            "Shader": "Illum",
+            "Shininess": "40",
+            "Specular": "1,1,1",
+            "StringGenMask": "%ALLOW_SILHOUETTE_POM%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+            "SurfaceType": "mat_metal",
+            "vertModifType": "0"
+          },
+          "public_params": {
+            "IndirectColor": "0.25,0.25,0.25",
+            "SSSIndex": "0"
+          },
+          "textures": [
+            {
+              "map": "Diffuse",
+              "file": "%ENGINE%/EngineAssets/Textures/grey.tif",
+              "attributes": {
+                "File": "%ENGINE%/EngineAssets/Textures/grey.tif",
+                "Map": "Diffuse"
+              },
+              "texmod": {}
+            },
+            {
+              "map": "Specular",
+              "file": "%ENGINE%/EngineAssets/Textures/grey.tif",
+              "attributes": {
+                "File": "%ENGINE%/EngineAssets/Textures/grey.tif",
+                "Map": "Specular"
+              },
+              "texmod": {}
+            }
+          ],
+          "child_tags": [
+            "Textures",
+            "PublicParams"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Engine\\EngineAssets\\Materials\\MeshImporter\\MI_PreviewVertexColor.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "tag": "Material",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "2020000000",
+            "value": 137975824384,
+            "base": 16,
+            "ambiguous": true,
+            "decimal_value": 2020000000,
+            "hex_value": 137975824384
+          },
+          "string_gen_mask": "%SUBSURFACE_SCATTERING%VERTCOLORS",
+          "tokens": [
+            "%SUBSURFACE_SCATTERING",
+            "%VERTCOLORS"
+          ],
+          "attributes": {
+            "CloakAmount": "0",
+            "Diffuse": "1,1,1",
+            "GenMask": "2020000000",
+            "LayerAct": "1",
+            "MatTemplate": "",
+            "MtlFlags": "524288",
+            "Opacity": "1",
+            "Shader": "Illum",
+            "Shininess": "10",
+            "Specular": "0,0,0",
+            "StringGenMask": "%SUBSURFACE_SCATTERING%VERTCOLORS",
+            "SurfaceType": "",
+            "vertModifType": "0"
+          },
+          "public_params": {
+            "EmittanceMapGamma": "1",
+            "SSSIndex": "0"
+          },
+          "textures": [
+            {
+              "map": "Diffuse",
+              "file": "%ENGINE%/engineassets/texturemsg/color_white.dds",
+              "attributes": {
+                "File": "%ENGINE%/engineassets/texturemsg/color_white.dds",
+                "Map": "Diffuse"
+              },
+              "texmod": {}
+            }
+          ],
+          "child_tags": [
+            "Textures",
+            "PublicParams"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Engine\\EngineAssets\\Materials\\Water\\ocean_default.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "tag": "Material",
+          "name": "",
+          "shader": "Water",
+          "mtl_flags": "526336",
+          "gen_mask": {
+            "literal": "C20",
+            "value": 3104,
+            "base": 16,
+            "ambiguous": false,
+            "decimal_value": null,
+            "hex_value": 3104
+          },
+          "string_gen_mask": "",
+          "tokens": [],
+          "attributes": {
+            "Diffuse": "0,0,0",
+            "Emissive": "0,0,0",
+            "GenMask": "C20",
+            "MatTemplate": "",
+            "MtlFlags": "526336",
+            "Opacity": "1",
+            "Shader": "Water",
+            "Shininess": "255",
+            "Specular": "0.50543249,0.50543249,0.50543249",
+            "StringGenMask": "",
+            "SurfaceType": "mat_water"
+          },
+          "public_params": {
+            "DetailNormalsScale": "1",
+            "DetailTilling": "1",
+            "FoamAmount": "0.5",
+            "FoamCrestAmount": "1.5",
+            "FoamSoftIntersectionFactor": "2",
+            "FoamTilling": "0.75",
+            "FresnelBias": "0.050000001",
+            "FresnelPower": "5",
+            "GradientScale": "0.1",
+            "HeightScale": "0.2",
+            "NormalsScale": "1",
+            "RainTilling": "1",
+            "ReflectionBumpScale": "0.050000001",
+            "ReflectionScale": "2.5",
+            "RefractionBumpScale": "0.025",
+            "RipplesNormalsScale": "1",
+            "SoftIntersectionFactor": "1",
+            "SubSurfaceScatteringScale": "2",
+            "Tilling": "50"
+          },
+          "textures": [],
+          "child_tags": [
+            "Textures",
+            "PublicParams"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Engine\\EngineAssets\\Materials\\material_default.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "tag": "Material",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "80000000",
+            "value": 2147483648,
+            "base": 16,
+            "ambiguous": true,
+            "decimal_value": 80000000,
+            "hex_value": 2147483648
+          },
+          "string_gen_mask": "%SUBSURFACE_SCATTERING",
+          "tokens": [
+            "%SUBSURFACE_SCATTERING"
+          ],
+          "attributes": {
+            "Diffuse": "1,1,1",
+            "Emissive": "0,0,0",
+            "GenMask": "80000000",
+            "LayerAct": "1",
+            "MatTemplate": "",
+            "MtlFlags": "524288",
+            "Opacity": "1",
+            "Shader": "Illum",
+            "Shininess": "10",
+            "Specular": "0.0030352699,0.0030352699,0.0030352699",
+            "StringGenMask": "%SUBSURFACE_SCATTERING",
+            "SurfaceType": "mat_concrete"
+          },
+          "public_params": {
+            "IndirectColor": "0.25,0.25,0.25",
+            "SSSIndex": "0"
+          },
+          "textures": [
+            {
+              "map": "Diffuse",
+              "file": "%ENGINE%/EngineAssets/Textures/grey.dds",
+              "attributes": {
+                "File": "%ENGINE%/EngineAssets/Textures/grey.dds",
+                "Map": "Diffuse"
+              },
+              "texmod": {}
+            }
+          ],
+          "child_tags": [
+            "Textures",
+            "PublicParams"
+          ]
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "file_count": 4,
+    "material_count": 4,
+    "multi_material_file_count": 0,
+    "tokenized_material_count": 3
+  },
+  "schema": {
+    "material_tags": [
+      {
+        "name": "Material",
+        "count": 4
+      }
+    ],
+    "child_tags": [
+      {
+        "name": "PublicParams",
+        "count": 4
+      },
+      {
+        "name": "Textures",
+        "count": 4
+      }
+    ],
+    "material_attributes": [
+      {
+        "name": "Diffuse",
+        "count": 4
+      },
+      {
+        "name": "GenMask",
+        "count": 4
+      },
+      {
+        "name": "MatTemplate",
+        "count": 4
+      },
+      {
+        "name": "MtlFlags",
+        "count": 4
+      },
+      {
+        "name": "Opacity",
+        "count": 4
+      },
+      {
+        "name": "Shader",
+        "count": 4
+      },
+      {
+        "name": "Shininess",
+        "count": 4
+      },
+      {
+        "name": "Specular",
+        "count": 4
+      },
+      {
+        "name": "StringGenMask",
+        "count": 4
+      },
+      {
+        "name": "SurfaceType",
+        "count": 4
+      },
+      {
+        "name": "Emissive",
+        "count": 3
+      },
+      {
+        "name": "LayerAct",
+        "count": 3
+      },
+      {
+        "name": "vertModifType",
+        "count": 2
+      },
+      {
+        "name": "CloakAmount",
+        "count": 1
+      }
+    ],
+    "public_params": [
+      {
+        "name": "SSSIndex",
+        "count": 3
+      },
+      {
+        "name": "IndirectColor",
+        "count": 2
+      },
+      {
+        "name": "DetailNormalsScale",
+        "count": 1
+      },
+      {
+        "name": "DetailTilling",
+        "count": 1
+      },
+      {
+        "name": "EmittanceMapGamma",
+        "count": 1
+      },
+      {
+        "name": "FoamAmount",
+        "count": 1
+      },
+      {
+        "name": "FoamCrestAmount",
+        "count": 1
+      },
+      {
+        "name": "FoamSoftIntersectionFactor",
+        "count": 1
+      },
+      {
+        "name": "FoamTilling",
+        "count": 1
+      },
+      {
+        "name": "FresnelBias",
+        "count": 1
+      },
+      {
+        "name": "FresnelPower",
+        "count": 1
+      },
+      {
+        "name": "GradientScale",
+        "count": 1
+      },
+      {
+        "name": "HeightScale",
+        "count": 1
+      },
+      {
+        "name": "NormalsScale",
+        "count": 1
+      },
+      {
+        "name": "RainTilling",
+        "count": 1
+      },
+      {
+        "name": "ReflectionBumpScale",
+        "count": 1
+      },
+      {
+        "name": "ReflectionScale",
+        "count": 1
+      },
+      {
+        "name": "RefractionBumpScale",
+        "count": 1
+      },
+      {
+        "name": "RipplesNormalsScale",
+        "count": 1
+      },
+      {
+        "name": "SoftIntersectionFactor",
+        "count": 1
+      },
+      {
+        "name": "SubSurfaceScatteringScale",
+        "count": 1
+      },
+      {
+        "name": "Tilling",
+        "count": 1
+      }
+    ],
+    "texture_maps": [
+      {
+        "name": "Diffuse",
+        "count": 3
+      },
+      {
+        "name": "Specular",
+        "count": 1
+      }
+    ],
+    "shaders": [
+      {
+        "name": "Illum",
+        "count": 3
+      },
+      {
+        "name": "Water",
+        "count": 1
+      }
+    ],
+    "string_gen_masks": [
+      {
+        "name": "%ALLOW_SILHOUETTE_POM%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%SUBSURFACE_SCATTERING",
+        "count": 1
+      },
+      {
+        "name": "%SUBSURFACE_SCATTERING%VERTCOLORS",
+        "count": 1
+      }
+    ],
+    "gen_mask_literals": [
+      {
+        "name": "2020000000",
+        "count": 1
+      },
+      {
+        "name": "80000000",
+        "count": 1
+      },
+      {
+        "name": "C0000001",
+        "count": 1
+      },
+      {
+        "name": "C20",
+        "count": 1
+      }
+    ],
+    "tokens": [
+      {
+        "name": "%SUBSURFACE_SCATTERING",
+        "count": 3
+      },
+      {
+        "name": "%ALLOW_SILHOUETTE_POM",
+        "count": 1
+      },
+      {
+        "name": "%SPECULAR_MAP",
+        "count": 1
+      },
+      {
+        "name": "%VERTCOLORS",
+        "count": 1
+      }
+    ],
+    "attributes_by_shader": {
+      "Illum": [
+        {
+          "name": "Diffuse",
+          "count": 3
+        },
+        {
+          "name": "GenMask",
+          "count": 3
+        },
+        {
+          "name": "LayerAct",
+          "count": 3
+        },
+        {
+          "name": "MatTemplate",
+          "count": 3
+        },
+        {
+          "name": "MtlFlags",
+          "count": 3
+        },
+        {
+          "name": "Opacity",
+          "count": 3
+        },
+        {
+          "name": "Shader",
+          "count": 3
+        },
+        {
+          "name": "Shininess",
+          "count": 3
+        },
+        {
+          "name": "Specular",
+          "count": 3
+        },
+        {
+          "name": "StringGenMask",
+          "count": 3
+        },
+        {
+          "name": "SurfaceType",
+          "count": 3
+        },
+        {
+          "name": "Emissive",
+          "count": 2
+        },
+        {
+          "name": "vertModifType",
+          "count": 2
+        },
+        {
+          "name": "CloakAmount",
+          "count": 1
+        }
+      ],
+      "Water": [
+        {
+          "name": "Diffuse",
+          "count": 1
+        },
+        {
+          "name": "Emissive",
+          "count": 1
+        },
+        {
+          "name": "GenMask",
+          "count": 1
+        },
+        {
+          "name": "MatTemplate",
+          "count": 1
+        },
+        {
+          "name": "MtlFlags",
+          "count": 1
+        },
+        {
+          "name": "Opacity",
+          "count": 1
+        },
+        {
+          "name": "Shader",
+          "count": 1
+        },
+        {
+          "name": "Shininess",
+          "count": 1
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        },
+        {
+          "name": "StringGenMask",
+          "count": 1
+        },
+        {
+          "name": "SurfaceType",
+          "count": 1
+        }
+      ]
+    },
+    "public_params_by_shader": {
+      "Illum": [
+        {
+          "name": "SSSIndex",
+          "count": 3
+        },
+        {
+          "name": "IndirectColor",
+          "count": 2
+        },
+        {
+          "name": "EmittanceMapGamma",
+          "count": 1
+        }
+      ],
+      "Water": [
+        {
+          "name": "DetailNormalsScale",
+          "count": 1
+        },
+        {
+          "name": "DetailTilling",
+          "count": 1
+        },
+        {
+          "name": "FoamAmount",
+          "count": 1
+        },
+        {
+          "name": "FoamCrestAmount",
+          "count": 1
+        },
+        {
+          "name": "FoamSoftIntersectionFactor",
+          "count": 1
+        },
+        {
+          "name": "FoamTilling",
+          "count": 1
+        },
+        {
+          "name": "FresnelBias",
+          "count": 1
+        },
+        {
+          "name": "FresnelPower",
+          "count": 1
+        },
+        {
+          "name": "GradientScale",
+          "count": 1
+        },
+        {
+          "name": "HeightScale",
+          "count": 1
+        },
+        {
+          "name": "NormalsScale",
+          "count": 1
+        },
+        {
+          "name": "RainTilling",
+          "count": 1
+        },
+        {
+          "name": "ReflectionBumpScale",
+          "count": 1
+        },
+        {
+          "name": "ReflectionScale",
+          "count": 1
+        },
+        {
+          "name": "RefractionBumpScale",
+          "count": 1
+        },
+        {
+          "name": "RipplesNormalsScale",
+          "count": 1
+        },
+        {
+          "name": "SoftIntersectionFactor",
+          "count": 1
+        },
+        {
+          "name": "SubSurfaceScatteringScale",
+          "count": 1
+        },
+        {
+          "name": "Tilling",
+          "count": 1
+        }
+      ]
+    },
+    "texture_maps_by_shader": {
+      "Illum": [
+        {
+          "name": "Diffuse",
+          "count": 3
+        },
+        {
+          "name": "Specular",
+          "count": 1
+        }
+      ]
+    }
+  }
+}
