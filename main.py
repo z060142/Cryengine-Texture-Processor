@@ -29,7 +29,7 @@ from ui_pyside.main_window import MainWindow
 from ui_pyside.progress_dialog import ProgressDialog
 from utils.config_manager import ConfigManager
 from utils.dds_processor import DDSProcessor
-from utils.rc_processor import RCProcessor
+from utils.rc_import_runner import RCImportRunner
 from utils.thumbnail_generator import generate_thumbnail
 
 
@@ -384,7 +384,22 @@ def main():
                 )
                 if json_success:
                     print(f"Successfully exported JSON configuration: {json_result}")
-                    RCProcessor().process_json_file(json_result)
+                    rc_exe_path = ConfigManager().get("rc_exe_path", "")
+                    if rc_exe_path:
+                        rc_result = RCImportRunner(rc_exe_path).run(
+                            json_result,
+                            source_fbx_path=fbx_output_path,
+                        )
+                        if rc_result.success:
+                            print(f"Successfully generated RC output: {rc_result.expected_output_path}")
+                        else:
+                            print(f"Warning: RC import failed: {rc_result.error}")
+                            if rc_result.stdout:
+                                print(rc_result.stdout)
+                            if rc_result.stderr:
+                                print(rc_result.stderr)
+                    else:
+                        print("RC executable path is not configured; skipping RC import.")
                 else:
                     print(f"Warning: Failed to export JSON for {model_filename}: {json_result}")
 
