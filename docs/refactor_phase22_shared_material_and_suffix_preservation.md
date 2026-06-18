@@ -149,5 +149,5 @@ Blender unique suffix preserved: DuplicateSurface -> 0, DuplicateSurface.001 -> 
 ## Remaining Work
 
 - Split user-facing texture base-name cleanup from RC-visible material-name identity.
-- Surface missing request material names directly in smoke material reports.
+- Use Phase 23's fixture semantic report as the shape for a future general FBX material-table inspector.
 - Update PySide diagnostics text to explain that `.001` may be a real material identity, not noise.

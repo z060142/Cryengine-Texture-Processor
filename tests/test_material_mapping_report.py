@@ -3,9 +3,12 @@ import xml.etree.ElementTree as ET
 
 from tools.material_mapping_report import (
     build_material_mapping_report,
+    discover_fixture_manifest,
     evaluate_cgf_material_ids,
+    evaluate_fixture_material_semantics,
     evaluate_material_slot_alignment,
     load_cryasset_details,
+    load_fixture_manifest,
     load_mtl_slots,
     load_request_materials,
     write_material_mapping_report,
@@ -84,6 +87,130 @@ def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
         {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Bark"},
         {"ok": False, "material_id": 2, "in_request": False, "in_mtl": True, "mtl_slot_name": "Proxy"},
     ]
+
+
+def test_discover_fixture_manifest_checks_source_before_copied(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    copied_fbx = tmp_path / "copied.fbx"
+    source_manifest = tmp_path / "source.fixture_manifest.json"
+    copied_manifest = tmp_path / "copied.fixture_manifest.json"
+    source_fbx.write_text("fbx", encoding="utf-8")
+    copied_fbx.write_text("fbx", encoding="utf-8")
+    source_manifest.write_text(json.dumps({"fixture_kind": "source"}), encoding="utf-8")
+    copied_manifest.write_text(json.dumps({"fixture_kind": "copied"}), encoding="utf-8")
+
+    manifest_path = discover_fixture_manifest(str(source_fbx), str(copied_fbx))
+
+    assert manifest_path == str(source_manifest)
+    assert load_fixture_manifest(manifest_path)["fixture_kind"] == "source"
+
+
+def test_evaluate_fixture_material_semantics_flags_swapped_request_names():
+    manifest = {
+        "fixture_kind": "multi-mesh-name-conflict",
+        "materials": [
+            {"slot": 0, "name": "LocalSlot0_Wood"},
+            {"slot": 1, "name": "LocalSlot0_Metal"},
+        ],
+        "polygons": [
+            {
+                "polygon": 0,
+                "material_slot": 0,
+                "material_name": "LocalSlot0_Wood",
+                "expected_cgf_material_id": 0,
+                "center_x": 0.0,
+            },
+            {
+                "polygon": 1,
+                "material_slot": 0,
+                "material_name": "LocalSlot0_Metal",
+                "expected_cgf_material_id": 1,
+                "center_x": 3.0,
+            },
+        ],
+    }
+    cgf_summary = {
+        "meshes": [
+            {
+                "chunk_id": 10,
+                "subsets": [
+                    {"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0},
+                    {"subset": 0, "center": [3.0, 0.0, 0.0], "material_id": 1},
+                ],
+            }
+        ]
+    }
+    result = evaluate_fixture_material_semantics(
+        manifest,
+        cgf_summary,
+        [
+            {"name": "LocalSlot0_Metal", "sub_index": 0},
+            {"name": "LocalSlot0_Wood", "sub_index": 1},
+        ],
+        [
+            {"slot": 0, "name": "LocalSlot0_Metal"},
+            {"slot": 1, "name": "LocalSlot0_Wood"},
+        ],
+    )
+
+    assert not result["ok"]
+    assert result["material_checks"][0]["expected_name"] == "LocalSlot0_Wood"
+    assert result["material_checks"][0]["request_names"] == ["LocalSlot0_Metal"]
+    assert result["polygon_checks"][0]["cgf_id_ok"]
+    assert not result["polygon_checks"][0]["ok"]
+
+
+def test_evaluate_fixture_material_semantics_accepts_preserved_suffix_names():
+    manifest = {
+        "fixture_kind": "multi-mesh-name-conflict",
+        "materials": [
+            {"slot": 0, "name": "DuplicateSurface"},
+            {"slot": 1, "name": "DuplicateSurface.001"},
+        ],
+        "polygons": [
+            {
+                "polygon": 0,
+                "material_slot": 0,
+                "material_name": "DuplicateSurface",
+                "expected_cgf_material_id": 0,
+                "center_x": 0.0,
+            },
+            {
+                "polygon": 1,
+                "material_slot": 0,
+                "material_name": "DuplicateSurface.001",
+                "expected_cgf_material_id": 1,
+                "center_x": 3.0,
+            },
+        ],
+    }
+    cgf_summary = {
+        "meshes": [
+            {
+                "chunk_id": 10,
+                "subsets": [
+                    {"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0},
+                    {"subset": 0, "center": [3.0, 0.0, 0.0], "material_id": 1},
+                ],
+            }
+        ]
+    }
+    result = evaluate_fixture_material_semantics(
+        manifest,
+        cgf_summary,
+        [
+            {"name": "DuplicateSurface", "sub_index": 0},
+            {"name": "DuplicateSurface.001", "sub_index": 1},
+        ],
+        [
+            {"slot": 0, "name": "DuplicateSurface"},
+            {"slot": 1, "name": "DuplicateSurface.001"},
+        ],
+    )
+
+    assert result["ok"]
+    assert result["duplicate_request_material_names"] == []
+    assert result["polygon_checks"][1]["request_names_for_actual_id"] == ["DuplicateSurface.001"]
 
 
 def test_build_and_write_material_mapping_report(tmp_path):
