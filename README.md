@@ -175,6 +175,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Request JSON and `.mtl` generation now use `model_data["material_manifest"]` as the RC material slot source of truth when present
 - RC smoke tests can now use `--materials-from-manifest` to build request JSON and `.mtl` directly from a fixture or Blender FBX material manifest sidecar
 - The PySide Model Import tab can run manifest-driven RC material smoke for a selected FBX and summarize semantic / CGF material-id alignment from the generated material report
+- `.mtl` XML generation now uses named document-builder helpers, but current shader/GenMask/PublicParams values are still guessed and need replacement with real CryEngine evidence
 
 ## License
 

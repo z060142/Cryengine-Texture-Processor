@@ -18,6 +18,55 @@ from model_processing.material_index_assigner import (
     parse_mtl_submaterial_names,
 )
 
+CRYENGINE_MAP_TYPES = {
+    "diffuse": "Diffuse",
+    "specular": "Specular",
+    "normal": "Bumpmap",
+    "glossiness": None,
+    "height": "Heightmap",
+    "displacement": "Heightmap",
+    "emissive": "Emittance",
+    "ao": None,
+    "opacity": "Opacity",
+    "alpha": "Opacity",
+    "transparency": "Opacity",
+    "mask": "Opacity",
+}
+
+ALPHA_TEXTURE_TYPES = {"alpha", "transparency", "opacity", "mask"}
+
+SUB_MATERIAL_DEFAULT_ATTRS = {
+    "MtlFlags": "524416",
+    "Shader": "Illum",
+    "SurfaceType": "",
+    "MatTemplate": "",
+    "Diffuse": "1,1,1",
+    "Specular": "1,1,1",
+    "Emittance": "0,0,0,0",
+    "Opacity": "1",
+    "Shininess": "255",
+}
+
+BASE_PUBLIC_PARAMS = {
+    "EmittanceMapGamma": "1",
+    "SSSIndex": "0",
+}
+
+DISPLACEMENT_PUBLIC_PARAMS = {
+    "TessellationDispBias": "0.5",
+    "TessellationFactor": "1",
+    "TessellationFactorMax": "32",
+    "TessellationFactorMin": "1",
+    "TessellationHeightScale": "1",
+}
+
+GEN_MASK_NORMAL_MAP = 0x4000000000000
+GEN_MASK_SPECULAR_MAP = 0x80000
+GEN_MASK_DISPLACEMENT_MAPPING = 0x200000000000
+GEN_MASK_PHONG_TESSELLATION = 0x10000000000000
+GEN_MASK_SUBSURFACE_SCATTERING = 0x20
+
+
 def _has_alpha_channel(image_path):
     """
     Detects if the image has an alpha channel and if that alpha channel contains
@@ -116,6 +165,137 @@ def _pretty_print_xml(elem):
     return reparsed.toprettyxml(indent=" ")
 
 
+def _normalize_texture_keys(textures):
+    return {str(texture_type).lower(): texture_path for texture_type, texture_path in (textures or {}).items()}
+
+
+def _material_has_alpha(textures):
+    normalized_textures = _normalize_texture_keys(textures)
+    for texture_type in normalized_textures:
+        if texture_type in ALPHA_TEXTURE_TYPES:
+            return True
+        if any(alpha_term in texture_type for alpha_term in ALPHA_TEXTURE_TYPES):
+            return True
+
+    diffuse_texture_path = normalized_textures.get("diffuse")
+    if diffuse_texture_path and os.path.exists(diffuse_texture_path) and _has_alpha_channel(diffuse_texture_path):
+        print(f"Detected alpha channel in diffuse texture: {diffuse_texture_path}")
+        return True
+    return False
+
+
+def _sub_material_attrs(material_name, textures):
+    attrs = {"Name": material_name, **SUB_MATERIAL_DEFAULT_ATTRS}
+    normalized_textures = _normalize_texture_keys(textures)
+    if "emissive" in normalized_textures:
+        attrs["Emittance"] = "1,1,1,10"
+    if _material_has_alpha(normalized_textures):
+        attrs["AlphaTest"] = "0.5"
+    return attrs
+
+
+def _append_texture_entries(textures_elem, textures, model_output_dir, material_name):
+    for map_type, abs_texture_path in _normalize_texture_keys(textures).items():
+        ce_map_type = CRYENGINE_MAP_TYPES.get(map_type)
+        if not ce_map_type or not abs_texture_path:
+            continue
+
+        relative_texture_path = _calculate_relative_path(abs_texture_path, model_output_dir)
+        if not relative_texture_path:
+            print(
+                f"Warning: Could not determine path for texture '{abs_texture_path}' "
+                f"in material '{material_name}'. Skipping."
+            )
+            continue
+
+        tex_elem = ET.SubElement(textures_elem, "Texture", Map=ce_map_type, File=relative_texture_path)
+        ET.SubElement(
+            tex_elem,
+            "TexMod",
+            TexMod_RotateType="0",
+            TexMod_TexGenType="0",
+            TexMod_bTexGenProjected="0",
+        )
+
+
+def _shader_masks_and_public_params(textures):
+    textures = _normalize_texture_keys(textures)
+    gen_mask_value = GEN_MASK_SUBSURFACE_SCATTERING
+    string_gen_mask_parts = ["%SUBSURFACE_SCATTERING"]
+    public_params = dict(BASE_PUBLIC_PARAMS)
+
+    if "normal" in textures:
+        gen_mask_value |= GEN_MASK_NORMAL_MAP
+        string_gen_mask_parts.append("%NORMAL_MAP")
+    if "specular" in textures:
+        gen_mask_value |= GEN_MASK_SPECULAR_MAP
+        string_gen_mask_parts.append("%SPECULAR_MAP")
+    if "displacement" in textures:
+        gen_mask_value |= GEN_MASK_DISPLACEMENT_MAPPING
+        string_gen_mask_parts.append("%DISPLACEMENT_MAPPING")
+        gen_mask_value |= GEN_MASK_PHONG_TESSELLATION
+        string_gen_mask_parts.append("%PHONG_TESSELLATION")
+        public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
+
+    return gen_mask_value, "".join(sorted(set(string_gen_mask_parts))), public_params
+
+
+def build_mtl_material_slots(materials_data, existing_submaterial_names=None):
+    if not materials_data:
+        return [{"name": "Default", "textures": {}, "is_default": True}]
+
+    assigned_materials = assign_material_sub_indices(materials_data, existing_submaterial_names or [])
+    used_materials = [record for record in assigned_materials if record["sub_index"] >= 0]
+    if not used_materials:
+        return []
+
+    material_slots = [None] * (max(record["sub_index"] for record in used_materials) + 1)
+    for record in used_materials:
+        new_mat_info = record["material"].copy()
+        new_mat_info["name"] = record["clean_name"]
+        new_mat_info["original_name"] = record["original_name"]
+        new_mat_info["sub_index"] = record["sub_index"]
+        new_mat_info["assignment_reason"] = record["reason"]
+        material_slots[record["sub_index"]] = new_mat_info
+
+    for slot_index, slot in enumerate(material_slots):
+        if slot is None:
+            material_slots[slot_index] = {
+                "name": "unassigned",
+                "original_name": "unassigned",
+                "sub_index": slot_index,
+                "textures": {},
+                "is_dummy": True,
+            }
+
+    return material_slots
+
+
+def _append_sub_material(sub_materials_elem, mat_info, model_output_dir):
+    material_name = mat_info.get("name", "UnnamedMaterial")
+    textures = mat_info.get("textures", {})
+    sub_mat = ET.SubElement(sub_materials_elem, "Material", **_sub_material_attrs(material_name, textures))
+    textures_elem = ET.SubElement(sub_mat, "Textures")
+    _append_texture_entries(textures_elem, textures, model_output_dir, material_name)
+
+    gen_mask_value, string_gen_mask, public_params = _shader_masks_and_public_params(textures)
+    sub_mat.set("GenMask", str(gen_mask_value))
+    sub_mat.set("StringGenMask", string_gen_mask)
+    ET.SubElement(sub_mat, "PublicParams", **public_params)
+
+
+def build_mtl_document(materials_data, model_output_dir, existing_submaterial_names=None):
+    root_material = ET.Element("Material", MtlFlags="524544", vertModifType="0")
+    sub_materials = ET.SubElement(root_material, "SubMaterials")
+    material_slots = build_mtl_material_slots(materials_data, existing_submaterial_names)
+
+    for mat_info in material_slots:
+        _append_sub_material(sub_materials, mat_info, model_output_dir)
+
+    ET.SubElement(root_material, "PublicParams", **BASE_PUBLIC_PARAMS)
+    return root_material, material_slots
+
+
 def export_mtl(materials_data, model_output_dir, texture_output_dir, output_filename):
     """
     Exports a .mtl file based on the provided material data.
@@ -144,223 +324,16 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
     mtl_file_path = os.path.join(model_output_dir, output_filename)
 
     try:
-        # Create the root <Material> element
-        # MtlFlags="524544" seems common for the root
-        root_material = ET.Element("Material", MtlFlags="524544", vertModifType="0")
-
-        # Create <SubMaterials> element
-        sub_materials = ET.SubElement(root_material, "SubMaterials")
-
         if not materials_data:
             print("Warning: No material data provided for MTL export.")
-            # Create a default empty material? Or just return?
-            # Let's create one default material to avoid empty SubMaterials tag
-            default_mat = ET.SubElement(sub_materials, "Material", Name="Default", MtlFlags="524416", Shader="Illum")
-            ET.SubElement(default_mat, "Textures") # Add empty Textures tag
-        else:
-            existing_submaterial_names = parse_mtl_submaterial_names(mtl_file_path)
-            assigned_materials = assign_material_sub_indices(materials_data, existing_submaterial_names)
-
-            material_slots = []
-            used_materials = [record for record in assigned_materials if record["sub_index"] >= 0]
-            if used_materials:
-                max_sub_index = max(record["sub_index"] for record in used_materials)
-                material_slots = [None] * (max_sub_index + 1)
-                for record in used_materials:
-                    new_mat_info = record["material"].copy()
-                    new_mat_info["name"] = record["clean_name"]
-                    new_mat_info["original_name"] = record["original_name"]
-                    new_mat_info["sub_index"] = record["sub_index"]
-                    new_mat_info["assignment_reason"] = record["reason"]
-                    material_slots[record["sub_index"]] = new_mat_info
-
-                for slot_index, slot in enumerate(material_slots):
-                    if slot is None:
-                        material_slots[slot_index] = {
-                            "name": "unassigned",
-                            "original_name": "unassigned",
-                            "sub_index": slot_index,
-                            "textures": {},
-                            "is_dummy": True,
-                        }
-
-            materials_data = material_slots
-            
-            for mat_info in materials_data:
-                # 獲取材質名稱和紐理
-                mat_name = mat_info.get('name', 'UnnamedMaterial')
-                textures = mat_info.get('textures', {})
-
-                # Create a <Material> element for this sub-material
-                # Default attributes based on the example
-                # MtlFlags="524416", Shader="Illum" are common defaults
-                material_attrs = {
-                    "Name": mat_name,
-                    "MtlFlags": "524416", # Common flag for sub-materials
-                    "Shader": "Illum", # Default shader
-                    # GenMask and StringGenMask will be added dynamically below
-                    "SurfaceType": "", # Keep empty unless specified
-                    "MatTemplate": "", # Keep empty unless specified
-                    "Diffuse": "1,1,1", # Default white
-                    "Specular": "1,1,1", # Adjusted default based on example
-                    "Emittance": "0,0,0,0", # Default no emittance, will be overridden if emissive texture exists
-                    "Opacity": "1",
-                    "Shininess": "255", # Adjusted default based on example
-                    # AlphaTest is now only added conditionally below
-                }
-                
-                # Check if this material has an alpha/transparency map or uses maps that typically include alpha
-                has_alpha_map = False
-                
-                # Alpha related texture types to check for
-                alpha_related_types = {
-                    'alpha', 'transparency', 'opacity', 'mask'
-                }
-                
-                # Check if material has any alpha-related texture type
-                for tex_type, tex_path in textures.items():
-                    tex_type_lower = tex_type.lower()
-                    
-                    # Direct match with alpha-related types
-                    if tex_type_lower in alpha_related_types:
-                        has_alpha_map = True
-                        break
-                        
-                    # Check for alpha/transparency terms within texture type names
-                    if any(alpha_term in tex_type_lower for alpha_term in alpha_related_types):
-                        has_alpha_map = True
-                        break
-                
-                # If no dedicated alpha map was found, check if diffuse texture has alpha channel
-                if not has_alpha_map:
-                    # Check diffuse texture for alpha channel
-                    diffuse_texture_path = textures.get('diffuse')
-                    if diffuse_texture_path and os.path.exists(diffuse_texture_path):
-                        if _has_alpha_channel(diffuse_texture_path):
-                            print(f"Detected alpha channel in diffuse texture: {diffuse_texture_path}")
-                            has_alpha_map = True
-                
-                # Only add AlphaTest parameter if we have an alpha map
-                if has_alpha_map:
-                    material_attrs["AlphaTest"] = "0.5"
-                
-                # Create the material element with our attribute dictionary
-                sub_mat = ET.SubElement(sub_materials, "Material", **material_attrs)
-
-                # Create <Textures> element
-                textures_elem = ET.SubElement(sub_mat, "Textures")
-
-                # Map our internal types to CryEngine MTL Map types
-                # Note: Normal map goes to 'Bumpmap' in CryEngine MTL
-                cryengine_map_types = {
-                    'diffuse': 'Diffuse',
-                    'specular': 'Specular',
-                    'normal': 'Bumpmap', # DDNA usually goes here
-                    'glossiness': None, # Gloss is part of DDNA, not separate usually
-                    'height': 'Heightmap', # Or Displacement? Check CryEngine docs
-                    'displacement': 'Heightmap', # Map displacement to Heightmap
-                    'emissive': 'Emittance',
-                    'ao': None, # AO often baked or part of Diffuse/DDNA alpha
-                    'opacity': 'Opacity',
-                    'alpha': 'Opacity', # Map alpha to Opacity as well
-                    'transparency': 'Opacity', # Map transparency to Opacity as well
-                    'mask': 'Opacity', # Mask maps often used for transparency/alpha
-                    # Add others if needed based on project's texture types
-                }
-
-                # Add <Texture> elements for each map
-                for map_type, abs_texture_path in textures.items():
-                    ce_map_type = cryengine_map_types.get(map_type.lower())
-                    if ce_map_type and abs_texture_path:
-                        # Calculate relative path from the MTL's directory
-                        relative_texture_path = _calculate_relative_path(abs_texture_path, model_output_dir)
-
-                        if relative_texture_path:
-                            tex_elem = ET.SubElement(textures_elem, "Texture",
-                                                     Map=ce_map_type,
-                                                     File=relative_texture_path)
-                            # Add default TexMod sub-element as seen in example
-                            ET.SubElement(tex_elem, "TexMod",
-                                          TexMod_RotateType="0",
-                                          TexMod_TexGenType="0",
-                                          TexMod_bTexGenProjected="0")
-                        else:
-                             print(f"Warning: Could not determine path for texture '{abs_texture_path}' in material '{mat_name}'. Skipping.")
-
-
-                # --- Dynamically generate GenMask and StringGenMask based on found textures ---
-                # Based on cliff_side1.mtl example and common CE usage
-                # NOTE: Exact GenMask bit values can be complex and shader-dependent.
-                # These are common flags associated with the texture maps.
-                gen_mask_value = 0
-                string_gen_mask_parts = []
-                public_params = {"EmittanceMapGamma": "1", "SSSIndex": "0"} # Base public params
-
-                # Check which texture types were successfully found and added
-                if 'diffuse' in textures:
-                    # Diffuse itself doesn't usually add a specific flag, but alpha might
-                    # TODO: Check if diffuse texture has alpha for AlphaTest flag?
-                    pass
-                if 'normal' in textures: # Mapped to Bumpmap
-                    gen_mask_value |= 0x4000000000000 # Assume this is NORMAL_MAP bit
-                    string_gen_mask_parts.append("%NORMAL_MAP")
-                if 'specular' in textures:
-                    gen_mask_value |= 0x80000 # Assume this is SPECULAR_MAP bit
-                    string_gen_mask_parts.append("%SPECULAR_MAP")
-                if 'displacement' in textures: # Mapped to Heightmap
-                    gen_mask_value |= 0x200000000000 # Assume this is DISPLACEMENT_MAPPING bit
-                    string_gen_mask_parts.append("%DISPLACEMENT_MAPPING")
-                    # Add tessellation flags if displacement map exists, as per example
-                    gen_mask_value |= 0x10000000000000 # Assume this is PHONG_TESSELLATION bit
-                    string_gen_mask_parts.append("%PHONG_TESSELLATION")
-                    # Add tessellation public params
-                    public_params.update({
-                        "TessellationDispBias": "0.5",
-                        "TessellationFactor": "1", # Keep low by default
-                        "TessellationFactorMax": "32", # Example values
-                        "TessellationFactorMin": "1",  # Example values
-                        "TessellationHeightScale": "1" # Default scale
-                    })
-                if 'emissive' in textures: # Mapped to Emittance
-                    # Set Emittance attribute on the material itself
-                    sub_mat.set("Emittance", "1,1,1,10") # Use example value when texture exists
-                    # Emissive map itself might not have a specific GenMask bit, depends on shader
-                    # string_gen_mask_parts.append("%EMITTANCE_MAP") # Add if needed
-                # For diffuse with alpha channel, we need to check if the texture has alpha
-                if 'diffuse' in textures and os.path.exists(textures['diffuse']):
-                    if _has_alpha_channel(textures['diffuse']):
-                        # Diffuse texture has alpha channel, add AlphaTest parameter
-                        sub_mat.set("AlphaTest", "0.5")
-                
-                # Check conventional opacity maps
-                if 'opacity' in textures or 'alpha' in textures or 'transparency' in textures or 'mask' in textures:
-                    # Dedicated opacity/alpha map, add AlphaTest parameter
-                    sub_mat.set("AlphaTest", "0.5") # Add AlphaTest parameter for opacity maps
-
-                # Add SSS flag by default? Or make it optional? Example had it often.
-                gen_mask_value |= 0x20 # Assume this is SUBSURFACE_SCATTERING bit
-                string_gen_mask_parts.append("%SUBSURFACE_SCATTERING")
-
-                # Set the calculated masks, ensuring StringGenMask is not empty if GenMask is non-zero
-                sub_mat.set("GenMask", str(gen_mask_value))
-                if string_gen_mask_parts:
-                    sub_mat.set("StringGenMask", "".join(sorted(list(set(string_gen_mask_parts))))) # Sort for consistency
-                else:
-                     # Ensure StringGenMask is empty if GenMask is 0 or only has flags without string equivalents
-                     sub_mat.set("StringGenMask", "")
-                # --- End Mask Generation ---
-
-                # Add <PublicParams> with potentially updated values
-                ET.SubElement(sub_mat, "PublicParams", **public_params)
-
-
-        # Add default <PublicParams> to root - TODO: Make dynamic?
-        ET.SubElement(root_material, "PublicParams", EmittanceMapGamma="1", SSSIndex="0")
-
-        # Generate pretty XML string
+        existing_submaterial_names = parse_mtl_submaterial_names(mtl_file_path)
+        root_material, exported_materials = build_mtl_document(
+            materials_data,
+            model_output_dir,
+            existing_submaterial_names,
+        )
         xml_string = _pretty_print_xml(root_material)
 
-        # Write to file
         os.makedirs(model_output_dir, exist_ok=True) # Ensure directory exists
         with open(mtl_file_path, "w", encoding="utf-8") as f:
             f.write(xml_string)
@@ -368,7 +341,7 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
         print(f"Successfully exported MTL file to: {mtl_file_path}")
         
         # Generate and export .mtl.cryasset file after successful .mtl export
-        success_cryasset, cryasset_result = export_mtl_cryasset(materials_data, mtl_file_path)
+        success_cryasset, cryasset_result = export_mtl_cryasset(exported_materials, mtl_file_path)
         if not success_cryasset:
             print(f"Warning: MTL file exported successfully, but cryasset file failed: {cryasset_result}")
             # Continue even if cryasset fails - not critical
