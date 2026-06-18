@@ -21,6 +21,12 @@ from PySide6.QtWidgets import (
 
 from language.language_manager import get_text
 from model_processing.material_index_assigner import assign_material_sub_indices
+from model_processing.material_manifest import (
+    discover_material_manifest,
+    load_material_manifest,
+    material_manifest_summary,
+    material_manifest_table_rows,
+)
 from model_processing.model_loader import ModelLoader
 from model_processing.texture_extractor import TextureExtractor
 from ui_pyside.progress_dialog import ProgressDialog
@@ -44,6 +50,25 @@ def collect_model_material_diagnostics(model_data):
                 }
             )
     return diagnostics
+
+
+def load_model_material_manifest(model_path):
+    manifest_path = discover_material_manifest(model_path)
+    manifest = load_material_manifest(manifest_path)
+    return {
+        "path": manifest_path,
+        "manifest": manifest,
+        "summary": material_manifest_summary(manifest, manifest_path) if manifest else {},
+        "materials": material_manifest_table_rows(manifest),
+    }
+
+
+def material_manifest_summary_text(material_manifest_info):
+    summary = (material_manifest_info or {}).get("summary", {})
+    if not summary:
+        return "not found"
+    kind = summary.get("kind") or "material manifest"
+    return f"{summary.get('material_count', 0)} slots / {summary.get('polygon_count', 0)} polygons ({kind})"
 
 
 def model_display_name(model_info):
@@ -88,13 +113,32 @@ class ModelImportPanel(QWidget):
         self.path_label = QLabel("")
         self.path_label.setWordWrap(True)
         self.materials_label = QLabel("0")
+        self.material_manifest_label = QLabel("not found")
+        self.material_manifest_label.setWordWrap(True)
         self.textures_label = QLabel("0")
         self.diagnostics_label = QLabel("0")
         info_layout.addRow(get_text("model_import.path_label", "Path:"), self.path_label)
         info_layout.addRow(get_text("model_import.materials_label", "Materials:"), self.materials_label)
+        info_layout.addRow(get_text("model_import.material_manifest_label", "Material Table:"), self.material_manifest_label)
         info_layout.addRow(get_text("model_import.textures_label", "Textures:"), self.textures_label)
         info_layout.addRow(get_text("model_import.diagnostics_label", "Diagnostics:"), self.diagnostics_label)
         layout.addWidget(info_box)
+
+        material_table_box = QGroupBox(get_text("model_import.material_table", "RC Material Table"))
+        material_table_layout = QVBoxLayout(material_table_box)
+        self.material_table = QTableWidget(0, 4)
+        self.material_table.setHorizontalHeaderLabels(
+            [
+                get_text("model_import.col_slot", "Slot"),
+                get_text("model_import.col_material", "Material"),
+                get_text("model_import.col_source", "Source"),
+                get_text("model_import.col_local_slot", "Local Slot"),
+            ]
+        )
+        self.material_table.horizontalHeader().setStretchLastSection(True)
+        self.material_table.setMinimumHeight(95)
+        material_table_layout.addWidget(self.material_table)
+        layout.addWidget(material_table_box)
 
         diagnostics_box = QGroupBox(get_text("model_import.material_diagnostics", "Material Slot Diagnostics"))
         diagnostics_layout = QVBoxLayout(diagnostics_box)
@@ -156,6 +200,7 @@ class ModelImportPanel(QWidget):
 
         self.imported_models_info.clear()
         self.models_list.clear()
+        self._populate_material_table([])
         self._populate_table([])
 
         progress_dialog = ProgressDialog(
@@ -189,6 +234,7 @@ class ModelImportPanel(QWidget):
                 "model_obj": None,
                 "extracted_textures": [],
                 "material_diagnostics": [],
+                "material_manifest": {},
             }
 
             try:
@@ -197,6 +243,7 @@ class ModelImportPanel(QWidget):
                     model_info["model_obj"] = model
                     model_info["materials"] = len(model.get("materials", []))
                     model_info["material_diagnostics"] = collect_model_material_diagnostics(model)
+                    model_info["material_manifest"] = load_model_material_manifest(file_path)
                     refs = self.texture_extractor.extract(model)
                     textures = self._get_accurate_texture_info(refs)
                     model_info["extracted_textures"] = textures
@@ -287,9 +334,11 @@ class ModelImportPanel(QWidget):
         if row < 0 or row >= len(self.imported_models_info):
             self.path_label.setText("")
             self.materials_label.setText("0")
+            self.material_manifest_label.setText("not found")
             self.textures_label.setText("0")
             self.diagnostics_label.setText("0")
             self._populate_diagnostics_table([])
+            self._populate_material_table([])
             self._populate_table([])
             self.currently_selected_model_textures = []
             self.add_to_processing_button.setEnabled(False)
@@ -298,12 +347,15 @@ class ModelImportPanel(QWidget):
         model_info = self.imported_models_info[row]
         textures = model_info.get("extracted_textures", [])
         diagnostics = model_info.get("material_diagnostics", [])
+        material_manifest = model_info.get("material_manifest", {})
         self.path_label.setText(model_info.get("path", ""))
         self.materials_label.setText(str(model_info.get("materials", 0)))
+        self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
         self.textures_label.setText(str(len(textures)))
         self.diagnostics_label.setText(str(len(diagnostics)))
         self.currently_selected_model_textures = textures
         self._populate_diagnostics_table(diagnostics)
+        self._populate_material_table(material_manifest.get("materials", []))
         self._populate_table(textures)
         self.add_to_processing_button.setEnabled(
             any(texture.get("path") and os.path.exists(texture["path"]) for texture in textures)
@@ -317,6 +369,17 @@ class ModelImportPanel(QWidget):
             self.texture_table.setItem(row, 0, QTableWidgetItem(texture.get("material", "Unknown")))
             self.texture_table.setItem(row, 1, QTableWidgetItem(texture.get("type", "Unknown")))
             self.texture_table.setItem(row, 2, QTableWidgetItem(texture.get("path") or texture.get("filename", "N/A")))
+
+    def _populate_material_table(self, materials):
+        self.material_table.setRowCount(0)
+        for material in materials:
+            row = self.material_table.rowCount()
+            self.material_table.insertRow(row)
+            local_slot = material.get("local_slot")
+            self.material_table.setItem(row, 0, QTableWidgetItem(str(material.get("slot", ""))))
+            self.material_table.setItem(row, 1, QTableWidgetItem(material.get("name", "")))
+            self.material_table.setItem(row, 2, QTableWidgetItem(material.get("source", "")))
+            self.material_table.setItem(row, 3, QTableWidgetItem("" if local_slot is None else str(local_slot)))
 
     def _populate_diagnostics_table(self, diagnostics):
         self.diagnostics_table.setRowCount(0)

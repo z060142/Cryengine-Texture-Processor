@@ -147,5 +147,5 @@ fixture_material_semantic_alignment.ok = true
 ## Remaining Work
 
 - Run the inspector on larger real FBX files and compare against RC output.
-- Feed inspector manifests into the PySide model import diagnostics.
+- Build on Phase 25's PySide manifest visibility with an action that can generate inspector manifests from the UI.
 - Consider renaming `fixture_material_semantic_alignment` to `source_material_semantic_alignment` after UI consumers are updated.

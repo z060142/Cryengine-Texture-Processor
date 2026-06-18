@@ -156,6 +156,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Shared-material and duplicate-name probes show that Blender suffixes such as `.001` are RC-visible material identities, not cosmetic noise; request JSON and `.mtl` generation must preserve them unless the exporter deliberately creates another stable unique name
 - RC smoke material reports now read controlled fixture manifests when available and emit `fixture_material_semantic_alignment`, which distinguishes "CGF id exists" from "that id points to the expected material name"
 - A Blender FBX material inspector can now emit `.fbx_material_manifest.json` sidecars so non-fixture FBX files can use the same semantic material report path
+- The PySide Model Import tab now reads `.fixture_manifest.json` / `.fbx_material_manifest.json` sidecars and displays the RC material table slots when available
 
 ## License
 

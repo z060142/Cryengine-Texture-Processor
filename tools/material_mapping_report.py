@@ -6,6 +6,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
+from model_processing.material_manifest import discover_material_manifest, load_material_manifest
 from utils.cgf_material_reader import read_cgf_material_summary
 
 
@@ -72,21 +73,11 @@ def load_cryasset_details(cryasset_path):
 
 
 def discover_fixture_manifest(source_fbx_path="", copied_fbx_path=""):
-    for fbx_path in (source_fbx_path, copied_fbx_path):
-        if not fbx_path:
-            continue
-        stem = os.path.splitext(fbx_path)[0]
-        for suffix in (".fixture_manifest.json", ".fbx_material_manifest.json"):
-            candidate = stem + suffix
-            if os.path.exists(candidate):
-                return candidate
-    return ""
+    return discover_material_manifest(source_fbx_path, copied_fbx_path)
 
 
 def load_fixture_manifest(manifest_path):
-    if not manifest_path or not os.path.exists(manifest_path):
-        return {}
-    return _read_json(manifest_path)
+    return load_material_manifest(manifest_path)
 
 
 def evaluate_material_slot_alignment(request_materials, mtl_slots):

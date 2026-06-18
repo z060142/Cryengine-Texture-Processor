@@ -1,4 +1,11 @@
-from ui_pyside.model_import import collect_model_material_diagnostics, model_display_name
+import json
+
+from ui_pyside.model_import import (
+    collect_model_material_diagnostics,
+    load_model_material_manifest,
+    material_manifest_summary_text,
+    model_display_name,
+)
 
 
 def test_collect_model_material_diagnostics_reports_deleted_known_slot():
@@ -80,3 +87,30 @@ def test_model_display_name_marks_hazards():
         )
         == "tree.fbx [hazard]"
     )
+
+
+def test_load_model_material_manifest_reads_fbx_material_sidecar(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+    manifest_path = tmp_path / "asset.fbx_material_manifest.json"
+    fbx_path.write_text("fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Stone", "first_object": "Mesh", "first_local_slot": 0}],
+                "polygons": [{"polygon": 0}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    info = load_model_material_manifest(str(fbx_path))
+
+    assert info["path"] == str(manifest_path)
+    assert info["summary"]["material_count"] == 1
+    assert info["materials"] == [{"slot": 0, "name": "Stone", "source": "Mesh", "local_slot": 0}]
+    assert material_manifest_summary_text(info) == "1 slots / 1 polygons (blender-fbx-material-inspection)"
+
+
+def test_material_manifest_summary_text_handles_missing_manifest():
+    assert material_manifest_summary_text({}) == "not found"
