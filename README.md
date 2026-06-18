@@ -109,6 +109,13 @@ Existing `.cgf` files can be inspected with:
 uv run python -m tools.cgf_material_probe path/to/asset.cgf
 ```
 
+Controlled Blender fixtures can be generated and verified with:
+
+```bash
+uv run python -m tools.blender_material_fixture --output-dir path/to/fixture
+uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json
+```
+
 ## Technologies
 
 - **Python**: Main programming language
@@ -128,6 +135,7 @@ uv run python -m tools.cgf_material_probe path/to/asset.cgf
 - RC execution now uses a structured runner; a real `rc.exe` smoke test has passed with the local GameSDK `CubeA.fbx` sample
 - A repeatable RC smoke harness is available via `uv run python -m tools.rc_smoke_test`
 - Smoke runs now emit a material mapping report with CGF `MeshSubsets.nMatID` inspection; controlled multi-material FBX fixtures are still needed to prove polygon assignment behavior end to end
+- A controlled Blender FBX fixture has verified that used material slots `0` and `1` survive RC conversion into CGF `MeshSubsets.nMatID`
 
 ## License
 

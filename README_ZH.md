@@ -107,6 +107,13 @@ harness 也会写出 `<asset>.material_report.json`，用于对照 RC request �
 uv run python -m tools.cgf_material_probe path/to/asset.cgf
 ```
 
+受控 Blender fixture 可用下列命令生成并验证：
+
+```bash
+uv run python -m tools.blender_material_fixture --output-dir path/to/fixture
+uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json
+```
+
 ## 技术
 
 - **Python**：主要编程语言
@@ -126,6 +133,7 @@ uv run python -m tools.cgf_material_probe path/to/asset.cgf
 - RC 执行现在改用结构化 runner；已用本机 GameSDK `CubeA.fbx` 样本通过真实 `rc.exe` smoke test
 - 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
 - Smoke 运行现在会输出含 CGF `MeshSubsets.nMatID` 检查的材质映射报告；仍需受控多材质 FBX fixture 才能端到端证明 polygon assignment 行为
+- 受控 Blender FBX fixture 已验证使用中的材质槽 `0` 与 `1` 会在 RC 转换后保留为 CGF `MeshSubsets.nMatID`
 
 ## 许可证
 
