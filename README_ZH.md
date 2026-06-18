@@ -89,6 +89,16 @@
 3. 从模型中提取贴图
 4. 将提取的贴图添加到处理队列
 
+### RC FBX Smoke Test
+
+仓库内有一个可重复执行的 CryEngine Resource Compiler FBX 转换 smoke harness：
+
+```bash
+uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to the bone\rc_smoke_work_default" --asset-name "CubeA_default_smoke" --materials "Default"
+```
+
+当本机存在 CryEngine 5.7.1 与 GameSDK sample 目录时，harness 会自动发现 `rc.exe` 与 `objects\cubao\CubeA.fbx`。已验证的真实 RC 执行会在指定工作目录生成 `.fbx`、`.mtl`、`.json`、`.cgf` 与 `.cryasset`。
+
 ## 技术
 
 - **Python**：主要编程语言
@@ -105,8 +115,8 @@
 - 要进行适当的 DDS 生成，必须在首选项中配置 RC.exe 路径
 - 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
 - RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
-- RC 执行现在改用结构化 runner，但真实 `rc.exe` smoke test 仍需要样本资产
-- 可重复执行的 RC smoke harness 已可通过 `python -m tools.rc_smoke_test` 使用
+- RC 执行现在改用结构化 runner；已用本机 GameSDK `CubeA.fbx` 样本通过真实 `rc.exe` smoke test
+- 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
 
 ## 许可证
 

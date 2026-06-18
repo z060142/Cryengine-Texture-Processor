@@ -17,6 +17,11 @@ model = [
     "bpy>=5.1; python_version >= '3.13' and python_version < '3.14'",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
 [project.scripts]
 cryengine-texture-processor = "main:main"
 

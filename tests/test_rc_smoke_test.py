@@ -3,6 +3,7 @@ import os
 
 from tools.rc_smoke_test import (
     build_smoke_model_data,
+    discover_default_fbx,
     material_names_from_arg,
     prepare_smoke_bundle,
     run_rc_smoke_test,
@@ -13,6 +14,14 @@ from utils.rc_import_runner import RCImportResult
 def test_material_names_from_arg_uses_default_when_empty():
     assert material_names_from_arg("") == ["Default"]
     assert material_names_from_arg(" Bark, Leaves ,,") == ["Bark", "Leaves"]
+
+
+def test_discover_default_fbx_returns_first_existing_candidate(tmp_path):
+    missing = tmp_path / "missing.fbx"
+    existing = tmp_path / "sample.fbx"
+    existing.write_text("fake fbx", encoding="utf-8")
+
+    assert discover_default_fbx([str(missing), str(existing)]) == str(existing)
 
 
 def test_build_smoke_model_data_uses_empty_node_list():

@@ -17,6 +17,11 @@ DEFAULT_RC_CANDIDATES = (
     r"S:\Crytek\crytek\CRYENGINE_Source-release\Tools\rc\rc.exe",
 )
 
+DEFAULT_FBX_CANDIDATES = (
+    r"S:\Crytek\crytek\cryengine-gamesdk-sample-project\5.7.1\gamesdk\objects\cubao\CubeA.fbx",
+    r"S:\Crytek\crytek\cryengine-gamesdk-sample-project\5.7.1\gamesdk\objects\cubez\CubeA.fbx",
+)
+
 
 @dataclass
 class RCSmokeResult:
@@ -33,6 +38,13 @@ class RCSmokeResult:
 
 
 def discover_default_rc(candidates=DEFAULT_RC_CANDIDATES):
+    for candidate in candidates:
+        if candidate and os.path.exists(candidate):
+            return candidate
+    return ""
+
+
+def discover_default_fbx(candidates=DEFAULT_FBX_CANDIDATES):
     for candidate in candidates:
         if candidate and os.path.exists(candidate):
             return candidate
@@ -145,7 +157,7 @@ def run_rc_smoke_test(
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Run a minimal CryEngine RC FBX import smoke test.")
     parser.add_argument("--rc", default=discover_default_rc(), help="Path to rc.exe")
-    parser.add_argument("--fbx", required=True, help="Path to a source FBX sample")
+    parser.add_argument("--fbx", default=discover_default_fbx(), help="Path to a source FBX sample")
     parser.add_argument("--work-dir", required=True, help="Directory for generated smoke-test files")
     parser.add_argument("--asset-name", default=None, help="Output asset base name")
     parser.add_argument("--materials", default="Default", help="Comma-separated material names")

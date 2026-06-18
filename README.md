@@ -91,6 +91,16 @@ The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migra
 3. Extract textures from the model
 4. Add extracted textures to the processing queue
 
+### RC FBX Smoke Test
+
+The repository includes a repeatable smoke harness for CryEngine Resource Compiler FBX conversion:
+
+```bash
+uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to the bone\rc_smoke_work_default" --asset-name "CubeA_default_smoke" --materials "Default"
+```
+
+When local CryEngine 5.7.1 and GameSDK sample folders are present, the harness discovers `rc.exe` and `objects\cubao\CubeA.fbx` automatically. The verified run writes a `.fbx`, `.mtl`, `.json`, `.cgf`, and `.cryasset` bundle under the selected work directory.
+
 ## Technologies
 
 - **Python**: Main programming language
@@ -107,8 +117,8 @@ The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migra
 - For proper DDS generation, RC.exe path must be configured in preferences
 - For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration
 - RC request generation now aligns material sub-indices with existing `.mtl` submaterial slots where possible; true FBX material-id extraction still needs a later pass
-- RC execution now uses a structured runner, but real `rc.exe` smoke tests still need sample assets
-- A repeatable RC smoke harness is available via `python -m tools.rc_smoke_test`
+- RC execution now uses a structured runner; a real `rc.exe` smoke test has passed with the local GameSDK `CubeA.fbx` sample
+- A repeatable RC smoke harness is available via `uv run python -m tools.rc_smoke_test`
 
 ## License
 
