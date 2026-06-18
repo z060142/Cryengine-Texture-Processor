@@ -94,6 +94,6 @@ uv run python -m compileall ui_pyside model_processing tools tests
 
 ## Remaining Work
 
-- Add a PySide action to generate `.fbx_material_manifest.json` through Blender.
+- Build on Phase 26's PySide action by using generated manifests in request JSON and `.mtl` generation.
 - Surface material semantic alignment failures directly in the Model Import tab.
 - Use the manifest table as the source of truth when building request JSON and `.mtl` from imported FBX models.

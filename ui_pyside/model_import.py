@@ -29,6 +29,7 @@ from model_processing.material_manifest import (
 )
 from model_processing.model_loader import ModelLoader
 from model_processing.texture_extractor import TextureExtractor
+from tools.blender_material_inspector import inspect_fbx_materials
 from ui_pyside.progress_dialog import ProgressDialog
 
 
@@ -69,6 +70,11 @@ def material_manifest_summary_text(material_manifest_info):
         return "not found"
     kind = summary.get("kind") or "material manifest"
     return f"{summary.get('material_count', 0)} slots / {summary.get('polygon_count', 0)} polygons ({kind})"
+
+
+def generate_model_material_manifest(model_path, inspector_func=inspect_fbx_materials):
+    inspector_func("", model_path)
+    return load_model_material_manifest(model_path)
 
 
 def model_display_name(model_info):
@@ -126,6 +132,15 @@ class ModelImportPanel(QWidget):
 
         material_table_box = QGroupBox(get_text("model_import.material_table", "RC Material Table"))
         material_table_layout = QVBoxLayout(material_table_box)
+        material_table_actions = QHBoxLayout()
+        self.generate_material_manifest_button = QPushButton(
+            get_text("model_import.generate_material_manifest", "Generate Material Table")
+        )
+        self.generate_material_manifest_button.clicked.connect(self._generate_material_manifest)
+        self.generate_material_manifest_button.setEnabled(False)
+        material_table_actions.addWidget(self.generate_material_manifest_button)
+        material_table_actions.addStretch(1)
+        material_table_layout.addLayout(material_table_actions)
         self.material_table = QTableWidget(0, 4)
         self.material_table.setHorizontalHeaderLabels(
             [
@@ -200,6 +215,7 @@ class ModelImportPanel(QWidget):
 
         self.imported_models_info.clear()
         self.models_list.clear()
+        self.generate_material_manifest_button.setEnabled(False)
         self._populate_material_table([])
         self._populate_table([])
 
@@ -342,6 +358,7 @@ class ModelImportPanel(QWidget):
             self._populate_table([])
             self.currently_selected_model_textures = []
             self.add_to_processing_button.setEnabled(False)
+            self.generate_material_manifest_button.setEnabled(False)
             return
 
         model_info = self.imported_models_info[row]
@@ -359,6 +376,9 @@ class ModelImportPanel(QWidget):
         self._populate_table(textures)
         self.add_to_processing_button.setEnabled(
             any(texture.get("path") and os.path.exists(texture["path"]) for texture in textures)
+        )
+        self.generate_material_manifest_button.setEnabled(
+            model_info.get("path", "").lower().endswith(".fbx") and os.path.exists(model_info.get("path", ""))
         )
 
     def _populate_table(self, textures):
@@ -380,6 +400,42 @@ class ModelImportPanel(QWidget):
             self.material_table.setItem(row, 1, QTableWidgetItem(material.get("name", "")))
             self.material_table.setItem(row, 2, QTableWidgetItem(material.get("source", "")))
             self.material_table.setItem(row, 3, QTableWidgetItem("" if local_slot is None else str(local_slot)))
+
+    def _generate_material_manifest(self):
+        row = self.models_list.currentRow()
+        if row < 0 or row >= len(self.imported_models_info):
+            return
+
+        model_info = self.imported_models_info[row]
+        model_path = model_info.get("path", "")
+        if not model_path or not model_path.lower().endswith(".fbx"):
+            QMessageBox.warning(
+                self,
+                get_text("error.title", "Error"),
+                get_text("model_import.material_manifest_fbx_only", "Material table inspection requires an FBX file."),
+            )
+            return
+
+        try:
+            material_manifest = generate_model_material_manifest(model_path)
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                get_text("error.title", "Error"),
+                get_text("model_import.material_manifest_failed", "Failed to generate material table:\n{error}").format(
+                    error=e
+                ),
+            )
+            return
+
+        model_info["material_manifest"] = material_manifest
+        self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
+        self._populate_material_table(material_manifest.get("materials", []))
+        QMessageBox.information(
+            self,
+            get_text("model_import.material_manifest_title", "Material Table"),
+            get_text("model_import.material_manifest_generated", "Material table generated successfully."),
+        )
 
     def _populate_diagnostics_table(self, diagnostics):
         self.diagnostics_table.setRowCount(0)
