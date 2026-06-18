@@ -2,15 +2,22 @@ import os
 
 from tools.blender_material_fixture import (
     DEFAULT_MATERIALS,
+    DEFAULT_POLYGON_SLOTS,
     build_blender_command,
     discover_default_blender,
     material_names_from_arg,
+    polygon_slots_from_arg,
 )
 
 
 def test_material_names_from_arg_uses_defaults():
     assert material_names_from_arg("") == list(DEFAULT_MATERIALS)
     assert material_names_from_arg(" A, B ,, C ") == ["A", "B", "C"]
+
+
+def test_polygon_slots_from_arg_uses_defaults():
+    assert polygon_slots_from_arg("") == list(DEFAULT_POLYGON_SLOTS)
+    assert polygon_slots_from_arg(" 0, 2 ,, 1 ") == [0, 2, 1]
 
 
 def test_discover_default_blender_returns_first_existing_candidate(tmp_path):

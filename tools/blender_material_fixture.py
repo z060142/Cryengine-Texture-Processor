@@ -18,6 +18,7 @@ DEFAULT_BLENDER_CANDIDATES = (
 )
 
 DEFAULT_MATERIALS = ("Slot_0_Red", "Slot_1_Green", "Slot_2_Blue")
+DEFAULT_POLYGON_SLOTS = (0, 1)
 
 
 def discover_default_blender(candidates=DEFAULT_BLENDER_CANDIDATES):
@@ -27,36 +28,37 @@ def discover_default_blender(candidates=DEFAULT_BLENDER_CANDIDATES):
     return ""
 
 
-def _blender_script(output_fbx_path, manifest_path, material_names):
+def _blender_script(output_fbx_path, manifest_path, material_names, polygon_material_slots):
     material_names_expr = repr(list(material_names))
+    polygon_slots_expr = repr(list(polygon_material_slots))
     output_fbx_expr = repr(output_fbx_path)
     manifest_expr = repr(manifest_path)
     return f"""
 import json
-import math
 import os
 
 import bpy
-from mathutils import Vector
 
 output_fbx_path = {output_fbx_expr}
 manifest_path = {manifest_expr}
 material_names = {material_names_expr}
+polygon_material_slots = {polygon_slots_expr}
 
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete()
 
 mesh = bpy.data.meshes.new('CE_MaterialSlotProbeMesh')
-verts = [
-    (-1.0, -1.0, 0.0),
-    (1.0, -1.0, 0.0),
-    (1.0, 1.0, 0.0),
-    (-1.0, 1.0, 0.0),
-]
-faces = [
-    (0, 1, 2),
-    (0, 2, 3),
-]
+verts = []
+faces = []
+for polygon_index, material_slot in enumerate(polygon_material_slots):
+    x = float(polygon_index) * 3.0
+    base = len(verts)
+    verts.extend([
+        (x - 1.0, -1.0, 0.0),
+        (x + 1.0, -1.0, 0.0),
+        (x, 1.0, 0.0),
+    ])
+    faces.append((base, base + 1, base + 2))
 mesh.from_pydata(verts, [], faces)
 mesh.update()
 
@@ -76,7 +78,7 @@ for index, name in enumerate(material_names):
     obj.data.materials.append(mat)
 
 for polygon in obj.data.polygons:
-    polygon.material_index = polygon.index % len(material_names)
+    polygon.material_index = polygon_material_slots[polygon.index]
 
 bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
 
@@ -111,6 +113,7 @@ manifest = {{
         }}
         for polygon in obj.data.polygons
     ],
+    'polygon_material_slots': polygon_material_slots,
     'expect_cgf_material_ids': sorted(set(polygon.material_index for polygon in obj.data.polygons)),
 }}
 with open(manifest_path, 'w', encoding='utf-8') as f:
@@ -123,10 +126,17 @@ def build_blender_command(blender_path, script_path):
     return [blender_path, "--background", "--factory-startup", "--python", script_path]
 
 
-def generate_material_fixture(blender_path, output_dir, asset_name="CE_MaterialSlotProbe", material_names=None):
+def generate_material_fixture(
+    blender_path,
+    output_dir,
+    asset_name="CE_MaterialSlotProbe",
+    material_names=None,
+    polygon_material_slots=None,
+):
     blender_path = blender_path or discover_default_blender()
     output_dir = os.path.abspath(output_dir)
     material_names = tuple(material_names or DEFAULT_MATERIALS)
+    polygon_material_slots = tuple(polygon_material_slots or DEFAULT_POLYGON_SLOTS)
 
     if not blender_path:
         raise RuntimeError("Blender executable path is required")
@@ -134,6 +144,16 @@ def generate_material_fixture(blender_path, output_dir, asset_name="CE_MaterialS
         raise RuntimeError(f"Blender executable not found: {blender_path}")
     if not material_names:
         raise RuntimeError("At least one material name is required")
+    if not polygon_material_slots:
+        raise RuntimeError("At least one polygon material slot is required")
+    max_slot = max(polygon_material_slots)
+    min_slot = min(polygon_material_slots)
+    if min_slot < 0:
+        raise RuntimeError("Polygon material slots must be zero or positive")
+    if max_slot >= len(material_names):
+        raise RuntimeError(
+            f"Polygon material slot {max_slot} has no matching material; only {len(material_names)} materials were provided"
+        )
 
     os.makedirs(output_dir, exist_ok=True)
     output_fbx_path = os.path.join(output_dir, f"{asset_name}.fbx")
@@ -141,7 +161,7 @@ def generate_material_fixture(blender_path, output_dir, asset_name="CE_MaterialS
 
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as script_file:
         script_path = script_file.name
-        script_file.write(_blender_script(output_fbx_path, manifest_path, material_names))
+        script_file.write(_blender_script(output_fbx_path, manifest_path, material_names, polygon_material_slots))
 
     command = build_blender_command(blender_path, script_path)
     try:
@@ -175,12 +195,29 @@ def material_names_from_arg(value):
     return names or list(DEFAULT_MATERIALS)
 
 
+def polygon_slots_from_arg(value):
+    if not value:
+        return list(DEFAULT_POLYGON_SLOTS)
+    slots = []
+    for item in value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        slots.append(int(item))
+    return slots or list(DEFAULT_POLYGON_SLOTS)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Generate a controlled multi-material FBX fixture with Blender.")
     parser.add_argument("--blender", default=discover_default_blender(), help="Path to blender.exe")
     parser.add_argument("--output-dir", required=True, help="Directory for generated fixture files")
     parser.add_argument("--asset-name", default="CE_MaterialSlotProbe", help="Output FBX base name")
     parser.add_argument("--materials", default=",".join(DEFAULT_MATERIALS), help="Comma-separated material names")
+    parser.add_argument(
+        "--polygon-slots",
+        default=",".join(str(slot) for slot in DEFAULT_POLYGON_SLOTS),
+        help="Comma-separated material slot index for each generated triangle",
+    )
     args = parser.parse_args(argv)
 
     result = generate_material_fixture(
@@ -188,6 +225,7 @@ def main(argv=None):
         args.output_dir,
         asset_name=args.asset_name,
         material_names=material_names_from_arg(args.materials),
+        polygon_material_slots=polygon_slots_from_arg(args.polygon_slots),
     )
 
     print(f"success: {result['success']}")

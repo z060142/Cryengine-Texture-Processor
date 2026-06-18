@@ -134,6 +134,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
 - Smoke 运行现在会输出含 CGF `MeshSubsets.nMatID` 检查的材质映射报告；仍需受控多材质 FBX fixture 才能端到端证明 polygon assignment 行为
 - 受控 Blender FBX fixture 已验证使用中的材质槽 `0` 与 `1` 会在 RC 转换后保留为 CGF `MeshSubsets.nMatID`
+- 受控 fixture 已验证 RC 会保留 `0` 与 `2` 这种有洞的材质 id，不会压缩成连续 id
 
 ## 许可证
 
