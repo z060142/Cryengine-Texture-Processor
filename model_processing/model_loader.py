@@ -11,6 +11,10 @@ import importlib
 
 from model_processing.material_slot_usage import build_material_slot_usage
 
+LOAD_STATUS_LOADED = "loaded"
+LOAD_STATUS_IMPORT_ONLY = "import_only"
+LOAD_STATUS_DUMMY = "dummy"
+
 class ModelLoader:
     """
     Class for loading 3D models using Blender's Python API.
@@ -72,7 +76,7 @@ class ModelLoader:
         """
         if not self.bpy:
             print("Cannot load model: Blender Python API not available")
-            return self._create_dummy_model(file_path)
+            return self._create_dummy_model(file_path, "Blender Python API (bpy) is not available")
         
         # Store the directory of the model file for texture path resolution
         self.last_loaded_dir = os.path.dirname(os.path.abspath(file_path))
@@ -112,7 +116,7 @@ class ModelLoader:
                     import_success = True
                 else:
                     print(f"Unsupported format: {extension}")
-                    return self._create_dummy_model(file_path)
+                    return self._create_dummy_model(file_path, f"Unsupported model format: {extension}")
             except Exception as e:
                 print(f"Error during standard import: {e}")
                 import_error = e
@@ -130,7 +134,7 @@ class ModelLoader:
                     # If alternative method also failed, return dummy model with original error
                     if import_error:
                         print(f"Alternative texture extraction also failed: {import_error}")
-                    return self._create_dummy_model(file_path)
+                    return self._create_dummy_model(file_path, str(import_error) if import_error else "Model import failed")
             
             # If standard import was successful, create model object with scene data
             meshes = self._extract_meshes()
@@ -142,6 +146,7 @@ class ModelLoader:
             model = {
                 "path": file_path,
                 "filename": os.path.basename(file_path),
+                "load_status": LOAD_STATUS_LOADED,
                 "materials": materials,
                 "meshes": meshes,
                 "scene_hierarchy": self._extract_scene_hierarchy()  # 添加場景層次結構
@@ -151,7 +156,7 @@ class ModelLoader:
             
         except Exception as e:
             print(f"Error loading model: {e}")
-            return self._create_dummy_model(file_path)
+            return self._create_dummy_model(file_path, str(e))
     
     def _clear_scene(self):
         """
@@ -350,6 +355,8 @@ class ModelLoader:
             model = {
                 "path": file_path,
                 "filename": os.path.basename(file_path),
+                "load_status": LOAD_STATUS_IMPORT_ONLY,
+                "load_warning": "Standard Blender import failed; using filesystem texture scan only.",
                 "materials": [],
                 "meshes": [],
                 "is_import_only": True  # Flag to indicate this is for import only
@@ -376,7 +383,7 @@ class ModelLoader:
             print(f"Error in alternative texture extraction: {e}")
             return None
             
-    def _create_dummy_model(self, file_path):
+    def _create_dummy_model(self, file_path, error_message="Model loading failed"):
         """
         Create a placeholder model object when actual loading fails.
         
@@ -389,6 +396,8 @@ class ModelLoader:
         return {
             "path": file_path,
             "filename": os.path.basename(file_path),
+            "load_status": LOAD_STATUS_DUMMY,
+            "load_error": error_message,
             "materials": [],
             "meshes": [],
             "is_dummy": True  # Flag to indicate this is a dummy model

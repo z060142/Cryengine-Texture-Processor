@@ -14,7 +14,7 @@ class TextureReference:
     Class representing a reference to a texture in a model material.
     """
     
-    def __init__(self, path, texture_type, material_name):
+    def __init__(self, path, texture_type, material_name, source_mode="blender"):
         """
         Initialize a texture reference.
         
@@ -28,6 +28,7 @@ class TextureReference:
         self.material_name = material_name
         self.filename = os.path.basename(path) if path else ""
         self.processed_path = None
+        self.source_mode = source_mode
     
     def set_processed_path(self, processed_path):
         """
@@ -50,7 +51,8 @@ class TextureReference:
             "type": self.texture_type,
             "material": self.material_name,
             "filename": self.filename,
-            "processed_path": self.processed_path
+            "processed_path": self.processed_path,
+            "source_mode": self.source_mode,
         }
 
 
@@ -114,14 +116,16 @@ class TextureExtractor:
             List of TextureReference objects
         """
         # Check if this is a dummy model or if Blender is not available
-        if not self.bpy or model.get("is_dummy", False):
-            # Create dummy texture references if bpy is not available or model is a dummy
-            return self._create_dummy_references(model)
+        if model.get("is_dummy", False):
+            print("Skipping texture extraction for dummy model.")
+            return []
+
+        if not self.bpy:
+            return self._create_filesystem_references(model, source_mode="filesystem_no_bpy")
             
         # Check if this is an import-only model (created by alternative import method)
         if model.get("is_import_only", False):
-            # Use the enhanced dummy reference creation that scans directories
-            return self._create_enhanced_references(model)
+            return self._create_filesystem_references(model, source_mode="filesystem_import_only")
         
         # If this is a full Blender model, extract textures using Blender's API
         texture_references = []
@@ -147,7 +151,8 @@ class TextureExtractor:
                             TextureReference(
                                 path=texture_path,
                                 texture_type=texture_type,
-                                material_name=material.name
+                                material_name=material.name,
+                                source_mode="blender",
                             )
                         )
         
@@ -223,25 +228,26 @@ class TextureExtractor:
         
         return texture_type
     
-    def _create_enhanced_references(self, model):
+    def _create_filesystem_references(self, model, source_mode="filesystem_import_only"):
         """
-        Create enhanced texture references for import-only models.
+        Create filesystem-scanned texture references for degraded model loads.
         This method performs a more thorough scan for textures in common locations.
         
         Args:
-            model: Model dictionary with is_import_only=True
+            model: Model dictionary
             
         Returns:
             List of TextureReference objects
         """
         texture_references = []
+        seen_paths = set()
         
         # Get the model path and extract directory
         model_path = model.get("path", "")
         model_dir = os.path.dirname(model_path)
         model_name = os.path.splitext(os.path.basename(model_path))[0]
         
-        print(f"Scanning for textures for import-only model: {model_name}")
+        print(f"Scanning for textures for model '{model_name}' using {source_mode} mode")
         
         # Define common texture directories to check
         directories_to_check = [
@@ -290,6 +296,10 @@ class TextureExtractor:
                         # Check if this is a texture file
                         if file.lower().endswith(texture_extensions):
                             file_path = os.path.join(root, file)
+                            normalized_file_path = os.path.normcase(os.path.abspath(file_path))
+                            if normalized_file_path in seen_paths:
+                                continue
+                            seen_paths.add(normalized_file_path)
                             file_lower = file.lower()
                             
                             # Determine texture type from filename
@@ -316,7 +326,8 @@ class TextureExtractor:
                                 TextureReference(
                                     path=file_path,
                                     texture_type=texture_type,
-                                    material_name=material_name
+                                    material_name=material_name,
+                                    source_mode=source_mode,
                                 )
                             )
                             print(f"Found texture: {file} (Type: {texture_type}, Material: {material_name})")
@@ -329,10 +340,14 @@ class TextureExtractor:
             # This would be better implemented in a real solution
         
         return texture_references
+
+    def _create_enhanced_references(self, model):
+        """Compatibility wrapper for older tests/callers."""
+        return self._create_filesystem_references(model, source_mode="filesystem_import_only")
         
     def _create_dummy_references(self, model):
         """
-        Create dummy texture references when bpy is not available or model is dummy.
+        Create filesystem texture references for legacy callers.
         
         Args:
             model: Model dictionary
@@ -340,52 +355,9 @@ class TextureExtractor:
         Returns:
             List of dummy TextureReference objects
         """
-        texture_references = []
-        
-        # Parse model path to get base directory
-        model_dir = os.path.dirname(model.get("path", ""))
-        
-        # Check if a textures folder exists in the same directory as the model
-        textures_dir = os.path.join(model_dir, "textures")
-        if os.path.exists(textures_dir) and os.path.isdir(textures_dir):
-            # Look for common texture file patterns
-            for root, _, files in os.walk(textures_dir):
-                for file in files:
-                    if file.lower().endswith((".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".bmp")):
-                        file_path = os.path.join(root, file)
-                        file_lower = file.lower()
-                        
-                        # Try to determine texture type from filename
-                        texture_type = "diffuse"  # Default
-                        if "_normal" in file_lower or "_n" in file_lower or "_nrm" in file_lower:
-                            texture_type = "normal"
-                        elif "_spec" in file_lower or "_s" in file_lower:
-                            texture_type = "specular"
-                        elif "_rough" in file_lower or "_r" in file_lower:
-                            texture_type = "roughness"
-                        elif "_gloss" in file_lower or "_glossy" in file_lower or "_g" in file_lower:
-                            texture_type = "glossiness"
-                        elif "_metal" in file_lower or "_m" in file_lower:
-                            texture_type = "metallic"
-                        elif "_emission" in file_lower or "_e" in file_lower or "_emissive" in file_lower:
-                            texture_type = "emissive"
-                        elif "_alpha" in file_lower or "_a" in file_lower or "_opacity" in file_lower:
-                            texture_type = "alpha"
-                        elif "_ao" in file_lower or "_ambient" in file_lower or "_occlusion" in file_lower:
-                            texture_type = "ao"
-                        elif "_height" in file_lower or "_h" in file_lower or "_disp" in file_lower or "_displacement" in file_lower:
-                            texture_type = "displacement"
-                        
-                        # Create texture reference
-                        texture_references.append(
-                            TextureReference(
-                                path=file_path,
-                                texture_type=texture_type,
-                                material_name="Material"  # Generic material name
-                            )
-                        )
-        
-        return texture_references
+        if model.get("is_dummy", False):
+            return []
+        return self._create_filesystem_references(model, source_mode="filesystem_legacy")
     
     def find_missing_textures(self, texture_references):
         """

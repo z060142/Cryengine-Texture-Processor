@@ -437,6 +437,7 @@ class ModelImportPanel(QWidget):
                     "filename": ref.filename,
                     "processed_path": ref.processed_path,
                     "base_name": base_name,
+                    "source_mode": getattr(ref, "source_mode", ""),
                 }
             )
 
