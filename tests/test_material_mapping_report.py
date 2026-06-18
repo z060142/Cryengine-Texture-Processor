@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 from tools.material_mapping_report import (
     build_material_mapping_report,
+    evaluate_cgf_material_ids,
     evaluate_material_slot_alignment,
     load_cryasset_details,
     load_mtl_slots,
@@ -71,6 +72,20 @@ def test_evaluate_material_slot_alignment_reports_mismatch():
     assert result["checks"][0]["type"] == "slot_name_mismatch"
 
 
+def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
+    result = evaluate_cgf_material_ids(
+        {"material_ids": [0, 2]},
+        [{"name": "Bark", "sub_index": 0}, {"name": "Leaves", "sub_index": 1}],
+        [{"slot": 0, "name": "Bark"}, {"slot": 2, "name": "Proxy"}],
+    )
+
+    assert not result["ok"]
+    assert result["checks"] == [
+        {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Bark"},
+        {"ok": False, "material_id": 2, "in_request": False, "in_mtl": True, "mtl_slot_name": "Proxy"},
+    ]
+
+
 def test_build_and_write_material_mapping_report(tmp_path):
     json_path = tmp_path / "asset.json"
     json_path.write_text(
@@ -107,6 +122,7 @@ def test_build_and_write_material_mapping_report(tmp_path):
     assert report["rc"]["output_exists"]
     assert report["rc"]["output_size"] == 3
     assert report["mtl_cryasset_details"]["subMaterialCount"] == "1"
+    assert report["cgf_material_id_alignment"]["material_ids"] == []
 
     report_path = tmp_path / "asset.material_report.json"
     write_material_mapping_report(report, str(report_path))

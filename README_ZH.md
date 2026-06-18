@@ -101,6 +101,12 @@ uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to th
 
 harness 也会写出 `<asset>.material_report.json`，用于对照 RC request 的材质 `sub_index` 与生成 `.mtl` 的子材质槽位。
 
+既有 `.cgf` 文件可用下列命令检查：
+
+```bash
+uv run python -m tools.cgf_material_probe path/to/asset.cgf
+```
+
 ## 技术
 
 - **Python**：主要编程语言
@@ -119,7 +125,7 @@ harness 也会写出 `<asset>.material_report.json`，用于对照 RC request �
 - RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
 - RC 执行现在改用结构化 runner；已用本机 GameSDK `CubeA.fbx` 样本通过真实 `rc.exe` smoke test
 - 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
-- Smoke 运行现在会输出材质映射报告；最终 `.cgf` 内部材质表仍需要后续用 CryEngine-aware reader 或 editor-side 检查
+- Smoke 运行现在会输出含 CGF `MeshSubsets.nMatID` 检查的材质映射报告；仍需受控多材质 FBX fixture 才能端到端证明 polygon assignment 行为
 
 ## 许可证
 

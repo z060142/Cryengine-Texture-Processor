@@ -103,6 +103,12 @@ When local CryEngine 5.7.1 and GameSDK sample folders are present, the harness d
 
 The harness also writes `<asset>.material_report.json`, which compares RC request material `sub_index` values with generated `.mtl` sub-material slots.
 
+Existing `.cgf` files can be inspected with:
+
+```bash
+uv run python -m tools.cgf_material_probe path/to/asset.cgf
+```
+
 ## Technologies
 
 - **Python**: Main programming language
@@ -121,7 +127,7 @@ The harness also writes `<asset>.material_report.json`, which compares RC reques
 - RC request generation now aligns material sub-indices with existing `.mtl` submaterial slots where possible; true FBX material-id extraction still needs a later pass
 - RC execution now uses a structured runner; a real `rc.exe` smoke test has passed with the local GameSDK `CubeA.fbx` sample
 - A repeatable RC smoke harness is available via `uv run python -m tools.rc_smoke_test`
-- Smoke runs now emit a material mapping report; final `.cgf` material table inspection still needs a later CryEngine-aware reader or editor-side check
+- Smoke runs now emit a material mapping report with CGF `MeshSubsets.nMatID` inspection; controlled multi-material FBX fixtures are still needed to prove polygon assignment behavior end to end
 
 ## License
 

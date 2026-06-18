@@ -6,6 +6,8 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
+from utils.cgf_material_reader import read_cgf_material_summary
+
 
 def _read_json(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -115,6 +117,31 @@ def evaluate_material_slot_alignment(request_materials, mtl_slots):
     return {"ok": ok, "checks": checks}
 
 
+def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots):
+    material_ids = cgf_material_summary.get("material_ids", []) if cgf_material_summary else []
+    request_slots = {material.get("sub_index") for material in request_materials if material.get("sub_index") is not None}
+    mtl_slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
+    checks = []
+    ok = True
+
+    for material_id in material_ids:
+        in_request = material_id in request_slots
+        in_mtl = material_id in mtl_slots_by_index
+        check_ok = in_request and in_mtl
+        ok = ok and check_ok
+        checks.append(
+            {
+                "ok": check_ok,
+                "material_id": material_id,
+                "in_request": in_request,
+                "in_mtl": in_mtl,
+                "mtl_slot_name": mtl_slots_by_index.get(material_id, {}).get("name", ""),
+            }
+        )
+
+    return {"ok": ok, "checks": checks, "material_ids": material_ids}
+
+
 def build_material_mapping_report(
     json_path,
     mtl_path,
@@ -131,6 +158,13 @@ def build_material_mapping_report(
 
     output_exists = bool(expected_output_path and os.path.exists(expected_output_path))
     output_size = os.path.getsize(expected_output_path) if output_exists else 0
+    cgf_material_summary = {}
+    cgf_read_error = ""
+    if output_exists:
+        try:
+            cgf_material_summary = read_cgf_material_summary(expected_output_path)
+        except Exception as e:
+            cgf_read_error = str(e)
 
     return {
         "paths": {
@@ -147,10 +181,13 @@ def build_material_mapping_report(
             "output_exists": output_exists,
             "output_size": output_size,
         },
+        "cgf_material_summary": cgf_material_summary,
+        "cgf_read_error": cgf_read_error,
         "request_materials": request_materials,
         "mtl_slots": mtl_slots,
         "mtl_cryasset_details": load_cryasset_details(cryasset_path),
         "alignment": alignment,
+        "cgf_material_id_alignment": evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots),
     }
 
 
