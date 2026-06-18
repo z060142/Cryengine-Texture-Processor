@@ -378,7 +378,7 @@ def main():
 
                 json_success, json_result = export_json(
                     reloaded_model,
-                    model_filename,
+                    f"{base_filename}.fbx",
                     model_output_dir,
                     texture_output_dir,
                 )

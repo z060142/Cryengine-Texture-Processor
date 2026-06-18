@@ -19,6 +19,7 @@
   - 自动生成缺失的贴图
   - 控制输出分辨率和格式
 - **模型导入**：从 3D 模型中提取贴图（FBX、OBJ、DAE、3DS、BLEND）
+- **RC 导入请求导出**：生成 CryEngine Resource Compiler FBX 转换使用的 `request` 根 JSON
 - **批处理**：一次处理多个贴图组
 - **DDS 生成**：使用 RC.exe 生成 DDS 文件
 - **多语言界面**：支持英文和繁体中文
@@ -103,6 +104,7 @@
 - 某些高级 PBR 工作流转换可能需要手动调整
 - 要进行适当的 DDS 生成，必须在首选项中配置 RC.exe 路径
 - 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
+- RC request 生成已经开始按 CryEngine 原码对齐，但材质 sub-index 指派还需要下一轮重构
 
 ## 许可证
 

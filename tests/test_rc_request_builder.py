@@ -1,0 +1,79 @@
+import json
+
+from output_formats.json_exporter import export_json
+from output_formats.rc_request_builder import build_import_request, wrap_import_request
+
+
+def sample_model():
+    return {
+        "path": "chair_source.obj",
+        "materials": [
+            {"name": "Chair"},
+            {"name": "Chair.001"},
+            {"name": "collision_proxy"},
+            {"name": "Material"},
+        ],
+        "scene_hierarchy": [
+            {
+                "name": "Root",
+                "children": [
+                    {"name": "ChairMesh", "children": []},
+                    {"name": "Chair_proxy", "children": []},
+                ],
+            }
+        ],
+    }
+
+
+def test_build_import_request_matches_rc_root_payload_shape():
+    request = build_import_request(sample_model(), "chair.fbx")
+
+    assert request["source_filename"] == "chair.fbx"
+    assert request["output_ext"] == "cgf"
+    assert request["material_filename"] == "chair"
+    assert request["unit_size"] == "cm"
+    assert request["forward_up_axes"] == "-Y+Z"
+    assert "use_32_bit_positions" not in request
+
+
+def test_material_requests_use_rc_fields_only_and_collapse_duplicate_names():
+    request = build_import_request(sample_model(), "chair.fbx")
+
+    assert request["materials"] == [
+        {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 1},
+    ]
+    assert all("file" not in material for material in request["materials"])
+    assert all("ui_name" not in material for material in request["materials"])
+
+
+def test_nodes_and_joint_physics_use_path_arrays():
+    request = build_import_request(sample_model(), "chair.fbx")
+    root = request["nodes"][0]
+
+    assert root["path"] == ["Root"]
+    assert root["nodes"][1]["path"] == ["Root", "Chair_proxy"]
+    assert request["jointPhysicsData"] == [
+        {
+            "jointNodePath": ["Root"],
+            "proxyNodePath": ["Root", "Chair_proxy"],
+            "snapToJoint": True,
+        }
+    ]
+
+
+def test_wrap_import_request_defaults_to_rc_request_name():
+    request = build_import_request(sample_model(), "chair.fbx")
+
+    assert set(wrap_import_request(request).keys()) == {"request"}
+    assert set(wrap_import_request(request, "metadata").keys()) == {"metadata"}
+
+
+def test_export_json_writes_request_wrapper_by_default(tmp_path):
+    success, output_file = export_json(sample_model(), "chair.fbx", str(tmp_path))
+
+    assert success
+    payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
+    assert set(payload.keys()) == {"request"}
+    assert payload["request"]["source_filename"] == "chair.fbx"
+    assert output_file.endswith("chair.json")

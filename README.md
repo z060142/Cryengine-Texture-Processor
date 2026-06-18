@@ -21,6 +21,7 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
   - Automatically generate missing textures
   - Control output resolution and format
 - **Model Import**: Extract textures from 3D models (FBX, OBJ, DAE, 3DS, BLEND)
+- **RC Import Request Export**: Generate `request`-root JSON files for CryEngine Resource Compiler FBX conversion
 - **Batch Processing**: Process multiple texture groups at once
 - **DDS Generation**: Generate DDS files using RC.exe
 - **Multilingual Interface**: Support for English and Traditional Chinese
@@ -105,6 +106,7 @@ The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migra
 - Certain advanced PBR workflow conversions may require manual tweaking
 - For proper DDS generation, RC.exe path must be configured in preferences
 - For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration
+- RC request generation is being aligned with CryEngine source, but material sub-index assignment still needs the next refactor pass
 
 ## License
 
