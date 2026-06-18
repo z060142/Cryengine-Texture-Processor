@@ -113,6 +113,6 @@ uv run python -m tools.verify_controlled_fixture --manifest "S:\Crytek\crytek\St
 
 ## Remaining Work
 
-- Surface diagnostics in the PySide UI material assignment panel.
+- Done in phase 15: surface diagnostics in the PySide model import panel.
 - Persist diagnostics alongside normal exports without adding non-RC fields to the RC request JSON.
 - Extract true polygon material-slot usage from Blender/FBX, so hazards can be downgraded when a slot is proven unused.

@@ -20,9 +20,35 @@ from PySide6.QtWidgets import (
 )
 
 from language.language_manager import get_text
+from model_processing.material_index_assigner import assign_material_sub_indices
 from model_processing.model_loader import ModelLoader
 from model_processing.texture_extractor import TextureExtractor
 from ui_pyside.progress_dialog import ProgressDialog
+
+
+def collect_model_material_diagnostics(model_data):
+    diagnostics = []
+    for record in assign_material_sub_indices(model_data.get("materials", []) if model_data else []):
+        for diagnostic in record.get("diagnostics", []):
+            diagnostics.append(
+                {
+                    **diagnostic,
+                    "source_order": record["source_order"],
+                    "assignment_reason": diagnostic.get("assignment_reason", record["reason"]),
+                    "original_name": record["original_name"],
+                }
+            )
+    return diagnostics
+
+
+def model_display_name(model_info):
+    filename = model_info.get("filename", "Unknown Model")
+    diagnostics = model_info.get("material_diagnostics", [])
+    if any(item.get("severity") == "hazard" for item in diagnostics):
+        return f"{filename} [hazard]"
+    if diagnostics:
+        return f"{filename} [diagnostics]"
+    return filename
 
 
 class ModelImportPanel(QWidget):
@@ -58,10 +84,28 @@ class ModelImportPanel(QWidget):
         self.path_label.setWordWrap(True)
         self.materials_label = QLabel("0")
         self.textures_label = QLabel("0")
+        self.diagnostics_label = QLabel("0")
         info_layout.addRow(get_text("model_import.path_label", "Path:"), self.path_label)
         info_layout.addRow(get_text("model_import.materials_label", "Materials:"), self.materials_label)
         info_layout.addRow(get_text("model_import.textures_label", "Textures:"), self.textures_label)
+        info_layout.addRow(get_text("model_import.diagnostics_label", "Diagnostics:"), self.diagnostics_label)
         layout.addWidget(info_box)
+
+        diagnostics_box = QGroupBox(get_text("model_import.material_diagnostics", "Material Slot Diagnostics"))
+        diagnostics_layout = QVBoxLayout(diagnostics_box)
+        self.diagnostics_table = QTableWidget(0, 4)
+        self.diagnostics_table.setHorizontalHeaderLabels(
+            [
+                get_text("model_import.col_severity", "Severity"),
+                get_text("model_import.col_material", "Material"),
+                get_text("model_import.col_slot", "Slot"),
+                get_text("model_import.col_message", "Message"),
+            ]
+        )
+        self.diagnostics_table.horizontalHeader().setStretchLastSection(True)
+        self.diagnostics_table.setMinimumHeight(110)
+        diagnostics_layout.addWidget(self.diagnostics_table)
+        layout.addWidget(diagnostics_box)
 
         textures_box = QGroupBox(get_text("model_import.extracted_textures", "Extracted Textures"))
         textures_layout = QVBoxLayout(textures_box)
@@ -138,6 +182,7 @@ class ModelImportPanel(QWidget):
                 "materials": 0,
                 "model_obj": None,
                 "extracted_textures": [],
+                "material_diagnostics": [],
             }
 
             try:
@@ -145,6 +190,7 @@ class ModelImportPanel(QWidget):
                 if model and not model.get("is_dummy", False):
                     model_info["model_obj"] = model
                     model_info["materials"] = len(model.get("materials", []))
+                    model_info["material_diagnostics"] = collect_model_material_diagnostics(model)
                     refs = self.texture_extractor.extract(model)
                     textures = self._get_accurate_texture_info(refs)
                     model_info["extracted_textures"] = textures
@@ -226,7 +272,7 @@ class ModelImportPanel(QWidget):
     def _update_model_list_display(self):
         self.models_list.clear()
         for model_info in self.imported_models_info:
-            self.models_list.addItem(model_info.get("filename", "Unknown Model"))
+            self.models_list.addItem(model_display_name(model_info))
         if self.imported_models_info:
             self.models_list.setCurrentRow(0)
 
@@ -236,6 +282,8 @@ class ModelImportPanel(QWidget):
             self.path_label.setText("")
             self.materials_label.setText("0")
             self.textures_label.setText("0")
+            self.diagnostics_label.setText("0")
+            self._populate_diagnostics_table([])
             self._populate_table([])
             self.currently_selected_model_textures = []
             self.add_to_processing_button.setEnabled(False)
@@ -243,10 +291,13 @@ class ModelImportPanel(QWidget):
 
         model_info = self.imported_models_info[row]
         textures = model_info.get("extracted_textures", [])
+        diagnostics = model_info.get("material_diagnostics", [])
         self.path_label.setText(model_info.get("path", ""))
         self.materials_label.setText(str(model_info.get("materials", 0)))
         self.textures_label.setText(str(len(textures)))
+        self.diagnostics_label.setText(str(len(diagnostics)))
         self.currently_selected_model_textures = textures
+        self._populate_diagnostics_table(diagnostics)
         self._populate_table(textures)
         self.add_to_processing_button.setEnabled(
             any(texture.get("path") and os.path.exists(texture["path"]) for texture in textures)
@@ -260,6 +311,23 @@ class ModelImportPanel(QWidget):
             self.texture_table.setItem(row, 0, QTableWidgetItem(texture.get("material", "Unknown")))
             self.texture_table.setItem(row, 1, QTableWidgetItem(texture.get("type", "Unknown")))
             self.texture_table.setItem(row, 2, QTableWidgetItem(texture.get("path") or texture.get("filename", "N/A")))
+
+    def _populate_diagnostics_table(self, diagnostics):
+        self.diagnostics_table.setRowCount(0)
+        for diagnostic in diagnostics:
+            row = self.diagnostics_table.rowCount()
+            self.diagnostics_table.insertRow(row)
+            fbx_slot = diagnostic.get("fbx_slot")
+            sub_index = diagnostic.get("sub_index")
+            slot_text = f"FBX {fbx_slot} -> sub {sub_index}"
+            self.diagnostics_table.setItem(row, 0, QTableWidgetItem(diagnostic.get("severity", "")))
+            self.diagnostics_table.setItem(
+                row,
+                1,
+                QTableWidgetItem(diagnostic.get("material") or diagnostic.get("original_name", "")),
+            )
+            self.diagnostics_table.setItem(row, 2, QTableWidgetItem(slot_text))
+            self.diagnostics_table.setItem(row, 3, QTableWidgetItem(diagnostic.get("message", "")))
 
     def _add_to_processing(self):
         paths = [

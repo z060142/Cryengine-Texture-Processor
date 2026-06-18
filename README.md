@@ -141,6 +141,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - A controlled request-name remap probe shows that RC keeps CGF polygon material ids aligned to raw FBX material slots; request/MTL material names do not rewrite polygon material ids when slot order differs
 - A controlled deleted-material probe shows that request `sub_index = -1` does not remove geometry material ids still used by the FBX; preserve placeholder slots unless polygon usage proves the slot is unused
 - Material assignment now emits diagnostics for hazardous deleted or remapped known FBX slots; smoke reports expose them as `preflight_material_diagnostics`
+- The PySide model import tab surfaces material-slot diagnostics for selected models and marks imported models with `[hazard]` when needed
 
 ## License
 
