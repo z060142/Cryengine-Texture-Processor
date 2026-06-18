@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Model import panel for the PySide6 UI."""
 
+import json
 import os
 
 from PySide6.QtWidgets import (
@@ -30,7 +31,9 @@ from model_processing.material_manifest import (
 from model_processing.model_loader import ModelLoader
 from model_processing.texture_extractor import TextureExtractor
 from tools.blender_material_inspector import inspect_fbx_materials
+from tools.rc_smoke_test import material_specs_from_manifest, run_rc_smoke_test
 from ui_pyside.progress_dialog import ProgressDialog
+from utils.config_manager import ConfigManager
 
 
 def collect_model_material_diagnostics(model_data):
@@ -77,6 +80,95 @@ def generate_model_material_manifest(model_path, inspector_func=inspect_fbx_mate
     return load_model_material_manifest(model_path)
 
 
+def default_rc_smoke_work_dir(model_path):
+    model_path = os.path.abspath(model_path)
+    model_dir = os.path.dirname(model_path)
+    model_stem = os.path.splitext(os.path.basename(model_path))[0] or "model"
+    return os.path.join(model_dir, f"{model_stem}_rc_smoke_work")
+
+
+def _load_rc_material_report(report_path):
+    if not report_path or not os.path.exists(report_path):
+        return {}
+    with open(report_path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _alignment_ok(report, key):
+    alignment = (report or {}).get(key, {})
+    if not alignment:
+        return None
+    return alignment.get("ok")
+
+
+def run_model_material_rc_smoke(
+    model_path,
+    rc_exe_path,
+    work_dir=None,
+    smoke_runner=run_rc_smoke_test,
+    material_spec_loader=material_specs_from_manifest,
+):
+    work_dir = os.path.abspath(work_dir or default_rc_smoke_work_dir(model_path))
+    asset_name = os.path.splitext(os.path.basename(model_path))[0] or "model"
+    result_info = {
+        "success": False,
+        "work_dir": work_dir,
+        "rc_exe_path": rc_exe_path or "",
+        "source_fbx_path": os.path.abspath(model_path) if model_path else "",
+        "material_report_path": "",
+        "semantic_alignment_ok": None,
+        "cgf_material_id_alignment_ok": None,
+        "error": "",
+    }
+
+    try:
+        material_specs = material_spec_loader(model_path)
+    except Exception as e:
+        result_info["error"] = str(e)
+        return result_info
+
+    result = smoke_runner(
+        rc_exe_path,
+        model_path,
+        work_dir,
+        asset_name=asset_name,
+        material_specs=material_specs,
+    )
+    report_path = getattr(result, "material_report_path", "") or ""
+    report = _load_rc_material_report(report_path)
+    result_info.update(
+        {
+            "success": bool(getattr(result, "success", False)),
+            "copied_fbx_path": getattr(result, "copied_fbx_path", ""),
+            "mtl_path": getattr(result, "mtl_path", ""),
+            "json_path": getattr(result, "json_path", ""),
+            "expected_output_path": getattr(result, "expected_output_path", ""),
+            "material_report_path": report_path,
+            "semantic_alignment_ok": _alignment_ok(report, "fixture_material_semantic_alignment"),
+            "cgf_material_id_alignment_ok": _alignment_ok(report, "cgf_material_id_alignment"),
+            "error": getattr(result, "error", "") or "",
+        }
+    )
+    return result_info
+
+
+def rc_material_smoke_summary_text(smoke_info):
+    if not smoke_info:
+        return "not run"
+    if smoke_info.get("error"):
+        return f"failed: {smoke_info.get('error')}"
+
+    status = "passed" if smoke_info.get("success") else "failed"
+    checks = []
+    semantic_ok = smoke_info.get("semantic_alignment_ok")
+    cgf_ok = smoke_info.get("cgf_material_id_alignment_ok")
+    if semantic_ok is not None:
+        checks.append("semantic ok" if semantic_ok else "semantic mismatch")
+    if cgf_ok is not None:
+        checks.append("CGF ids ok" if cgf_ok else "CGF ids mismatch")
+    return " / ".join([status, *checks])
+
+
 def model_display_name(model_info):
     filename = model_info.get("filename", "Unknown Model")
     diagnostics = model_info.get("material_diagnostics", [])
@@ -121,11 +213,14 @@ class ModelImportPanel(QWidget):
         self.materials_label = QLabel("0")
         self.material_manifest_label = QLabel("not found")
         self.material_manifest_label.setWordWrap(True)
+        self.rc_smoke_label = QLabel("not run")
+        self.rc_smoke_label.setWordWrap(True)
         self.textures_label = QLabel("0")
         self.diagnostics_label = QLabel("0")
         info_layout.addRow(get_text("model_import.path_label", "Path:"), self.path_label)
         info_layout.addRow(get_text("model_import.materials_label", "Materials:"), self.materials_label)
         info_layout.addRow(get_text("model_import.material_manifest_label", "Material Table:"), self.material_manifest_label)
+        info_layout.addRow(get_text("model_import.rc_smoke_label", "RC Material Smoke:"), self.rc_smoke_label)
         info_layout.addRow(get_text("model_import.textures_label", "Textures:"), self.textures_label)
         info_layout.addRow(get_text("model_import.diagnostics_label", "Diagnostics:"), self.diagnostics_label)
         layout.addWidget(info_box)
@@ -139,6 +234,12 @@ class ModelImportPanel(QWidget):
         self.generate_material_manifest_button.clicked.connect(self._generate_material_manifest)
         self.generate_material_manifest_button.setEnabled(False)
         material_table_actions.addWidget(self.generate_material_manifest_button)
+        self.run_rc_material_smoke_button = QPushButton(
+            get_text("model_import.run_rc_material_smoke", "Run RC Material Smoke")
+        )
+        self.run_rc_material_smoke_button.clicked.connect(self._run_rc_material_smoke)
+        self.run_rc_material_smoke_button.setEnabled(False)
+        material_table_actions.addWidget(self.run_rc_material_smoke_button)
         material_table_actions.addStretch(1)
         material_table_layout.addLayout(material_table_actions)
         self.material_table = QTableWidget(0, 4)
@@ -216,6 +317,7 @@ class ModelImportPanel(QWidget):
         self.imported_models_info.clear()
         self.models_list.clear()
         self.generate_material_manifest_button.setEnabled(False)
+        self.run_rc_material_smoke_button.setEnabled(False)
         self._populate_material_table([])
         self._populate_table([])
 
@@ -251,6 +353,7 @@ class ModelImportPanel(QWidget):
                 "extracted_textures": [],
                 "material_diagnostics": [],
                 "material_manifest": {},
+                "rc_material_smoke": {},
             }
 
             try:
@@ -352,6 +455,7 @@ class ModelImportPanel(QWidget):
             self.path_label.setText("")
             self.materials_label.setText("0")
             self.material_manifest_label.setText("not found")
+            self.rc_smoke_label.setText("not run")
             self.textures_label.setText("0")
             self.diagnostics_label.setText("0")
             self._populate_diagnostics_table([])
@@ -360,15 +464,18 @@ class ModelImportPanel(QWidget):
             self.currently_selected_model_textures = []
             self.add_to_processing_button.setEnabled(False)
             self.generate_material_manifest_button.setEnabled(False)
+            self.run_rc_material_smoke_button.setEnabled(False)
             return
 
         model_info = self.imported_models_info[row]
         textures = model_info.get("extracted_textures", [])
         diagnostics = model_info.get("material_diagnostics", [])
         material_manifest = model_info.get("material_manifest", {})
+        rc_smoke = model_info.get("rc_material_smoke", {})
         self.path_label.setText(model_info.get("path", ""))
         self.materials_label.setText(str(model_info.get("materials", 0)))
         self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
+        self.rc_smoke_label.setText(rc_material_smoke_summary_text(rc_smoke))
         self.textures_label.setText(str(len(textures)))
         self.diagnostics_label.setText(str(len(diagnostics)))
         self.currently_selected_model_textures = textures
@@ -379,6 +486,9 @@ class ModelImportPanel(QWidget):
             any(texture.get("path") and os.path.exists(texture["path"]) for texture in textures)
         )
         self.generate_material_manifest_button.setEnabled(
+            model_info.get("path", "").lower().endswith(".fbx") and os.path.exists(model_info.get("path", ""))
+        )
+        self.run_rc_material_smoke_button.setEnabled(
             model_info.get("path", "").lower().endswith(".fbx") and os.path.exists(model_info.get("path", ""))
         )
 
@@ -439,6 +549,51 @@ class ModelImportPanel(QWidget):
             get_text("model_import.material_manifest_title", "Material Table"),
             get_text("model_import.material_manifest_generated", "Material table generated successfully."),
         )
+
+    def _run_rc_material_smoke(self):
+        row = self.models_list.currentRow()
+        if row < 0 or row >= len(self.imported_models_info):
+            return
+
+        model_info = self.imported_models_info[row]
+        model_path = model_info.get("path", "")
+        if not model_path or not model_path.lower().endswith(".fbx"):
+            QMessageBox.warning(
+                self,
+                get_text("error.title", "Error"),
+                get_text("model_import.rc_smoke_fbx_only", "RC material smoke requires an FBX file."),
+            )
+            return
+
+        material_manifest = load_model_material_manifest(model_path)
+        if not material_manifest.get("summary"):
+            QMessageBox.warning(
+                self,
+                get_text("error.title", "Error"),
+                get_text(
+                    "model_import.rc_smoke_manifest_required",
+                    "Generate or provide an FBX material table before running RC material smoke.",
+                ),
+            )
+            return
+
+        rc_exe_path = ConfigManager().get("rc_exe_path", "")
+        smoke_info = run_model_material_rc_smoke(model_path, rc_exe_path)
+        model_info["material_manifest"] = material_manifest
+        model_info["rc_material_smoke"] = smoke_info
+        if model_info.get("model_obj"):
+            model_info["model_obj"]["material_manifest"] = material_manifest
+        self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
+        self.rc_smoke_label.setText(rc_material_smoke_summary_text(smoke_info))
+        self._populate_material_table(material_manifest.get("materials", []))
+
+        message = rc_material_smoke_summary_text(smoke_info)
+        if smoke_info.get("material_report_path"):
+            message += f"\n{smoke_info['material_report_path']}"
+        if smoke_info.get("success"):
+            QMessageBox.information(self, get_text("model_import.rc_smoke_title", "RC Material Smoke"), message)
+        else:
+            QMessageBox.warning(self, get_text("model_import.rc_smoke_title", "RC Material Smoke"), message)
 
     def _populate_diagnostics_table(self, diagnostics):
         self.diagnostics_table.setRowCount(0)

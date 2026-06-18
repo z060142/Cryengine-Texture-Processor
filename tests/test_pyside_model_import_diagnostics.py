@@ -2,11 +2,15 @@ import json
 
 from ui_pyside.model_import import (
     collect_model_material_diagnostics,
+    default_rc_smoke_work_dir,
     generate_model_material_manifest,
     load_model_material_manifest,
     material_manifest_summary_text,
     model_display_name,
+    rc_material_smoke_summary_text,
+    run_model_material_rc_smoke,
 )
+from tools.rc_smoke_test import RCSmokeResult
 
 
 def test_collect_model_material_diagnostics_reports_deleted_known_slot():
@@ -117,6 +121,28 @@ def test_material_manifest_summary_text_handles_missing_manifest():
     assert material_manifest_summary_text({}) == "not found"
 
 
+def test_default_rc_smoke_work_dir_uses_model_stem(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+
+    assert default_rc_smoke_work_dir(str(fbx_path)) == str(tmp_path / "asset_rc_smoke_work")
+
+
+def test_rc_material_smoke_summary_text_handles_states():
+    assert rc_material_smoke_summary_text({}) == "not run"
+    assert rc_material_smoke_summary_text({"success": True}) == "passed"
+    assert (
+        rc_material_smoke_summary_text(
+            {
+                "success": True,
+                "semantic_alignment_ok": True,
+                "cgf_material_id_alignment_ok": False,
+            }
+        )
+        == "passed / semantic ok / CGF ids mismatch"
+    )
+    assert rc_material_smoke_summary_text({"error": "missing rc"}) == "failed: missing rc"
+
+
 def test_generate_model_material_manifest_runs_inspector_and_reloads_sidecar(tmp_path):
     fbx_path = tmp_path / "asset.fbx"
     manifest_path = tmp_path / "asset.fbx_material_manifest.json"
@@ -145,3 +171,55 @@ def test_generate_model_material_manifest_runs_inspector_and_reloads_sidecar(tmp
     assert info["path"] == str(manifest_path)
     assert info["summary"]["material_count"] == 2
     assert info["materials"][1]["name"] == "Stone.001"
+
+
+def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+    manifest_path = tmp_path / "asset.fbx_material_manifest.json"
+    report_path = tmp_path / "asset_rc_smoke_work" / "asset.material_report.json"
+    fbx_path.write_text("fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone", "first_object": "MeshA", "first_local_slot": 0},
+                    {"slot": 1, "name": "Stone.001", "first_object": "MeshB", "first_local_slot": 0},
+                ],
+                "polygons": [{"material": "Stone"}, {"material": "Stone.001"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_smoke_runner(rc_exe_path, source_fbx_path, work_dir, asset_name=None, material_specs=None):
+        assert rc_exe_path == "S:/Tools/rc.exe"
+        assert source_fbx_path == str(fbx_path)
+        assert work_dir == str(tmp_path / "asset_rc_smoke_work")
+        assert asset_name == "asset"
+        assert [material["name"] for material in material_specs] == ["Stone", "Stone.001"]
+        assert [material["sub_index"] for material in material_specs] == [0, 1]
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(
+                {
+                    "fixture_material_semantic_alignment": {"ok": True},
+                    "cgf_material_id_alignment": {"ok": True},
+                }
+            ),
+            encoding="utf-8",
+        )
+        return RCSmokeResult(
+            True,
+            work_dir,
+            rc_exe_path,
+            source_fbx_path,
+            material_report_path=str(report_path),
+        )
+
+    smoke_info = run_model_material_rc_smoke(str(fbx_path), "S:/Tools/rc.exe", smoke_runner=fake_smoke_runner)
+
+    assert smoke_info["success"] is True
+    assert smoke_info["material_report_path"] == str(report_path)
+    assert smoke_info["semantic_alignment_ok"] is True
+    assert smoke_info["cgf_material_id_alignment_ok"] is True

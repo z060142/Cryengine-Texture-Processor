@@ -121,6 +121,14 @@ When a material manifest sidecar exists, RC smoke tests can build request/MTL ma
 uv run python -m tools.rc_smoke_test --fbx path/to/asset.fbx --work-dir path/to/work --materials-from-manifest
 ```
 
+The same manifest-driven RC smoke path is available in the PySide Model Import tab:
+
+```text
+Import FBX -> Generate Material Table -> Run RC Material Smoke
+```
+
+The UI reads `rc_exe_path` from preferences, writes the smoke bundle under `<fbx stem>_rc_smoke_work`, and shows semantic/CGF material-id alignment when the generated material report contains those checks.
+
 Controlled Blender fixtures can be generated and verified with:
 
 ```bash
@@ -166,6 +174,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - The PySide Model Import tab can generate `.fbx_material_manifest.json` sidecars for selected FBX models through Blender and refresh the RC material table view
 - Request JSON and `.mtl` generation now use `model_data["material_manifest"]` as the RC material slot source of truth when present
 - RC smoke tests can now use `--materials-from-manifest` to build request JSON and `.mtl` directly from a fixture or Blender FBX material manifest sidecar
+- The PySide Model Import tab can run manifest-driven RC material smoke for a selected FBX and summarize semantic / CGF material-id alignment from the generated material report
 
 ## License
 
