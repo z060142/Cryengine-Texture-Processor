@@ -7,12 +7,12 @@ from dataclasses import dataclass
 import os
 import shutil
 
-from model_processing.material_index_assigner import assign_material_sub_indices
 from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
 )
+from model_processing.material_slot_table import build_material_slot_records
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
@@ -156,7 +156,7 @@ def _copy_material_manifest(source_fbx_path, copied_fbx_path):
 
 def collect_material_slot_diagnostics(material_specs, existing_submaterial_names=None):
     diagnostics = []
-    for record in assign_material_sub_indices(material_specs, existing_submaterial_names):
+    for record in build_material_slot_records(material_specs, existing_submaterial_names):
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(
                 {

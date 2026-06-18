@@ -23,9 +23,9 @@ from output_formats.cryengine_mtl_schema import (
     exported_string_gen_mask,
 )
 from model_processing.material_index_assigner import (
-    assign_material_sub_indices,
     parse_mtl_submaterial_names,
 )
+from model_processing.material_slot_table import build_expanded_material_slot_table
 
 
 def _has_alpha_channel(image_path):
@@ -201,34 +201,10 @@ def _shader_masks_and_public_params(textures):
 
 
 def build_mtl_material_slots(materials_data, existing_submaterial_names=None):
-    if not materials_data:
-        return [{"name": "Default", "textures": {}, "is_default": True}]
-
-    assigned_materials = assign_material_sub_indices(materials_data, existing_submaterial_names or [])
-    used_materials = [record for record in assigned_materials if record["sub_index"] >= 0]
-    if not used_materials:
-        return []
-
-    material_slots = [None] * (max(record["sub_index"] for record in used_materials) + 1)
-    for record in used_materials:
-        new_mat_info = record["material"].copy()
-        new_mat_info["name"] = record["clean_name"]
-        new_mat_info["original_name"] = record["original_name"]
-        new_mat_info["sub_index"] = record["sub_index"]
-        new_mat_info["assignment_reason"] = record["reason"]
-        material_slots[record["sub_index"]] = new_mat_info
-
-    for slot_index, slot in enumerate(material_slots):
-        if slot is None:
-            material_slots[slot_index] = {
-                "name": "unassigned",
-                "original_name": "unassigned",
-                "sub_index": slot_index,
-                "textures": {},
-                "is_dummy": True,
-            }
-
-    return material_slots
+    return build_expanded_material_slot_table(
+        materials_data,
+        existing_submaterial_names=existing_submaterial_names or [],
+    )
 
 
 def _append_sub_material(sub_materials_elem, mat_info, model_output_dir):

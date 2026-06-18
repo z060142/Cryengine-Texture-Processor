@@ -157,6 +157,7 @@ harness 也会记录 `sandbox_edcommand`，用于尝试普通 Editor 启动加 `
 - 通过 Blender 载入的模型现在会保留 mesh material slot 顺序与 polygon 使用次数，避免 `bpy.data.materials` placeholder 导致 slot 偏移
 - material diagnostics sidecar 与 PySide diagnostics 表格现在会在已知时显示 polygon 使用次数
 - material diagnostics 现在会在多个 mesh 对同一 FBX slot 使用不同材质名时给出 warning
+- RC request、`.mtl`、diagnostics 与 smoke preflight 现在共用 `model_processing.material_slot_table` 作为唯一 material slot assignment 入口
 
 ## 许可证
 

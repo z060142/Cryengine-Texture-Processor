@@ -5,7 +5,7 @@
 import json
 import os
 
-from model_processing.material_index_assigner import assign_material_sub_indices
+from model_processing.material_slot_table import build_material_slot_records
 
 
 def _record_to_report_item(record):
@@ -35,7 +35,7 @@ def build_material_diagnostics_report(
     source_model="",
     artifact_kind="model",
 ):
-    records = assign_material_sub_indices(materials, existing_submaterial_names)
+    records = build_material_slot_records(materials, existing_submaterial_names)
     material_items = [_record_to_report_item(record) for record in records]
     diagnostics = []
     for item in material_items:

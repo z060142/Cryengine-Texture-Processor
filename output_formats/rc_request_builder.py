@@ -7,8 +7,7 @@ import os
 import re
 import traceback
 
-from model_processing.material_index_assigner import assign_material_sub_indices
-from model_processing.material_manifest import material_manifest_materials
+from model_processing.material_slot_table import build_material_slot_records
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
 
@@ -166,8 +165,11 @@ def build_material_requests(
     material_manifest_info=None,
 ):
     material_requests = []
-    resolved_materials = material_manifest_materials(materials, material_manifest_info)
-    for material in assign_material_sub_indices(resolved_materials, existing_submaterial_names):
+    for material in build_material_slot_records(
+        materials,
+        existing_submaterial_names=existing_submaterial_names,
+        material_manifest_info=material_manifest_info,
+    ):
         request_material = {
             "name": material["clean_name"],
             "physicalize": get_material_physicalize_type(material["original_name"]),
