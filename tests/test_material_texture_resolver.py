@@ -76,4 +76,6 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
         "tif",
     )
 
-    assert result == [{"name": "Wall", "textures": {}}]
+    assert len(result) == 1
+    assert result[0]["name"] == "Wall"
+    assert result[0]["textures"] == {}

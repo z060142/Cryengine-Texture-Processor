@@ -104,7 +104,7 @@
 - 某些高级 PBR 工作流转换可能需要手动调整
 - 要进行适当的 DDS 生成，必须在首选项中配置 RC.exe 路径
 - 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
-- RC request 生成已经开始按 CryEngine 原码对齐，但材质 sub-index 指派还需要下一轮重构
+- RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
 
 ## 许可证
 

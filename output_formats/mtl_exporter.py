@@ -13,7 +13,10 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
 
-from model_processing.material_texture_resolver import iter_unique_clean_materials
+from model_processing.material_index_assigner import (
+    assign_material_sub_indices,
+    parse_mtl_submaterial_names,
+)
 
 def _has_alpha_channel(image_path):
     """
@@ -155,15 +158,33 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
             default_mat = ET.SubElement(sub_materials, "Material", Name="Default", MtlFlags="524416", Shader="Illum")
             ET.SubElement(default_mat, "Textures") # Add empty Textures tag
         else:
-            cleaned_materials_data = []
-            for material_record in iter_unique_clean_materials(materials_data):
-                new_mat_info = material_record["material"].copy()
-                new_mat_info['name'] = material_record["clean_name"]
-                new_mat_info['original_name'] = material_record["original_name"]
-                cleaned_materials_data.append(new_mat_info)
+            existing_submaterial_names = parse_mtl_submaterial_names(mtl_file_path)
+            assigned_materials = assign_material_sub_indices(materials_data, existing_submaterial_names)
 
-            # 使用清理後的材質數據
-            materials_data = cleaned_materials_data
+            material_slots = []
+            used_materials = [record for record in assigned_materials if record["sub_index"] >= 0]
+            if used_materials:
+                max_sub_index = max(record["sub_index"] for record in used_materials)
+                material_slots = [None] * (max_sub_index + 1)
+                for record in used_materials:
+                    new_mat_info = record["material"].copy()
+                    new_mat_info["name"] = record["clean_name"]
+                    new_mat_info["original_name"] = record["original_name"]
+                    new_mat_info["sub_index"] = record["sub_index"]
+                    new_mat_info["assignment_reason"] = record["reason"]
+                    material_slots[record["sub_index"]] = new_mat_info
+
+                for slot_index, slot in enumerate(material_slots):
+                    if slot is None:
+                        material_slots[slot_index] = {
+                            "name": "unassigned",
+                            "original_name": "unassigned",
+                            "sub_index": slot_index,
+                            "textures": {},
+                            "is_dummy": True,
+                        }
+
+            materials_data = material_slots
             
             for mat_info in materials_data:
                 # 獲取材質名稱和紐理

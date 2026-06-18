@@ -183,7 +183,7 @@ def build_material_texture_records(
     refs_by_material = group_texture_refs_by_material(texture_refs)
     records = []
 
-    for material_name, _ in iter_model_materials(model_data.get("materials", [])):
+    for material_name, material in iter_model_materials(model_data.get("materials", [])):
         material_refs = refs_by_material.get(material_name, [])
         base_name = resolve_base_name(material_refs, texture_manager)
         processed_textures = find_processed_textures(
@@ -198,6 +198,12 @@ def build_material_texture_records(
                 {
                     "name": material_name,
                     "clean_name": clean_material_name(material_name),
+                    "id": material.get("id"),
+                    "index": material.get("index"),
+                    "sub_index": material.get("sub_index"),
+                    "auto_assigned": material.get("auto_assigned", material.get("ui_autoflag", True)),
+                    "deleted": material.get("deleted", False),
+                    "is_dummy": material.get("is_dummy", False),
                     "base_name": base_name,
                     "textures": processed_textures,
                     "source_texture_count": len(material_refs),
@@ -222,4 +228,17 @@ def build_mtl_material_data(*args, **kwargs):
     kwargs["suffix_map"] = MTL_OUTPUT_TEXTURE_SUFFIXES
     kwargs["include_empty"] = True
     records = build_material_texture_records(*args, **kwargs)
-    return [{"name": record["name"], "textures": record["textures"]} for record in records]
+    return [
+        {
+            "name": record["name"],
+            "clean_name": record["clean_name"],
+            "id": record["id"],
+            "index": record["index"],
+            "sub_index": record["sub_index"],
+            "auto_assigned": record["auto_assigned"],
+            "deleted": record["deleted"],
+            "is_dummy": record["is_dummy"],
+            "textures": record["textures"],
+        }
+        for record in records
+    ]

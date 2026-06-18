@@ -199,9 +199,11 @@ class ModelLoader:
             return []
             
         materials = []
-        for mat in self.bpy.data.materials:
+        for index, mat in enumerate(self.bpy.data.materials):
             materials.append({
                 "name": mat.name,
+                "id": index + 1,
+                "index": index,
                 "nodes": mat.use_nodes  # Whether the material uses nodes
             })
             

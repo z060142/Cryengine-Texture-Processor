@@ -6,6 +6,7 @@ import json
 import os
 import traceback
 
+from model_processing.material_index_assigner import parse_mtl_submaterial_names
 from output_formats.rc_request_builder import build_import_request, wrap_import_request
 
 
@@ -44,12 +45,23 @@ def export_json(
         base_name = os.path.splitext(os.path.basename(source_filename))[0]
         json_filename = f"{base_name}.json"
         json_file_path = os.path.join(output_path, json_filename)
+        resolved_material_filename = material_filename or base_name
+        existing_submaterial_names = []
+
+        if resolved_material_filename and not resolved_material_filename.startswith("%"):
+            mtl_basename = resolved_material_filename
+            if not mtl_basename.lower().endswith(".mtl"):
+                mtl_basename = f"{mtl_basename}.mtl"
+            existing_submaterial_names = parse_mtl_submaterial_names(
+                os.path.join(output_path, mtl_basename)
+            )
 
         request = build_import_request(
             model_data,
             source_filename=source_filename,
-            material_filename=material_filename or base_name,
+            material_filename=resolved_material_filename,
             output_ext=output_ext,
+            existing_submaterial_names=existing_submaterial_names,
         )
         json_data = wrap_import_request(request, wrapper_name=wrapper_name)
 

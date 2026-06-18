@@ -7,7 +7,7 @@ import os
 import re
 import traceback
 
-from model_processing.material_texture_resolver import iter_unique_clean_materials
+from model_processing.material_index_assigner import assign_material_sub_indices
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
 
@@ -158,9 +158,9 @@ def find_joint_physics_relations(processed_nodes):
     return joint_physics_data
 
 
-def build_material_requests(materials):
+def build_material_requests(materials, existing_submaterial_names=None):
     material_requests = []
-    for material in iter_unique_clean_materials(materials):
+    for material in assign_material_sub_indices(materials, existing_submaterial_names):
         material_requests.append(
             {
                 "name": material["clean_name"],
@@ -184,6 +184,7 @@ def build_import_request(
     ignore_custom_normals=False,
     ignore_uv=False,
     autolodsettings=None,
+    existing_submaterial_names=None,
 ):
     base_name = os.path.splitext(os.path.basename(source_filename))[0]
     node_hierarchy = extract_scene_hierarchy_from_model(model_data)
@@ -200,7 +201,7 @@ def build_import_request(
         "scene_origin": scene_origin,
         "ignore_custom_normals": ignore_custom_normals,
         "ignore_uv": ignore_uv,
-        "materials": build_material_requests(model_data.get("materials", [])),
+        "materials": build_material_requests(model_data.get("materials", []), existing_submaterial_names),
         "nodes": processed_nodes,
         "jointPhysicsData": find_joint_physics_relations(processed_nodes),
         "autolodsettings": autolodsettings or {"GenerateAutomaticLODs": False},

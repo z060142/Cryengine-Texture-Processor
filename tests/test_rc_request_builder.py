@@ -1,4 +1,5 @@
 import json
+import xml.etree.ElementTree as ET
 
 from output_formats.json_exporter import export_json
 from output_formats.rc_request_builder import build_import_request, wrap_import_request
@@ -41,7 +42,7 @@ def test_material_requests_use_rc_fields_only_and_collapse_duplicate_names():
 
     assert request["materials"] == [
         {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
-        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 1},
+        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2},
     ]
     assert all("file" not in material for material in request["materials"])
     assert all("ui_name" not in material for material in request["materials"])
@@ -77,3 +78,20 @@ def test_export_json_writes_request_wrapper_by_default(tmp_path):
     assert set(payload.keys()) == {"request"}
     assert payload["request"]["source_filename"] == "chair.fbx"
     assert output_file.endswith("chair.json")
+
+
+def test_export_json_matches_existing_mtl_submaterial_order(tmp_path):
+    root = ET.Element("Material")
+    sub_materials = ET.SubElement(root, "SubMaterials")
+    ET.SubElement(sub_materials, "Material", Name="collision_proxy")
+    ET.SubElement(sub_materials, "Material", Name="Chair")
+    ET.ElementTree(root).write(tmp_path / "chair.mtl", encoding="utf-8")
+
+    success, _ = export_json(sample_model(), "chair.fbx", str(tmp_path))
+
+    assert success
+    payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
+    assert payload["request"]["materials"] == [
+        {"name": "Chair", "physicalize": "no_collide", "sub_index": 1},
+        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 0},
+    ]
