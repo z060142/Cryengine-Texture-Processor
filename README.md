@@ -177,6 +177,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - The PySide Model Import tab can run manifest-driven RC material smoke for a selected FBX and summarize semantic / CGF material-id alignment from the generated material report
 - `.mtl` XML generation now uses named document-builder helpers, but current shader/GenMask/PublicParams values are still guessed and need replacement with real CryEngine evidence
 - CryEngine `.mtl` texture map names and Illum shader token masks are now captured in `output_formats/cryengine_mtl_schema.py`; exporter GenMask numeric values remain compatibility-preserved until real RC/Material Editor comparison is complete
+- `tools.mtl_mask_report` can compare real `.mtl` samples against Illum.ext, ShaderCore common legacy-fix, and exporter compatibility mask tables; current samples show persisted `GenMask` needs the full renderer remap path
 
 ## License
 

@@ -1,6 +1,7 @@
 from output_formats.cryengine_mtl_schema import (
     CE_TEXTURE_MAP_TYPES,
     CE_TEXTURE_SUFFIXES,
+    COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,
     ILLUM_EXT_SHADER_MASKS,
     exported_gen_mask,
@@ -34,6 +35,12 @@ def test_illum_ext_shader_masks_are_source_evidence_not_export_compat_values():
     assert ILLUM_EXT_SHADER_MASKS["%SUBSURFACE_SCATTERING"] == 0x80000
 
     assert EXPORT_COMPAT_SHADER_MASKS["%NORMAL_MAP"] != ILLUM_EXT_SHADER_MASKS["%NORMAL_MAP"]
+
+
+def test_common_global_legacy_fix_masks_follow_shadercore_evidence():
+    assert COMMON_GLOBAL_LEGACY_FIX_MASKS["%OFFSET_BUMP_MAPPING"] == 0x2000000
+    assert COMMON_GLOBAL_LEGACY_FIX_MASKS["%BILLBOARD"] == 0x100000000
+    assert COMMON_GLOBAL_LEGACY_FIX_MASKS["%VERTCOLORS"] == 0x2000000000
 
 
 def test_exported_gen_mask_preserves_current_export_compat_values():
