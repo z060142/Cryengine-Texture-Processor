@@ -139,6 +139,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - A controlled Blender FBX fixture has verified that used material slots `0` and `1` survive RC conversion into CGF `MeshSubsets.nMatID`
 - Controlled fixtures have verified that RC preserves sparse used material ids such as `0` and `2`; it does not compress them to contiguous ids
 - A controlled request-name remap probe shows that RC keeps CGF polygon material ids aligned to raw FBX material slots; request/MTL material names do not rewrite polygon material ids when slot order differs
+- A controlled deleted-material probe shows that request `sub_index = -1` does not remove geometry material ids still used by the FBX; preserve placeholder slots unless polygon usage proves the slot is unused
 
 ## License
 

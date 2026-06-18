@@ -58,41 +58,93 @@ def material_names_from_arg(value):
     return names or ["Default"]
 
 
-def build_smoke_model_data(asset_name, material_names):
+def material_specs_from_arg(value):
+    specs = []
+    for index, item in enumerate((value or "").split(",")):
+        item = item.strip()
+        if not item:
+            continue
+
+        name = item
+        deleted = False
+        explicit_sub_index = None
+        if ":" in item:
+            name, marker = item.rsplit(":", 1)
+            name = name.strip()
+            marker = marker.strip().lower()
+            if marker in {"deleted", "delete", "removed", "-1"}:
+                deleted = True
+                explicit_sub_index = -1
+            elif marker:
+                explicit_sub_index = int(marker)
+
+        spec = {
+            "name": name,
+            "id": index + 1,
+            "index": index,
+        }
+        if deleted:
+            spec["deleted"] = True
+        if explicit_sub_index is not None:
+            spec["sub_index"] = explicit_sub_index
+            if explicit_sub_index >= 0:
+                spec["auto_assigned"] = False
+        specs.append(spec)
+
+    if not specs:
+        return [{"name": "Default", "id": 1, "index": 0}]
+    return specs
+
+
+def _normalize_material_specs(material_names=None, material_specs=None):
+    if material_specs is not None:
+        return [
+            {
+                **spec,
+                "id": spec.get("id", index + 1),
+                "index": spec.get("index", index),
+            }
+            for index, spec in enumerate(material_specs)
+        ]
+    return [
+        {
+            "name": name,
+            "id": index + 1,
+            "index": index,
+        }
+        for index, name in enumerate(material_names or ["Default"])
+    ]
+
+
+def build_smoke_model_data(asset_name, material_names=None, material_specs=None):
+    material_specs = _normalize_material_specs(material_names, material_specs)
     return {
         "path": f"{asset_name}.fbx",
-        "materials": [
-            {
-                "name": name,
-                "id": index + 1,
-                "index": index,
-            }
-            for index, name in enumerate(material_names)
-        ],
+        "materials": material_specs,
         # Empty nodes avoids guessing Blender/FBX scene paths for arbitrary samples.
         "scene_hierarchy": [],
         "meshes": [],
     }
 
 
-def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_names=None):
+def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_names=None, material_specs=None):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
     asset_name = asset_name or os.path.splitext(os.path.basename(source_fbx_path))[0]
-    material_names = material_names or ["Default"]
+    material_specs = _normalize_material_specs(material_names, material_specs)
 
     os.makedirs(work_dir, exist_ok=True)
     copied_fbx_path = os.path.join(work_dir, f"{asset_name}.fbx")
     if os.path.abspath(source_fbx_path) != os.path.abspath(copied_fbx_path):
         shutil.copy2(source_fbx_path, copied_fbx_path)
 
-    materials_data = [{"name": name, "id": index + 1, "textures": {}} for index, name in enumerate(material_names)]
+    materials_data = [{**spec, "textures": {}} for spec in material_specs]
     mtl_filename = f"{asset_name}.mtl"
     mtl_success, mtl_result = export_mtl(materials_data, work_dir, work_dir, mtl_filename)
     if not mtl_success:
         raise RuntimeError(mtl_result)
 
-    model_data = build_smoke_model_data(asset_name, material_names)
+    model_data = build_smoke_model_data(asset_name, material_specs=material_specs)
     json_success, json_result = export_json(
         model_data,
         f"{asset_name}.fbx",
@@ -115,6 +167,7 @@ def run_rc_smoke_test(
     work_dir,
     asset_name=None,
     material_names=None,
+    material_specs=None,
     runner_factory=RCImportRunner,
 ):
     rc_exe_path = rc_exe_path or ""
@@ -136,6 +189,7 @@ def run_rc_smoke_test(
             work_dir,
             asset_name=asset_name,
             material_names=material_names,
+            material_specs=material_specs,
         )
     except Exception as e:
         return RCSmokeResult(False, work_dir, rc_exe_path, source_fbx_path, error=str(e))
@@ -197,7 +251,7 @@ def main(argv=None):
         args.fbx,
         args.work_dir,
         asset_name=args.asset_name,
-        material_names=material_names_from_arg(args.materials),
+        material_specs=material_specs_from_arg(args.materials),
     )
 
     print(f"success: {result.success}")

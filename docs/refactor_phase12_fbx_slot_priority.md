@@ -73,4 +73,4 @@ uv run python -m pytest tests
   - assigned `sub_index`
   - assignment reason
   - placeholder `unassigned` slots
-- Probe deleted or disabled sub-materials with `sub_index = -1` while the FBX still contains geometry assigned to that slot.
+- Done in phase 13: probe deleted or disabled sub-materials with `sub_index = -1` while the FBX still contains geometry assigned to that slot.

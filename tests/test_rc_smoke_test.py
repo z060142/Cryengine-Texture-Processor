@@ -5,15 +5,26 @@ from tools.rc_smoke_test import (
     build_smoke_model_data,
     discover_default_fbx,
     material_names_from_arg,
+    material_specs_from_arg,
     prepare_smoke_bundle,
     run_rc_smoke_test,
 )
 from utils.rc_import_runner import RCImportResult
+import xml.etree.ElementTree as ET
 
 
 def test_material_names_from_arg_uses_default_when_empty():
     assert material_names_from_arg("") == ["Default"]
     assert material_names_from_arg(" Bark, Leaves ,,") == ["Bark", "Leaves"]
+
+
+def test_material_specs_from_arg_supports_deleted_and_explicit_slots():
+    assert material_specs_from_arg("") == [{"name": "Default", "id": 1, "index": 0}]
+    assert material_specs_from_arg(" Bark, Leaves:deleted, Proxy:4 ,,") == [
+        {"name": "Bark", "id": 1, "index": 0},
+        {"name": "Leaves", "id": 2, "index": 1, "deleted": True, "sub_index": -1},
+        {"name": "Proxy", "id": 3, "index": 2, "sub_index": 4, "auto_assigned": False},
+    ]
 
 
 def test_discover_default_fbx_returns_first_existing_candidate(tmp_path):
@@ -55,6 +66,38 @@ def test_prepare_smoke_bundle_copies_fbx_and_writes_mtl_and_request(tmp_path):
     assert payload["request"]["materials"] == [
         {"name": "Bark", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Leaves", "physicalize": "no_collide", "sub_index": 1},
+    ]
+
+
+def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=[
+            {"name": "Slot_0_Red", "id": 1, "index": 0},
+            {"name": "Slot_1_Green", "id": 2, "index": 1, "deleted": True, "sub_index": -1},
+            {"name": "Slot_2_Blue", "id": 3, "index": 2},
+        ],
+    )
+
+    payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
+    assert payload["request"]["materials"] == [
+        {"name": "Slot_0_Red", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "Slot_1_Green", "physicalize": "no_collide", "sub_index": -1},
+        {"name": "Slot_2_Blue", "physicalize": "no_collide", "sub_index": 2},
+    ]
+
+    root = ET.parse(bundle["mtl_path"]).getroot()
+    sub_materials = root.find("SubMaterials")
+    assert [material.get("Name") for material in list(sub_materials)] == [
+        "Slot_0_Red",
+        "unassigned",
+        "Slot_2_Blue",
     ]
 
 
