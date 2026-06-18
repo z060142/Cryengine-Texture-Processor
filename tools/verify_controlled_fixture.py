@@ -137,6 +137,7 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
         "raw_fbx_slot_by_polygon": raw_fbx_slot_by_polygon,
         "actual_cgf_material_id_by_polygon": actual_by_polygon,
         "request_sub_index_by_polygon_name": request_sub_index_by_polygon,
+        "request_name_mapping_ok": not name_remap_mismatches,
         "name_remap_mismatches": name_remap_mismatches,
         "center_polygon_lookup": center_polygon_lookup,
         "duplicate_polygons": duplicate_polygons,

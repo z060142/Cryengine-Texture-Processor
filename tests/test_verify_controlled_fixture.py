@@ -95,6 +95,7 @@ def test_verify_fixture_polygon_material_ids_matches_raw_fbx_slots(tmp_path):
     assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 1}
     assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
     assert result["request_sub_index_by_polygon_name"] == {0: 1, 1: 0}
+    assert not result["request_name_mapping_ok"]
     assert result["name_remap_mismatches"] == [
         {
             "polygon": 0,
@@ -209,3 +210,4 @@ def test_verify_fixture_polygon_material_ids_accepts_explicit_expected_cgf_ids(t
     assert result["expected_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
     assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 0}
     assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
+    assert result["request_name_mapping_ok"]

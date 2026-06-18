@@ -38,7 +38,7 @@ use the later RC probe results before deciding the final mapping
 
 The diagnostic is a warning rather than a hazard because the CGF geometry can still be correct if the FBX material names, request sub-indices, and `.mtl` slots remain aligned.
 
-Phase 20 supersedes the earlier conservative assumption that the local slot id is always authoritative. A real multi-mesh RC probe showed that two objects can both use local FBX slot `0`, while RC writes CGF material ids `0` and `1` by matching the FBX material names to request/MTL sub-materials.
+Phase 20 supersedes the earlier conservative assumption that the local slot id is always authoritative. A real multi-mesh RC probe showed that two objects can both use local FBX slot `0`, while RC writes CGF material ids `0` and `1`. Phase 21 then showed that RC does not remap those ids by swapped request/MTL names, so the request/MTL order must mirror the exported FBX material table.
 
 ## Example
 

@@ -146,7 +146,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Blender-loaded models now preserve mesh material slot order and polygon usage counts, avoiding `bpy.data.materials` placeholder slot drift
 - Material diagnostics sidecars and the PySide diagnostics table now show polygon usage counts when known
 - Material diagnostics now warn when multiple meshes use the same FBX slot with different material names
-- A controlled multi-mesh probe shows that raw per-object local FBX slot ids are not enough: two meshes can both use local slot `0`, while RC maps them to CGF material ids `0` and `1` through the FBX material-name to request/MTL sub-material mapping
+- Controlled multi-mesh probes show that raw per-object local FBX slot ids are not enough: two meshes can both use local slot `0`, while RC writes CGF material ids `0` and `1`; a swapped request/MTL probe shows RC does not remap those ids by material name, so request/MTL slot order must mirror the exported FBX material table
 
 ## License
 

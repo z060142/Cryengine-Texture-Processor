@@ -92,19 +92,21 @@ The request and MTL slots were:
 
 For multi-mesh FBX files, raw per-object local material slot ids are not enough to predict CGF `MeshSubsets.nMatID`.
 
-In this probe, both polygons used local slot `0`, but RC mapped the second mesh to CGF material id `1` because its material name matched the second request/MTL sub-material.
+In this probe, both polygons used local slot `0`, but RC mapped the second mesh to CGF material id `1`.
+
+This proved that per-object local material slots are not the final CGF ids for multi-mesh FBX files. Phase 21 refines the cause: RC did not remap by request/MTL material name when request order was swapped. The observed ids are best explained as FBX material table indices that the request/MTL files must mirror.
 
 Practical rule:
 
 ```text
-The converter must preserve a stable FBX material-name to request/MTL sub-material mapping.
+The converter must preserve a stable FBX material table order and emit request/MTL sub-materials in that same order.
 Do not treat local mesh material slot index alone as the final CGF material id for multi-mesh models.
 ```
 
 ## Impact
 
-- Blender plugin/export tooling should build a global material table from the actual FBX material identities.
-- Request JSON `materials[].name`, request `sub_index`, and `.mtl` sub-material slot names must remain aligned.
+- Blender plugin/export tooling should build a global material table from the actual FBX material identities in exported order.
+- Request JSON `materials[].name`, request `sub_index`, and `.mtl` sub-material slot names must mirror that table order.
 - A per-mesh local slot can still be useful for diagnostics, but it is not the complete identity.
 - Phase 19 diagnostics should stay, but their wording should not claim that slot id is always authoritative in multi-mesh exports.
 
@@ -120,12 +122,12 @@ Real RC probe passed:
 
 ```text
 raw local slots: polygon 0 -> 0, polygon 1 -> 0
-request names: LocalSlot0_Wood -> 0, LocalSlot0_Metal -> 1
+FBX/export material order: LocalSlot0_Wood -> 0, LocalSlot0_Metal -> 1
 CGF ids: polygon 0 -> 0, polygon 1 -> 1
 ```
 
 ## Remaining Work
 
 - Update material conflict diagnostics so the UI explains the difference between local slot ids and global material identities.
-- Add a fixture where the MTL/request order is deliberately swapped against the FBX material order.
+- Keep Phase 21's swapped request-order probe in mind when implementing automatic MTL generation.
 - Add a fixture with duplicate material names across different objects.
