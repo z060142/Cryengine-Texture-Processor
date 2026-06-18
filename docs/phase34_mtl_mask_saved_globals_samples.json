@@ -1,0 +1,204 @@
+{
+  "files": [
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Editor\\Objects\\mtlobjects.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "C0000001",
+            "value": 3221225473,
+            "base": 16,
+            "ambiguous": false,
+            "decimal_value": null,
+            "hex_value": 3221225473
+          },
+          "string_gen_mask": "%ALLOW_SILHOUETTE_POM%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+          "tokens": [
+            "%ALLOW_SILHOUETTE_POM",
+            "%SPECULAR_MAP",
+            "%SUBSURFACE_SCATTERING"
+          ],
+          "illum_ext_mask": {
+            "value": 524304,
+            "known_tokens": [
+              "%SPECULAR_MAP",
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": [
+              "%ALLOW_SILHOUETTE_POM"
+            ]
+          },
+          "common_global_legacy_fix_mask": {
+            "value": 0,
+            "known_tokens": [],
+            "unknown_tokens": [
+              "%ALLOW_SILHOUETTE_POM",
+              "%SPECULAR_MAP",
+              "%SUBSURFACE_SCATTERING"
+            ]
+          },
+          "common_global_generated_mask": {
+            "value": 1688849860263936,
+            "known_tokens": [
+              "%SPECULAR_MAP",
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": [
+              "%ALLOW_SILHOUETTE_POM"
+            ]
+          },
+          "export_compat_mask": {
+            "value": 524320,
+            "known_tokens": [
+              "%SPECULAR_MAP",
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": [
+              "%ALLOW_SILHOUETTE_POM"
+            ]
+          },
+          "matches_illum_ext_mask": false,
+          "matches_common_global_legacy_fix_mask": false,
+          "matches_common_global_generated_mask": false,
+          "matches_export_compat_mask": false
+        }
+      ]
+    },
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Engine\\EngineAssets\\Materials\\MeshImporter\\MI_PreviewVertexColor.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "2020000000",
+            "value": 137975824384,
+            "base": 16,
+            "ambiguous": true,
+            "decimal_value": 2020000000,
+            "hex_value": 137975824384
+          },
+          "string_gen_mask": "%SUBSURFACE_SCATTERING%VERTCOLORS",
+          "tokens": [
+            "%SUBSURFACE_SCATTERING",
+            "%VERTCOLORS"
+          ],
+          "illum_ext_mask": {
+            "value": 4718592,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING",
+              "%VERTCOLORS"
+            ],
+            "unknown_tokens": []
+          },
+          "common_global_legacy_fix_mask": {
+            "value": 137438953472,
+            "known_tokens": [
+              "%VERTCOLORS"
+            ],
+            "unknown_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ]
+          },
+          "common_global_generated_mask": {
+            "value": 1126037345796096,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING",
+              "%VERTCOLORS"
+            ],
+            "unknown_tokens": []
+          },
+          "export_compat_mask": {
+            "value": 32,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": [
+              "%VERTCOLORS"
+            ]
+          },
+          "matches_illum_ext_mask": false,
+          "matches_common_global_legacy_fix_mask": false,
+          "matches_common_global_generated_mask": false,
+          "matches_export_compat_mask": false
+        }
+      ]
+    },
+    {
+      "path": "S:\\Crytek\\crytek\\CRYENGINE_Source-release\\Engine\\EngineAssets\\Materials\\material_default.mtl",
+      "materials": [
+        {
+          "location": "Material[0]",
+          "name": "",
+          "shader": "Illum",
+          "mtl_flags": "524288",
+          "gen_mask": {
+            "literal": "80000000",
+            "value": 2147483648,
+            "base": 16,
+            "ambiguous": true,
+            "decimal_value": 80000000,
+            "hex_value": 2147483648
+          },
+          "string_gen_mask": "%SUBSURFACE_SCATTERING",
+          "tokens": [
+            "%SUBSURFACE_SCATTERING"
+          ],
+          "illum_ext_mask": {
+            "value": 524288,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": []
+          },
+          "common_global_legacy_fix_mask": {
+            "value": 0,
+            "known_tokens": [],
+            "unknown_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ]
+          },
+          "common_global_generated_mask": {
+            "value": 1125899906842624,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": []
+          },
+          "export_compat_mask": {
+            "value": 32,
+            "known_tokens": [
+              "%SUBSURFACE_SCATTERING"
+            ],
+            "unknown_tokens": []
+          },
+          "matches_illum_ext_mask": false,
+          "matches_common_global_legacy_fix_mask": false,
+          "matches_common_global_generated_mask": false,
+          "matches_export_compat_mask": false
+        }
+      ]
+    }
+  ],
+  "common_global_flag_source": {
+    "mode": "globals_file",
+    "globals_file": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\user\\shaders\\cache\\globals.txt",
+    "shader_ext_dir": "",
+    "token_count": 51
+  },
+  "summary": {
+    "file_count": 3,
+    "material_count": 3,
+    "tokenized_material_mismatch_count": 3,
+    "unknown_illum_token_count": 1,
+    "unknown_common_global_legacy_fix_token_count": 5,
+    "unknown_common_global_generated_token_count": 1,
+    "common_global_generated_match_count": 0
+  }
+}

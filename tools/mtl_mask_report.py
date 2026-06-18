@@ -13,7 +13,10 @@ from output_formats.cryengine_mtl_schema import (
     EXPORT_COMPAT_SHADER_MASKS,
     ILLUM_EXT_SHADER_MASKS,
 )
-from tools.cryengine_shader_flags import build_common_global_flag_table_from_dir
+from tools.cryengine_shader_flags import (
+    build_common_global_flag_table_from_dir,
+    load_common_global_flag_table,
+)
 
 
 TOKEN_PATTERN = re.compile(r"%[A-Za-z0-9_]+")
@@ -148,11 +151,30 @@ def iter_mtl_files(paths):
             yield path
 
 
-def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None):
-    common_global_flags = (
-        build_common_global_flag_table_from_dir(shader_ext_dir)
-        if shader_ext_dir
-        else {}
+def _load_common_global_flags(shader_ext_dir=None, globals_file=None):
+    if globals_file:
+        return load_common_global_flag_table(globals_file), {
+            "mode": "globals_file",
+            "globals_file": os.path.abspath(globals_file),
+            "shader_ext_dir": os.path.abspath(shader_ext_dir) if shader_ext_dir else "",
+        }
+    if shader_ext_dir:
+        return build_common_global_flag_table_from_dir(shader_ext_dir), {
+            "mode": "shader_ext_dir",
+            "globals_file": "",
+            "shader_ext_dir": os.path.abspath(shader_ext_dir),
+        }
+    return {}, {
+        "mode": "",
+        "globals_file": "",
+        "shader_ext_dir": "",
+    }
+
+
+def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=None):
+    common_global_flags, common_global_flag_source = _load_common_global_flags(
+        shader_ext_dir=shader_ext_dir,
+        globals_file=globals_file,
     )
     files = []
     for index, mtl_path in enumerate(sorted(set(iter_mtl_files(paths)))):
@@ -187,7 +209,7 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None):
     return {
         "files": files,
         "common_global_flag_source": {
-            "shader_ext_dir": os.path.abspath(shader_ext_dir) if shader_ext_dir else "",
+            **common_global_flag_source,
             "token_count": len(common_global_flags),
         },
         "summary": {
@@ -207,10 +229,16 @@ def main(argv=None):
     parser.add_argument("paths", nargs="+", help="MTL files or directories to scan")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of .mtl files to scan")
     parser.add_argument("--shader-ext-dir", default="", help="Optional CryEngine Engine/Shaders folder")
+    parser.add_argument("--globals-file", default="", help="Optional CryEngine user Shaders/Cache/globals.txt file")
     parser.add_argument("--output", default="", help="Optional JSON output path")
     args = parser.parse_args(argv)
 
-    report = build_mtl_mask_report(args.paths, limit=args.limit, shader_ext_dir=args.shader_ext_dir or None)
+    report = build_mtl_mask_report(
+        args.paths,
+        limit=args.limit,
+        shader_ext_dir=args.shader_ext_dir or None,
+        globals_file=args.globals_file or None,
+    )
     output = json.dumps(report, indent=2)
     if args.output:
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)

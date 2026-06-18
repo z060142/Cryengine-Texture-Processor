@@ -128,3 +128,49 @@ def test_build_mtl_mask_report_uses_generated_common_global_table(tmp_path):
     assert report["common_global_flag_source"]["token_count"] == 1
     assert material["common_global_generated_mask"]["value"] == 1
     assert material["matches_common_global_generated_mask"] is True
+
+
+def test_build_mtl_mask_report_prefers_saved_globals_file(tmp_path):
+    shader_dir = tmp_path / "Shaders"
+    shader_dir.mkdir()
+    (shader_dir / "Illum.ext").write_text(
+        """
+        UsesCommonGlobalFlags
+        Property { Name = %SUBSURFACE_SCATTERING }
+        """,
+        encoding="utf-8",
+    )
+    globals_file = tmp_path / "globals.txt"
+    globals_file.write_text(
+        """
+        FX_CACHE_VER 1.000000
+        %ILLUM
+
+        %SUBSURFACE_SCATTERING 80000000
+        """,
+        encoding="utf-8",
+    )
+    mtl_path = tmp_path / "sample.mtl"
+    write_mtl(
+        mtl_path,
+        [
+            {
+                "Name": "SavedGlobalsStyle",
+                "Shader": "Illum",
+                "GenMask": "80000000",
+                "StringGenMask": "%SUBSURFACE_SCATTERING",
+            },
+        ],
+    )
+
+    report = build_mtl_mask_report(
+        [str(mtl_path)],
+        shader_ext_dir=str(shader_dir),
+        globals_file=str(globals_file),
+    )
+    material = report["files"][0]["materials"][1]
+
+    assert report["common_global_flag_source"]["mode"] == "globals_file"
+    assert report["common_global_flag_source"]["token_count"] == 1
+    assert material["common_global_generated_mask"]["value"] == 0x80000000
+    assert material["matches_common_global_generated_mask"] is True

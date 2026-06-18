@@ -10,6 +10,7 @@ from output_formats.cryengine_mtl_schema import COMMON_GLOBAL_LEGACY_FIX_MASKS
 
 USES_COMMON_GLOBAL_FLAGS = "UsesCommonGlobalFlags"
 EXT_NAME_PATTERN = re.compile(r"\bName\s*=\s*(%[A-Za-z0-9_]+)")
+GLOBALS_LINE_PATTERN = re.compile(r"^\s*(%[A-Za-z0-9_]+)\s+(0x[0-9a-fA-F]+|[0-9a-fA-F]+)\b")
 
 
 def extract_common_global_tokens_from_ext(ext_text):
@@ -48,3 +49,19 @@ def build_common_global_flag_table(tokens, legacy_fix_masks=COMMON_GLOBAL_LEGACY
 
 def build_common_global_flag_table_from_dir(shader_ext_dir):
     return build_common_global_flag_table(collect_common_global_tokens(shader_ext_dir))
+
+
+def parse_common_global_flags_text(globals_text):
+    table = {}
+    for line in globals_text.splitlines():
+        match = GLOBALS_LINE_PATTERN.match(line)
+        if not match:
+            continue
+        token, mask = match.groups()
+        table[token.upper()] = int(mask, 16)
+    return table
+
+
+def load_common_global_flag_table(globals_path):
+    with open(globals_path, encoding="utf-8", errors="ignore") as f:
+        return parse_common_global_flags_text(f.read())
