@@ -130,4 +130,4 @@ CGF ids: polygon 0 -> 0, polygon 1 -> 1
 
 - Update material conflict diagnostics so the UI explains the difference between local slot ids and global material identities.
 - Keep Phase 21's swapped request-order probe in mind when implementing automatic MTL generation.
-- Add a fixture with duplicate material names across different objects.
+- Keep Phase 22's suffix-preservation probe in mind when implementing Blender material-name handling.

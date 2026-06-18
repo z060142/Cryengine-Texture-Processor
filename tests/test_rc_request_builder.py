@@ -37,11 +37,12 @@ def test_build_import_request_matches_rc_root_payload_shape():
     assert "use_32_bit_positions" not in request
 
 
-def test_material_requests_use_rc_fields_only_and_collapse_duplicate_names():
+def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
     request = build_import_request(sample_model(), "chair.fbx")
 
     assert request["materials"] == [
         {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "Chair.001", "physicalize": "no_collide", "sub_index": 1},
         {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2},
     ]
     assert all("file" not in material for material in request["materials"])
@@ -104,5 +105,6 @@ def test_export_json_preserves_fbx_slot_order_over_existing_mtl_name_order(tmp_p
     payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
     assert payload["request"]["materials"] == [
         {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "Chair.001", "physicalize": "no_collide", "sub_index": 1},
         {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2},
     ]

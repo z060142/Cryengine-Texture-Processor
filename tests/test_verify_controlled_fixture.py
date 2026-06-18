@@ -96,6 +96,7 @@ def test_verify_fixture_polygon_material_ids_matches_raw_fbx_slots(tmp_path):
     assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
     assert result["request_sub_index_by_polygon_name"] == {0: 1, 1: 0}
     assert not result["request_name_mapping_ok"]
+    assert result["duplicate_request_material_names"] == []
     assert result["name_remap_mismatches"] == [
         {
             "polygon": 0,
@@ -211,3 +212,53 @@ def test_verify_fixture_polygon_material_ids_accepts_explicit_expected_cgf_ids(t
     assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 0}
     assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
     assert result["request_name_mapping_ok"]
+    assert result["duplicate_request_material_names"] == []
+
+
+def test_verify_fixture_polygon_material_ids_flags_missing_request_material_name(tmp_path):
+    manifest_path = tmp_path / "asset.fixture_manifest.json"
+    report_path = tmp_path / "asset.material_report.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "polygons": [
+                    {"polygon": 0, "material_slot": 0, "material_name": "Stone", "expected_cgf_material_id": 0},
+                    {"polygon": 1, "material_slot": 1, "material_name": "Stone.001", "expected_cgf_material_id": 1},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path.write_text(
+        json.dumps(
+            {
+                "cgf_read_error": "",
+                "request_materials": [{"name": "Stone", "sub_index": 0}],
+                "cgf_material_summary": {
+                    "meshes": [
+                        {
+                            "chunk_id": 10,
+                            "subsets": [
+                                {"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0, "num_indices": 3},
+                                {"subset": 1, "center": [3.0, 0.0, 0.0], "material_id": 1, "num_indices": 3},
+                            ],
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = verify_fixture_polygon_material_ids(str(manifest_path), str(report_path))
+
+    assert result["ok"]
+    assert not result["request_name_mapping_ok"]
+    assert result["name_remap_mismatches"] == [
+        {
+            "polygon": 1,
+            "material_name": "Stone.001",
+            "actual_material_id": 1,
+            "request_sub_index_for_name": None,
+        }
+    ]

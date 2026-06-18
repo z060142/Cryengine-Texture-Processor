@@ -163,10 +163,10 @@ def test_slot_name_conflict_reports_warning():
     assert diagnostic["mesh_names"] == ["MeshA", "MeshB"]
 
 
-def test_duplicate_blender_suffix_is_collapsed():
+def test_blender_duplicate_suffix_is_preserved_as_distinct_material():
     records = assign_material_sub_indices(
         [{"name": "Stone", "id": 1}, {"name": "Stone.001", "id": 2}],
         existing_submaterial_names=[],
     )
 
-    assert sub_index_by_name(records) == {"Stone": 0}
+    assert sub_index_by_name(records) == {"Stone": 0, "Stone.001": 1}

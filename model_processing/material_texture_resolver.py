@@ -8,9 +8,6 @@ place so the next phase can swap them for RC-accurate material/sub-index logic.
 """
 
 import os
-import re
-
-
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 
 COMMON_TEXTURE_BASE_SUFFIXES = (
@@ -54,8 +51,8 @@ MTL_OUTPUT_TEXTURE_SUFFIXES = {
 
 
 def clean_material_name(material_name):
-    """Remove Blender duplicate suffixes such as .001 while preserving the base name."""
-    return re.sub(r"\.[0-9]{3}$", "", material_name or "UnnamedMaterial")
+    """Return the material name that should be emitted to RC-visible files."""
+    return material_name or "UnnamedMaterial"
 
 
 def iter_model_materials(materials, ignored_names=IGNORED_MATERIAL_NAMES):
@@ -69,10 +66,11 @@ def iter_model_materials(materials, ignored_names=IGNORED_MATERIAL_NAMES):
 
 def iter_unique_clean_materials(materials, ignored_names=IGNORED_MATERIAL_NAMES):
     """
-    Yield materials with duplicate Blender suffixes collapsed.
+    Yield materials with exact duplicate names collapsed.
 
     The yielded index is contiguous and matches the existing JSON exporter
-    behavior. This is not yet RC's full material auto-assignment algorithm.
+    behavior. Blender suffixes such as `.001` are preserved because RC can use
+    them as distinct FBX material table names.
     """
     seen_clean_names = set()
     sub_index = 0
@@ -80,7 +78,7 @@ def iter_unique_clean_materials(materials, ignored_names=IGNORED_MATERIAL_NAMES)
     for material_name, material in iter_model_materials(materials, ignored_names):
         clean_name = clean_material_name(material_name)
         if clean_name in seen_clean_names:
-            print(f"Skipping duplicate material after cleaning: {material_name} -> {clean_name}")
+            print(f"Skipping exact duplicate material name: {material_name}")
             continue
 
         seen_clean_names.add(clean_name)

@@ -4,8 +4,10 @@ from tools.blender_material_fixture import (
     DEFAULT_MATERIALS,
     DEFAULT_POLYGON_SLOTS,
     FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT,
+    FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL,
     FIXTURE_KIND_SINGLE_MESH,
     MULTI_MESH_CONFLICT_MATERIALS,
+    MULTI_MESH_SHARED_MATERIALS,
     _blender_script,
     build_blender_command,
     discover_default_blender,
@@ -56,6 +58,22 @@ def test_multi_mesh_name_conflict_script_uses_local_slot_zero_for_each_object():
     assert "'material_slot': 0" in script
     assert "'expect_cgf_material_ids': list(range(len(material_names)))" in script
     assert "Two mesh objects each use local material slot 0" in script
+
+
+def test_multi_mesh_shared_material_script_uses_one_expected_cgf_id():
+    script = _blender_script(
+        "out.fbx",
+        "manifest.json",
+        MULTI_MESH_SHARED_MATERIALS,
+        DEFAULT_POLYGON_SLOTS,
+        FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL,
+    )
+
+    assert "CE_SharedMaterialProbe_" in script
+    assert "'material_slot': 0" in script
+    assert "'expected_cgf_material_id': 0" in script
+    assert "'expect_cgf_material_ids': [0]" in script
+    assert "same Blender material datablock" in script
 
 
 def test_single_mesh_script_keeps_fixture_kind_default_behavior():

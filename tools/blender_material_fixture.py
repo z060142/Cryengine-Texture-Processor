@@ -21,8 +21,14 @@ DEFAULT_MATERIALS = ("Slot_0_Red", "Slot_1_Green", "Slot_2_Blue")
 DEFAULT_POLYGON_SLOTS = (0, 1)
 FIXTURE_KIND_SINGLE_MESH = "single-mesh"
 FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT = "multi-mesh-name-conflict"
-FIXTURE_KINDS = (FIXTURE_KIND_SINGLE_MESH, FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT)
+FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL = "multi-mesh-shared-material"
+FIXTURE_KINDS = (
+    FIXTURE_KIND_SINGLE_MESH,
+    FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT,
+    FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL,
+)
 MULTI_MESH_CONFLICT_MATERIALS = ("LocalSlot0_Wood", "LocalSlot0_Metal")
+MULTI_MESH_SHARED_MATERIALS = ("SharedSlot0_Surface",)
 
 
 def discover_default_blender(candidates=DEFAULT_BLENDER_CANDIDATES):
@@ -178,7 +184,8 @@ for object_index, material_name in enumerate(material_names):
         'object_polygon': 0,
         'vertices': list(obj.data.polygons[0].vertices),
         'material_slot': 0,
-        'material_name': material_name,
+        'requested_material_name': material_name,
+        'material_name': mat.name,
         'expected_cgf_material_id': object_index,
         'object': obj.name,
         'center_x': x,
@@ -207,8 +214,8 @@ manifest = {{
     'objects': [obj.name for obj in objects],
     'fbx': output_fbx_path,
     'materials': [
-        {{'slot': index, 'name': name}}
-        for index, name in enumerate(material_names)
+        {{'slot': index, 'name': polygon['material_name'], 'requested_name': polygon['requested_material_name']}}
+        for index, polygon in enumerate(polygons)
     ],
     'polygons': polygons,
     'polygon_material_slots': [polygon['material_slot'] for polygon in polygons],
@@ -221,11 +228,103 @@ with open(manifest_path, 'w', encoding='utf-8') as f:
 """
 
 
+def _multi_mesh_shared_material_blender_script(output_fbx_path, manifest_path, material_names):
+    material_name_expr = repr(list(material_names)[0])
+    output_fbx_expr = repr(output_fbx_path)
+    manifest_expr = repr(manifest_path)
+    return f"""
+import json
+import os
+
+import bpy
+
+output_fbx_path = {output_fbx_expr}
+manifest_path = {manifest_expr}
+material_name = {material_name_expr}
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+
+shared_mat = bpy.data.materials.new(material_name)
+shared_mat.diffuse_color = (0.45, 0.68, 0.22, 1.0)
+
+objects = []
+polygons = []
+for object_index in range(2):
+    x = float(object_index) * 3.0
+    mesh = bpy.data.meshes.new(f'CE_SharedMaterialProbeMesh_{{object_index}}')
+    mesh.from_pydata(
+        [
+            (x - 1.0, -1.0, 0.0),
+            (x + 1.0, -1.0, 0.0),
+            (x, 1.0, 0.0),
+        ],
+        [],
+        [(0, 1, 2)],
+    )
+    mesh.update()
+
+    obj = bpy.data.objects.new(f'CE_SharedMaterialProbe_{{object_index}}', mesh)
+    bpy.context.collection.objects.link(obj)
+    obj.data.materials.append(shared_mat)
+    obj.data.polygons[0].material_index = 0
+    obj.select_set(True)
+    objects.append(obj)
+    polygons.append({{
+        'polygon': object_index,
+        'object_polygon': 0,
+        'vertices': list(obj.data.polygons[0].vertices),
+        'material_slot': 0,
+        'requested_material_name': material_name,
+        'material_name': shared_mat.name,
+        'expected_cgf_material_id': 0,
+        'object': obj.name,
+        'center_x': x,
+    }})
+
+bpy.context.view_layer.objects.active = objects[0]
+bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+os.makedirs(os.path.dirname(output_fbx_path), exist_ok=True)
+bpy.ops.export_scene.fbx(
+    filepath=output_fbx_path,
+    use_selection=True,
+    object_types={{'MESH'}},
+    apply_unit_scale=True,
+    global_scale=1.0,
+    axis_forward='-Y',
+    axis_up='Z',
+    add_leaf_bones=False,
+    bake_anim=False,
+    use_mesh_modifiers=True,
+    path_mode='AUTO',
+)
+
+manifest = {{
+    'fixture_kind': '{FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL}',
+    'objects': [obj.name for obj in objects],
+    'fbx': output_fbx_path,
+    'materials': [
+        {{'slot': 0, 'name': shared_mat.name, 'requested_name': material_name}}
+    ],
+    'polygons': polygons,
+    'polygon_material_slots': [polygon['material_slot'] for polygon in polygons],
+    'expect_cgf_material_ids': [0],
+    'probe_question': 'Two mesh objects both use local material slot 0 and the same Blender material datablock.',
+}}
+with open(manifest_path, 'w', encoding='utf-8') as f:
+    json.dump(manifest, f, indent=2, ensure_ascii=False)
+    f.write('\\n')
+"""
+
+
 def _blender_script(output_fbx_path, manifest_path, material_names, polygon_material_slots, fixture_kind):
     if fixture_kind == FIXTURE_KIND_SINGLE_MESH:
         return _single_mesh_blender_script(output_fbx_path, manifest_path, material_names, polygon_material_slots)
     if fixture_kind == FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT:
         return _multi_mesh_name_conflict_blender_script(output_fbx_path, manifest_path, material_names)
+    if fixture_kind == FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL:
+        return _multi_mesh_shared_material_blender_script(output_fbx_path, manifest_path, material_names)
     raise RuntimeError(f"Unsupported fixture kind: {fixture_kind}")
 
 
@@ -245,6 +344,8 @@ def generate_material_fixture(
     output_dir = os.path.abspath(output_dir)
     if fixture_kind == FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT and material_names is None:
         material_names = MULTI_MESH_CONFLICT_MATERIALS
+    if fixture_kind == FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL and material_names is None:
+        material_names = MULTI_MESH_SHARED_MATERIALS
     material_names = tuple(material_names or DEFAULT_MATERIALS)
     polygon_material_slots = tuple(polygon_material_slots or DEFAULT_POLYGON_SLOTS)
 
@@ -258,16 +359,19 @@ def generate_material_fixture(
         raise RuntimeError("At least one material name is required")
     if not polygon_material_slots:
         raise RuntimeError("At least one polygon material slot is required")
-    max_slot = max(polygon_material_slots)
-    min_slot = min(polygon_material_slots)
-    if min_slot < 0:
-        raise RuntimeError("Polygon material slots must be zero or positive")
-    if max_slot >= len(material_names):
-        raise RuntimeError(
-            f"Polygon material slot {max_slot} has no matching material; only {len(material_names)} materials were provided"
-        )
+    if fixture_kind == FIXTURE_KIND_SINGLE_MESH:
+        max_slot = max(polygon_material_slots)
+        min_slot = min(polygon_material_slots)
+        if min_slot < 0:
+            raise RuntimeError("Polygon material slots must be zero or positive")
+        if max_slot >= len(material_names):
+            raise RuntimeError(
+                f"Polygon material slot {max_slot} has no matching material; only {len(material_names)} materials were provided"
+            )
     if fixture_kind == FIXTURE_KIND_MULTI_MESH_NAME_CONFLICT and len(material_names) < 2:
         raise RuntimeError("Multi-mesh name conflict fixture requires at least two material names")
+    if fixture_kind == FIXTURE_KIND_MULTI_MESH_SHARED_MATERIAL and len(material_names) != 1:
+        raise RuntimeError("Multi-mesh shared material fixture requires exactly one material name")
 
     os.makedirs(output_dir, exist_ok=True)
     output_fbx_path = os.path.join(output_dir, f"{asset_name}.fbx")

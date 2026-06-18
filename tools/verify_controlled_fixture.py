@@ -101,6 +101,12 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
         int(polygon["polygon"]): polygon.get("material_name", "")
         for polygon in manifest.get("polygons", [])
     }
+    request_name_counts = {}
+    for material in report.get("request_materials", []):
+        name = material.get("name")
+        if name is not None:
+            request_name_counts[name] = request_name_counts.get(name, 0) + 1
+    duplicate_request_names = sorted(name for name, count in request_name_counts.items() if count > 1)
     request_name_to_sub_index = {
         material.get("name"): int(material.get("sub_index"))
         for material in report.get("request_materials", [])
@@ -124,7 +130,7 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
             "request_sub_index_for_name": request_sub_index,
         }
         for polygon, request_sub_index in request_sub_index_by_polygon.items()
-        if request_sub_index is not None and actual_by_polygon.get(polygon) != request_sub_index
+        if request_sub_index is None or actual_by_polygon.get(polygon) != request_sub_index
     ]
 
     return {
@@ -137,7 +143,8 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
         "raw_fbx_slot_by_polygon": raw_fbx_slot_by_polygon,
         "actual_cgf_material_id_by_polygon": actual_by_polygon,
         "request_sub_index_by_polygon_name": request_sub_index_by_polygon,
-        "request_name_mapping_ok": not name_remap_mismatches,
+        "request_name_mapping_ok": not name_remap_mismatches and not duplicate_request_names,
+        "duplicate_request_material_names": duplicate_request_names,
         "name_remap_mismatches": name_remap_mismatches,
         "center_polygon_lookup": center_polygon_lookup,
         "duplicate_polygons": duplicate_polygons,

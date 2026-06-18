@@ -100,5 +100,5 @@ That false value is the important semantic hazard.
 ## Remaining Work
 
 - Make smoke reports surface this semantic mismatch without requiring the controlled-fixture verifier.
-- Add a duplicate-name probe to learn how RC behaves when two FBX materials share the same display name.
+- Use Phase 22's shared-material and suffix-preservation probes when handling Blender duplicate material names.
 - Update the PySide diagnostics wording so users understand that request/MTL slot order must mirror exported FBX material order.

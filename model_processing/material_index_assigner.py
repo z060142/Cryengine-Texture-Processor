@@ -120,7 +120,8 @@ def diagnose_material_record(record):
                 "mesh_names": record["material"].get("mesh_names", []),
                 "message": (
                     "Multiple material names were found for the same FBX material slot across meshes. "
-                    "The slot id remains authoritative; do not use the material name alone as the slot identity."
+                    "Local mesh slot ids and global FBX material identities can diverge; keep request/MTL slot order "
+                    "aligned to the exported FBX material table."
                 ),
             }
         )
@@ -179,7 +180,7 @@ def _normalized_records(materials):
     for order, (material_name, material) in enumerate(iter_model_materials(materials)):
         clean_name = clean_material_name(material_name)
         if clean_name in seen_names:
-            print(f"Skipping duplicate material after cleaning: {material_name} -> {clean_name}")
+            print(f"Skipping exact duplicate material name: {material_name}")
             continue
 
         seen_names.add(clean_name)

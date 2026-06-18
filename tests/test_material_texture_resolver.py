@@ -21,12 +21,12 @@ class TextureManagerStub:
         return "diffuse", filename.removesuffix("_albedo")
 
 
-def test_clean_material_name_removes_blender_duplicate_suffix():
-    assert clean_material_name("Stone.001") == "Stone"
+def test_clean_material_name_preserves_blender_duplicate_suffix():
+    assert clean_material_name("Stone.001") == "Stone.001"
     assert clean_material_name("Stone") == "Stone"
 
 
-def test_iter_unique_clean_materials_skips_defaults_and_duplicate_suffixes():
+def test_iter_unique_clean_materials_skips_defaults_and_preserves_suffixes():
     materials = [
         {"name": "Material"},
         {"name": "Stone"},
@@ -36,8 +36,8 @@ def test_iter_unique_clean_materials_skips_defaults_and_duplicate_suffixes():
 
     result = list(iter_unique_clean_materials(materials))
 
-    assert [item["clean_name"] for item in result] == ["Stone", "Metal"]
-    assert [item["sub_index"] for item in result] == [0, 1]
+    assert [item["clean_name"] for item in result] == ["Stone", "Stone.001", "Metal"]
+    assert [item["sub_index"] for item in result] == [0, 1, 2]
 
 
 def test_strip_known_texture_suffix_handles_cryengine_outputs():
