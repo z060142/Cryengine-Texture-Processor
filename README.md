@@ -101,6 +101,8 @@ uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to th
 
 When local CryEngine 5.7.1 and GameSDK sample folders are present, the harness discovers `rc.exe` and `objects\cubao\CubeA.fbx` automatically. The verified run writes a `.fbx`, `.mtl`, `.json`, `.cgf`, and `.cryasset` bundle under the selected work directory.
 
+The harness also writes `<asset>.material_report.json`, which compares RC request material `sub_index` values with generated `.mtl` sub-material slots.
+
 ## Technologies
 
 - **Python**: Main programming language
@@ -119,6 +121,7 @@ When local CryEngine 5.7.1 and GameSDK sample folders are present, the harness d
 - RC request generation now aligns material sub-indices with existing `.mtl` submaterial slots where possible; true FBX material-id extraction still needs a later pass
 - RC execution now uses a structured runner; a real `rc.exe` smoke test has passed with the local GameSDK `CubeA.fbx` sample
 - A repeatable RC smoke harness is available via `uv run python -m tools.rc_smoke_test`
+- Smoke runs now emit a material mapping report; final `.cgf` material table inspection still needs a later CryEngine-aware reader or editor-side check
 
 ## License
 

@@ -99,6 +99,8 @@ uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to th
 
 当本机存在 CryEngine 5.7.1 与 GameSDK sample 目录时，harness 会自动发现 `rc.exe` 与 `objects\cubao\CubeA.fbx`。已验证的真实 RC 执行会在指定工作目录生成 `.fbx`、`.mtl`、`.json`、`.cgf` 与 `.cryasset`。
 
+harness 也会写出 `<asset>.material_report.json`，用于对照 RC request 的材质 `sub_index` 与生成 `.mtl` 的子材质槽位。
+
 ## 技术
 
 - **Python**：主要编程语言
@@ -117,6 +119,7 @@ uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to th
 - RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
 - RC 执行现在改用结构化 runner；已用本机 GameSDK `CubeA.fbx` 样本通过真实 `rc.exe` smoke test
 - 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
+- Smoke 运行现在会输出材质映射报告；最终 `.cgf` 内部材质表仍需要后续用 CryEngine-aware reader 或 editor-side 检查
 
 ## 许可证
 

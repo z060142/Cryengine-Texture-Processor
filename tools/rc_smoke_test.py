@@ -9,6 +9,7 @@ import shutil
 
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
+from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
 from utils.rc_import_runner import RCImportRunner, RCImportResult
 
 
@@ -33,6 +34,7 @@ class RCSmokeResult:
     mtl_path: str = ""
     json_path: str = ""
     expected_output_path: str = ""
+    material_report_path: str = ""
     rc_result: RCImportResult | None = None
     error: str = ""
 
@@ -140,6 +142,32 @@ def run_rc_smoke_test(
 
     runner = runner_factory(rc_exe_path)
     rc_result = runner.run(bundle["json_path"], source_fbx_path=bundle["copied_fbx_path"])
+    report_path = os.path.join(work_dir, f"{os.path.splitext(os.path.basename(bundle['json_path']))[0]}.material_report.json")
+    try:
+        report = build_material_mapping_report(
+            bundle["json_path"],
+            bundle["mtl_path"],
+            expected_output_path=rc_result.expected_output_path,
+            rc_exe_path=rc_exe_path,
+            source_fbx_path=source_fbx_path,
+            copied_fbx_path=bundle["copied_fbx_path"],
+            rc_returncode=rc_result.returncode,
+        )
+        write_material_mapping_report(report, report_path)
+    except Exception as e:
+        report_path = ""
+        if rc_result.success:
+            rc_result = RCImportResult(
+                success=False,
+                command=rc_result.command,
+                json_path=rc_result.json_path,
+                expected_output_path=rc_result.expected_output_path,
+                returncode=rc_result.returncode,
+                stdout=rc_result.stdout,
+                stderr=rc_result.stderr,
+                error=f"Failed to write material mapping report: {e}",
+            )
+
     return RCSmokeResult(
         success=rc_result.success,
         work_dir=work_dir,
@@ -149,6 +177,7 @@ def run_rc_smoke_test(
         mtl_path=bundle["mtl_path"],
         json_path=bundle["json_path"],
         expected_output_path=rc_result.expected_output_path,
+        material_report_path=report_path,
         rc_result=rc_result,
         error=rc_result.error,
     )
@@ -178,6 +207,7 @@ def main(argv=None):
     print(f"mtl: {result.mtl_path}")
     print(f"json: {result.json_path}")
     print(f"expected_output: {result.expected_output_path}")
+    print(f"material_report: {result.material_report_path}")
     if result.error:
         print(f"error: {result.error}")
     if result.rc_result and result.rc_result.stdout:

@@ -110,3 +110,5 @@ def test_run_rc_smoke_test_uses_runner_factory(tmp_path):
     assert result.rc_result.stdout == "ok"
     assert result.json_path.endswith("asset.json")
     assert result.copied_fbx_path.endswith("asset.fbx")
+    assert result.material_report_path.endswith("asset.material_report.json")
+    assert os.path.exists(result.material_report_path)
