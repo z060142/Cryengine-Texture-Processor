@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import os
 import shutil
 
+from model_processing.material_index_assigner import assign_material_sub_indices
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
@@ -127,6 +128,21 @@ def build_smoke_model_data(asset_name, material_names=None, material_specs=None)
     }
 
 
+def collect_material_slot_diagnostics(material_specs, existing_submaterial_names=None):
+    diagnostics = []
+    for record in assign_material_sub_indices(material_specs, existing_submaterial_names):
+        for diagnostic in record.get("diagnostics", []):
+            diagnostics.append(
+                {
+                    **diagnostic,
+                    "source_order": record["source_order"],
+                    "assignment_reason": diagnostic.get("assignment_reason", record["reason"]),
+                    "original_name": record["original_name"],
+                }
+            )
+    return diagnostics
+
+
 def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_names=None, material_specs=None):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
@@ -158,6 +174,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
         "copied_fbx_path": copied_fbx_path,
         "mtl_path": mtl_result,
         "json_path": json_result,
+        "material_diagnostics": collect_material_slot_diagnostics(materials_data),
     }
 
 
@@ -207,6 +224,7 @@ def run_rc_smoke_test(
             copied_fbx_path=bundle["copied_fbx_path"],
             rc_returncode=rc_result.returncode,
         )
+        report["preflight_material_diagnostics"] = bundle.get("material_diagnostics", [])
         write_material_mapping_report(report, report_path)
     except Exception as e:
         report_path = ""

@@ -2,7 +2,7 @@ import json
 import xml.etree.ElementTree as ET
 
 from output_formats.json_exporter import export_json
-from output_formats.rc_request_builder import build_import_request, wrap_import_request
+from output_formats.rc_request_builder import build_import_request, build_material_requests, wrap_import_request
 
 
 def sample_model():
@@ -46,6 +46,17 @@ def test_material_requests_use_rc_fields_only_and_collapse_duplicate_names():
     ]
     assert all("file" not in material for material in request["materials"])
     assert all("ui_name" not in material for material in request["materials"])
+    assert all("diagnostics" not in material for material in request["materials"])
+
+
+def test_material_requests_can_include_slot_diagnostics():
+    materials = build_material_requests(
+        [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}],
+        include_diagnostics=True,
+    )
+
+    assert "diagnostics" not in materials[0]
+    assert materials[1]["diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 
 
 def test_nodes_and_joint_physics_use_path_arrays():

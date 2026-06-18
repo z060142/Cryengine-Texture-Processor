@@ -99,7 +99,7 @@ uv run python -m tools.rc_smoke_test --work-dir "S:\Crytek\crytek\Stripped to th
 
 当本机存在 CryEngine 5.7.1 与 GameSDK sample 目录时，harness 会自动发现 `rc.exe` 与 `objects\cubao\CubeA.fbx`。已验证的真实 RC 执行会在指定工作目录生成 `.fbx`、`.mtl`、`.json`、`.cgf` 与 `.cryasset`。
 
-harness 也会写出 `<asset>.material_report.json`，用于对照 RC request 的材质 `sub_index` 与生成 `.mtl` 的子材质槽位。
+harness 也会写出 `<asset>.material_report.json`，用于对照 RC request 的材质 `sub_index`、生成 `.mtl` 的子材质槽位，并记录转换前 material-slot diagnostics。
 
 既有 `.cgf` 文件可用下列命令检查：
 
@@ -138,6 +138,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - 受控 fixture 已验证 RC 会保留 `0` 与 `2` 这种有洞的材质 id，不会压缩成连续 id
 - 受控 request-name remap 探针显示，当 request/MTL 槽位顺序与 FBX 不同时，RC 仍让 CGF polygon 材质 id 对齐原始 FBX material slot；材质名称不会重写 polygon 材质 id
 - 受控 deleted-material 探针显示，request `sub_index = -1` 不会移除 FBX 仍在使用的 geometry material id；除非已证明该 slot 没有 polygon 使用，否则应保留 placeholder 槽
+- 材质分配现在会对危险的 deleted 或 remapped 已知 FBX slot 产生 diagnostics；smoke report 会以 `preflight_material_diagnostics` 输出
 
 ## 许可证
 

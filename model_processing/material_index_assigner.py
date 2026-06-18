@@ -81,6 +81,79 @@ def _first_free_index(occupied):
     return index
 
 
+def _known_polygon_usage(material):
+    for key in ("polygon_count", "face_count", "used_polygon_count"):
+        value = _coerce_int(material.get(key))
+        if value is not None:
+            return value > 0
+
+    for key in ("used_by_polygons", "is_used", "used"):
+        value = material.get(key)
+        if value is not None:
+            return bool(value)
+
+    return None
+
+
+def _fbx_slot(record):
+    fbx_id = record.get("fbx_material_id")
+    if fbx_id is None or fbx_id < 1:
+        return None
+    return fbx_id - 1
+
+
+def diagnose_material_record(record):
+    diagnostics = []
+    fbx_slot = _fbx_slot(record)
+    polygon_usage = _known_polygon_usage(record["material"])
+
+    if record["deleted"] and fbx_slot is not None and polygon_usage is not False:
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "deleted_known_fbx_slot_usage_unknown",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "message": (
+                    "Deleted material has a known FBX slot. RC does not remove geometry material ids "
+                    "for slots still used by the FBX; preserve a placeholder unless polygon usage proves it is unused."
+                ),
+            }
+        )
+
+    if (
+        not record["deleted"]
+        and fbx_slot is not None
+        and record["sub_index"] is not None
+        and record["sub_index"] >= 0
+        and record["sub_index"] != fbx_slot
+        and polygon_usage is not False
+    ):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "sub_index_differs_from_fbx_slot_usage_unknown",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "assignment_reason": record["reason"],
+                "message": (
+                    "Assigned sub_index differs from the known FBX slot. RC keeps geometry material ids "
+                    "aligned to FBX slots, so this can point polygons at the wrong material unless the slot is unused."
+                ),
+            }
+        )
+
+    return diagnostics
+
+
+def attach_material_diagnostics(records):
+    for record in records:
+        record["diagnostics"] = diagnose_material_record(record)
+    return records
+
+
 def _normalized_records(materials):
     records = []
     seen_names = set()
@@ -102,6 +175,7 @@ def _normalized_records(materials):
                 "deleted": is_deleted_material(material),
                 "sub_index": None,
                 "reason": "",
+                "diagnostics": [],
             }
         )
 
@@ -173,6 +247,7 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
         record["reason"] = "first_free"
         occupied.add(index)
 
+    attach_material_diagnostics(records)
     return records
 
 

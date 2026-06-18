@@ -14,6 +14,10 @@ def reason_by_name(records):
     return {record["clean_name"]: record["reason"] for record in records}
 
 
+def diagnostics_by_name(records):
+    return {record["clean_name"]: record["diagnostics"] for record in records}
+
+
 def test_parse_mtl_submaterial_names_uses_child_order(tmp_path):
     mtl_path = tmp_path / "asset.mtl"
     root = ET.Element("Material")
@@ -94,6 +98,46 @@ def test_deleted_material_gets_negative_sub_index():
 
     assert sub_index_by_name(records) == {"Visible": 0, "Removed": -1}
     assert reason_by_name(records)["Removed"] == "deleted"
+
+
+def test_deleted_known_fbx_slot_reports_hazard_when_usage_unknown():
+    records = assign_material_sub_indices(
+        [{"name": "Visible", "id": 1}, {"name": "Removed", "deleted": True, "id": 2}],
+        existing_submaterial_names=[],
+    )
+
+    diagnostics = diagnostics_by_name(records)
+
+    assert diagnostics["Visible"] == []
+    assert diagnostics["Removed"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
+    assert diagnostics["Removed"][0]["fbx_slot"] == 1
+    assert diagnostics["Removed"][0]["sub_index"] == -1
+
+
+def test_deleted_known_fbx_slot_has_no_hazard_when_usage_is_known_unused():
+    records = assign_material_sub_indices(
+        [{"name": "Removed", "deleted": True, "id": 2, "polygon_count": 0}],
+        existing_submaterial_names=[],
+    )
+
+    assert diagnostics_by_name(records)["Removed"] == []
+
+
+def test_sub_index_different_from_fbx_slot_reports_hazard_when_usage_unknown():
+    records = assign_material_sub_indices(
+        [
+            {"name": "Reserved", "sub_index": 0, "auto_assigned": False},
+            {"name": "Moved", "id": 1},
+        ],
+        existing_submaterial_names=["Reserved", "Moved"],
+    )
+
+    diagnostics = diagnostics_by_name(records)
+
+    assert sub_index_by_name(records)["Moved"] == 1
+    assert diagnostics["Moved"][0]["code"] == "sub_index_differs_from_fbx_slot_usage_unknown"
+    assert diagnostics["Moved"][0]["fbx_slot"] == 0
+    assert diagnostics["Moved"][0]["sub_index"] == 1
 
 
 def test_duplicate_blender_suffix_is_collapsed():

@@ -3,6 +3,7 @@ import os
 
 from tools.rc_smoke_test import (
     build_smoke_model_data,
+    collect_material_slot_diagnostics,
     discover_default_fbx,
     material_names_from_arg,
     material_specs_from_arg,
@@ -44,6 +45,17 @@ def test_build_smoke_model_data_uses_empty_node_list():
         {"name": "Bark", "id": 1, "index": 0},
         {"name": "Leaves", "id": 2, "index": 1},
     ]
+
+
+def test_collect_material_slot_diagnostics_reports_deleted_known_slot():
+    diagnostics = collect_material_slot_diagnostics(
+        [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}]
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["code"] == "deleted_known_fbx_slot_usage_unknown"
+    assert diagnostics[0]["original_name"] == "Removed"
+    assert diagnostics[0]["fbx_slot"] == 1
 
 
 def test_prepare_smoke_bundle_copies_fbx_and_writes_mtl_and_request(tmp_path):
@@ -99,6 +111,7 @@ def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_pa
         "unassigned",
         "Slot_2_Blue",
     ]
+    assert bundle["material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 
 
 def test_run_rc_smoke_test_reports_missing_rc(tmp_path):
@@ -155,3 +168,40 @@ def test_run_rc_smoke_test_uses_runner_factory(tmp_path):
     assert result.copied_fbx_path.endswith("asset.fbx")
     assert result.material_report_path.endswith("asset.material_report.json")
     assert os.path.exists(result.material_report_path)
+
+
+def test_run_rc_smoke_test_writes_preflight_material_diagnostics(tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        material_specs=[
+            {"name": "Visible", "id": 1},
+            {"name": "Removed", "id": 2, "deleted": True},
+        ],
+        runner_factory=FakeRunner,
+    )
+
+    assert result.success
+    report = json.loads(open(result.material_report_path, encoding="utf-8").read())
+    assert report["preflight_material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"

@@ -124,6 +124,6 @@ uv run python -m tools.verify_controlled_fixture --manifest "S:\Crytek\crytek\St
 
 ## Remaining Work
 
-- Add a converter-side diagnostic when a deleted material has a known FBX slot id and polygon usage is unknown.
+- Done in phase 14: add a converter-side diagnostic when a deleted material has a known FBX slot id and polygon usage is unknown.
 - Add UI visibility for slot hazards: deleted, placeholder, missing request slot, and missing `.mtl` slot.
 - Extract true polygon-to-material-slot usage from Blender/FBX so deleted slots can be allowed only when truly unused.

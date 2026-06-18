@@ -158,16 +158,17 @@ def find_joint_physics_relations(processed_nodes):
     return joint_physics_data
 
 
-def build_material_requests(materials, existing_submaterial_names=None):
+def build_material_requests(materials, existing_submaterial_names=None, include_diagnostics=False):
     material_requests = []
     for material in assign_material_sub_indices(materials, existing_submaterial_names):
-        material_requests.append(
-            {
-                "name": material["clean_name"],
-                "physicalize": get_material_physicalize_type(material["original_name"]),
-                "sub_index": material["sub_index"],
-            }
-        )
+        request_material = {
+            "name": material["clean_name"],
+            "physicalize": get_material_physicalize_type(material["original_name"]),
+            "sub_index": material["sub_index"],
+        }
+        if include_diagnostics and material.get("diagnostics"):
+            request_material["diagnostics"] = material["diagnostics"]
+        material_requests.append(request_material)
     return material_requests
 
 
