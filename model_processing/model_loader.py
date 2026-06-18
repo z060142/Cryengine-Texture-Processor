@@ -233,6 +233,8 @@ class ModelLoader:
                 "polygon_count": usage.get("polygon_count", 0),
                 "used_by_polygons": usage.get("used_by_polygons", False),
                 "mesh_names": usage.get("mesh_names", []),
+                "material_names": usage.get("material_names", [slot["name"]]),
+                "slot_name_conflict": usage.get("slot_name_conflict", False),
             })
             
         return materials

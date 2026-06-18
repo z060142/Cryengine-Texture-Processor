@@ -73,6 +73,8 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
                 "polygon_count": 3,
                 "used_by_polygons": True,
                 "mesh_names": ["WallMesh"],
+                "material_names": ["Wall", "WallAlt"],
+                "slot_name_conflict": True,
             }
         ]
     }
@@ -91,3 +93,5 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
     assert result[0]["polygon_count"] == 3
     assert result[0]["used_by_polygons"] is True
     assert result[0]["mesh_names"] == ["WallMesh"]
+    assert result[0]["material_names"] == ["Wall", "WallAlt"]
+    assert result[0]["slot_name_conflict"] is True

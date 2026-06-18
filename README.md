@@ -145,6 +145,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Normal model export now writes `<model>.material_diagnostics.json` sidecars without adding non-RC fields to the RC request JSON
 - Blender-loaded models now preserve mesh material slot order and polygon usage counts, avoiding `bpy.data.materials` placeholder slot drift
 - Material diagnostics sidecars and the PySide diagnostics table now show polygon usage counts when known
+- Material diagnostics now warn when multiple meshes use the same FBX slot with different material names
 
 ## License
 

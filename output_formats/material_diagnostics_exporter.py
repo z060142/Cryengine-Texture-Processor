@@ -23,6 +23,8 @@ def _record_to_report_item(record):
         "polygon_count": record["material"].get("polygon_count"),
         "used_by_polygons": record["material"].get("used_by_polygons"),
         "mesh_names": record["material"].get("mesh_names", []),
+        "material_names": record["material"].get("material_names", []),
+        "slot_name_conflict": record["material"].get("slot_name_conflict", False),
         "diagnostics": record.get("diagnostics", []),
     }
 
@@ -47,6 +49,8 @@ def build_material_diagnostics_report(
                     "polygon_count": item["polygon_count"],
                     "used_by_polygons": item["used_by_polygons"],
                     "mesh_names": item["mesh_names"],
+                    "material_names": item["material_names"],
+                    "slot_name_conflict": item["slot_name_conflict"],
                 }
             )
 

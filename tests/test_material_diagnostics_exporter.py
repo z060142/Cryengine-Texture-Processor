@@ -17,6 +17,8 @@ def test_build_material_diagnostics_report_summarizes_hazards():
                 "polygon_count": 3,
                 "used_by_polygons": True,
                 "mesh_names": ["ProbeMesh"],
+                "material_names": ["Removed"],
+                "slot_name_conflict": False,
             },
         ],
         source_model="probe.fbx",
@@ -35,10 +37,37 @@ def test_build_material_diagnostics_report_summarizes_hazards():
     assert report["materials"][1]["polygon_count"] == 3
     assert report["materials"][1]["used_by_polygons"] is True
     assert report["materials"][1]["mesh_names"] == ["ProbeMesh"]
+    assert report["materials"][1]["material_names"] == ["Removed"]
+    assert report["materials"][1]["slot_name_conflict"] is False
     assert report["diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
     assert report["diagnostics"][0]["polygon_count"] == 3
     assert report["diagnostics"][0]["used_by_polygons"] is True
     assert report["diagnostics"][0]["mesh_names"] == ["ProbeMesh"]
+
+
+def test_build_material_diagnostics_report_includes_slot_name_conflict_warning():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Wood",
+                "id": 1,
+                "polygon_count": 2,
+                "used_by_polygons": True,
+                "mesh_names": ["MeshA", "MeshB"],
+                "material_names": ["Metal", "Wood"],
+                "slot_name_conflict": True,
+            }
+        ],
+        source_model="conflict.fbx",
+    )
+
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["summary"]["hazard_count"] == 0
+    assert report["materials"][0]["slot_name_conflict"] is True
+    assert report["materials"][0]["material_names"] == ["Metal", "Wood"]
+    assert report["diagnostics"][0]["severity"] == "warning"
+    assert report["diagnostics"][0]["code"] == "material_slot_name_conflict"
+    assert report["diagnostics"][0]["material_names"] == ["Metal", "Wood"]
 
 
 def test_build_material_diagnostics_report_allows_deleted_known_unused_slot():

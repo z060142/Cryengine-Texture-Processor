@@ -51,4 +51,4 @@ Removed
 
 - Add material rows to the UI even when there are no hazards, so users can inspect all slots.
 - Add a sidecar/open-location affordance after model export.
-- Investigate multi-mesh cases where the same slot index has different material names on different mesh objects.
+- Started in phase 19: add diagnostics for multi-mesh cases where the same slot index has different material names on different mesh objects.

@@ -140,6 +140,29 @@ def test_sub_index_different_from_fbx_slot_reports_hazard_when_usage_unknown():
     assert diagnostics["Moved"][0]["sub_index"] == 1
 
 
+def test_slot_name_conflict_reports_warning():
+    records = assign_material_sub_indices(
+        [
+            {
+                "name": "Wood",
+                "id": 1,
+                "material_names": ["Metal", "Wood"],
+                "slot_name_conflict": True,
+                "mesh_names": ["MeshA", "MeshB"],
+            }
+        ],
+        existing_submaterial_names=[],
+    )
+
+    diagnostic = diagnostics_by_name(records)["Wood"][0]
+
+    assert diagnostic["severity"] == "warning"
+    assert diagnostic["code"] == "material_slot_name_conflict"
+    assert diagnostic["fbx_slot"] == 0
+    assert diagnostic["material_names"] == ["Metal", "Wood"]
+    assert diagnostic["mesh_names"] == ["MeshA", "MeshB"]
+
+
 def test_duplicate_blender_suffix_is_collapsed():
     records = assign_material_sub_indices(
         [{"name": "Stone", "id": 1}, {"name": "Stone.001", "id": 2}],

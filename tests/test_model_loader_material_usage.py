@@ -33,6 +33,8 @@ def test_extract_materials_uses_mesh_slot_order_not_global_materials():
     assert [material["index"] for material in materials] == [0, 1, 2]
     assert [material["polygon_count"] for material in materials] == [1, 0, 1]
     assert [material["used_by_polygons"] for material in materials] == [True, False, True]
+    assert materials[0]["material_names"] == ["Slot_0_Red"]
+    assert materials[1]["slot_name_conflict"] is False
 
 
 def test_extract_materials_keeps_first_name_for_shared_slot_across_meshes():
@@ -59,3 +61,5 @@ def test_extract_materials_keeps_first_name_for_shared_slot_across_meshes():
     assert materials[0]["name"] == "Slot_A"
     assert materials[0]["polygon_count"] == 2
     assert materials[0]["mesh_names"] == ["MeshA", "MeshB"]
+    assert materials[0]["material_names"] == ["Slot_A", "Slot_B"]
+    assert materials[0]["slot_name_conflict"] is True

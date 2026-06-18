@@ -106,6 +106,24 @@ def diagnose_material_record(record):
     diagnostics = []
     fbx_slot = _fbx_slot(record)
     polygon_usage = _known_polygon_usage(record["material"])
+    material_names = record["material"].get("material_names", [])
+
+    if record["material"].get("slot_name_conflict", False):
+        diagnostics.append(
+            {
+                "severity": "warning",
+                "code": "material_slot_name_conflict",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "material_names": material_names,
+                "mesh_names": record["material"].get("mesh_names", []),
+                "message": (
+                    "Multiple material names were found for the same FBX material slot across meshes. "
+                    "The slot id remains authoritative; do not use the material name alone as the slot identity."
+                ),
+            }
+        )
 
     if record["deleted"] and fbx_slot is not None and polygon_usage is not False:
         diagnostics.append(

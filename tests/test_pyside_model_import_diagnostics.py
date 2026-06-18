@@ -40,8 +40,37 @@ def test_collect_model_material_diagnostics_is_empty_for_normal_slots():
     assert diagnostics == []
 
 
+def test_collect_model_material_diagnostics_reports_slot_name_conflict_warning():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [
+                {
+                    "name": "Wood",
+                    "id": 1,
+                    "material_names": ["Metal", "Wood"],
+                    "slot_name_conflict": True,
+                },
+            ]
+        }
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["severity"] == "warning"
+    assert diagnostics[0]["code"] == "material_slot_name_conflict"
+    assert diagnostics[0]["material_names"] == ["Metal", "Wood"]
+
+
 def test_model_display_name_marks_hazards():
     assert model_display_name({"filename": "tree.fbx", "material_diagnostics": []}) == "tree.fbx"
+    assert (
+        model_display_name(
+            {
+                "filename": "tree.fbx",
+                "material_diagnostics": [{"severity": "warning"}],
+            }
+        )
+        == "tree.fbx [diagnostics]"
+    )
     assert (
         model_display_name(
             {

@@ -209,6 +209,8 @@ def build_material_texture_records(
                     "used_polygon_count": material.get("used_polygon_count"),
                     "used_by_polygons": material.get("used_by_polygons"),
                     "mesh_names": material.get("mesh_names", []),
+                    "material_names": material.get("material_names", []),
+                    "slot_name_conflict": material.get("slot_name_conflict", False),
                     "base_name": base_name,
                     "textures": processed_textures,
                     "source_texture_count": len(material_refs),
@@ -248,6 +250,8 @@ def build_mtl_material_data(*args, **kwargs):
             "used_polygon_count": record["used_polygon_count"],
             "used_by_polygons": record["used_by_polygons"],
             "mesh_names": record["mesh_names"],
+            "material_names": record["material_names"],
+            "slot_name_conflict": record["slot_name_conflict"],
             "textures": record["textures"],
         }
         for record in records

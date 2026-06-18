@@ -39,6 +39,8 @@ def collect_model_material_diagnostics(model_data):
                     "polygon_count": record["material"].get("polygon_count"),
                     "used_by_polygons": record["material"].get("used_by_polygons"),
                     "mesh_names": record["material"].get("mesh_names", []),
+                    "material_names": record["material"].get("material_names", []),
+                    "slot_name_conflict": record["material"].get("slot_name_conflict", False),
                 }
             )
     return diagnostics
