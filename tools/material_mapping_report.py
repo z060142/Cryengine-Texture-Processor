@@ -75,9 +75,11 @@ def discover_fixture_manifest(source_fbx_path="", copied_fbx_path=""):
     for fbx_path in (source_fbx_path, copied_fbx_path):
         if not fbx_path:
             continue
-        candidate = os.path.splitext(fbx_path)[0] + ".fixture_manifest.json"
-        if os.path.exists(candidate):
-            return candidate
+        stem = os.path.splitext(fbx_path)[0]
+        for suffix in (".fixture_manifest.json", ".fbx_material_manifest.json"):
+            candidate = stem + suffix
+            if os.path.exists(candidate):
+                return candidate
     return ""
 
 
@@ -251,7 +253,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
 
     return {
         "ok": ok,
-        "fixture_kind": manifest.get("fixture_kind", ""),
+        "manifest_kind": manifest.get("fixture_kind", manifest.get("manifest_kind", "")),
         "material_checks": material_checks,
         "polygon_checks": polygon_checks,
         "duplicate_polygons": duplicate_polygons,

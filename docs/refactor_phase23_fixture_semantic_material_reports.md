@@ -32,10 +32,11 @@ but request/MTL slot 0 points to the wrong material name.
 When present, the report includes:
 
 ```json
-"source_fixture_manifest": "...fixture_manifest.json",
-"fixture_material_semantic_alignment": {
-  "ok": false,
-  "material_checks": [],
+  "source_fixture_manifest": "...fixture_manifest.json",
+  "fixture_material_semantic_alignment": {
+    "ok": false,
+    "manifest_kind": "multi-mesh-name-conflict",
+    "material_checks": [],
   "polygon_checks": [],
   "duplicate_request_material_names": [],
   "duplicate_request_sub_indices": []

@@ -105,6 +105,18 @@ def test_discover_fixture_manifest_checks_source_before_copied(tmp_path):
     assert load_fixture_manifest(manifest_path)["fixture_kind"] == "source"
 
 
+def test_discover_fixture_manifest_falls_back_to_fbx_material_manifest(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    source_manifest = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fbx", encoding="utf-8")
+    source_manifest.write_text(json.dumps({"manifest_kind": "blender-fbx-material-inspection"}), encoding="utf-8")
+
+    manifest_path = discover_fixture_manifest(str(source_fbx))
+
+    assert manifest_path == str(source_manifest)
+    assert load_fixture_manifest(manifest_path)["manifest_kind"] == "blender-fbx-material-inspection"
+
+
 def test_evaluate_fixture_material_semantics_flags_swapped_request_names():
     manifest = {
         "fixture_kind": "multi-mesh-name-conflict",
@@ -154,6 +166,7 @@ def test_evaluate_fixture_material_semantics_flags_swapped_request_names():
     )
 
     assert not result["ok"]
+    assert result["manifest_kind"] == "multi-mesh-name-conflict"
     assert result["material_checks"][0]["expected_name"] == "LocalSlot0_Wood"
     assert result["material_checks"][0]["request_names"] == ["LocalSlot0_Metal"]
     assert result["polygon_checks"][0]["cgf_id_ok"]
@@ -209,6 +222,7 @@ def test_evaluate_fixture_material_semantics_accepts_preserved_suffix_names():
     )
 
     assert result["ok"]
+    assert result["manifest_kind"] == "multi-mesh-name-conflict"
     assert result["duplicate_request_material_names"] == []
     assert result["polygon_checks"][1]["request_names_for_actual_id"] == ["DuplicateSurface.001"]
 
