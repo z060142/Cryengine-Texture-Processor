@@ -1,0 +1,274 @@
+{
+  "probe": "mtl_genmask_rc_acceptance",
+  "rc_exe_path": "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+  "source_fbx_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\objects\\cubao\\CubeA.fbx",
+  "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35",
+  "asset_name": "Phase35GenMaskProbe",
+  "variants": [
+    {
+      "slug": "exporter_baseline",
+      "description": "Exporter compatibility GenMask and StringGenMask.",
+      "requested": {
+        "gen_mask": "__keep__",
+        "string_gen_mask": "__keep__"
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\exporter_baseline\\Phase35GenMaskProbe_exporter_baseline.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_exporter_baseline.cgf"
+        ],
+        "stdout_length": 4072,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    },
+    {
+      "slug": "string_only_subsurface",
+      "description": "StringGenMask only, with GenMask removed.",
+      "requested": {
+        "gen_mask": null,
+        "string_gen_mask": "%SUBSURFACE_SCATTERING"
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\string_only_subsurface\\Phase35GenMaskProbe_string_only_subsurface.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_string_only_subsurface.cgf"
+        ],
+        "stdout_length": 4132,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    },
+    {
+      "slug": "gen_only_legacy_subsurface",
+      "description": "Persisted EngineAssets-style GenMask only, with StringGenMask removed.",
+      "requested": {
+        "gen_mask": "80000000",
+        "string_gen_mask": null
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "80000000",
+            "string_gen_mask": ""
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\gen_only_legacy_subsurface\\Phase35GenMaskProbe_gen_only_legacy_subsurface.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_gen_only_legacy_subsurface.cgf"
+        ],
+        "stdout_length": 4180,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    },
+    {
+      "slug": "legacy_gen_with_string",
+      "description": "Persisted EngineAssets-style GenMask paired with matching StringGenMask.",
+      "requested": {
+        "gen_mask": "80000000",
+        "string_gen_mask": "%SUBSURFACE_SCATTERING"
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "80000000",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\legacy_gen_with_string\\Phase35GenMaskProbe_legacy_gen_with_string.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_legacy_gen_with_string.cgf"
+        ],
+        "stdout_length": 4132,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    },
+    {
+      "slug": "runtime_globals_gen_with_string",
+      "description": "Current generated globals GenMask paired with matching StringGenMask.",
+      "requested": {
+        "gen_mask": "4000000000000",
+        "string_gen_mask": "%SUBSURFACE_SCATTERING"
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "4000000000000",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\runtime_globals_gen_with_string\\Phase35GenMaskProbe_runtime_globals_gen_with_string.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_runtime_globals_gen_with_string.cgf"
+        ],
+        "stdout_length": 4240,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    },
+    {
+      "slug": "no_mask_fields",
+      "description": "Both GenMask and StringGenMask removed.",
+      "requested": {
+        "gen_mask": null,
+        "string_gen_mask": null
+      },
+      "work_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields",
+      "mtl_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.mtl",
+      "json_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.json",
+      "copied_fbx_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.fbx",
+      "expected_output_path": "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.cgf",
+      "expected_output_exists": true,
+      "material_snapshots": [
+        {
+          "before": {
+            "name": "Default",
+            "gen_mask": "32",
+            "string_gen_mask": "%SUBSURFACE_SCATTERING"
+          },
+          "after": {
+            "name": "Default",
+            "gen_mask": "",
+            "string_gen_mask": ""
+          }
+        }
+      ],
+      "rc": {
+        "success": true,
+        "returncode": 0,
+        "error": "",
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.json",
+          "/overwriteextension=fbx",
+          "/overwritesourcefile=S:\\Crytek\\crytek\\Stripped to the bone\\mtl_genmask_probe_work_phase35\\no_mask_fields\\Phase35GenMaskProbe_no_mask_fields.fbx",
+          "/overwritefilename=Phase35GenMaskProbe_no_mask_fields.cgf"
+        ],
+        "stdout_length": 4036,
+        "stderr_length": 0,
+        "mask_related_log_hits": []
+      }
+    }
+  ],
+  "summary": {
+    "variant_count": 6,
+    "success_count": 6,
+    "failure_count": 0,
+    "mask_related_log_hit_count": 0,
+    "rc_accepts_all_variants": true
+  }
+}

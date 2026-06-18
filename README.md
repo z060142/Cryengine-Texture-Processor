@@ -181,6 +181,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - `tools.cryengine_shader_flags` can rebuild the current source-derived common global flag table from `Engine/Shaders/*.ext`, but that table still does not match persisted engine `.mtl` samples, so exporter `GenMask` remains compatibility-preserved
 - `tools.cryengine_shader_flags` can also parse CryEngine generated `Shaders/Cache/globals.txt`, and `tools.mtl_mask_report` accepts `--globals-file` as the preferred runtime common-global mask source
 - Local CryEngine 5.7.1 `globals.txt` caches still do not match inspected persisted EngineAssets `.mtl` `GenMask` values, so the next material phase must probe RC / Material Editor round-trip behavior before changing exporter mask generation
+- `tools.mtl_genmask_probe` shows RC 5.7.1 accepts FBX imports with missing or contradictory `.mtl` `GenMask` / `StringGenMask`, so RC success only proves conversion acceptance, not material shader-mask correctness
 
 ## License
 
