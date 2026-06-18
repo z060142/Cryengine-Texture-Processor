@@ -159,6 +159,17 @@ def prepare_roundtrip_fixtures(
         ],
         "strategy": "script_path_as_argv0",
     }
+    sandbox_edcommand = {
+        "executable": sandbox_exe,
+        "args": [
+            sandbox_exe,
+            "-project",
+            cryproject_path,
+            "-edCommand",
+            f"general.run_file '{sandbox_script_path}'",
+        ],
+        "strategy": "normal_editor_edCommand_run_file",
+    }
     manifest = {
         "kind": "material_editor_roundtrip_fixture",
         "work_dir": work_dir,
@@ -171,9 +182,11 @@ def prepare_roundtrip_fixtures(
         "sandbox_result_path": sandbox_result_path,
         "launch_command": launch_command,
         "sandbox_popen": sandbox_popen,
+        "sandbox_edcommand": sandbox_edcommand,
         "cases": cases,
         "notes": [
             "Use sandbox_popen for automated runs so CryEdit.cpp sees the script path as the first non-flag argument.",
+            "Use sandbox_edcommand to try a normal Editor launch without /BatchMode.",
             "launch_command is the human-readable Sandbox command, but normal shells may pass Sandbox.exe as argv0.",
             "After Sandbox exits, run the compare command against this manifest.",
         ],
@@ -276,7 +289,24 @@ def compare_roundtrip_manifest(manifest_path):
     }
 
 
-def run_sandbox_roundtrip(manifest_path, timeout_seconds=120):
+def _select_sandbox_launch(manifest, strategy):
+    if strategy == "edcommand":
+        launch = manifest.get("sandbox_edcommand", {})
+        command = launch.get("args")
+    elif strategy == "launch_command":
+        launch = {"strategy": "launch_command"}
+        command = manifest.get("launch_command")
+    else:
+        launch = manifest.get("sandbox_popen", {})
+        command = launch.get("args")
+
+    if not command:
+        command = manifest["launch_command"]
+    executable = launch.get("executable", command[0] if command else "")
+    return command, executable, launch.get("strategy", strategy)
+
+
+def run_sandbox_roundtrip(manifest_path, timeout_seconds=120, strategy="argv0"):
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
@@ -287,9 +317,7 @@ def run_sandbox_roundtrip(manifest_path, timeout_seconds=120):
         except FileNotFoundError:
             pass
 
-    sandbox_popen = manifest.get("sandbox_popen", {})
-    command = sandbox_popen.get("args") or manifest["launch_command"]
-    executable = sandbox_popen.get("executable", command[0] if command else "")
+    command, executable, launch_strategy = _select_sandbox_launch(manifest, strategy)
     cwd = os.path.dirname(os.path.abspath(executable)) if executable else None
     process = subprocess.Popen(command, cwd=cwd, executable=executable or None)
     deadline = time.time() + timeout_seconds
@@ -320,7 +348,7 @@ def run_sandbox_roundtrip(manifest_path, timeout_seconds=120):
         "manifest_path": os.path.abspath(manifest_path),
         "command": command,
         "executable": executable,
-        "launch_strategy": sandbox_popen.get("strategy", "normal_command"),
+        "launch_strategy": launch_strategy,
         "timeout_seconds": timeout_seconds,
         "state": state,
         "returncode": process.poll(),
@@ -358,6 +386,12 @@ def main(argv=None):
     run = subparsers.add_parser("run", help="Run Sandbox with the manifest launch command and wait for script output")
     run.add_argument("--manifest", required=True, help="Manifest from the prepare command")
     run.add_argument("--timeout", type=int, default=120, help="Seconds to wait for Sandbox script output")
+    run.add_argument(
+        "--strategy",
+        choices=("argv0", "edcommand", "launch_command"),
+        default="argv0",
+        help="Sandbox launch strategy recorded in the manifest",
+    )
     run.add_argument("--output", default="", help="Optional JSON run report path")
 
     args = parser.parse_args(argv)
@@ -379,7 +413,7 @@ def main(argv=None):
         return 0
 
     if args.command == "run":
-        report = run_sandbox_roundtrip(args.manifest, timeout_seconds=args.timeout)
+        report = run_sandbox_roundtrip(args.manifest, timeout_seconds=args.timeout, strategy=args.strategy)
         output_path = args.output or os.path.join(os.path.dirname(os.path.abspath(args.manifest)), "material_editor_roundtrip_sandbox_run.json")
         write_json(report, output_path)
         print(f"report: {output_path}")

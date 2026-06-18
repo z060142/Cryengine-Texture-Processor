@@ -1,0 +1,18 @@
+{
+  "kind": "material_editor_roundtrip_sandbox_run",
+  "manifest_path": "S:\\Crytek\\crytek\\Stripped to the bone\\Cryengine-Texture-Processor\\docs\\phase37_material_editor_roundtrip_manifest.json",
+  "command": [
+    "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\bin\\win_x64\\Sandbox.exe",
+    "-project",
+    "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk.cryproject",
+    "-edCommand",
+    "general.run_file 'S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\run_material_roundtrip.py'"
+  ],
+  "launch_strategy": "normal_editor_edCommand_run_file",
+  "timeout_seconds": 300,
+  "state": "timeout",
+  "returncode": 1,
+  "result_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\sandbox_roundtrip_result.json",
+  "result_exists": false,
+  "sandbox_result": {}
+}

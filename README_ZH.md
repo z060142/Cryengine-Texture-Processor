@@ -124,6 +124,7 @@ uv run python -m tools.material_editor_roundtrip compare --manifest docs\phase37
 ```
 
 自动化 Sandbox `/runpython` 启动必须使用 manifest 内的 `sandbox_popen` 策略，让 CryEdit 的解析器把脚本路径看成第一个非 flag 参数。
+harness 也会记录 `sandbox_edcommand`，用于尝试普通 Editor 启动加 `-edCommand "general.run_file '<script>'"`，适合 `/BatchMode` 卡住的环境。
 
 ## 技术
 
@@ -147,6 +148,7 @@ uv run python -m tools.material_editor_roundtrip compare --manifest docs\phase37
 - 受控 Blender FBX fixture 已验证使用中的材质槽 `0` 与 `1` 会在 RC 转换后保留为 CGF `MeshSubsets.nMatID`
 - 受控 fixture 已验证 RC 会保留 `0` 与 `2` 这种有洞的材质 id，不会压缩成连续 id
 - Material Editor round-trip harness 现在已绕过 Sandbox `/runpython` 的 argv0 解析陷阱，但本机 Sandbox 仍会在产生 `sandbox_roundtrip_result.json` 前 timeout；这还不能证明 Material Editor 会保留或改写 `GenMask`/`StringGenMask`
+- 本机 Sandbox probe 显示 `/BatchMode` 会卡在早期 system config；普通 Editor 的 `-edCommand` 会启动到更深处，但 GameSDK sample 会在 `WaitForAllowSendClientConnect` 卡住，脚本仍未执行
 - 受控 request-name remap 探针显示，当 request/MTL 槽位顺序与 FBX 不同时，RC 仍让 CGF polygon 材质 id 对齐原始 FBX material slot；材质名称不会重写 polygon 材质 id
 - 受控 deleted-material 探针显示，request `sub_index = -1` 不会移除 FBX 仍在使用的 geometry material id；除非已证明该 slot 没有 polygon 使用，否则应保留 placeholder 槽
 - 材质分配现在会对危险的 deleted 或 remapped 已知 FBX slot 产生 diagnostics；smoke report 会以 `preflight_material_diagnostics` 输出

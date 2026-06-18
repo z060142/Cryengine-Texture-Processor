@@ -146,6 +146,7 @@ uv run python -m tools.material_editor_roundtrip compare --manifest docs\phase37
 ```
 
 Automated Sandbox `/runpython` launches must use the manifest `sandbox_popen` strategy so CryEdit's parser sees the script path as the first non-flag argument.
+The harness also records `sandbox_edcommand`, a normal Editor launch strategy using `-edCommand "general.run_file '<script>'"` for environments where `/BatchMode` stalls.
 
 ## Technologies
 
@@ -169,6 +170,7 @@ Automated Sandbox `/runpython` launches must use the manifest `sandbox_popen` st
 - A controlled Blender FBX fixture has verified that used material slots `0` and `1` survive RC conversion into CGF `MeshSubsets.nMatID`
 - Controlled fixtures have verified that RC preserves sparse used material ids such as `0` and `2`; it does not compress them to contiguous ids
 - The Material Editor round-trip harness now works around Sandbox `/runpython` argv0 parsing, but the local Sandbox still times out before producing `sandbox_roundtrip_result.json`; this is not yet evidence for Material Editor `GenMask`/`StringGenMask` preservation
+- Local Sandbox probes show `/BatchMode` stalls during early system config; normal Editor `-edCommand` starts deeper but the GameSDK sample blocks at `WaitForAllowSendClientConnect` before the round-trip script runs
 - A controlled request-name remap probe shows that RC keeps CGF polygon material ids aligned to raw FBX material slots; request/MTL material names do not rewrite polygon material ids when slot order differs
 - A controlled deleted-material probe shows that request `sub_index = -1` does not remove geometry material ids still used by the FBX; preserve placeholder slots unless polygon usage proves the slot is unused
 - Material assignment now emits diagnostics for hazardous deleted or remapped known FBX slots; smoke reports expose them as `preflight_material_diagnostics`

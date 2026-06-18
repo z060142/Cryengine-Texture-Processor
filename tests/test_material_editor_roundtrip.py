@@ -57,6 +57,17 @@ def test_prepare_roundtrip_fixtures_writes_game_materials_and_script(tmp_path):
         ],
         "strategy": "script_path_as_argv0",
     }
+    assert manifest["sandbox_edcommand"] == {
+        "executable": str(sandbox),
+        "args": [
+            str(sandbox),
+            "-project",
+            str(cryproject),
+            "-edCommand",
+            f"general.run_file '{manifest['sandbox_script_path']}'",
+        ],
+        "strategy": "normal_editor_edCommand_run_file",
+    }
     script = open(manifest["sandbox_script_path"], encoding="utf-8").read()
     assert "material.set_property" in script
     assert "Material Settings/Surface Type" in script

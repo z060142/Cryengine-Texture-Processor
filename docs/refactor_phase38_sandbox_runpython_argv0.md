@@ -131,6 +131,8 @@ This is still not evidence that the Material Editor preserves or rewrites GenMas
 Sandbox reaches only early initialization in editor.log before the timeout.
 ```
 
+Phase 39 narrowed this further: `/BatchMode` itself stalls during early system config in this local Sandbox build, while a normal Editor `-edCommand` launch reaches GameSDK initialization but blocks at `WaitForAllowSendClientConnect`.
+
 No `Sandbox.exe` process remained after the timeout.
 
 ## Rule

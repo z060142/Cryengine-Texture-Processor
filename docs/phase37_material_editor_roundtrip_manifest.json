@@ -27,6 +27,17 @@
     ],
     "strategy": "script_path_as_argv0"
   },
+  "sandbox_edcommand": {
+    "executable": "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\bin\\win_x64\\Sandbox.exe",
+    "args": [
+      "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\bin\\win_x64\\Sandbox.exe",
+      "-project",
+      "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk.cryproject",
+      "-edCommand",
+      "general.run_file 'S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\run_material_roundtrip.py'"
+    ],
+    "strategy": "normal_editor_edCommand_run_file"
+  },
   "cases": [
     {
       "slug": "exporter_baseline",
@@ -109,6 +120,7 @@
   ],
   "notes": [
     "Use sandbox_popen for automated runs so CryEdit.cpp sees the script path as the first non-flag argument.",
+    "Use sandbox_edcommand to try a normal Editor launch without /BatchMode.",
     "launch_command is the human-readable Sandbox command, but normal shells may pass Sandbox.exe as argv0.",
     "After Sandbox exits, run the compare command against this manifest."
   ],

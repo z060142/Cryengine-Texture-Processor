@@ -1,0 +1,12 @@
+{
+  "kind": "sandbox_batchmode_launch_probe",
+  "command": [
+    "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\bin\\win_x64\\Sandbox.exe",
+    "-project",
+    "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk.cryproject",
+    "/BatchMode"
+  ],
+  "timeout_seconds": 60,
+  "state": "timeout",
+  "returncode": 1
+}
