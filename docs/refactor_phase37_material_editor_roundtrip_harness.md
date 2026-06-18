@@ -121,6 +121,8 @@ Launch command:
 S:\Crytek\crytek\cryengine-57-lts\5.7.1\bin\win_x64\Sandbox.exe -project S:\Crytek\crytek\cryengine-gamesdk-sample-project\5.7.1\gamesdk.cryproject /BatchMode /runpython "S:\Crytek\crytek\Stripped to the bone\material_editor_roundtrip_phase37\run_material_roundtrip.py"
 ```
 
+Phase 38 added a safer automated launch strategy named `sandbox_popen`, because `CryEdit.cpp` includes argv0 when it selects the first non-flag token for `/runpython`. Keep this command as the readable human form, but use `sandbox_popen` for automated runs.
+
 ## Current Run Result
 
 Prepared cases:

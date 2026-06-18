@@ -46,6 +46,17 @@ def test_prepare_roundtrip_fixtures_writes_game_materials_and_script(tmp_path):
         "/runpython",
         manifest["sandbox_script_path"],
     ]
+    assert manifest["sandbox_popen"] == {
+        "executable": str(sandbox),
+        "args": [
+            manifest["sandbox_script_path"],
+            "-project",
+            str(cryproject),
+            "/BatchMode",
+            "/runpython",
+        ],
+        "strategy": "script_path_as_argv0",
+    }
     script = open(manifest["sandbox_script_path"], encoding="utf-8").read()
     assert "material.set_property" in script
     assert "Material Settings/Surface Type" in script
@@ -134,6 +145,7 @@ def test_run_sandbox_roundtrip_detects_result_file(tmp_path):
         "-c",
         f"from pathlib import Path; Path(r'{result_path}').write_text('{{\"results\": []}}', encoding='utf-8')",
     ]
+    manifest.pop("sandbox_popen", None)
     with open(manifest["manifest_path"], "w", encoding="utf-8") as f:
         json.dump(manifest, f)
 

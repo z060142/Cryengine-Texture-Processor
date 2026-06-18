@@ -148,6 +148,17 @@ def prepare_roundtrip_fixtures(
         "/runpython",
         sandbox_script_path,
     ]
+    sandbox_popen = {
+        "executable": sandbox_exe,
+        "args": [
+            sandbox_script_path,
+            "-project",
+            cryproject_path,
+            "/BatchMode",
+            "/runpython",
+        ],
+        "strategy": "script_path_as_argv0",
+    }
     manifest = {
         "kind": "material_editor_roundtrip_fixture",
         "work_dir": work_dir,
@@ -159,9 +170,11 @@ def prepare_roundtrip_fixtures(
         "sandbox_script_path": sandbox_script_path,
         "sandbox_result_path": sandbox_result_path,
         "launch_command": launch_command,
+        "sandbox_popen": sandbox_popen,
         "cases": cases,
         "notes": [
-            "Run launch_command to let Sandbox load each material and save it through material.set_property.",
+            "Use sandbox_popen for automated runs so CryEdit.cpp sees the script path as the first non-flag argument.",
+            "launch_command is the human-readable Sandbox command, but normal shells may pass Sandbox.exe as argv0.",
             "After Sandbox exits, run the compare command against this manifest.",
         ],
     }
@@ -274,9 +287,11 @@ def run_sandbox_roundtrip(manifest_path, timeout_seconds=120):
         except FileNotFoundError:
             pass
 
-    command = manifest["launch_command"]
-    cwd = os.path.dirname(os.path.abspath(command[0])) if command else None
-    process = subprocess.Popen(command, cwd=cwd)
+    sandbox_popen = manifest.get("sandbox_popen", {})
+    command = sandbox_popen.get("args") or manifest["launch_command"]
+    executable = sandbox_popen.get("executable", command[0] if command else "")
+    cwd = os.path.dirname(os.path.abspath(executable)) if executable else None
+    process = subprocess.Popen(command, cwd=cwd, executable=executable or None)
     deadline = time.time() + timeout_seconds
     state = "timeout"
     while time.time() < deadline:
@@ -304,6 +319,8 @@ def run_sandbox_roundtrip(manifest_path, timeout_seconds=120):
         "kind": "material_editor_roundtrip_sandbox_run",
         "manifest_path": os.path.abspath(manifest_path),
         "command": command,
+        "executable": executable,
+        "launch_strategy": sandbox_popen.get("strategy", "normal_command"),
         "timeout_seconds": timeout_seconds,
         "state": state,
         "returncode": process.poll(),

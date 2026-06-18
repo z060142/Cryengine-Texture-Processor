@@ -137,6 +137,16 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json --check-polygons
 ```
 
+Material Editor save behavior for `.mtl` mask fields is being probed with:
+
+```bash
+uv run python -m tools.material_editor_roundtrip prepare --work-dir "S:\Crytek\crytek\Stripped to the bone\material_editor_roundtrip_phase37" --output docs\phase37_material_editor_roundtrip_manifest.json
+uv run python -m tools.material_editor_roundtrip run --manifest docs\phase37_material_editor_roundtrip_manifest.json --timeout 180 --output docs\phase38_material_editor_roundtrip_sandbox_run_argv0.json
+uv run python -m tools.material_editor_roundtrip compare --manifest docs\phase37_material_editor_roundtrip_manifest.json --output docs\phase38_material_editor_roundtrip_compare_after_argv0.json
+```
+
+Automated Sandbox `/runpython` launches must use the manifest `sandbox_popen` strategy so CryEdit's parser sees the script path as the first non-flag argument.
+
 ## Technologies
 
 - **Python**: Main programming language
@@ -158,6 +168,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Smoke runs now emit a material mapping report with CGF `MeshSubsets.nMatID` inspection; controlled multi-material FBX fixtures are still needed to prove polygon assignment behavior end to end
 - A controlled Blender FBX fixture has verified that used material slots `0` and `1` survive RC conversion into CGF `MeshSubsets.nMatID`
 - Controlled fixtures have verified that RC preserves sparse used material ids such as `0` and `2`; it does not compress them to contiguous ids
+- The Material Editor round-trip harness now works around Sandbox `/runpython` argv0 parsing, but the local Sandbox still times out before producing `sandbox_roundtrip_result.json`; this is not yet evidence for Material Editor `GenMask`/`StringGenMask` preservation
 - A controlled request-name remap probe shows that RC keeps CGF polygon material ids aligned to raw FBX material slots; request/MTL material names do not rewrite polygon material ids when slot order differs
 - A controlled deleted-material probe shows that request `sub_index = -1` does not remove geometry material ids still used by the FBX; preserve placeholder slots unless polygon usage proves the slot is unused
 - Material assignment now emits diagnostics for hazardous deleted or remapped known FBX slots; smoke reports expose them as `preflight_material_diagnostics`
