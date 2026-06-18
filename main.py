@@ -18,15 +18,14 @@ from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 from core.batch_processor import BatchProcessor
 from language.language_manager import get_instance as get_language_manager
 from language.language_manager import get_text
-from model_processing.material_texture_resolver import (
-    build_fbx_texture_data,
-    build_mtl_material_data,
+from model_processing.model_export_context import (
+    attach_material_manifest,
+    build_model_export_context,
 )
 from model_processing.texture_extractor import TextureExtractor
 from output_formats.json_exporter import export_json
 from output_formats.material_diagnostics_exporter import export_material_diagnostics
 from output_formats.mtl_exporter import export_mtl
-from model_processing.material_index_assigner import parse_mtl_submaterial_names
 from ui_pyside.main_window import MainWindow
 from ui_pyside.progress_dialog import ProgressDialog
 from utils.config_manager import ConfigManager
@@ -256,31 +255,34 @@ def main():
 
             try:
                 texture_refs = texture_extractor.extract(model_obj)
-                materials_data = build_mtl_material_data(
+                export_context = build_model_export_context(
                     model_obj,
+                    model_filename,
+                    model_output_dir,
+                    texture_output_dir,
                     texture_refs,
                     texture_manager,
-                    texture_output_dir,
                     settings.get("output_format", "tif"),
                 )
-                if not materials_data:
+                if not export_context.mtl_materials:
                     print(f"No processable material data found for {model_filename}. Skipping MTL export.")
                     continue
 
-                mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
-                base_filename = os.path.splitext(model_filename)[0]
-                existing_mtl_path = os.path.join(model_output_dir, mtl_filename)
-                existing_submaterial_names = parse_mtl_submaterial_names(existing_mtl_path)
-                success, result = export_mtl(materials_data, model_output_dir, texture_output_dir, mtl_filename)
+                success, result = export_mtl(
+                    export_context.mtl_materials,
+                    model_output_dir,
+                    texture_output_dir,
+                    export_context.mtl_filename,
+                )
                 if success:
                     exported_count += 1
                     print(f"Successfully exported MTL: {result}")
                     try:
                         diagnostics_path = export_material_diagnostics(
-                            materials_data,
+                            export_context.mtl_materials,
                             model_output_dir,
-                            f"{base_filename}.material_diagnostics.json",
-                            existing_submaterial_names=existing_submaterial_names,
+                            f"{export_context.base_filename}.material_diagnostics.json",
+                            existing_submaterial_names=export_context.existing_submaterial_names,
                             source_model=model_filename,
                             artifact_kind="mtl",
                         )
@@ -347,7 +349,6 @@ def main():
 
             model_path = model_info.get("path", "")
             model_filename = model_info.get("filename", "unknown_model")
-            base_filename = os.path.splitext(model_filename)[0]
             current_progress = (index + 1) / total_models
             if progress_dialog:
                 progress_dialog.update_progress(
@@ -373,46 +374,44 @@ def main():
                     error_count += 1
                     error_messages.append(f"Failed to reload model: {model_filename}")
                     continue
-                if model_info.get("material_manifest"):
-                    reloaded_model["material_manifest"] = model_info["material_manifest"]
+                attach_material_manifest(reloaded_model, model_info)
 
                 texture_refs = texture_extractor.extract(reloaded_model)
-                texture_data = build_fbx_texture_data(
+                export_context = build_model_export_context(
                     reloaded_model,
+                    model_filename,
+                    model_output_dir,
+                    texture_output_dir,
                     texture_refs,
                     texture_manager,
-                    texture_output_dir,
                     settings.get("output_format", "tif"),
+                    texture_rel_dir=texture_rel_dir,
                 )
-                if not texture_data:
+                if not export_context.fbx_texture_data:
                     print(f"No processed textures found for model {model_filename}. Skipping FBX export.")
                     continue
 
-                os.makedirs(os.path.join(model_output_dir, texture_rel_dir), exist_ok=True)
-                fbx_output_path = os.path.join(model_output_dir, f"{base_filename}.fbx")
+                os.makedirs(export_context.model_texture_dir, exist_ok=True)
                 result = fbx_exporter.export(
                     reloaded_model,
-                    fbx_output_path,
-                    texture_dir=texture_rel_dir,
-                    texture_data=texture_data,
+                    export_context.fbx_output_path,
+                    texture_dir=export_context.texture_rel_dir,
+                    texture_data=export_context.fbx_texture_data,
                 )
 
                 json_success, json_result = export_json(
                     reloaded_model,
-                    f"{base_filename}.fbx",
+                    export_context.fbx_filename,
                     model_output_dir,
                     texture_output_dir,
                 )
                 try:
-                    existing_submaterial_names = parse_mtl_submaterial_names(
-                        os.path.join(model_output_dir, f"{base_filename}.mtl")
-                    )
                     diagnostics_path = export_material_diagnostics(
                         reloaded_model.get("materials", []),
                         model_output_dir,
-                        f"{base_filename}.material_diagnostics.json",
-                        existing_submaterial_names=existing_submaterial_names,
-                        source_model=f"{base_filename}.fbx",
+                        f"{export_context.base_filename}.material_diagnostics.json",
+                        existing_submaterial_names=export_context.existing_submaterial_names,
+                        source_model=export_context.fbx_filename,
                         artifact_kind="fbx_json",
                     )
                     print(f"Successfully exported material diagnostics: {diagnostics_path}")
@@ -426,7 +425,7 @@ def main():
                     if rc_exe_path:
                         rc_result = RCImportRunner(rc_exe_path).run(
                             json_result,
-                            source_fbx_path=fbx_output_path,
+                            source_fbx_path=export_context.fbx_output_path,
                         )
                         if rc_result.success:
                             print(f"Successfully generated RC output: {rc_result.expected_output_path}")
@@ -443,9 +442,12 @@ def main():
 
                 if result:
                     exported_count += 1
-                    thumbnail_path = os.path.join(model_output_dir, f"{base_filename}.cgf.thmb.png")
+                    thumbnail_path = os.path.join(
+                        model_output_dir,
+                        f"{export_context.base_filename}.cgf.thmb.png",
+                    )
                     try:
-                        generate_thumbnail(fbx_output_path, thumbnail_path)
+                        generate_thumbnail(export_context.fbx_output_path, thumbnail_path)
                     except Exception as thumb_e:
                         print(f"Thumbnail generation failed for {model_filename}: {thumb_e}")
                 else:

@@ -159,6 +159,7 @@ harness 也会记录 `sandbox_edcommand`，用于尝试普通 Editor 启动加 `
 - material diagnostics 现在会在多个 mesh 对同一 FBX slot 使用不同材质名时给出 warning
 - RC request、`.mtl`、diagnostics 与 smoke preflight 现在共用 `model_processing.material_slot_table` 作为唯一 material slot assignment 入口
 - FBX 材质导出现在会优先使用 resolver 产出的已处理 `diff` 贴图路径，并把相对贴图目录解析到导出的 FBX 旁边
+- PySide 模型导出流程现在通过 `model_processing.model_export_context` 共用 MTL、FBX、JSON 与 diagnostics 的输出路径和材质/贴图准备数据
 
 ## 许可证
 
