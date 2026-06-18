@@ -104,8 +104,8 @@
     *   **功能 (Function):** 使用 Blender Python API 將模型導出為 FBX 格式。
     *   **相依性 (Dependencies):** `os`, `sys`, `traceback`, `pathlib`
 *   **`model_processing/material_converter.py`**:
-    *   **功能 (Function):** 使用 Blender Python API 將材質轉換為 CryEngine 格式。
-    *   **相依性 (Dependencies):** 無
+    *   **功能 (Function):** 將通用材質資料與貼圖 map 正規化為保守的 CryEngine-style 材質資料契約。
+    *   **相依性 (Dependencies):** `os`, `copy`, `output_formats.cryengine_mtl_schema`
 *   **`model_processing/model_loader.py`**:
     *   **功能 (Function):** 使用 Blender Python API 載入 3D 模型。
     *   **相依性 (Dependencies):** `os`, `importlib`

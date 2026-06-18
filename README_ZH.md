@@ -161,6 +161,7 @@ harness 也会记录 `sandbox_edcommand`，用于尝试普通 Editor 启动加 `
 - FBX 材质导出现在会优先使用 resolver 产出的已处理 `diff` 贴图路径，并把相对贴图目录解析到导出的 FBX 旁边
 - PySide 模型导出流程现在通过 `model_processing.model_export_context` 共用 MTL、FBX、JSON 与 diagnostics 的输出路径和材质/贴图准备数据
 - `.mtl` 贴图路径输出现在会保留 CryEngine `%...%` alias，并使用有测试覆盖的相对/绝对 fallback 规则
+- `model_processing.material_converter` 现在改为有测试覆盖的保守资料转换契约，不再保留假的 Blender 节点修改 placeholder
 
 ## 许可证
 
