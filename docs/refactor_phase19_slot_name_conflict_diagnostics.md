@@ -31,12 +31,14 @@ material_slot_name_conflict
 When a slot has multiple names:
 
 ```text
-slot id remains authoritative
-material name is not a stable identity
-do not remap by material name alone
+this is a warning that local slot identity and material-name identity may diverge
+do not assume material name alone or local mesh slot alone is sufficient
+use the later RC probe results before deciding the final mapping
 ```
 
-The diagnostic is a warning rather than a hazard because the CGF geometry can still be correct if the `.mtl` slot id is correct.
+The diagnostic is a warning rather than a hazard because the CGF geometry can still be correct if the FBX material names, request sub-indices, and `.mtl` slots remain aligned.
+
+Phase 20 supersedes the earlier conservative assumption that the local slot id is always authoritative. A real multi-mesh RC probe showed that two objects can both use local FBX slot `0`, while RC writes CGF material ids `0` and `1` by matching the FBX material names to request/MTL sub-materials.
 
 ## Example
 
@@ -81,5 +83,5 @@ uv run python -m pytest tests\test_material_slot_usage.py tests\test_model_loade
 ## Remaining Work
 
 - Decide how the UI should help resolve name conflicts, for example by choosing the canonical `.mtl` slot name.
-- Investigate how RC behaves when a real FBX contains same slot ids with different per-mesh material names.
-- Add a Blender fixture that intentionally exports a multi-mesh slot-name conflict.
+- Update the UI wording to explain local slot ids versus global material identities.
+- Add swapped-order and duplicate-name probes to stress the Phase 20 material-name mapping rule.

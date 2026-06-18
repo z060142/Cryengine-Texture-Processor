@@ -37,14 +37,37 @@ def _polygon_from_subset_center(subset, polygon_spacing=DEFAULT_POLYGON_SPACING)
     return int(round(float(center[0]) / polygon_spacing))
 
 
-def _collect_subset_polygon_material_ids(report, polygon_spacing=DEFAULT_POLYGON_SPACING):
+def _build_center_polygon_lookup(manifest):
+    lookup = {}
+    for polygon in manifest.get("polygons", []):
+        if "center_x" not in polygon:
+            continue
+        lookup[round(float(polygon["center_x"]), 4)] = int(polygon["polygon"])
+    return lookup
+
+
+def _polygon_from_subset(subset, center_polygon_lookup=None, polygon_spacing=DEFAULT_POLYGON_SPACING):
+    center = subset.get("center") or []
+    if not center:
+        raise ValueError("subset has no center")
+    center_x = round(float(center[0]), 4)
+    if center_polygon_lookup and center_x in center_polygon_lookup:
+        return center_polygon_lookup[center_x]
+    return _polygon_from_subset_center(subset, polygon_spacing=polygon_spacing)
+
+
+def _collect_subset_polygon_material_ids(report, center_polygon_lookup=None, polygon_spacing=DEFAULT_POLYGON_SPACING):
     actual_by_polygon = {}
     subset_entries = []
     duplicate_polygons = []
     meshes = report.get("cgf_material_summary", {}).get("meshes", [])
     for mesh in meshes:
         for subset in mesh.get("subsets", []):
-            polygon = _polygon_from_subset_center(subset, polygon_spacing=polygon_spacing)
+            polygon = _polygon_from_subset(
+                subset,
+                center_polygon_lookup=center_polygon_lookup,
+                polygon_spacing=polygon_spacing,
+            )
             material_id = int(subset.get("material_id"))
             if polygon in actual_by_polygon:
                 duplicate_polygons.append(polygon)
@@ -66,8 +89,12 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
     manifest = load_json(manifest_path)
     report = load_json(report_path)
 
-    expected_raw_by_polygon = {
+    raw_fbx_slot_by_polygon = {
         int(polygon["polygon"]): int(polygon["material_slot"])
+        for polygon in manifest.get("polygons", [])
+    }
+    expected_cgf_by_polygon = {
+        int(polygon["polygon"]): int(polygon.get("expected_cgf_material_id", polygon["material_slot"]))
         for polygon in manifest.get("polygons", [])
     }
     material_name_by_polygon = {
@@ -83,8 +110,10 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
         polygon: request_name_to_sub_index.get(material_name)
         for polygon, material_name in material_name_by_polygon.items()
     }
+    center_polygon_lookup = _build_center_polygon_lookup(manifest)
     actual_by_polygon, subset_entries, duplicate_polygons = _collect_subset_polygon_material_ids(
         report,
+        center_polygon_lookup=center_polygon_lookup,
         polygon_spacing=polygon_spacing,
     )
     name_remap_mismatches = [
@@ -100,14 +129,16 @@ def verify_fixture_polygon_material_ids(manifest_path, report_path, polygon_spac
 
     return {
         "ok": (
-            expected_raw_by_polygon == actual_by_polygon
+            expected_cgf_by_polygon == actual_by_polygon
             and not duplicate_polygons
             and not report.get("cgf_read_error")
         ),
-        "expected_raw_fbx_slot_by_polygon": expected_raw_by_polygon,
+        "expected_cgf_material_id_by_polygon": expected_cgf_by_polygon,
+        "raw_fbx_slot_by_polygon": raw_fbx_slot_by_polygon,
         "actual_cgf_material_id_by_polygon": actual_by_polygon,
         "request_sub_index_by_polygon_name": request_sub_index_by_polygon,
         "name_remap_mismatches": name_remap_mismatches,
+        "center_polygon_lookup": center_polygon_lookup,
         "duplicate_polygons": duplicate_polygons,
         "subset_entries": subset_entries,
         "cgf_read_error": report.get("cgf_read_error", ""),

@@ -91,7 +91,8 @@ def test_verify_fixture_polygon_material_ids_matches_raw_fbx_slots(tmp_path):
     result = verify_fixture_polygon_material_ids(str(manifest_path), str(report_path))
 
     assert result["ok"]
-    assert result["expected_raw_fbx_slot_by_polygon"] == {0: 0, 1: 1}
+    assert result["expected_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
+    assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 1}
     assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
     assert result["request_sub_index_by_polygon_name"] == {0: 1, 1: 0}
     assert result["name_remap_mismatches"] == [
@@ -147,5 +148,64 @@ def test_verify_fixture_polygon_material_ids_fails_when_polygon_id_differs(tmp_p
     result = verify_fixture_polygon_material_ids(str(manifest_path), str(report_path))
 
     assert not result["ok"]
-    assert result["expected_raw_fbx_slot_by_polygon"] == {0: 0, 1: 1}
+    assert result["expected_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
+    assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 1}
     assert result["actual_cgf_material_id_by_polygon"] == {0: 1, 1: 0}
+
+
+def test_verify_fixture_polygon_material_ids_accepts_explicit_expected_cgf_ids(tmp_path):
+    manifest_path = tmp_path / "asset.fixture_manifest.json"
+    report_path = tmp_path / "asset.material_report.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "polygons": [
+                    {
+                        "polygon": 0,
+                        "material_slot": 0,
+                        "material_name": "LocalSlot0_Wood",
+                        "expected_cgf_material_id": 0,
+                        "center_x": 0.0,
+                    },
+                    {
+                        "polygon": 1,
+                        "material_slot": 0,
+                        "material_name": "LocalSlot0_Metal",
+                        "expected_cgf_material_id": 1,
+                        "center_x": 3.0,
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path.write_text(
+        json.dumps(
+            {
+                "cgf_read_error": "",
+                "request_materials": [
+                    {"name": "LocalSlot0_Wood", "sub_index": 0},
+                    {"name": "LocalSlot0_Metal", "sub_index": 1},
+                ],
+                "cgf_material_summary": {
+                    "meshes": [
+                        {
+                            "chunk_id": 10,
+                            "subsets": [
+                                {"subset": 0, "center": [0.00001, 0.0, 0.0], "material_id": 0, "num_indices": 3},
+                                {"subset": 0, "center": [3.0, 0.0, 0.0], "material_id": 1, "num_indices": 3},
+                            ],
+                        }
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = verify_fixture_polygon_material_ids(str(manifest_path), str(report_path))
+
+    assert result["ok"]
+    assert result["expected_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
+    assert result["raw_fbx_slot_by_polygon"] == {0: 0, 1: 0}
+    assert result["actual_cgf_material_id_by_polygon"] == {0: 0, 1: 1}
