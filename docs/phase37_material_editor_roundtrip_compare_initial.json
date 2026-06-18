@@ -1,0 +1,63 @@
+{
+  "kind": "material_editor_roundtrip_compare",
+  "manifest_path": "S:\\Crytek\\crytek\\Stripped to the bone\\Cryengine-Texture-Processor\\docs\\phase37_material_editor_roundtrip_manifest.json",
+  "sandbox_result_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\sandbox_roundtrip_result.json",
+  "sandbox_result": {},
+  "summary": {
+    "case_count": 6,
+    "changed_count": 0,
+    "unchanged_count": 6,
+    "missing_after_count": 0,
+    "sandbox_result_present": false
+  },
+  "cases": [
+    {
+      "slug": "exporter_baseline",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_exporter_baseline.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_exporter_baseline.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    },
+    {
+      "slug": "string_only_subsurface",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_string_only_subsurface.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_string_only_subsurface.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    },
+    {
+      "slug": "gen_only_legacy_subsurface",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_gen_only_legacy_subsurface.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_gen_only_legacy_subsurface.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    },
+    {
+      "slug": "legacy_gen_with_string",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_legacy_gen_with_string.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_legacy_gen_with_string.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    },
+    {
+      "slug": "runtime_globals_gen_with_string",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_runtime_globals_gen_with_string.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_runtime_globals_gen_with_string.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    },
+    {
+      "slug": "no_mask_fields",
+      "input_path": "S:\\Crytek\\crytek\\Stripped to the bone\\material_editor_roundtrip_phase37\\input\\Phase37_no_mask_fields.mtl",
+      "staged_path": "S:\\Crytek\\crytek\\cryengine-gamesdk-sample-project\\5.7.1\\gamesdk\\materials\\codex_phase37_roundtrip\\Phase37_no_mask_fields.mtl",
+      "exists_after": true,
+      "changed": false,
+      "material_changes": []
+    }
+  ]
+}

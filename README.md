@@ -183,6 +183,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Local CryEngine 5.7.1 `globals.txt` caches still do not match inspected persisted EngineAssets `.mtl` `GenMask` values, so the next material phase must probe RC / Material Editor round-trip behavior before changing exporter mask generation
 - `tools.mtl_genmask_probe` shows RC 5.7.1 accepts FBX imports with missing or contradictory `.mtl` `GenMask` / `StringGenMask`, so RC success only proves conversion acceptance, not material shader-mask correctness
 - `tools.mtl_schema_report` summarizes real `.mtl` XML usage; source tracing shows runtime/editor load reads `GenMask` first but lets `StringGenMask` remap it, while Editor save writes both fields and shader-dependent `PublicParams`
+- `tools.material_editor_roundtrip` prepares Material Editor load/save fixtures and compares before/after `.mtl` XML; the current Sandbox `/runpython` attempt timed out before producing round-trip evidence
 
 ## License
 
