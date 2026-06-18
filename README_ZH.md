@@ -29,11 +29,13 @@
 
 ### 前提条件
 
-- Python 3.7 或更新版本
+- Python 3.10 或更新版本
+- uv
 - Pillow (PIL) 库
 - NumPy（推荐版本 1.x，以与 Blender Python API 兼容）
+- PySide6
 - ImageMagick（用于高级图像处理）
-- Tkinter（用于 GUI）
+- Blender Python API (bpy)，模型导入/导出支持用，可选
 
 ### 设置
 
@@ -43,19 +45,22 @@
    cd cryengine-texture-processor
    ```
 
-2. 运行设置脚本来创建虚拟环境并安装依赖：
+2. 使用 uv 同步环境：
    ```bash
-   python setup_env.py
+   uv sync
    ```
 
-3. 启动应用程序：
+   如果需要 Blender Python API，并且当前 Python 版本有兼容的 `bpy` wheel：
    ```bash
-   # 在 Windows 上
-   run.bat
-   
-   # 在 Linux/Mac 上
-   ./run.sh
+   uv sync --extra model
    ```
+
+3. 启动 PySide 应用程序：
+   ```bash
+   uv run python main.py
+   ```
+
+旧 Tkinter 入口在迁移期间保留为 `legacy_tk_main.py`。
 
 ## 使用方法
 
@@ -88,7 +93,7 @@
 - **Python**：主要编程语言
 - **Pillow (PIL)**：图像处理
 - **NumPy**：图像处理的数值运算
-- **Tkinter**：GUI 框架
+- **PySide6**：GUI 框架
 - **ImageMagick**：高级图像处理操作
 - **Blender Python API (bpy)**：可选的模型加载支持
 
@@ -97,7 +102,7 @@
 - 模型导出功能仍在开发中
 - 某些高级 PBR 工作流转换可能需要手动调整
 - 要进行适当的 DDS 生成，必须在首选项中配置 RC.exe 路径
-- 对于模型加载功能，需要 Blender Python API (bpy)
+- 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
 
 ## 许可证
 

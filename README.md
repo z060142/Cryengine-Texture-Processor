@@ -31,11 +31,13 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
 
 ### Prerequisites
 
-- Python 3.7 or newer
+- Python 3.10 or newer
+- uv
 - Pillow (PIL) library
 - NumPy (version 1.x recommended for compatibility with Blender Python API)
+- PySide6
 - ImageMagick (for advanced image processing)
-- Tkinter (for GUI)
+- Blender Python API (bpy), optional for model loading/export support
 
 ### Setup
 
@@ -45,19 +47,22 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
    cd cryengine-texture-processor
    ```
 
-2. Run the setup script to create a virtual environment and install dependencies:
+2. Sync the environment with uv:
    ```bash
-   python setup_env.py
+   uv sync
    ```
 
-3. Start the application:
+   If you need Blender Python API support and your Python version has a compatible `bpy` wheel:
    ```bash
-   # On Windows
-   run.bat
-   
-   # On Linux/Mac
-   ./run.sh
+   uv sync --extra model
    ```
+
+3. Start the PySide application:
+   ```bash
+   uv run python main.py
+   ```
+
+The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migration.
 
 ## Usage
 
@@ -90,7 +95,7 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
 - **Python**: Main programming language
 - **Pillow (PIL)**: Image processing
 - **NumPy**: Numerical operations for image processing
-- **Tkinter**: GUI framework
+- **PySide6**: GUI framework
 - **ImageMagick**: Advanced image processing operations
 - **Blender Python API (bpy)**: Optional model loading support
 
@@ -99,7 +104,7 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
 - Model export functionality is still under development
 - Certain advanced PBR workflow conversions may require manual tweaking
 - For proper DDS generation, RC.exe path must be configured in preferences
-- For model loading functionality, Blender Python API (bpy) is required
+- For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration
 
 ## License
 

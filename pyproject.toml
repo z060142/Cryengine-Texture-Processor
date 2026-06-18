@@ -1,0 +1,28 @@
+[project]
+name = "cryengine-texture-processor"
+version = "0.2.0"
+description = "Asset conversion helper for CryEngine textures, materials, and model import requests."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "Pillow>=8.0.0",
+    "numpy>=1.19.0,<2.0",
+    "PySide6>=6.7",
+    "wand>=0.6",
+]
+
+[project.optional-dependencies]
+model = [
+    "bpy>=4.0,<5.1; python_version >= '3.11' and python_version < '3.12'",
+    "bpy>=5.1; python_version >= '3.13' and python_version < '3.14'",
+]
+
+[project.scripts]
+cryengine-texture-processor = "main:main"
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

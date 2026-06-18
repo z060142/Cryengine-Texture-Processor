@@ -11,8 +11,9 @@ import os
 import json
 import re
 import traceback
-from pathlib import Path
 import importlib
+
+from model_processing.material_texture_resolver import iter_unique_clean_materials
 
 def _get_node_path(node_name, parent_path=None):
     """
@@ -361,47 +362,13 @@ def export_json(model_data, source_filename, output_path, texture_output_dir):
         
         print(f"Total polygons in model: {total_polygons}")
         
-        # 處理材質索引與名稱兼容性
-        # 1. 清除數字後綴 (.001, .002)
-        # 2. 去除重複材質（清除後綴後可能產生重複名稱）
-        # 3. 確保sub_index是連續的整數，從0開始
-        
-        # 準備材質數據，保存清理後的名稱和唯一材質列表
-        clean_materials = []
-        seen_clean_names = set()
-        
-        for i, material in enumerate(materials):
-            material_name = material.get("name", f"Material_{i}")
-            
-            # 跳過默認/不需要的材質
-            if material_name in ["Material", "Dots Stroke"]:
-                continue
-            
-            # 清除數字後綴
-            clean_name = re.sub(r'\.[0-9]{3}$', '', material_name)
-            
-            # 如果清理後的名稱已存在，跳過這個材質
-            if clean_name in seen_clean_names:
-                print(f"跳過重複材質（清理後綴後）: {material_name} -> {clean_name}")
-                continue
-            
-            # 記錄這個清理後的名稱
-            seen_clean_names.add(clean_name)
-            
-            # 添加到清理後的材質列表
-            clean_materials.append({
-                "original_name": material_name,
-                "clean_name": clean_name,
-                "index": len(clean_materials)  # 使用連續的索引
-            })
-        
         # 處理材質
-        for mat_data in clean_materials:
+        for mat_data in iter_unique_clean_materials(materials):
             material_entry = {
                 "name": mat_data["clean_name"],  # 使用清理後的名稱作為材質名
                 "file": f"{base_name}.mtl",
                 "physicalize": _get_material_physicalize_type(mat_data["original_name"], total_polygons),
-                "sub_index": mat_data["index"],  # 使用連續的索引
+                "sub_index": mat_data["sub_index"],  # 使用連續的索引
                 "ui_name": mat_data["clean_name"],  # UI名稱也使用清理後的名稱
                 "ui_autoflag": True
             }

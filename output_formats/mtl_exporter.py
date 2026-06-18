@@ -13,6 +13,8 @@ import xml.etree.ElementTree as ET
 from xml.dom import minidom
 from PIL import Image
 
+from model_processing.material_texture_resolver import iter_unique_clean_materials
+
 def _has_alpha_channel(image_path):
     """
     Detects if the image has an alpha channel and if that alpha channel contains
@@ -153,41 +155,11 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
             default_mat = ET.SubElement(sub_materials, "Material", Name="Default", MtlFlags="524416", Shader="Illum")
             ET.SubElement(default_mat, "Textures") # Add empty Textures tag
         else:
-            # Define materials to ignore
-            ignored_materials = {"Material", "Dots Stroke"} # Use a set for efficient lookup
-
-            # 清理材質數據，去除數字後綴並卻除重複
             cleaned_materials_data = []
-            seen_clean_names = set()
-            
-            for mat_info in materials_data:
-                # 獲取材質名稱和紐理
-                mat_name = mat_info.get('name', 'UnnamedMaterial')
-                textures = mat_info.get('textures', {})
-                # 檢查材質名稱是否應該被忽略
-                mat_name_check = mat_info.get('name')
-                if mat_name_check in ignored_materials:
-                    print(f"Skipping ignored material: {mat_name_check}") # Optional: Log skipped material
-                    continue # Skip this material
-                    
-                # 清除數字後綴 (.001, .002 等)
-                import re
-                original_name = mat_info.get('name', 'UnnamedMaterial')
-                clean_name = re.sub(r'\.[0-9]{3}$', '', original_name)
-                
-                # 如果清理後的名稱已經存在，則跳過
-                if clean_name in seen_clean_names:
-                    print(f"Skipping duplicate material after cleaning: {original_name} -> {clean_name}")
-                    continue
-                    
-                # 記錄這個名稱已被使用
-                seen_clean_names.add(clean_name)
-                
-                # 建立新的材質資訊結構
-                new_mat_info = mat_info.copy()  # 複製原始數據
-                new_mat_info['name'] = clean_name  # 使用清理後的名稱
-                new_mat_info['original_name'] = original_name  # 保存原始名稱以便參考
-                
+            for material_record in iter_unique_clean_materials(materials_data):
+                new_mat_info = material_record["material"].copy()
+                new_mat_info['name'] = material_record["clean_name"]
+                new_mat_info['original_name'] = material_record["original_name"]
                 cleaned_materials_data.append(new_mat_info)
 
             # 使用清理後的材質數據
