@@ -44,3 +44,18 @@ def test_export_mtl_preserves_fbx_slots_over_existing_submaterial_name_order(tmp
 
     assert success
     assert submaterial_names(result) == ["First", "Third"]
+
+
+def test_export_mtl_preserves_manifest_pinned_suffix_materials(tmp_path):
+    success, result = export_mtl(
+        [
+            {"name": "Stone", "sub_index": 0, "auto_assigned": False, "textures": {}},
+            {"name": "Stone.001", "sub_index": 1, "auto_assigned": False, "textures": {}},
+        ],
+        str(tmp_path),
+        str(tmp_path),
+        "asset.mtl",
+    )
+
+    assert success
+    assert submaterial_names(result) == ["Stone", "Stone.001"]

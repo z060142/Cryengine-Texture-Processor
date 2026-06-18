@@ -8,6 +8,9 @@ place so the next phase can swap them for RC-accurate material/sub-index logic.
 """
 
 import os
+
+from model_processing.material_manifest import material_manifest_materials
+
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 
 COMMON_TEXTURE_BASE_SUFFIXES = (
@@ -233,7 +236,7 @@ def build_mtl_material_data(*args, **kwargs):
     kwargs["suffix_map"] = MTL_OUTPUT_TEXTURE_SUFFIXES
     kwargs["include_empty"] = True
     records = build_material_texture_records(*args, **kwargs)
-    return [
+    materials = [
         {
             "name": record["name"],
             "clean_name": record["clean_name"],
@@ -254,3 +257,5 @@ def build_mtl_material_data(*args, **kwargs):
         }
         for record in records
     ]
+    model_data = args[0] if args else kwargs.get("model_data", {})
+    return material_manifest_materials(materials, model_data.get("material_manifest"))

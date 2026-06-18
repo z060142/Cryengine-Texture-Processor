@@ -8,6 +8,7 @@ import re
 import traceback
 
 from model_processing.material_index_assigner import assign_material_sub_indices
+from model_processing.material_manifest import material_manifest_materials
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
 
@@ -158,9 +159,15 @@ def find_joint_physics_relations(processed_nodes):
     return joint_physics_data
 
 
-def build_material_requests(materials, existing_submaterial_names=None, include_diagnostics=False):
+def build_material_requests(
+    materials,
+    existing_submaterial_names=None,
+    include_diagnostics=False,
+    material_manifest_info=None,
+):
     material_requests = []
-    for material in assign_material_sub_indices(materials, existing_submaterial_names):
+    resolved_materials = material_manifest_materials(materials, material_manifest_info)
+    for material in assign_material_sub_indices(resolved_materials, existing_submaterial_names):
         request_material = {
             "name": material["clean_name"],
             "physicalize": get_material_physicalize_type(material["original_name"]),
@@ -202,7 +209,11 @@ def build_import_request(
         "scene_origin": scene_origin,
         "ignore_custom_normals": ignore_custom_normals,
         "ignore_uv": ignore_uv,
-        "materials": build_material_requests(model_data.get("materials", []), existing_submaterial_names),
+        "materials": build_material_requests(
+            model_data.get("materials", []),
+            existing_submaterial_names,
+            material_manifest_info=model_data.get("material_manifest"),
+        ),
         "nodes": processed_nodes,
         "jointPhysicsData": find_joint_physics_relations(processed_nodes),
         "autolodsettings": autolodsettings or {"GenerateAutomaticLODs": False},

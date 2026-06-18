@@ -50,6 +50,30 @@ def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
     assert all("diagnostics" not in material for material in request["materials"])
 
 
+def test_material_requests_follow_material_manifest_table_order():
+    model = sample_model()
+    model["materials"] = [
+        {"name": "Stone.001"},
+        {"name": "Stone"},
+    ]
+    model["material_manifest"] = {
+        "manifest": {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [
+                {"slot": 0, "name": "Stone"},
+                {"slot": 1, "name": "Stone.001"},
+            ],
+        }
+    }
+
+    request = build_import_request(model, "stone.fbx")
+
+    assert request["materials"] == [
+        {"name": "Stone", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "Stone.001", "physicalize": "no_collide", "sub_index": 1},
+    ]
+
+
 def test_material_requests_can_include_slot_diagnostics():
     materials = build_material_requests(
         [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}],

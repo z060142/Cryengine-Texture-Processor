@@ -158,6 +158,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - A Blender FBX material inspector can now emit `.fbx_material_manifest.json` sidecars so non-fixture FBX files can use the same semantic material report path
 - The PySide Model Import tab now reads `.fixture_manifest.json` / `.fbx_material_manifest.json` sidecars and displays the RC material table slots when available
 - The PySide Model Import tab can generate `.fbx_material_manifest.json` sidecars for selected FBX models through Blender and refresh the RC material table view
+- Request JSON and `.mtl` generation now use `model_data["material_manifest"]` as the RC material slot source of truth when present
 
 ## License
 

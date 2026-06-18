@@ -373,6 +373,8 @@ def main():
                     error_count += 1
                     error_messages.append(f"Failed to reload model: {model_filename}")
                     continue
+                if model_info.get("material_manifest"):
+                    reloaded_model["material_manifest"] = model_info["material_manifest"]
 
                 texture_refs = texture_extractor.extract(reloaded_model)
                 texture_data = build_fbx_texture_data(

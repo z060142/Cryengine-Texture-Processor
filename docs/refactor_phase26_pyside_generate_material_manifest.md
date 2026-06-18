@@ -71,6 +71,6 @@ The tests use a fake inspector to prove that the UI helper runs the inspector, r
 
 ## Remaining Work
 
-- Wire the generated sidecar into actual request JSON / `.mtl` generation for imported models.
+- Build on Phase 27's manifest-driven request/MTL generation with a full UI-to-RC smoke run.
 - Add UI surfacing for `fixture_material_semantic_alignment` after an RC smoke/import run.
 - Consider running the inspector asynchronously for very large FBX files.

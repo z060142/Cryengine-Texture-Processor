@@ -260,6 +260,7 @@ class ModelImportPanel(QWidget):
                     model_info["materials"] = len(model.get("materials", []))
                     model_info["material_diagnostics"] = collect_model_material_diagnostics(model)
                     model_info["material_manifest"] = load_model_material_manifest(file_path)
+                    model["material_manifest"] = model_info["material_manifest"]
                     refs = self.texture_extractor.extract(model)
                     textures = self._get_accurate_texture_info(refs)
                     model_info["extracted_textures"] = textures
@@ -429,6 +430,8 @@ class ModelImportPanel(QWidget):
             return
 
         model_info["material_manifest"] = material_manifest
+        if model_info.get("model_obj"):
+            model_info["model_obj"]["material_manifest"] = material_manifest
         self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
         self._populate_material_table(material_manifest.get("materials", []))
         QMessageBox.information(

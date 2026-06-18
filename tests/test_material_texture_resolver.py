@@ -95,3 +95,30 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
     assert result[0]["mesh_names"] == ["WallMesh"]
     assert result[0]["material_names"] == ["Wall", "WallAlt"]
     assert result[0]["slot_name_conflict"] is True
+
+
+def test_build_mtl_material_data_follows_material_manifest_order(tmp_path):
+    model_data = {
+        "materials": [{"name": "Stone.001"}, {"name": "Stone"}],
+        "material_manifest": {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Stone.001"},
+                ],
+            }
+        },
+    }
+
+    result = build_mtl_material_data(
+        model_data,
+        [],
+        TextureManagerStub(),
+        str(tmp_path),
+        "tif",
+    )
+
+    assert [item["name"] for item in result] == ["Stone", "Stone.001"]
+    assert [item["sub_index"] for item in result] == [0, 1]
+    assert [item["auto_assigned"] for item in result] == [False, False]
