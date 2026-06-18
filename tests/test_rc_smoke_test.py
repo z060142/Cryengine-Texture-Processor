@@ -6,6 +6,7 @@ from tools.rc_smoke_test import (
     collect_material_slot_diagnostics,
     discover_default_fbx,
     material_names_from_arg,
+    material_specs_from_manifest,
     material_specs_from_arg,
     prepare_smoke_bundle,
     run_rc_smoke_test,
@@ -25,6 +26,31 @@ def test_material_specs_from_arg_supports_deleted_and_explicit_slots():
         {"name": "Bark", "id": 1, "index": 0},
         {"name": "Leaves", "id": 2, "index": 1, "deleted": True, "sub_index": -1},
         {"name": "Proxy", "id": 3, "index": 2, "sub_index": 4, "auto_assigned": False},
+    ]
+
+
+def test_material_specs_from_manifest_uses_rc_material_table(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+    manifest_path = tmp_path / "asset.fbx_material_manifest.json"
+    fbx_path.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Stone.001"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    specs = material_specs_from_manifest(str(fbx_path))
+
+    assert [(spec["name"], spec["id"], spec["sub_index"], spec["auto_assigned"]) for spec in specs] == [
+        ("Stone", 1, 0, False),
+        ("Stone.001", 2, 1, False),
     ]
 
 
@@ -79,6 +105,44 @@ def test_prepare_smoke_bundle_copies_fbx_and_writes_mtl_and_request(tmp_path):
         {"name": "Bark", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Leaves", "physicalize": "no_collide", "sub_index": 1},
     ]
+
+
+def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Stone.001"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    copied_manifest = work_dir / "asset.fbx_material_manifest.json"
+    assert bundle["copied_manifest_path"] == str(copied_manifest)
+    assert copied_manifest.exists()
+    payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
+    assert payload["request"]["materials"] == [
+        {"name": "Stone", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "Stone.001", "physicalize": "no_collide", "sub_index": 1},
+    ]
+    root = ET.parse(bundle["mtl_path"]).getroot()
+    sub_materials = root.find("SubMaterials")
+    assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001"]
 
 
 def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):

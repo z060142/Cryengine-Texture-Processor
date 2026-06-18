@@ -115,6 +115,12 @@ FBX material table evidence can be inspected with Blender and written as a sidec
 uv run python -m tools.blender_material_inspector --fbx path/to/asset.fbx
 ```
 
+When a material manifest sidecar exists, RC smoke tests can build request/MTL materials from it:
+
+```bash
+uv run python -m tools.rc_smoke_test --fbx path/to/asset.fbx --work-dir path/to/work --materials-from-manifest
+```
+
 Controlled Blender fixtures can be generated and verified with:
 
 ```bash
@@ -159,6 +165,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - The PySide Model Import tab now reads `.fixture_manifest.json` / `.fbx_material_manifest.json` sidecars and displays the RC material table slots when available
 - The PySide Model Import tab can generate `.fbx_material_manifest.json` sidecars for selected FBX models through Blender and refresh the RC material table view
 - Request JSON and `.mtl` generation now use `model_data["material_manifest"]` as the RC material slot source of truth when present
+- RC smoke tests can now use `--materials-from-manifest` to build request JSON and `.mtl` directly from a fixture or Blender FBX material manifest sidecar
 
 ## License
 

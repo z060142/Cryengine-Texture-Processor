@@ -82,6 +82,6 @@ request:  DuplicateSurface -> 0, DuplicateSurface.001 -> 1
 
 ## Remaining Work
 
-- Run a full UI export with a generated sidecar and real RC conversion.
+- Build on Phase 28's manifest-driven RC smoke path from the PySide UI.
 - Export or surface semantic material alignment reports from the UI after RC runs.
 - Decide whether missing sidecars should become warnings before model export.

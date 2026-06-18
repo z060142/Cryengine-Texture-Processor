@@ -8,6 +8,11 @@ import os
 import shutil
 
 from model_processing.material_index_assigner import assign_material_sub_indices
+from model_processing.material_manifest import (
+    discover_material_manifest,
+    load_material_manifest,
+    material_manifest_materials,
+)
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
@@ -97,6 +102,14 @@ def material_specs_from_arg(value):
     return specs
 
 
+def material_specs_from_manifest(source_fbx_path):
+    manifest_path = discover_material_manifest(source_fbx_path)
+    manifest = load_material_manifest(manifest_path)
+    if not manifest:
+        raise RuntimeError(f"Material manifest not found for FBX: {source_fbx_path}")
+    return material_manifest_materials([], {"path": manifest_path, "manifest": manifest})
+
+
 def _normalize_material_specs(material_names=None, material_specs=None):
     if material_specs is not None:
         return [
@@ -128,6 +141,19 @@ def build_smoke_model_data(asset_name, material_names=None, material_specs=None)
     }
 
 
+def _copy_material_manifest(source_fbx_path, copied_fbx_path):
+    manifest_path = discover_material_manifest(source_fbx_path)
+    if not manifest_path:
+        return ""
+    source_stem = os.path.splitext(os.path.abspath(source_fbx_path))[0]
+    copied_stem = os.path.splitext(os.path.abspath(copied_fbx_path))[0]
+    suffix = manifest_path[len(source_stem) :]
+    copied_manifest_path = copied_stem + suffix
+    if os.path.abspath(manifest_path) != os.path.abspath(copied_manifest_path):
+        shutil.copy2(manifest_path, copied_manifest_path)
+    return copied_manifest_path
+
+
 def collect_material_slot_diagnostics(material_specs, existing_submaterial_names=None):
     diagnostics = []
     for record in assign_material_sub_indices(material_specs, existing_submaterial_names):
@@ -153,6 +179,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
     copied_fbx_path = os.path.join(work_dir, f"{asset_name}.fbx")
     if os.path.abspath(source_fbx_path) != os.path.abspath(copied_fbx_path):
         shutil.copy2(source_fbx_path, copied_fbx_path)
+    copied_manifest_path = _copy_material_manifest(source_fbx_path, copied_fbx_path)
 
     materials_data = [{**spec, "textures": {}} for spec in material_specs]
     mtl_filename = f"{asset_name}.mtl"
@@ -172,6 +199,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
 
     return {
         "copied_fbx_path": copied_fbx_path,
+        "copied_manifest_path": copied_manifest_path,
         "mtl_path": mtl_result,
         "json_path": json_result,
         "material_diagnostics": collect_material_slot_diagnostics(materials_data),
@@ -262,14 +290,24 @@ def main(argv=None):
     parser.add_argument("--work-dir", required=True, help="Directory for generated smoke-test files")
     parser.add_argument("--asset-name", default=None, help="Output asset base name")
     parser.add_argument("--materials", default="Default", help="Comma-separated material names")
+    parser.add_argument(
+        "--materials-from-manifest",
+        action="store_true",
+        help="Use the source FBX material manifest sidecar to build request and MTL materials",
+    )
     args = parser.parse_args(argv)
+    material_specs = (
+        material_specs_from_manifest(args.fbx)
+        if args.materials_from_manifest
+        else material_specs_from_arg(args.materials)
+    )
 
     result = run_rc_smoke_test(
         args.rc,
         args.fbx,
         args.work_dir,
         asset_name=args.asset_name,
-        material_specs=material_specs_from_arg(args.materials),
+        material_specs=material_specs,
     )
 
     print(f"success: {result.success}")
