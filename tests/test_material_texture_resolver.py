@@ -66,7 +66,16 @@ def test_build_fbx_texture_data_finds_existing_diff_and_ddna(tmp_path):
 
 
 def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_path):
-    model_data = {"materials": [{"name": "Wall"}]}
+    model_data = {
+        "materials": [
+            {
+                "name": "Wall",
+                "polygon_count": 3,
+                "used_by_polygons": True,
+                "mesh_names": ["WallMesh"],
+            }
+        ]
+    }
 
     result = build_mtl_material_data(
         model_data,
@@ -79,3 +88,6 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
     assert len(result) == 1
     assert result[0]["name"] == "Wall"
     assert result[0]["textures"] == {}
+    assert result[0]["polygon_count"] == 3
+    assert result[0]["used_by_polygons"] is True
+    assert result[0]["mesh_names"] == ["WallMesh"]

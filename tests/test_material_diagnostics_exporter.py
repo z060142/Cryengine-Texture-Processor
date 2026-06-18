@@ -28,6 +28,30 @@ def test_build_material_diagnostics_report_summarizes_hazards():
     assert report["diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 
 
+def test_build_material_diagnostics_report_allows_deleted_known_unused_slot():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Removed", "id": 2, "deleted": True, "polygon_count": 0},
+        ],
+        source_model="probe.fbx",
+    )
+
+    assert report["summary"]["diagnostic_count"] == 0
+    assert report["summary"]["hazard_count"] == 0
+
+
+def test_build_material_diagnostics_report_flags_deleted_known_used_slot():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Removed", "id": 2, "deleted": True, "polygon_count": 4},
+        ],
+        source_model="probe.fbx",
+    )
+
+    assert report["summary"]["hazard_count"] == 1
+    assert report["diagnostics"][0]["fbx_slot"] == 1
+
+
 def test_build_material_diagnostics_report_keeps_clean_material_records_without_hazards():
     report = build_material_diagnostics_report(
         [

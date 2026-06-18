@@ -9,6 +9,8 @@ This module provides functionality for loading 3D models using Blender's Python 
 import os
 import importlib
 
+from model_processing.material_slot_usage import build_material_slot_usage
+
 class ModelLoader:
     """
     Class for loading 3D models using Blender's Python API.
@@ -131,11 +133,17 @@ class ModelLoader:
                     return self._create_dummy_model(file_path)
             
             # If standard import was successful, create model object with scene data
+            meshes = self._extract_meshes()
+            max_material_slots = max((len(mesh.get("material_slots", [])) for mesh in meshes), default=0)
+            materials = self._extract_materials(
+                meshes,
+                build_material_slot_usage(meshes, material_count=max_material_slots),
+            )
             model = {
                 "path": file_path,
                 "filename": os.path.basename(file_path),
-                "materials": self._extract_materials(),
-                "meshes": self._extract_meshes(),
+                "materials": materials,
+                "meshes": meshes,
                 "scene_hierarchy": self._extract_scene_hierarchy()  # 添加場景層次結構
             }
             
@@ -188,7 +196,7 @@ class ModelLoader:
             print(f"Error during scene cleanup: {e}")
             # 不執行備份清理方法，避免重複錯誤
     
-    def _extract_materials(self):
+    def _extract_materials(self, meshes=None, material_slot_usage=None):
         """
         Extract material information from the loaded Blender scene.
         
@@ -199,12 +207,32 @@ class ModelLoader:
             return []
             
         materials = []
-        for index, mat in enumerate(self.bpy.data.materials):
+        material_slot_usage = material_slot_usage or {}
+        slot_materials = {}
+        for mesh in meshes or []:
+            for slot in mesh.get("material_slots", []):
+                slot_index = slot.get("slot")
+                if slot_index is not None and slot.get("name") and slot_index not in slot_materials:
+                    slot_materials[slot_index] = slot
+
+        if not slot_materials:
+            for index, mat in enumerate(self.bpy.data.materials):
+                slot_materials[index] = {
+                    "slot": index,
+                    "name": mat.name,
+                    "nodes": mat.use_nodes,
+                }
+
+        for index, slot in sorted(slot_materials.items()):
+            usage = material_slot_usage.get(index, {})
             materials.append({
-                "name": mat.name,
+                "name": slot["name"],
                 "id": index + 1,
                 "index": index,
-                "nodes": mat.use_nodes  # Whether the material uses nodes
+                "nodes": slot.get("nodes", False),  # Whether the material uses nodes
+                "polygon_count": usage.get("polygon_count", 0),
+                "used_by_polygons": usage.get("used_by_polygons", False),
+                "mesh_names": usage.get("mesh_names", []),
             })
             
         return materials
@@ -225,14 +253,39 @@ class ModelLoader:
                 mesh_data = {
                     "name": obj.name,
                     "vertices": len(obj.data.vertices),
-                    "polygons": len(obj.data.polygons),
-                    "materials": []
+                    "polygon_count": len(obj.data.polygons),
+                    "polygons": [],
+                    "materials": [],
+                    "material_slots": [],
                 }
                 
                 # Extract material slots
-                for slot in obj.material_slots:
+                for slot_index, slot in enumerate(obj.material_slots):
                     if slot.material:
                         mesh_data["materials"].append(slot.material.name)
+                        mesh_data["material_slots"].append(
+                            {
+                                "slot": slot_index,
+                                "name": slot.material.name,
+                                "nodes": slot.material.use_nodes,
+                            }
+                        )
+
+                for polygon in obj.data.polygons:
+                    material_slot = int(polygon.material_index)
+                    material_name = ""
+                    if 0 <= material_slot < len(obj.material_slots):
+                        slot = obj.material_slots[material_slot]
+                        if slot.material:
+                            material_name = slot.material.name
+                    mesh_data["polygons"].append(
+                        {
+                            "index": polygon.index,
+                            "material_slot": material_slot,
+                            "material_name": material_name,
+                            "vertices": list(polygon.vertices),
+                        }
+                    )
                         
                 meshes.append(mesh_data)
                 

@@ -204,6 +204,11 @@ def build_material_texture_records(
                     "auto_assigned": material.get("auto_assigned", material.get("ui_autoflag", True)),
                     "deleted": material.get("deleted", False),
                     "is_dummy": material.get("is_dummy", False),
+                    "polygon_count": material.get("polygon_count"),
+                    "face_count": material.get("face_count"),
+                    "used_polygon_count": material.get("used_polygon_count"),
+                    "used_by_polygons": material.get("used_by_polygons"),
+                    "mesh_names": material.get("mesh_names", []),
                     "base_name": base_name,
                     "textures": processed_textures,
                     "source_texture_count": len(material_refs),
@@ -238,6 +243,11 @@ def build_mtl_material_data(*args, **kwargs):
             "auto_assigned": record["auto_assigned"],
             "deleted": record["deleted"],
             "is_dummy": record["is_dummy"],
+            "polygon_count": record["polygon_count"],
+            "face_count": record["face_count"],
+            "used_polygon_count": record["used_polygon_count"],
+            "used_by_polygons": record["used_by_polygons"],
+            "mesh_names": record["mesh_names"],
             "textures": record["textures"],
         }
         for record in records

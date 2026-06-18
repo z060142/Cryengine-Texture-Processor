@@ -78,5 +78,5 @@ uv run python -m pytest tests\test_material_diagnostics_exporter.py tests\test_m
 ## Remaining Work
 
 - Add a UI affordance to open or reveal the sidecar after export.
-- Add true polygon material-slot usage extraction so sidecar diagnostics can distinguish unused deleted slots from dangerous deleted used slots.
+- Done in phase 17: add true polygon material-slot usage extraction for Blender-loaded models so diagnostics can distinguish unused deleted slots from dangerous deleted used slots.
 - Use the sidecar schema as the handoff format for a future Blender add-on.
