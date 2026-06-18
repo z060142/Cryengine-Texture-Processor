@@ -24,7 +24,9 @@ from model_processing.material_texture_resolver import (
 )
 from model_processing.texture_extractor import TextureExtractor
 from output_formats.json_exporter import export_json
+from output_formats.material_diagnostics_exporter import export_material_diagnostics
 from output_formats.mtl_exporter import export_mtl
+from model_processing.material_index_assigner import parse_mtl_submaterial_names
 from ui_pyside.main_window import MainWindow
 from ui_pyside.progress_dialog import ProgressDialog
 from utils.config_manager import ConfigManager
@@ -266,10 +268,27 @@ def main():
                     continue
 
                 mtl_filename = f"{os.path.splitext(model_filename)[0]}.mtl"
+                base_filename = os.path.splitext(model_filename)[0]
+                existing_mtl_path = os.path.join(model_output_dir, mtl_filename)
+                existing_submaterial_names = parse_mtl_submaterial_names(existing_mtl_path)
                 success, result = export_mtl(materials_data, model_output_dir, texture_output_dir, mtl_filename)
                 if success:
                     exported_count += 1
                     print(f"Successfully exported MTL: {result}")
+                    try:
+                        diagnostics_path = export_material_diagnostics(
+                            materials_data,
+                            model_output_dir,
+                            f"{base_filename}.material_diagnostics.json",
+                            existing_submaterial_names=existing_submaterial_names,
+                            source_model=model_filename,
+                            artifact_kind="mtl",
+                        )
+                        print(f"Successfully exported material diagnostics: {diagnostics_path}")
+                    except Exception as diagnostics_error:
+                        message = f"{model_filename}: failed to export material diagnostics: {diagnostics_error}"
+                        print(f"Warning: {message}")
+                        error_messages.append(message)
                 else:
                     error_count += 1
                     error_messages.append(f"{model_filename}: {result}")
@@ -382,6 +401,23 @@ def main():
                     model_output_dir,
                     texture_output_dir,
                 )
+                try:
+                    existing_submaterial_names = parse_mtl_submaterial_names(
+                        os.path.join(model_output_dir, f"{base_filename}.mtl")
+                    )
+                    diagnostics_path = export_material_diagnostics(
+                        reloaded_model.get("materials", []),
+                        model_output_dir,
+                        f"{base_filename}.material_diagnostics.json",
+                        existing_submaterial_names=existing_submaterial_names,
+                        source_model=f"{base_filename}.fbx",
+                        artifact_kind="fbx_json",
+                    )
+                    print(f"Successfully exported material diagnostics: {diagnostics_path}")
+                except Exception as diagnostics_error:
+                    message = f"{model_filename}: failed to export material diagnostics: {diagnostics_error}"
+                    print(f"Warning: {message}")
+                    error_messages.append(message)
                 if json_success:
                     print(f"Successfully exported JSON configuration: {json_result}")
                     rc_exe_path = ConfigManager().get("rc_exe_path", "")

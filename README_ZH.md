@@ -140,6 +140,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - 受控 deleted-material 探针显示，request `sub_index = -1` 不会移除 FBX 仍在使用的 geometry material id；除非已证明该 slot 没有 polygon 使用，否则应保留 placeholder 槽
 - 材质分配现在会对危险的 deleted 或 remapped 已知 FBX slot 产生 diagnostics；smoke report 会以 `preflight_material_diagnostics` 输出
 - PySide 模型导入页现在会显示所选模型的 material-slot diagnostics，并在需要时用 `[hazard]` 标记已导入模型
+- 一般模型导出现在会写出 `<model>.material_diagnostics.json` sidecar，不会把非 RC 字段塞进 RC request JSON
 
 ## 许可证
 

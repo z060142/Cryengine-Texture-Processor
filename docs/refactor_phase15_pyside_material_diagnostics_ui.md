@@ -76,6 +76,6 @@ PY
 
 ## Remaining Work
 
-- Persist diagnostics next to normal export artifacts, not only in smoke reports and UI state.
+- Done in phase 16: persist diagnostics next to normal export artifacts as `<model>.material_diagnostics.json`.
 - Add true polygon material-slot usage extraction so hazards can become precise per-slot validation instead of usage-unknown warnings.
 - Add UI actions for resolving a hazard, such as converting deleted used slots back into explicit placeholder materials.
