@@ -1,5 +1,7 @@
+import os
 import xml.etree.ElementTree as ET
 
+from output_formats import mtl_exporter
 from output_formats.mtl_exporter import build_mtl_document, build_mtl_material_slots, export_mtl
 
 
@@ -74,6 +76,49 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     }
     public_params = material.find("PublicParams")
     assert public_params.get("TessellationFactorMax") == "32"
+
+
+def test_calculate_relative_path_preserves_cryengine_aliases():
+    assert (
+        mtl_exporter._calculate_relative_path(
+            r"%ENGINE%\EngineAssets\Textures\white.dds",
+            r"C:\project\objects",
+        )
+        == "%ENGINE%/EngineAssets/Textures/white.dds"
+    )
+
+
+def test_calculate_relative_path_normalizes_absolute_paths(tmp_path):
+    texture_path = tmp_path / "textures" / "asset_diff.dds"
+    texture_path.parent.mkdir()
+    texture_path.write_text("dds", encoding="utf-8")
+
+    assert mtl_exporter._calculate_relative_path(texture_path, tmp_path) == "./textures/asset_diff.dds"
+
+
+def test_calculate_relative_path_keeps_parent_relative_paths(tmp_path):
+    texture_root = tmp_path / "textures"
+    model_root = tmp_path / "objects"
+    texture_root.mkdir()
+    model_root.mkdir()
+    texture_path = texture_root / "asset_diff.dds"
+    texture_path.write_text("dds", encoding="utf-8")
+
+    assert mtl_exporter._calculate_relative_path(texture_path, model_root) == "../textures/asset_diff.dds"
+
+
+def test_calculate_relative_path_uses_absolute_fallback_across_drives(monkeypatch):
+    def raise_value_error(target, start):
+        raise ValueError("different drives")
+
+    monkeypatch.setattr(mtl_exporter.os.path, "relpath", raise_value_error)
+
+    result = mtl_exporter._calculate_relative_path(
+        r"D:\textures\asset_diff.dds",
+        r"C:\project\objects",
+    )
+
+    assert result == os.path.abspath(r"D:\textures\asset_diff.dds").replace("\\", "/")
 
 
 def test_build_mtl_document_uses_default_material_for_empty_input(tmp_path):

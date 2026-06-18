@@ -182,6 +182,7 @@ The harness also records `sandbox_edcommand`, a normal Editor launch strategy us
 - RC request, `.mtl`, diagnostics, and smoke preflight now share `model_processing.material_slot_table` as the single material slot assignment entry point
 - FBX material export now uses the resolver-produced processed `diff` texture path when available and resolves relative texture directories next to the exported FBX
 - The PySide model export flow now prepares MTL, FBX, JSON, and diagnostics paths through `model_processing.model_export_context`
+- `.mtl` texture path emission now preserves CryEngine `%...%` aliases and uses explicit tested relative/absolute fallback rules
 - Controlled multi-mesh probes show that raw per-object local FBX slot ids are not enough: two meshes can both use local slot `0`, while RC writes CGF material ids `0` and `1`; a swapped request/MTL probe shows RC does not remap those ids by material name, so request/MTL slot order must mirror the exported FBX material table
 - Shared-material and duplicate-name probes show that Blender suffixes such as `.001` are RC-visible material identities, not cosmetic noise; request JSON and `.mtl` generation must preserve them unless the exporter deliberately creates another stable unique name
 - RC smoke material reports now read controlled fixture manifests when available and emit `fixture_material_semantic_alignment`, which distinguishes "CGF id exists" from "that id points to the expected material name"

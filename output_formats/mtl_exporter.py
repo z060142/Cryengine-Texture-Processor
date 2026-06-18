@@ -75,6 +75,12 @@ def _has_alpha_channel(image_path):
         return False
 
 
+def _with_local_relative_prefix(path):
+    if not path or path.startswith(("../", "/", ".", "%")):
+        return path
+    return f"./{path}"
+
+
 def _calculate_relative_path(target_path, start_path):
     """
     Calculates the relative path from start_path to target_path,
@@ -90,24 +96,25 @@ def _calculate_relative_path(target_path, start_path):
     """
     if not target_path or not start_path:
         return ""
+    target_path = os.fspath(target_path)
+    if target_path.startswith("%"):
+        return target_path.replace("\\", "/")
+    if not os.path.isabs(target_path):
+        return _with_local_relative_prefix(target_path.replace("\\", "/"))
+
     try:
-        # Calculate relative path
-        relative = os.path.relpath(target_path, start_path)
+        absolute_target = os.path.abspath(target_path)
+        absolute_start = os.path.abspath(start_path)
+        relative = os.path.relpath(absolute_target, absolute_start)
         # Ensure forward slashes
         relative = relative.replace("\\", "/")
-        # Prepend './' if it's not already relative from parent or absolute
-        if not relative.startswith(("../", "/", ".")):
-             relative = "./" + relative
-        return relative
+        return _with_local_relative_prefix(relative)
     except ValueError:
         # Handle cases where paths are on different drives (Windows)
         # In this scenario, returning the absolute path might be the fallback,
         # but CryEngine typically expects relative paths within the project.
-        # For now, return the original target path or an empty string.
         print(f"Warning: Could not calculate relative path between {start_path} and {target_path}. Paths might be on different drives.")
-        # Return the filename part as a fallback? Or the full path?
-        # Let's return the filename for now, assuming it might be placed alongside the mtl.
-        return os.path.basename(target_path)
+        return os.path.abspath(target_path).replace("\\", "/")
 
 
 def _pretty_print_xml(elem):
