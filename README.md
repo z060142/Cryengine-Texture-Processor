@@ -108,6 +108,7 @@ The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migra
 - For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration
 - RC request generation now aligns material sub-indices with existing `.mtl` submaterial slots where possible; true FBX material-id extraction still needs a later pass
 - RC execution now uses a structured runner, but real `rc.exe` smoke tests still need sample assets
+- A repeatable RC smoke harness is available via `python -m tools.rc_smoke_test`
 
 ## License
 

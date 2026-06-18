@@ -106,6 +106,7 @@
 - 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
 - RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
 - RC 执行现在改用结构化 runner，但真实 `rc.exe` smoke test 仍需要样本资产
+- 可重复执行的 RC smoke harness 已可通过 `python -m tools.rc_smoke_test` 使用
 
 ## 许可证
 
