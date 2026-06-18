@@ -43,8 +43,8 @@ def get_fbx_material_id(material, fallback_order=None):
     """
     Return a 1-based FBX material id when known.
 
-    CryEngine's editor stores material ids as 1-based values and preserves
-    `id - 1` as the submaterial slot when that slot is free.
+    CryEngine's editor exposes material ids as 1-based values. The generated
+    CGF stores polygon material ids as zero-based `MeshSubset.nMatID` values.
     """
     for key in ("id", "material_id", "fbx_material_id", "fbx_id"):
         value = _coerce_int(material.get(key))
@@ -116,8 +116,8 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
 
     1. Deleted materials receive `sub_index = -1`.
     2. Explicit non-auto `sub_index` values reserve their slots.
-    3. Auto materials reuse matching existing .mtl submaterial names.
-    4. Auto materials preserve FBX material id as `id - 1` when free.
+    3. Auto materials preserve FBX material id as `id - 1` when free.
+    4. Auto materials reuse matching existing .mtl submaterial names as fallback.
     5. Remaining materials are sorted dummy-first, then by name, and fill gaps.
     """
     records = _normalized_records(materials)
@@ -147,22 +147,22 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
         if record["sub_index"] is not None:
             continue
 
-        existing_index = existing_lookup.get(record["clean_name"])
-        if existing_index is not None and existing_index not in occupied:
-            record["sub_index"] = existing_index
-            record["reason"] = "existing_mtl_name"
-            occupied.add(existing_index)
-
-    for record in records:
-        if record["sub_index"] is not None:
-            continue
-
         fbx_id = record["fbx_material_id"]
         preferred_index = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
         if preferred_index is not None and preferred_index not in occupied:
             record["sub_index"] = preferred_index
             record["reason"] = "fbx_material_id"
             occupied.add(preferred_index)
+
+    for record in records:
+        if record["sub_index"] is not None:
+            continue
+
+        existing_index = existing_lookup.get(record["clean_name"])
+        if existing_index is not None and existing_index not in occupied:
+            record["sub_index"] = existing_index
+            record["reason"] = "existing_mtl_name"
+            occupied.add(existing_index)
 
     remaining = [record for record in records if record["sub_index"] is None]
     remaining.sort(key=lambda record: (not is_dummy_material(record), record["clean_name"].lower()))

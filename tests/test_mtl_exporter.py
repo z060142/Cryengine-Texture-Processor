@@ -24,7 +24,7 @@ def test_export_mtl_preserves_sub_index_slots_and_fills_gaps(tmp_path):
     assert submaterial_names(result) == ["First", "unassigned", "Third"]
 
 
-def test_export_mtl_reuses_existing_submaterial_name_slots(tmp_path):
+def test_export_mtl_preserves_fbx_slots_over_existing_submaterial_name_order(tmp_path):
     existing = tmp_path / "asset.mtl"
     root = ET.Element("Material")
     sub_materials = ET.SubElement(root, "SubMaterials")
@@ -43,4 +43,4 @@ def test_export_mtl_reuses_existing_submaterial_name_slots(tmp_path):
     )
 
     assert success
-    assert submaterial_names(result) == ["Third", "First"]
+    assert submaterial_names(result) == ["First", "Third"]

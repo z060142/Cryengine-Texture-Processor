@@ -25,16 +25,32 @@ def test_parse_mtl_submaterial_names_uses_child_order(tmp_path):
     assert parse_mtl_submaterial_names(str(mtl_path)) == ["Bark", "Leaves"]
 
 
-def test_existing_mtl_name_match_wins_for_auto_materials():
+def test_fbx_material_id_wins_over_existing_mtl_name_for_auto_materials():
     records = assign_material_sub_indices(
         [{"name": "Leaves", "id": 1}, {"name": "Bark", "id": 2}],
         existing_submaterial_names=["Bark", "Leaves"],
     )
 
-    assert sub_index_by_name(records) == {"Leaves": 1, "Bark": 0}
+    assert sub_index_by_name(records) == {"Leaves": 0, "Bark": 1}
     assert reason_by_name(records) == {
+        "Leaves": "fbx_material_id",
+        "Bark": "fbx_material_id",
+    }
+
+
+def test_existing_mtl_name_match_is_fallback_when_fbx_slot_is_occupied():
+    records = assign_material_sub_indices(
+        [
+            {"name": "Reserved", "sub_index": 0, "auto_assigned": False},
+            {"name": "Leaves", "id": 1},
+        ],
+        existing_submaterial_names=["Reserved", "Leaves"],
+    )
+
+    assert sub_index_by_name(records) == {"Reserved": 0, "Leaves": 1}
+    assert reason_by_name(records) == {
+        "Reserved": "explicit",
         "Leaves": "existing_mtl_name",
-        "Bark": "existing_mtl_name",
     }
 
 

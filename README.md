@@ -132,7 +132,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Certain advanced PBR workflow conversions may require manual tweaking
 - For proper DDS generation, RC.exe path must be configured in preferences
 - For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration
-- RC request generation now aligns material sub-indices with existing `.mtl` submaterial slots where possible; true FBX material-id extraction still needs a later pass
+- RC request and `.mtl` generation now preserve known FBX material slots first; existing `.mtl` name matches are only a fallback when the FBX slot is unavailable
 - RC execution now uses a structured runner; a real `rc.exe` smoke test has passed with the local GameSDK `CubeA.fbx` sample
 - A repeatable RC smoke harness is available via `uv run python -m tools.rc_smoke_test`
 - Smoke runs now emit a material mapping report with CGF `MeshSubsets.nMatID` inspection; controlled multi-material FBX fixtures are still needed to prove polygon assignment behavior end to end

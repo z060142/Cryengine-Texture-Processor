@@ -130,7 +130,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - 某些高级 PBR 工作流转换可能需要手动调整
 - 要进行适当的 DDS 生成，必须在首选项中配置 RC.exe 路径
 - 对于模型加载功能，需要 Blender Python API (bpy)，或后续改为通过 Blender 子进程提供
-- RC request 生成现在会尽量按既有 `.mtl` 子材质槽对齐材质 sub-index；真正的 FBX material-id 提取还需要后续处理
+- RC request 与 `.mtl` 生成现在会优先保留已知 FBX material slot；既有 `.mtl` 名称匹配只在 FBX slot 不可用时作为 fallback
 - RC 执行现在改用结构化 runner；已用本机 GameSDK `CubeA.fbx` 样本通过真实 `rc.exe` smoke test
 - 可重复执行的 RC smoke harness 已可通过 `uv run python -m tools.rc_smoke_test` 使用
 - Smoke 运行现在会输出含 CGF `MeshSubsets.nMatID` 检查的材质映射报告；仍需受控多材质 FBX fixture 才能端到端证明 polygon assignment 行为

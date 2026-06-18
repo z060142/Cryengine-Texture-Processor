@@ -3,6 +3,10 @@
 Date: 2026-06-19
 Branch: `feat/fbx-material-mapping`
 
+## Current Status
+
+This phase documented the first material sub-index implementation. Phase 11 later proved that RC keeps CGF polygon material ids aligned to raw FBX material slots, even when request/MTL material names are reordered. Phase 12 supersedes the old priority rule: known FBX material slots now win over existing `.mtl` name matches.
+
 ## Goal
 
 Make the converter stop treating material list order as the CryEngine material id. CryEngine's FBX import request needs `materials[].sub_index` to match the final `.mtl` sub-material slot. If this drifts, a converted model can point polygons at the wrong material.
@@ -28,8 +32,8 @@ Rules:
 2. Collapse Blender duplicate suffixes such as `.001`.
 3. Deleted materials receive `sub_index = -1`.
 4. Explicit non-auto `sub_index` values reserve their slots.
-5. Auto-assigned materials first try to match an existing `.mtl` sub-material by name.
-6. If no existing slot matches, preserve FBX material id as `id - 1` when that slot is free.
+5. Auto-assigned materials preserve FBX material id as `id - 1` when that slot is free.
+6. If the FBX slot is unavailable, try to match an existing `.mtl` sub-material by name as fallback.
 7. Remaining materials are sorted dummy-first, then by clean name, and placed in the first free slot.
 
 ## MTL Slot Behavior
@@ -57,7 +61,7 @@ That gap is intentional. It preserves the material id relationship instead of si
 
 ## JSON Behavior
 
-When exporting `chair.fbx`, `export_json()` looks for a sibling `chair.mtl`.
+When exporting `chair.fbx`, `export_json()` looks for a sibling `chair.mtl`, but known FBX slots remain authoritative.
 
 If the MTL contains:
 
@@ -66,16 +70,16 @@ If the MTL contains:
 1: Chair
 ```
 
-The generated request uses:
+The generated request preserves FBX/list slot ids:
 
 ```json
 [
-  {"name": "Chair", "physicalize": "no_collide", "sub_index": 1},
-  {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 0}
+  {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
+  {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2}
 ]
 ```
 
-This keeps RC's request aligned with the material file that will be loaded in CryEngine.
+This keeps request/MTL slots aligned to the source FBX material ids that RC writes into CGF `MeshSubset.nMatID`.
 
 ## Tests Added
 
@@ -86,14 +90,14 @@ This keeps RC's request aligned with the material file that will be loaded in Cr
 Covered cases:
 
 - parse `.mtl` sub-material names by child order
-- existing MTL name match wins for auto materials
-- FBX material id is preserved when free
+- FBX material id wins over existing MTL name matches for auto materials
+- existing MTL name match remains a fallback when the FBX slot is occupied
 - explicit non-auto sub-index reserves a slot
 - remaining materials fill free slots deterministically
 - deleted materials get `sub_index = -1`
 - Blender duplicate suffixes collapse
 - MTL export fills holes with `unassigned`
-- JSON request follows existing MTL sub-material order
+- JSON request preserves FBX slot order over existing MTL name order
 
 ## Verification
 

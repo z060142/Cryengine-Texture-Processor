@@ -121,6 +121,6 @@ uv run python -m tools.verify_controlled_fixture --manifest "S:\Crytek\crytek\St
 
 ## Remaining Work
 
-- Update the material assignment logic if it can currently prefer an existing `.mtl` name match over a known FBX material slot id.
+- Done in phase 12: material assignment now prefers known FBX material slot ids over existing `.mtl` name matches.
 - Add UI visibility for FBX slot ids and empty slot placeholders, so artists can see when the converter is preserving sparse slots intentionally.
 - Probe deleted or disabled sub-materials with `sub_index = -1` while the FBX still contains geometry assigned to that slot.

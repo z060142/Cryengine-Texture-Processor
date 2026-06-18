@@ -80,7 +80,7 @@ def test_export_json_writes_request_wrapper_by_default(tmp_path):
     assert output_file.endswith("chair.json")
 
 
-def test_export_json_matches_existing_mtl_submaterial_order(tmp_path):
+def test_export_json_preserves_fbx_slot_order_over_existing_mtl_name_order(tmp_path):
     root = ET.Element("Material")
     sub_materials = ET.SubElement(root, "SubMaterials")
     ET.SubElement(sub_materials, "Material", Name="collision_proxy")
@@ -92,6 +92,6 @@ def test_export_json_matches_existing_mtl_submaterial_order(tmp_path):
     assert success
     payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
     assert payload["request"]["materials"] == [
-        {"name": "Chair", "physicalize": "no_collide", "sub_index": 1},
-        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 0},
+        {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2},
     ]
