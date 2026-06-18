@@ -114,6 +114,7 @@ Controlled Blender fixtures can be generated and verified with:
 ```bash
 uv run python -m tools.blender_material_fixture --output-dir path/to/fixture
 uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json
+uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json --check-polygons
 ```
 
 ## Technologies
@@ -137,6 +138,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Smoke runs now emit a material mapping report with CGF `MeshSubsets.nMatID` inspection; controlled multi-material FBX fixtures are still needed to prove polygon assignment behavior end to end
 - A controlled Blender FBX fixture has verified that used material slots `0` and `1` survive RC conversion into CGF `MeshSubsets.nMatID`
 - Controlled fixtures have verified that RC preserves sparse used material ids such as `0` and `2`; it does not compress them to contiguous ids
+- A controlled request-name remap probe shows that RC keeps CGF polygon material ids aligned to raw FBX material slots; request/MTL material names do not rewrite polygon material ids when slot order differs
 
 ## License
 

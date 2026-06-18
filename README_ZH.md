@@ -112,6 +112,7 @@ uv run python -m tools.cgf_material_probe path/to/asset.cgf
 ```bash
 uv run python -m tools.blender_material_fixture --output-dir path/to/fixture
 uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json
+uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_MaterialSlotProbe.fixture_manifest.json --report path/to/work/CE_MaterialSlotProbe.material_report.json --check-polygons
 ```
 
 ## 技术
@@ -135,6 +136,7 @@ uv run python -m tools.verify_controlled_fixture --manifest path/to/fixture/CE_M
 - Smoke 运行现在会输出含 CGF `MeshSubsets.nMatID` 检查的材质映射报告；仍需受控多材质 FBX fixture 才能端到端证明 polygon assignment 行为
 - 受控 Blender FBX fixture 已验证使用中的材质槽 `0` 与 `1` 会在 RC 转换后保留为 CGF `MeshSubsets.nMatID`
 - 受控 fixture 已验证 RC 会保留 `0` 与 `2` 这种有洞的材质 id，不会压缩成连续 id
+- 受控 request-name remap 探针显示，当 request/MTL 槽位顺序与 FBX 不同时，RC 仍让 CGF polygon 材质 id 对齐原始 FBX material slot；材质名称不会重写 polygon 材质 id
 
 ## 许可证
 
