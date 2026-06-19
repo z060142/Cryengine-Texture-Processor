@@ -27,6 +27,7 @@ from model_processing.texture_extractor import TextureExtractor
 from output_formats.json_exporter import export_json
 from output_formats.material_diagnostics_exporter import export_material_diagnostics
 from output_formats.mtl_exporter import export_mtl
+from tools.rc_export_gate import run_rc_import_with_gates
 from ui_pyside.main_window import MainWindow
 from ui_pyside.progress_dialog import ProgressDialog
 from utils.config_manager import ConfigManager
@@ -450,14 +451,25 @@ def main():
                     print(f"Successfully exported JSON configuration: {json_result}")
                     rc_exe_path = ConfigManager().get("rc_exe_path", "")
                     if rc_exe_path:
-                        rc_result = RCImportRunner(rc_exe_path).run(
+                        gate_result = run_rc_import_with_gates(
+                            RCImportRunner(rc_exe_path),
                             json_result,
                             source_fbx_path=export_context.fbx_output_path,
+                            mtl_path=export_context.existing_mtl_path,
+                            rc_exe_path=rc_exe_path,
+                            original_source_fbx_path=model_path,
+                            texture_output_dir=texture_output_dir,
                         )
+                        rc_result = gate_result["rc_result"]
                         if rc_result.success:
                             print(f"Successfully generated RC output: {rc_result.expected_output_path}")
+                            print(f"Successfully exported material report: {gate_result['material_report_path']}")
                         else:
+                            error_count += 1
+                            error_messages.append(f"{model_filename}: RC import failed: {rc_result.error}")
                             print(f"Warning: RC import failed: {rc_result.error}")
+                            if gate_result.get("material_report_path"):
+                                print(f"Material report: {gate_result['material_report_path']}")
                             if rc_result.stdout:
                                 print(rc_result.stdout)
                             if rc_result.stderr:
