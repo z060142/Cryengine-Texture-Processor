@@ -77,6 +77,46 @@ The authoritative machine-readable version is:
 docs/converter_schema.json -> material_slot_mapping.assignment_policy
 ```
 
+## Material State Contract
+
+For high-value material state, prefer an existing CryEngine-authored `.mtl` over
+exporter guesses.
+
+Authoritative path:
+
+```text
+reference .mtl
+-> tools.mtl_override_extractor
+-> cryengine_material_overrides.v1
+-> material_overrides[MaterialName].cryengine_material
+-> generated MTL
+-> tools.mtl_material_state_compare
+```
+
+The override may provide:
+
+- material attributes such as `Shader`, `MtlFlags`, `Diffuse`, `Specular`,
+  `Opacity`, `Shininess`, `AlphaTest`, and shader-specific attrs
+- `GenMask` and `StringGenMask`
+- `PublicParams`
+
+When a reference MTL exists, `tools.mtl_material_state_compare` is the gate. It
+compares `Shader`, `MtlFlags`, `GenMask`, `StringGenMask`, and `PublicParams` by
+material name.
+
+Fallback MTL generation is still allowed, but it is degraded. Some emitted
+values are source-backed defaults, while others are compatibility-preserved
+until stronger round-trip evidence exists. In particular, fallback shader masks,
+`PublicParams`, default `TexMod`, `Specular`, and `Shininess` must stay visible
+as compatibility evidence and must not be treated as fully proven CryEngine
+material state.
+
+Machine-readable entry:
+
+```text
+docs/converter_schema.json -> mtl.material_state
+```
+
 Current validation gates:
 
 ```text

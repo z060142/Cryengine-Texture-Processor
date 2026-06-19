@@ -445,6 +445,97 @@ def exported_material_attribute_policy():
     }
 
 
+def exported_material_state_contract():
+    """
+    Return the external-tool contract for high-value CryEngine material state.
+
+    This separates source-backed material state from exporter fallback state.
+    A reference/native MTL override is the supported way to carry exact shader
+    choices and shader parameters while the fallback exporter policy remains
+    visible as compatibility evidence.
+    """
+    return {
+        "schema": "cryengine_mtl_material_state_contract.v1",
+        "authoritative_sources": [
+            {
+                "id": "reference_mtl_override",
+                "tool": "tools.mtl_override_extractor",
+                "payload_schema": "cryengine_material_overrides.v1",
+                "accepted_material_keys": [
+                    "cryengine_material",
+                    "ce_material",
+                    "mtl_overrides",
+                ],
+                "rule": (
+                    "Use an existing CryEngine-authored MTL as the source of exact Shader, MtlFlags, "
+                    "GenMask, StringGenMask, material attributes, and PublicParams whenever available."
+                ),
+            },
+            {
+                "id": "source_backed_schema_defaults",
+                "rule": (
+                    "Exporter defaults may be used only where their policy status is source-backed. "
+                    "Compatibility-preserved statuses are diagnostics, not proof of final CE correctness."
+                ),
+            },
+        ],
+        "state_fields": {
+            "material_attrs": {
+                "fields": sorted(
+                    {
+                        *SUB_MATERIAL_DEFAULT_ATTRS,
+                        "AlphaTest",
+                        "CloakAmount",
+                        "LayerAct",
+                        "vertModifType",
+                    }
+                ),
+                "override_aliases": ["material_attrs", "mtl_attrs", "attributes"],
+                "source_evidence": MTL_MATERIAL_ATTRIBUTE_POLICY,
+                "export_default_policy": exported_material_attribute_policy(),
+            },
+            "shader_masks": {
+                "fields": ["GenMask", "StringGenMask"],
+                "override_aliases": ["GenMask", "gen_mask", "StringGenMask", "string_gen_mask"],
+                "load_precedence": MTL_SHADER_MASK_LOAD_POLICY,
+                "export_default_policy": {
+                    "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
+                    "string_gen_mask_source": "source_backed_token_names",
+                    "compat_mask_table": "EXPORT_COMPAT_SHADER_MASKS",
+                },
+            },
+            "public_params": {
+                "fields": "open_named_attributes",
+                "override_aliases": ["PublicParams", "public_params"],
+                "source_evidence": MTL_PUBLIC_PARAMS_POLICY,
+                "export_default_policy": {
+                    "public_params": dict(BASE_PUBLIC_PARAMS),
+                    "public_params_policy": "compatibility_preserved_until_roundtrip_evidence",
+                },
+            },
+            "mtl_flags": exported_mtl_flags_policy(),
+        },
+        "comparison_gate": {
+            "tool": "tools.mtl_material_state_compare",
+            "schema": "cryengine_mtl_material_state_compare.v1",
+            "compared_attrs": ["Shader", "MtlFlags", "GenMask", "StringGenMask", "PublicParams"],
+            "rule": (
+                "When a reference MTL is available, generated MTL material state must compare equal "
+                "by material name before the RC smoke flow is considered successful."
+            ),
+        },
+        "fallback_policy": {
+            "allowed": True,
+            "status": "degraded_without_reference_mtl",
+            "rule": (
+                "Fallback MTL generation is allowed for rough conversion, but its compatibility-preserved "
+                "shader masks, PublicParams, TexMod defaults, Specular, and Shininess must remain visible "
+                "in diagnostics and must not be described as fully source-backed."
+            ),
+        },
+    }
+
+
 def analyze_ce_texture_suffix(ce_map_type, texture_path):
     expected_suffix = CE_TEXTURE_SUFFIXES.get(ce_map_type or "", "")
     accepted_suffixes = CE_TEXTURE_ACCEPTED_SUFFIXES.get(ce_map_type or "", ())

@@ -62,6 +62,13 @@ def test_build_converter_schema_exports_external_tool_contract():
     attrs = schema["mtl"]["material_attributes"]["attributes"]
     assert attrs["Shader"] == "Illum"
     assert attrs["Opacity"] == "1"
+    material_state = schema["mtl"]["material_state"]
+    assert material_state["authoritative_sources"][0]["payload_schema"] == "cryengine_material_overrides.v1"
+    assert material_state["state_fields"]["shader_masks"]["export_default_policy"]["compat_mask_table"] == (
+        "EXPORT_COMPAT_SHADER_MASKS"
+    )
+    assert material_state["comparison_gate"]["schema"] == "cryengine_mtl_material_state_compare.v1"
+    assert material_state["fallback_policy"]["status"] == "degraded_without_reference_mtl"
     assert schema["mtl"]["mtl_flags"]["sub_material"]["mtl_flags"] == "524416"
     assert "%NORMAL_MAP" in schema["mtl"]["shader_policy"]["normal_specular_displacement"]["tokens"]
 

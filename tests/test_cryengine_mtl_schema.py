@@ -25,6 +25,7 @@ from output_formats.cryengine_mtl_schema import (
     describe_mtl_flags,
     exported_gen_mask,
     exported_material_attribute_policy,
+    exported_material_state_contract,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
     exported_texture_map_policy,
@@ -329,6 +330,28 @@ def test_exported_material_attribute_policy_marks_source_backed_and_compat_defau
     assert policy["attribute_status"]["Shininess"] == "compatibility_preserved_editor_default_differs"
     assert policy["source_evidence"]["lighting_load_source"].endswith("MaterialHelpers.cpp")
     assert policy["source_evidence"]["editor_default_source"].endswith("Material.cpp")
+
+
+def test_exported_material_state_contract_separates_reference_overrides_from_fallbacks():
+    contract = exported_material_state_contract()
+
+    assert contract["schema"] == "cryengine_mtl_material_state_contract.v1"
+    assert contract["authoritative_sources"][0]["tool"] == "tools.mtl_override_extractor"
+    assert contract["authoritative_sources"][0]["payload_schema"] == "cryengine_material_overrides.v1"
+    assert contract["state_fields"]["shader_masks"]["load_precedence"]["runtime_source"].endswith("MatMan.cpp")
+    assert contract["state_fields"]["shader_masks"]["export_default_policy"]["gen_mask_policy"] == (
+        "compatibility_preserved_until_roundtrip_evidence"
+    )
+    assert contract["state_fields"]["public_params"]["override_aliases"] == ["PublicParams", "public_params"]
+    assert contract["comparison_gate"]["tool"] == "tools.mtl_material_state_compare"
+    assert contract["comparison_gate"]["compared_attrs"] == [
+        "Shader",
+        "MtlFlags",
+        "GenMask",
+        "StringGenMask",
+        "PublicParams",
+    ]
+    assert contract["fallback_policy"]["status"] == "degraded_without_reference_mtl"
 
 
 def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():

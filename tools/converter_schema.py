@@ -19,6 +19,7 @@ from output_formats.cryengine_mtl_schema import (
     RC_TEXTURE_SOURCE_EXTENSIONS,
     analyze_rc_texture_source_extension,
     exported_material_attribute_policy,
+    exported_material_state_contract,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
     exported_texture_map_policy,
@@ -93,6 +94,7 @@ def build_converter_schema():
             "texture_maps": _mtl_texture_map_schema(),
             "texture_modifier": exported_texture_modifier_policy(),
             "material_attributes": exported_material_attribute_policy(),
+            "material_state": exported_material_state_contract(),
             "mtl_flags": exported_mtl_flags_policy(),
             "shader_policy": {
                 "empty_material": exported_material_shader_policy({}),

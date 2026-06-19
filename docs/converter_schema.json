@@ -589,6 +589,202 @@
         "rule": "MaterialHelpers loads Diffuse, Specular, Emittance, Shininess, Opacity, and AlphaTest from XML attributes and saves lighting attributes only when they differ from renderer defaults. Sandbox Material initializes Illum, Opacity=1, Diffuse=1,1,1,1, and Smoothness=10. Exporter values that do not have confirmed default equivalence stay marked as compatibility-preserved."
       }
     },
+    "material_state": {
+      "schema": "cryengine_mtl_material_state_contract.v1",
+      "authoritative_sources": [
+        {
+          "id": "reference_mtl_override",
+          "tool": "tools.mtl_override_extractor",
+          "payload_schema": "cryengine_material_overrides.v1",
+          "accepted_material_keys": [
+            "cryengine_material",
+            "ce_material",
+            "mtl_overrides"
+          ],
+          "rule": "Use an existing CryEngine-authored MTL as the source of exact Shader, MtlFlags, GenMask, StringGenMask, material attributes, and PublicParams whenever available."
+        },
+        {
+          "id": "source_backed_schema_defaults",
+          "rule": "Exporter defaults may be used only where their policy status is source-backed. Compatibility-preserved statuses are diagnostics, not proof of final CE correctness."
+        }
+      ],
+      "state_fields": {
+        "material_attrs": {
+          "fields": [
+            "AlphaTest",
+            "CloakAmount",
+            "Diffuse",
+            "Emittance",
+            "LayerAct",
+            "MatTemplate",
+            "MtlFlags",
+            "Opacity",
+            "Shader",
+            "Shininess",
+            "Specular",
+            "SurfaceType",
+            "vertModifType"
+          ],
+          "override_aliases": [
+            "material_attrs",
+            "mtl_attrs",
+            "attributes"
+          ],
+          "source_evidence": {
+            "lighting_load_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+            "lighting_load_lines": "638-652",
+            "lighting_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+            "lighting_save_lines": "667-680",
+            "editor_default_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_default_lines": "58-70",
+            "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_save_lines": "1128-1139",
+            "runtime_default_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_default_lines": "1012-1019",
+            "rule": "MaterialHelpers loads Diffuse, Specular, Emittance, Shininess, Opacity, and AlphaTest from XML attributes and saves lighting attributes only when they differ from renderer defaults. Sandbox Material initializes Illum, Opacity=1, Diffuse=1,1,1,1, and Smoothness=10. Exporter values that do not have confirmed default equivalence stay marked as compatibility-preserved."
+          },
+          "export_default_policy": {
+            "attributes": {
+              "MtlFlags": "524416",
+              "Shader": "Illum",
+              "SurfaceType": "",
+              "MatTemplate": "",
+              "Diffuse": "1,1,1",
+              "Specular": "1,1,1",
+              "Emittance": "0,0,0,0",
+              "Opacity": "1",
+              "Shininess": "255"
+            },
+            "attribute_status": {
+              "Diffuse": "source_backed_editor_default",
+              "Emittance": "source_loaded_compatibility_default",
+              "MatTemplate": "source_loaded_empty_export_default",
+              "MtlFlags": "covered_by_mtl_flags_policy",
+              "Opacity": "source_backed_editor_default",
+              "Shader": "source_backed_editor_default",
+              "Shininess": "compatibility_preserved_editor_default_differs",
+              "Specular": "compatibility_preserved_until_roundtrip_evidence",
+              "SurfaceType": "source_loaded_empty_export_default"
+            },
+            "source_evidence": {
+              "lighting_load_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+              "lighting_load_lines": "638-652",
+              "lighting_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+              "lighting_save_lines": "667-680",
+              "editor_default_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+              "editor_default_lines": "58-70",
+              "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+              "editor_save_lines": "1128-1139",
+              "runtime_default_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+              "runtime_default_lines": "1012-1019",
+              "rule": "MaterialHelpers loads Diffuse, Specular, Emittance, Shininess, Opacity, and AlphaTest from XML attributes and saves lighting attributes only when they differ from renderer defaults. Sandbox Material initializes Illum, Opacity=1, Diffuse=1,1,1,1, and Smoothness=10. Exporter values that do not have confirmed default equivalence stay marked as compatibility-preserved."
+            }
+          }
+        },
+        "shader_masks": {
+          "fields": [
+            "GenMask",
+            "StringGenMask"
+          ],
+          "override_aliases": [
+            "GenMask",
+            "gen_mask",
+            "StringGenMask",
+            "string_gen_mask"
+          ],
+          "load_precedence": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "451-475",
+            "editor_load_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_load_lines": "887-915",
+            "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_save_lines": "1132-1137",
+            "public_params_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "public_params_lines": "813-830",
+            "rule": "GenMask is read first, but a present StringGenMask is converted through EF_GetShaderGlobalMaskGenFromString and becomes the effective shader mask. If StringGenMask is absent, GenMask is remapped through EF_GetRemapedShaderMaskGen. The Material Editor saves both GenMask and StringGenMask."
+          },
+          "export_default_policy": {
+            "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
+            "string_gen_mask_source": "source_backed_token_names",
+            "compat_mask_table": "EXPORT_COMPAT_SHADER_MASKS"
+          }
+        },
+        "public_params": {
+          "fields": "open_named_attributes",
+          "override_aliases": [
+            "PublicParams",
+            "public_params"
+          ],
+          "source_evidence": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "800-830",
+            "editor_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+            "editor_save_lines": "774-803",
+            "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_cache_lines": "523-533",
+            "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
+          },
+          "export_default_policy": {
+            "public_params": {
+              "EmittanceMapGamma": "1",
+              "SSSIndex": "0"
+            },
+            "public_params_policy": "compatibility_preserved_until_roundtrip_evidence"
+          }
+        },
+        "mtl_flags": {
+          "root_material": {
+            "mtl_flags": "524544",
+            "analysis": {
+              "value": 524544,
+              "names": [
+                "MTL_FLAG_MULTI_SUBMTL",
+                "MTL_64BIT_SHADERGENMASK"
+              ],
+              "unknown_mask": 0,
+              "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+              "lines": "46-77"
+            },
+            "usage": "multi_sub_material_container"
+          },
+          "sub_material": {
+            "mtl_flags": "524416",
+            "analysis": {
+              "value": 524416,
+              "names": [
+                "MTL_FLAG_PURE_CHILD",
+                "MTL_64BIT_SHADERGENMASK"
+              ],
+              "unknown_mask": 0,
+              "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+              "lines": "46-77"
+            },
+            "usage": "exported_sub_material"
+          },
+          "source_evidence": {
+            "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+            "lines": "46-77"
+          }
+        }
+      },
+      "comparison_gate": {
+        "tool": "tools.mtl_material_state_compare",
+        "schema": "cryengine_mtl_material_state_compare.v1",
+        "compared_attrs": [
+          "Shader",
+          "MtlFlags",
+          "GenMask",
+          "StringGenMask",
+          "PublicParams"
+        ],
+        "rule": "When a reference MTL is available, generated MTL material state must compare equal by material name before the RC smoke flow is considered successful."
+      },
+      "fallback_policy": {
+        "allowed": true,
+        "status": "degraded_without_reference_mtl",
+        "rule": "Fallback MTL generation is allowed for rough conversion, but its compatibility-preserved shader masks, PublicParams, TexMod defaults, Specular, and Shininess must remain visible in diagnostics and must not be described as fully source-backed."
+      }
+    },
     "mtl_flags": {
       "root_material": {
         "mtl_flags": "524544",
