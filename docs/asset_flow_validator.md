@@ -145,6 +145,7 @@ uv run python -m tools.asset_flow_spec_builder `
   "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX\Weed_b.fbx" `
   --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
   --include-texture-process `
+  --max-textures-per-case 2 `
   --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_auto_texture_process_spec.json" `
   --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_auto_texture_process" `
   --limit 1 `
@@ -157,6 +158,11 @@ adds a `texture_process` case before the `rc` case. It also does a narrow
 same-base expansion from names such as `_a`/`_diff` to `_n`/`_normal` and
 `_s`/`_spec` when those files exist nearby.
 
+`--max-textures-per-case` keeps the rough batch flow bounded. The generated
+spec and Markdown report preserve `source_texture_count` and
+`texture_limit_applied`, so a truncated case is visible instead of silently
+looking complete.
+
 Observed auto texture-process result:
 
 ```text
@@ -166,6 +172,8 @@ ok_count: 2
 failed_count: 0
 Weed_b_27b3df7b_raw_textures: True
 Weed_b_27b3df7b: True
+source_texture_count: 2
+texture_limit_applied: false
 ```
 
 Observed processed outputs:

@@ -290,6 +290,8 @@ def _texture_process_case(case):
         "type": "texture_process",
         "ok": ok,
         "textures": texture_paths,
+        "source_texture_count": case.get("source_texture_count", len(texture_paths)),
+        "texture_limit_applied": bool(case.get("texture_limit_applied")),
         "output_dir": output_dir,
         "texture_output_report": processor.texture_output_report_path,
         "checks": {
@@ -335,6 +337,13 @@ def format_markdown_report(report):
             case.get("cgf"),
         ]
         evidence = "<br>".join(_md_escape(value) for value in evidence_values if value)
+        details = ""
+        if case.get("type") == "texture_process":
+            details = (
+                f", source_texture_count={case.get('source_texture_count', len(case.get('textures', [])))}"
+                f", texture_limit_applied={str(bool(case.get('texture_limit_applied'))).lower()}"
+            )
+            checks = f"{checks}{details}" if checks else details.lstrip(", ")
         lines.append(
             "| {name} | {type} | {result} | {checks} | {evidence} |".format(
                 name=_md_escape(case.get("name", "")),

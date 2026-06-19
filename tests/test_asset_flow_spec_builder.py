@@ -201,6 +201,39 @@ def test_build_spec_can_add_texture_process_case_from_obj_mtl(tmp_path):
     assert spec["cases"][1]["obj_mtl_evidence"] == str(mtl.resolve())
 
 
+def test_build_spec_limits_texture_process_case_size(tmp_path):
+    pack = tmp_path / "Pack"
+    fbx_dir = pack / "Models" / "FBX"
+    obj_dir = pack / "Models" / "OBJ"
+    texture_dir = pack / "Textures"
+    fbx_dir.mkdir(parents=True)
+    obj_dir.mkdir()
+    texture_dir.mkdir()
+    fbx = fbx_dir / "Weed_b.fbx"
+    mtl = obj_dir / "Weed_b.mtl"
+    fbx.write_bytes(b"fbx")
+    lines = ["newmtl Weed_bSG"]
+    for index in range(4):
+        texture = texture_dir / f"Weed_B_{index}_a.tga"
+        texture.write_bytes(b"diff")
+        lines.append(f"map_Kd Weed_B_{index}_a.tga")
+    mtl.write_text("\n".join(lines), encoding="utf-8")
+
+    spec = asset_flow_spec_builder.build_spec(
+        [str(fbx)],
+        str(tmp_path / "work"),
+        obj_mtl_roots=[str(obj_dir)],
+        include_texture_process=True,
+        max_textures_per_case=2,
+    )
+
+    texture_case = spec["cases"][0]
+    assert len(texture_case["textures"]) == 2
+    assert texture_case["source_texture_count"] == 4
+    assert texture_case["texture_limit_applied"] is True
+    assert spec["metadata"]["max_textures_per_case"] == 2
+
+
 def test_main_prints_texture_process_cases(tmp_path, capsys):
     pack = tmp_path / "Pack"
     fbx_dir = pack / "Models" / "FBX"

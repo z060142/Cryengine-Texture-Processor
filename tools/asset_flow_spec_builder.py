@@ -214,6 +214,7 @@ def build_spec(
     obj_mtl_roots=None,
     include_obj_mtl_evidence=True,
     include_texture_process=False,
+    max_textures_per_case=8,
 ):
     selected = collect_fbx_candidates(roots, max_bytes=max_bytes)
     if limit and limit > 0:
@@ -243,6 +244,11 @@ def build_spec(
             case["obj_mtl_evidence"] = obj_mtl_evidence
             if include_texture_process:
                 texture_paths = texture_paths_from_obj_mtl(obj_mtl_evidence, name_hint=Path(path).stem)
+        source_texture_count = len(texture_paths)
+        texture_limit_applied = False
+        if max_textures_per_case and max_textures_per_case > 0 and len(texture_paths) > max_textures_per_case:
+            texture_paths = texture_paths[:max_textures_per_case]
+            texture_limit_applied = True
         if include_texture_process and texture_paths and not case_texture_output_dir:
             case_texture_output_dir = os.path.join(work_root, f"{name}_textures")
             cases.append(
@@ -252,6 +258,8 @@ def build_spec(
                     "textures": texture_paths,
                     "output_dir": case_texture_output_dir,
                     "source_obj_mtl_evidence": obj_mtl_evidence,
+                    "source_texture_count": source_texture_count,
+                    "texture_limit_applied": texture_limit_applied,
                 }
             )
         if case_texture_output_dir:
@@ -270,6 +278,7 @@ def build_spec(
             "include_obj_mtl_evidence": include_obj_mtl_evidence,
             "texture_output_dir": texture_output_dir,
             "include_texture_process": include_texture_process,
+            "max_textures_per_case": max_textures_per_case,
             "case_count": len(cases),
         },
         "cases": cases,
@@ -321,6 +330,12 @@ def main(argv=None):
         action="store_true",
         help="Add texture_process cases from OBJ .mtl texture references when possible.",
     )
+    parser.add_argument(
+        "--max-textures-per-case",
+        type=int,
+        default=8,
+        help="Maximum raw textures to add to each generated texture_process case. Use 0 to disable.",
+    )
     args = parser.parse_args(argv)
 
     max_bytes = _parse_size_mb(args.max_mb)
@@ -334,6 +349,7 @@ def main(argv=None):
         obj_mtl_roots=args.obj_mtl_root or args.roots,
         include_obj_mtl_evidence=not args.no_obj_mtl_evidence,
         include_texture_process=args.include_texture_process,
+        max_textures_per_case=args.max_textures_per_case,
     )
     write_spec(args.output, spec)
     print(args.output)

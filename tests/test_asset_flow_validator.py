@@ -101,6 +101,8 @@ def test_texture_process_case_reports_raw_to_processed_flow(monkeypatch, tmp_pat
                     "name": "raw_textures",
                     "type": "texture_process",
                     "textures": [str(source)],
+                    "source_texture_count": 3,
+                    "texture_limit_applied": True,
                     "output_dir": str(output_dir),
                 }
             ]
@@ -111,6 +113,8 @@ def test_texture_process_case_reports_raw_to_processed_flow(monkeypatch, tmp_pat
     case = report["cases"][0]
     assert case["checks"]["raw_textures_found"] is True
     assert case["checks"]["texture_format_ok"] is True
+    assert case["source_texture_count"] == 3
+    assert case["texture_limit_applied"] is True
     assert case["groups"][0]["outputs"]["diff"].endswith("wall_diff.tif")
 
 
@@ -143,6 +147,16 @@ def test_format_markdown_report_summarizes_cases():
                         }
                     ],
                     "cgf": "S:/out/asset.cgf",
+                },
+                {
+                    "name": "asset_raw_textures",
+                    "type": "texture_process",
+                    "ok": True,
+                    "checks": {
+                        "texture_format_ok": True,
+                    },
+                    "source_texture_count": 5,
+                    "texture_limit_applied": True,
                 }
             ],
         }
@@ -153,6 +167,8 @@ def test_format_markdown_report_summarizes_cases():
     assert "model_format_ok=PASS" in markdown
     assert "texture_format_ok=N/A" in markdown
     assert "S:/out/asset.cgf" in markdown
+    assert "source_texture_count=5" in markdown
+    assert "texture_limit_applied=true" in markdown
     assert "## MTL Values" in markdown
     assert "Diffuse:Mat_diff.tif" in markdown
 
