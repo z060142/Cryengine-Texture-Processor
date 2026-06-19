@@ -186,6 +186,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     child_tag_counts = Counter()
     attribute_counts = Counter()
     public_param_counts = Counter()
+    public_param_value_counts = Counter()
     attribute_policy_status_counts = Counter()
     attribute_policy_diff_counts = Counter()
     attribute_policy_missing_counts = Counter()
@@ -205,6 +206,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     mtl_flag_unknown_mask_counts = Counter()
     attributes_by_shader = defaultdict(Counter)
     public_params_by_shader = defaultdict(Counter)
+    public_param_values_by_name = defaultdict(Counter)
+    public_param_component_counts_by_name = defaultdict(Counter)
     texture_maps_by_shader = defaultdict(Counter)
 
     for index, mtl_path in enumerate(sorted(set(iter_mtl_files(paths)))):
@@ -237,8 +240,14 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             for param_name in material["public_params"]:
                 public_param_counts[param_name] += 1
                 public_params_by_shader[shader][param_name] += 1
+                param_value = material["public_params"][param_name]
+                public_param_value_counts[f"{param_name}={param_value}"] += 1
+                public_param_values_by_name[param_name][param_value] += 1
             for param_info in material["public_param_analysis"].values():
                 public_param_component_counts[str(param_info["parsed_component_count"])] += 1
+            for param_name, param_info in material["public_param_analysis"].items():
+                component_count = str(param_info["parsed_component_count"])
+                public_param_component_counts_by_name[param_name][component_count] += 1
             for flag_name in material["mtl_flags_analysis"]["names"]:
                 mtl_flag_name_counts[flag_name] += 1
             unknown_mask = material["mtl_flags_analysis"]["unknown_mask"]
@@ -289,7 +298,10 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "material_attribute_policy_missing": _counter_to_sorted_pairs(attribute_policy_missing_counts),
             "material_attribute_policy_differences": _counter_to_sorted_pairs(attribute_policy_diff_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
+            "public_param_values": _counter_to_sorted_pairs(public_param_value_counts)[:value_limit],
             "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
+            "public_param_values_by_name": _top_values(public_param_values_by_name, value_limit),
+            "public_param_component_counts_by_name": _top_values(public_param_component_counts_by_name, value_limit),
             "mtl_flag_names": _counter_to_sorted_pairs(mtl_flag_name_counts),
             "mtl_flag_unknown_masks": _counter_to_sorted_pairs(mtl_flag_unknown_mask_counts),
             "texture_maps": _counter_to_sorted_pairs(texture_map_counts),

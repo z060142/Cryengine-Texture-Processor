@@ -28,7 +28,13 @@ def write_schema_mtl(path):
         TileU="2",
     )
     ET.SubElement(textures, "Texture", Map="PackedORM", File="./asset_orm.dds")
-    ET.SubElement(root, "PublicParams", SSSIndex="0", IndirectColor="0.25,0.25,0.25")
+    ET.SubElement(
+        root,
+        "PublicParams",
+        SSSIndex="0",
+        IndirectColor="0.25,0.25,0.25",
+        EmittanceMapGamma="1",
+    )
     sub_materials = ET.SubElement(root, "SubMaterials")
     ET.SubElement(
         sub_materials,
@@ -65,7 +71,15 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "Shininess=10", "count": 1} in schema["material_attribute_policy_differences"]
     assert {"name": "Specular", "count": 2} in schema["material_attribute_policy_missing"]
     assert {"name": "SSSIndex", "count": 1} in schema["public_params"]
-    assert {"name": "1", "count": 1} in schema["public_param_component_counts"]
+    assert {"name": "IndirectColor=0.25,0.25,0.25", "count": 1} in schema["public_param_values"]
+    assert {"name": "EmittanceMapGamma=1", "count": 1} in schema["public_param_values"]
+    assert schema["public_param_values_by_name"]["SSSIndex"] == [{"name": "0", "count": 1}]
+    assert schema["public_param_values_by_name"]["IndirectColor"] == [
+        {"name": "0.25,0.25,0.25", "count": 1}
+    ]
+    assert schema["public_param_component_counts_by_name"]["SSSIndex"] == [{"name": "1", "count": 1}]
+    assert schema["public_param_component_counts_by_name"]["IndirectColor"] == [{"name": "3", "count": 1}]
+    assert {"name": "1", "count": 2} in schema["public_param_component_counts"]
     assert {"name": "3", "count": 1} in schema["public_param_component_counts"]
     assert {"name": "MTL_64BIT_SHADERGENMASK", "count": 2} in schema["mtl_flag_names"]
     assert {"name": "MTL_FLAG_MULTI_SUBMTL", "count": 1} in schema["mtl_flag_names"]
