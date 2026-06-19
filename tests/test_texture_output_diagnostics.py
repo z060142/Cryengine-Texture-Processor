@@ -1,6 +1,12 @@
+import json
+
 from core.batch_processor import BatchProcessor
 from core.texture_manager import TextureGroup
-from output_formats.texture_output_diagnostics import build_texture_output_policy
+from output_formats.texture_output_diagnostics import (
+    build_texture_output_policy,
+    build_texture_output_report,
+    export_texture_output_report,
+)
 
 
 class ExporterStub:
@@ -75,3 +81,56 @@ def test_batch_processor_records_texture_output_policy(tmp_path):
         "unsupported_rc_texture_output_extension",
         "mismatch_texture_output_suffix",
     ]
+
+
+def test_build_texture_output_report_summarizes_groups_and_diagnostics():
+    clean_group = TextureGroup("clean_wall")
+    clean_group.output["diff"] = "clean_wall_diff.tif"
+    clean_group.output["spec"] = "clean_wall_spec.tif"
+    dirty_group = TextureGroup("dirty_wall")
+    dirty_group.output["diff"] = "dirty_wall_basecolor.png"
+
+    report = build_texture_output_report([clean_group, dirty_group], source="test")
+
+    assert report["schema"] == "cryengine_texture_output_diagnostics.v1"
+    assert report["source"] == "test"
+    assert report["summary"] == {
+        "group_count": 2,
+        "output_count": 3,
+        "diagnostic_count": 2,
+        "ok": False,
+    }
+    assert report["groups"][0]["ok"] is True
+    assert report["groups"][1]["diagnostic_count"] == 2
+    assert [diagnostic["code"] for diagnostic in report["groups"][1]["diagnostics"]] == [
+        "unsupported_rc_texture_output_extension",
+        "mismatch_texture_output_suffix",
+    ]
+
+
+def test_export_texture_output_report_writes_json(tmp_path):
+    group = TextureGroup("wall")
+    group.output["ddna"] = str(tmp_path / "wall_ddna.tif")
+
+    report_path, report = export_texture_output_report([group], str(tmp_path))
+
+    assert report_path == str(tmp_path / "texture_output_diagnostics.json")
+    assert report["summary"]["ok"] is True
+    written = json.loads((tmp_path / "texture_output_diagnostics.json").read_text(encoding="utf-8"))
+    assert written["groups"][0]["base_name"] == "wall"
+    assert written["groups"][0]["output_policy"]["entries"][0]["policy"]["ce_map_type"] == "Bumpmap"
+
+
+def test_batch_processor_writes_texture_output_report(tmp_path):
+    group = TextureGroup("wall")
+    group.output["diff"] = str(tmp_path / "wall_basecolor.png")
+    processor = BatchProcessor(texture_manager=None)
+    processor.set_output_dir(str(tmp_path))
+
+    report_path = processor._write_texture_output_report([group])
+
+    assert report_path == str(tmp_path / "texture_output_diagnostics.json")
+    assert processor.texture_output_report_path == report_path
+    assert processor.texture_output_report["summary"]["diagnostic_count"] == 2
+    written = json.loads((tmp_path / "texture_output_diagnostics.json").read_text(encoding="utf-8"))
+    assert written["summary"]["diagnostic_count"] == 2

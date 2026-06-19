@@ -200,6 +200,15 @@ def main():
         else:
             progress_dialog.show_completion(True, True)
 
+        if processing_successful and not progress_dialog.is_cancelled() and not batch_processor.cancel_flag:
+            texture_report_path = batch_processor.texture_output_report_path
+            if texture_report_path:
+                report_summary = (batch_processor.texture_output_report or {}).get("summary", {})
+                diagnostic_count = report_summary.get("diagnostic_count", 0)
+                report_status = f"Texture diagnostics: {diagnostic_count}; report: {texture_report_path}"
+                progress_dialog.update_progress(1.0, None, report_status)
+                window.update_status(report_status)
+
         return processing_successful
 
     def run_model_mtl_export(settings, progress_dialog=None):

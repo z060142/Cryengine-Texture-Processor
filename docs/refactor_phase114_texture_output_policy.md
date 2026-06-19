@@ -70,11 +70,17 @@ group.output_diagnostics
 These diagnostics do not block export. They are meant to make rough batch runs
 tell us when output filenames or extensions drift away from RC/CE expectations.
 
-## Current boundary
+## Phase 114 boundary
 
 The policy reports on paths currently present in `group.output`. It does not
-yet write a separate sidecar file for texture batches and does not rewrite
-filenames. Exporter filename fixes should remain explicit, source-backed edits.
+rewrite filenames. Exporter filename fixes should remain explicit,
+source-backed edits.
+
+Phase 115 adds the batch sidecar report:
+
+```text
+docs/refactor_phase115_texture_output_report.md
+```
 
 ## Verification
 

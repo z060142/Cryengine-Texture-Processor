@@ -24,7 +24,10 @@ from output_formats.ddna_exporter import DDNAExporter
 from output_formats.displ_exporter import DisplExporter
 from output_formats.emissive_exporter import EmissiveExporter
 from output_formats.sss_exporter import SSSExporter
-from output_formats.texture_output_diagnostics import build_texture_output_policy
+from output_formats.texture_output_diagnostics import (
+    build_texture_output_policy,
+    export_texture_output_report,
+)
 
 class BatchProcessor:
     """
@@ -45,6 +48,8 @@ class BatchProcessor:
         self.cancel_flag = False
         self.processing_thread = None
         self._temp_dir_path = None # To store the path for cleanup
+        self.texture_output_report_path = ""
+        self.texture_output_report = {}
 
         # Initialize processors
         self.albedo_processor = AlbedoProcessor()
@@ -138,6 +143,8 @@ class BatchProcessor:
             # Get texture groups
             texture_groups = self.texture_manager.get_all_groups()
             total_groups = len(texture_groups)
+            self.texture_output_report_path = ""
+            self.texture_output_report = {}
             
             # --- Stage 1: Generate Intermediate Formats ---
             stage1_text = "Stage 1/2: Generating Intermediates"
@@ -181,12 +188,19 @@ class BatchProcessor:
                 self._generate_output_formats(group)
                 time.sleep(0.01)
 
+            self._write_texture_output_report(texture_groups)
+            report_summary = (self.texture_output_report or {}).get("summary", {})
+            diagnostic_count = report_summary.get("diagnostic_count", 0)
+            final_status = f"Processed {total_groups} texture groups"
+            if self.texture_output_report_path:
+                final_status += f"; texture diagnostics: {diagnostic_count}; report: {self.texture_output_report_path}"
+
             # Final progress update
             self._update_progress(
                 1.0,
                 "Batch processing complete", # Keep final message simple
                 "Finished",
-                f"Processed {total_groups} texture groups"
+                final_status
             )
 
         except Exception as e:
@@ -413,6 +427,19 @@ class BatchProcessor:
 
         group.output_policy = build_texture_output_policy(group.output)
         group.output_diagnostics = group.output_policy["diagnostics"]
+
+    def _write_texture_output_report(self, texture_groups):
+        """
+        Write the batch texture output diagnostics sidecar.
+
+        Args:
+            texture_groups: Iterable of TextureGroup instances processed in the run
+        """
+        self.texture_output_report_path, self.texture_output_report = export_texture_output_report(
+            texture_groups,
+            self.output_dir,
+        )
+        return self.texture_output_report_path
 
     # Corrected function definition to accept stage_text
     def _update_progress(self, progress, stage_text, current=None, status=None):

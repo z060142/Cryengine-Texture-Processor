@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 """Diagnostics for processed CryEngine texture outputs."""
 
+import json
+import os
+
 from output_formats.cryengine_mtl_schema import resolve_ce_texture_map
 
 
@@ -92,3 +95,57 @@ def build_texture_output_policy(output_paths):
         "diagnostic_count": len(diagnostics),
         "ok": not diagnostics,
     }
+
+
+def build_texture_output_report(texture_groups, source="batch_texture_export"):
+    group_reports = []
+    diagnostic_count = 0
+    output_count = 0
+
+    for group in texture_groups or []:
+        outputs = {
+            output_key: texture_path
+            for output_key, texture_path in getattr(group, "output", {}).items()
+            if texture_path
+        }
+        policy = build_texture_output_policy(outputs)
+        diagnostics = policy["diagnostics"]
+        output_count += len(outputs)
+        diagnostic_count += len(diagnostics)
+        group_reports.append(
+            {
+                "base_name": getattr(group, "base_name", ""),
+                "outputs": outputs,
+                "output_policy": policy,
+                "diagnostics": diagnostics,
+                "diagnostic_count": len(diagnostics),
+                "ok": not diagnostics,
+            }
+        )
+
+    return {
+        "schema": "cryengine_texture_output_diagnostics.v1",
+        "source": source,
+        "summary": {
+            "group_count": len(group_reports),
+            "output_count": output_count,
+            "diagnostic_count": diagnostic_count,
+            "ok": diagnostic_count == 0,
+        },
+        "groups": group_reports,
+    }
+
+
+def write_texture_output_report(report, output_path):
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    return output_path
+
+
+def export_texture_output_report(texture_groups, output_dir, output_filename="texture_output_diagnostics.json"):
+    output_path = os.path.join(output_dir, output_filename)
+    report = build_texture_output_report(texture_groups)
+    write_texture_output_report(report, output_path)
+    return output_path, report
