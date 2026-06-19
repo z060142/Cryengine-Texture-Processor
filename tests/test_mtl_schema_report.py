@@ -11,6 +11,8 @@ def write_schema_mtl(path):
         GenMask="80000000",
         StringGenMask="%SUBSURFACE_SCATTERING",
         SurfaceType="mat_concrete",
+        Diffuse="1,1,1",
+        Opacity="1",
     )
     textures = ET.SubElement(root, "Textures")
     texture = ET.SubElement(textures, "Texture", Map="Diffuse", File="./asset_diff.dds")
@@ -33,6 +35,7 @@ def write_schema_mtl(path):
         Name="Slot_0",
         MtlFlags="524416",
         Shader="Illum",
+        Shininess="10",
         GenMask="2020000000",
         StringGenMask="%SUBSURFACE_SCATTERING%VERTCOLORS",
     )
@@ -53,6 +56,13 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     }
     schema = report["schema"]
     assert {"name": "Shader", "count": 2} in schema["material_attributes"]
+    assert {"name": "matches_export_attribute", "count": 5} in schema["material_attribute_policy_statuses"]
+    assert {"name": "missing_export_attribute", "count": 10} in schema["material_attribute_policy_statuses"]
+    assert {"name": "differs_from_export_attribute", "count": 3} in schema["material_attribute_policy_statuses"]
+    assert {"name": "MtlFlags=524544", "count": 1} in schema["material_attribute_policy_differences"]
+    assert {"name": "SurfaceType=mat_concrete", "count": 1} in schema["material_attribute_policy_differences"]
+    assert {"name": "Shininess=10", "count": 1} in schema["material_attribute_policy_differences"]
+    assert {"name": "Specular", "count": 2} in schema["material_attribute_policy_missing"]
     assert {"name": "SSSIndex", "count": 1} in schema["public_params"]
     assert {"name": "1", "count": 1} in schema["public_param_component_counts"]
     assert {"name": "3", "count": 1} in schema["public_param_component_counts"]
@@ -73,10 +83,18 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
         "MTL_FLAG_MULTI_SUBMTL",
         "MTL_64BIT_SHADERGENMASK",
     ]
+    root_attribute_policy = report["files"][0]["materials"][0]["attribute_policy_analysis"]
+    assert root_attribute_policy["entries"]["Shader"]["status"] == "matches_export_attribute"
+    assert root_attribute_policy["entries"]["SurfaceType"]["status"] == "differs_from_export_attribute"
+    assert root_attribute_policy["entries"]["Specular"]["status"] == "missing_export_attribute"
+    assert root_attribute_policy["different_attrs"] == ["MtlFlags", "SurfaceType"]
     assert report["files"][0]["materials"][1]["mtl_flags_analysis"]["names"] == [
         "MTL_FLAG_PURE_CHILD",
         "MTL_64BIT_SHADERGENMASK",
     ]
+    sub_attribute_policy = report["files"][0]["materials"][1]["attribute_policy_analysis"]
+    assert sub_attribute_policy["entries"]["Shininess"]["status"] == "differs_from_export_attribute"
+    assert sub_attribute_policy["entries"]["Shininess"]["actual"] == "10"
     assert report["files"][0]["materials"][0]["textures"][0]["texmod"]["TexMod_RotateType"] == "0"
     assert report["files"][0]["materials"][0]["textures"][0]["texmod_analysis"]["status"] == (
         "partial_export_minimal_texmod"

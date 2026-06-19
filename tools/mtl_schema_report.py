@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 from output_formats.cryengine_mtl_schema import (
     analyze_public_params,
     describe_mtl_flags,
+    exported_material_attribute_policy,
     exported_texture_modifier_policy,
 )
 from tools.mtl_mask_report import parse_gen_mask_literal, string_gen_mask_tokens
@@ -69,6 +70,32 @@ def _analyze_texmod_attrs(texmod_attrs):
     }
 
 
+def _analyze_material_attributes(attrs):
+    policy = exported_material_attribute_policy()
+    expected_attrs = policy["attributes"]
+    entry_statuses = {}
+    for name, expected_value in expected_attrs.items():
+        if name not in attrs:
+            status = "missing_export_attribute"
+        elif attrs.get(name) == expected_value:
+            status = "matches_export_attribute"
+        else:
+            status = "differs_from_export_attribute"
+        entry_statuses[name] = {
+            "status": status,
+            "actual": attrs.get(name, ""),
+            "expected": expected_value,
+            "policy_status": policy["attribute_status"].get(name, ""),
+        }
+
+    return {
+        "entries": entry_statuses,
+        "missing_attrs": sorted(name for name, entry in entry_statuses.items() if entry["status"] == "missing_export_attribute"),
+        "different_attrs": sorted(name for name, entry in entry_statuses.items() if entry["status"] == "differs_from_export_attribute"),
+        "policy": policy,
+    }
+
+
 def _texture_entries(element):
     textures = element.find("Textures")
     if textures is None:
@@ -98,6 +125,7 @@ def analyze_material_element(element, location):
     tokens = string_gen_mask_tokens(element.get("StringGenMask", ""))
     public_params = _child_attributes(element, "PublicParams")
     mtl_flags_analysis = describe_mtl_flags(element.get("MtlFlags", ""))
+    attributes = _attributes(element)
     return {
         "location": location,
         "tag": element.tag,
@@ -108,7 +136,8 @@ def analyze_material_element(element, location):
         "gen_mask": gen_mask,
         "string_gen_mask": element.get("StringGenMask", ""),
         "tokens": tokens,
-        "attributes": _attributes(element),
+        "attributes": attributes,
+        "attribute_policy_analysis": _analyze_material_attributes(attributes),
         "public_params": public_params,
         "public_param_analysis": analyze_public_params(public_params),
         "textures": _texture_entries(element),
@@ -153,6 +182,9 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     child_tag_counts = Counter()
     attribute_counts = Counter()
     public_param_counts = Counter()
+    attribute_policy_status_counts = Counter()
+    attribute_policy_diff_counts = Counter()
+    attribute_policy_missing_counts = Counter()
     texture_map_counts = Counter()
     texmod_status_counts = Counter()
     texmod_attribute_counts = Counter()
@@ -187,6 +219,13 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             for attr_name in material["attributes"]:
                 attribute_counts[attr_name] += 1
                 attributes_by_shader[shader][attr_name] += 1
+            for attr_name, analysis in material["attribute_policy_analysis"]["entries"].items():
+                status = analysis["status"]
+                attribute_policy_status_counts.update([status])
+                if status == "missing_export_attribute":
+                    attribute_policy_missing_counts.update([attr_name])
+                elif status == "differs_from_export_attribute":
+                    attribute_policy_diff_counts.update([f"{attr_name}={analysis['actual']}"])
             for param_name in material["public_params"]:
                 public_param_counts[param_name] += 1
                 public_params_by_shader[shader][param_name] += 1
@@ -229,6 +268,9 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "material_tags": _counter_to_sorted_pairs(tag_counts),
             "child_tags": _counter_to_sorted_pairs(child_tag_counts),
             "material_attributes": _counter_to_sorted_pairs(attribute_counts),
+            "material_attribute_policy_statuses": _counter_to_sorted_pairs(attribute_policy_status_counts),
+            "material_attribute_policy_missing": _counter_to_sorted_pairs(attribute_policy_missing_counts),
+            "material_attribute_policy_differences": _counter_to_sorted_pairs(attribute_policy_diff_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
             "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
             "mtl_flag_names": _counter_to_sorted_pairs(mtl_flag_name_counts),
