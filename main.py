@@ -285,6 +285,7 @@ def main():
                             existing_submaterial_names=export_context.existing_submaterial_names,
                             source_model=model_filename,
                             artifact_kind="mtl",
+                            source_materials=export_context.model_data.get("materials", []),
                         )
                         print(f"Successfully exported material diagnostics: {diagnostics_path}")
                     except Exception as diagnostics_error:
@@ -413,6 +414,8 @@ def main():
                         existing_submaterial_names=export_context.existing_submaterial_names,
                         source_model=export_context.fbx_filename,
                         artifact_kind="fbx_json",
+                        material_manifest_info=reloaded_model.get("material_manifest"),
+                        source_materials=reloaded_model.get("materials", []),
                     )
                     print(f"Successfully exported material diagnostics: {diagnostics_path}")
                 except Exception as diagnostics_error:

@@ -124,11 +124,9 @@ def build_omitted_material_diagnostics(materials, emitted_records):
         clean_name = clean_material_name(material_name)
         if clean_name.casefold() in emitted_names:
             continue
-        if material_name not in IGNORED_MATERIAL_NAMES:
-            continue
-
         polygon_usage = _known_polygon_usage(material)
         severity = "hazard" if polygon_usage is not False else "warning"
+        omitted_reason = "default_name_filter" if material_name in IGNORED_MATERIAL_NAMES else "not_in_request_materials"
         diagnostics.append(
             {
                 "severity": severity,
@@ -138,8 +136,9 @@ def build_omitted_material_diagnostics(materials, emitted_records):
                 "polygon_count": material.get("polygon_count"),
                 "used_by_polygons": material.get("used_by_polygons"),
                 "ignored_material_name": material_name,
+                "omitted_reason": omitted_reason,
                 "message": (
-                    "This source material is omitted from request materials by the converter's default-name filter. "
+                    "This source material is omitted from request materials. "
                     "RC only falls back to automatic material mapping when request materials is empty; otherwise "
                     "unmatched source materials keep remap id -1 and faces using them are deleted."
                 ),

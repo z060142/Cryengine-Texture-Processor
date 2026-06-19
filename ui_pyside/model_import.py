@@ -21,7 +21,8 @@ from PySide6.QtWidgets import (
 )
 
 from language.language_manager import get_text
-from model_processing.material_index_assigner import assign_material_sub_indices
+from model_processing.material_index_assigner import build_omitted_material_diagnostics
+from model_processing.material_slot_table import build_material_slot_records
 from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
@@ -103,7 +104,13 @@ def _degraded_texture_reference_diagnostics(material_name, material):
 
 def collect_model_material_diagnostics(model_data):
     diagnostics = _degraded_model_load_diagnostics(model_data or {})
-    for record in assign_material_sub_indices(model_data.get("materials", []) if model_data else []):
+    materials = model_data.get("materials", []) if model_data else []
+    records = build_material_slot_records(
+        materials,
+        material_manifest_info=(model_data or {}).get("material_manifest"),
+    )
+    diagnostics.extend(build_omitted_material_diagnostics(materials, records))
+    for record in records:
         diagnostics.extend(_degraded_texture_reference_diagnostics(record["clean_name"], record["material"]))
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(

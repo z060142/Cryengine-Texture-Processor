@@ -84,9 +84,16 @@ def build_material_diagnostics_report(
     existing_submaterial_names=None,
     source_model="",
     artifact_kind="model",
+    material_manifest_info=None,
+    source_materials=None,
 ):
-    records = build_material_slot_records(materials, existing_submaterial_names)
+    records = build_material_slot_records(
+        materials,
+        existing_submaterial_names,
+        material_manifest_info=material_manifest_info,
+    )
     material_items = [_record_to_report_item(record) for record in records]
+    source_materials = materials if source_materials is None else source_materials
     diagnostics = [
         {
             **diagnostic,
@@ -97,7 +104,7 @@ def build_material_diagnostics_report(
             "slot_name_conflict": diagnostic.get("slot_name_conflict", False),
             "texture_ref_evidence": diagnostic.get("texture_ref_evidence", []),
         }
-        for diagnostic in build_omitted_material_diagnostics(materials, records)
+        for diagnostic in build_omitted_material_diagnostics(source_materials, records)
     ]
     for item in material_items:
         item["diagnostics"] = [
@@ -153,12 +160,16 @@ def export_material_diagnostics(
     existing_submaterial_names=None,
     source_model="",
     artifact_kind="model",
+    material_manifest_info=None,
+    source_materials=None,
 ):
     report = build_material_diagnostics_report(
         materials,
         existing_submaterial_names=existing_submaterial_names,
         source_model=source_model,
         artifact_kind=artifact_kind,
+        material_manifest_info=material_manifest_info,
+        source_materials=source_materials,
     )
     output_path = os.path.join(output_dir, output_filename)
     return write_material_diagnostics_report(report, output_path)

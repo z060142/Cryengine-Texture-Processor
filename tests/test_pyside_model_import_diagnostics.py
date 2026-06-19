@@ -75,6 +75,27 @@ def test_collect_model_material_diagnostics_reports_slot_name_conflict_warning()
     assert diagnostics[0]["material_names"] == ["Metal", "Wood"]
 
 
+def test_collect_model_material_diagnostics_reports_manifest_omitted_material():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [
+                {"name": "Visible", "id": 1, "polygon_count": 2, "used_by_polygons": True},
+                {"name": "Missing", "id": 2, "polygon_count": 3, "used_by_polygons": True},
+            ],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [{"slot": 0, "name": "Visible"}],
+                }
+            },
+        }
+    )
+
+    assert diagnostics[0]["code"] == "rc_omitted_source_material_faces_deleted"
+    assert diagnostics[0]["material"] == "Missing"
+    assert diagnostics[0]["omitted_reason"] == "not_in_request_materials"
+
+
 def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
     diagnostics = collect_model_material_diagnostics(
         {

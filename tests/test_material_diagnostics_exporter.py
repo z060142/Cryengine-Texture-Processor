@@ -190,6 +190,44 @@ def test_build_material_diagnostics_report_flags_used_ignored_source_material():
     assert report["diagnostics"][0]["code"] == "rc_omitted_source_material_faces_deleted"
     assert report["diagnostics"][0]["material"] == "Material"
     assert report["diagnostics"][0]["polygon_count"] == 4
+    assert report["diagnostics"][0]["omitted_reason"] == "default_name_filter"
+
+
+def test_build_material_diagnostics_report_flags_manifest_omitted_source_material():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Visible", "id": 1, "polygon_count": 2, "used_by_polygons": True},
+            {"name": "Missing", "id": 2, "polygon_count": 3, "used_by_polygons": True},
+        ],
+        source_model="manifest_missing.fbx",
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Visible"}],
+            }
+        },
+    )
+
+    assert report["summary"]["material_count"] == 1
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["summary"]["hazard_count"] == 1
+    assert report["diagnostics"][0]["code"] == "rc_omitted_source_material_faces_deleted"
+    assert report["diagnostics"][0]["material"] == "Missing"
+    assert report["diagnostics"][0]["omitted_reason"] == "not_in_request_materials"
+
+
+def test_build_material_diagnostics_report_checks_source_materials_separately_from_output_materials():
+    report = build_material_diagnostics_report(
+        [{"name": "Visible", "id": 1}],
+        source_materials=[
+            {"name": "Visible", "id": 1},
+            {"name": "Missing", "id": 2, "polygon_count": 3, "used_by_polygons": True},
+        ],
+    )
+
+    assert report["summary"]["material_count"] == 1
+    assert report["summary"]["hazard_count"] == 1
+    assert report["diagnostics"][0]["material"] == "Missing"
 
 
 def test_build_material_diagnostics_report_does_not_warn_when_only_ignored_materials_are_present():
