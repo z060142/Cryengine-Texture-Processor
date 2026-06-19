@@ -1,0 +1,25 @@
+{
+  "work_root": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator",
+  "texture_output_format": "tif",
+  "cases": [
+    {
+      "name": "Weed_b_texture_backed",
+      "type": "rc",
+      "fbx": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\FBX\\Weed_b.fbx",
+      "texture_output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures",
+      "obj_mtl_evidence": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\OBJ\\Weed_b.mtl"
+    },
+    {
+      "name": "Trash_Paper_D_model_only",
+      "type": "rc",
+      "fbx": "D:\\DATA\\3D模型\\Unreal Projects\\Unreal Projects\\Downtown\\fbx\\Game\\Downtown\\Meshes\\Trash_Paper_D.FBX"
+    },
+    {
+      "name": "Weed_b_texture_outputs",
+      "type": "texture_gate",
+      "paths": [
+        "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,215 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""Run practical asset-flow validation cases and write a pass/fail report."""
+
+import argparse
+import json
+import os
+import re
+from pathlib import Path
+
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
+from output_formats.texture_output_diagnostics import build_texture_output_report_from_paths
+from tools.blender_material_inspector import inspect_fbx_materials
+from tools.material_report_summary import compact_material_report_summary, load_report
+from tools.rc_smoke_test import (
+    discover_default_rc,
+    load_external_material_texture_evidence,
+    material_specs_from_manifest,
+    run_rc_smoke_test,
+)
+
+
+def _safe_name(value):
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "asset")).strip("._")
+    return safe or "asset"
+
+
+def _load_json(path):
+    with open(path, "r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _write_json(path, payload):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+
+
+def _summary_ok(summary):
+    return bool(summary.get("rc_success")) and not bool(summary.get("action_required"))
+
+
+def _rc_case(case, defaults):
+    source_fbx = case["fbx"]
+    name = case.get("name") or Path(source_fbx).stem
+    work_root = case.get("work_root") or defaults["work_root"]
+    work_dir = os.path.join(work_root, _safe_name(name))
+    manifest_path = case.get("manifest") or f"{source_fbx}_material_manifest.json"
+
+    inspect_result = inspect_fbx_materials(
+        case.get("blender") or defaults.get("blender", ""),
+        source_fbx,
+        manifest_path,
+    )
+
+    material_specs = material_specs_from_manifest(source_fbx)
+    external_evidence = (
+        load_external_material_texture_evidence(case.get("obj_mtl_evidence", ""))
+        if case.get("obj_mtl_evidence")
+        else None
+    )
+    result = run_rc_smoke_test(
+        case.get("rc") or defaults.get("rc") or discover_default_rc(),
+        source_fbx,
+        work_dir,
+        asset_name=case.get("asset_name") or _safe_name(name),
+        material_specs=material_specs,
+        texture_output_dir=case.get("texture_output_dir", ""),
+        texture_output_format=case.get("texture_output_format", defaults.get("texture_output_format", "tif")),
+        external_material_texture_evidence=external_evidence,
+    )
+
+    material_summary = {}
+    texture_gate_ok = None
+    mtl_schema_gate_ok = None
+    if result.material_report_path and os.path.exists(result.material_report_path):
+        material_summary = compact_material_report_summary(load_report(result.material_report_path))
+        report = _load_json(result.material_report_path)
+        texture_gate_ok = material_summary.get("texture_output_gate_ok")
+        mtl_schema_gate_ok = material_summary.get("mtl_schema_gate_ok")
+
+    checks = {
+        "manifest_generated": bool(inspect_result.get("success")) and os.path.exists(manifest_path),
+        "model_format_ok": result.success and bool(result.expected_output_path) and os.path.exists(result.expected_output_path),
+        "material_slots_ok": bool(material_summary.get("slot_alignment_ok")) and bool(material_summary.get("material_slot_evidence_ok")),
+        "mtl_format_ok": mtl_schema_gate_ok is True,
+        "texture_format_ok": texture_gate_ok is True if case.get("texture_output_dir") else None,
+        "material_texture_ok": None,
+    }
+    if case.get("texture_output_dir"):
+        checks["material_texture_ok"] = (
+            texture_gate_ok is True
+            and bool(material_summary.get("texture_output_gate_ok"))
+        )
+
+    ok = (
+        checks["manifest_generated"]
+        and checks["model_format_ok"]
+        and checks["material_slots_ok"]
+        and checks["mtl_format_ok"]
+        and (checks["texture_format_ok"] is not False)
+        and (checks["material_texture_ok"] is not False)
+        and _summary_ok(material_summary)
+    )
+
+    return {
+        "name": name,
+        "type": "rc",
+        "ok": bool(ok),
+        "source_fbx": os.path.abspath(source_fbx),
+        "work_dir": work_dir,
+        "manifest": manifest_path,
+        "material_report": result.material_report_path,
+        "mtl": result.mtl_path,
+        "json": result.json_path,
+        "cgf": result.expected_output_path,
+        "checks": checks,
+        "summary": material_summary,
+        "error": result.error,
+    }
+
+
+def _texture_gate_case(case):
+    report = build_texture_output_report_from_paths(
+        case.get("paths", []),
+        source="asset_flow_validator",
+    )
+    return {
+        "name": case.get("name") or "texture_gate",
+        "type": "texture_gate",
+        "ok": bool(report["summary"]["ok"]),
+        "paths": case.get("paths", []),
+        "checks": {
+            "texture_format_ok": bool(report["summary"]["ok"]),
+        },
+        "summary": report["summary"],
+        "report": report,
+    }
+
+
+def run_validation(spec):
+    defaults = {
+        "work_root": spec.get("work_root", os.path.abspath("asset_flow_validation")),
+        "rc": spec.get("rc") or discover_default_rc(),
+        "blender": spec.get("blender", ""),
+        "texture_output_format": spec.get("texture_output_format", "tif"),
+    }
+    cases = []
+    for case in spec.get("cases", []):
+        case_type = case.get("type", "rc")
+        try:
+            if case_type == "rc":
+                cases.append(_rc_case(case, defaults))
+            elif case_type == "texture_gate":
+                cases.append(_texture_gate_case(case))
+            else:
+                cases.append(
+                    {
+                        "name": case.get("name", "unnamed"),
+                        "type": case_type,
+                        "ok": False,
+                        "error": f"Unknown case type: {case_type}",
+                    }
+                )
+        except Exception as exc:
+            cases.append(
+                {
+                    "name": case.get("name", "unnamed"),
+                    "type": case_type,
+                    "ok": False,
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "schema": "cryengine_asset_flow_validation.v1",
+        "summary": {
+            "case_count": len(cases),
+            "ok_count": sum(1 for case in cases if case.get("ok")),
+            "failed_count": sum(1 for case in cases if not case.get("ok")),
+            "ok": all(case.get("ok") for case in cases) if cases else False,
+        },
+        "cases": cases,
+    }
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Run practical CryEngine asset-flow validation cases.")
+    parser.add_argument("--spec", required=True, help="Validation spec JSON")
+    parser.add_argument("--output", required=True, help="Output JSON report")
+    args = parser.parse_args(argv)
+
+    report = run_validation(_load_json(args.spec))
+    _write_json(args.output, report)
+    print(args.output)
+    print(f"ok: {report['summary']['ok']}")
+    print(f"case_count: {report['summary']['case_count']}")
+    print(f"ok_count: {report['summary']['ok_count']}")
+    print(f"failed_count: {report['summary']['failed_count']}")
+    for case in report["cases"]:
+        print(f"{case.get('name')}: {case.get('ok')}")
+        if case.get("error"):
+            print(f"  error: {case['error']}")
+    return 0 if report["summary"]["ok"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
