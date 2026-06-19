@@ -9,6 +9,7 @@ from collections import Counter
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_manifest import material_manifest_table_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
+from model_processing.material_slot_mapping import build_material_slot_mapping_contract
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 from output_formats.cryengine_mtl_schema import (
     analyze_ce_texture_path_reuse,
@@ -344,6 +345,7 @@ def build_material_diagnostics_report(
                 }
             )
 
+    slot_mapping_contract = build_material_slot_mapping_contract(material_items)
     hazard_count = sum(1 for diagnostic in diagnostics if diagnostic.get("severity") == "hazard")
     return {
         "source_model": source_model,
@@ -354,6 +356,7 @@ def build_material_diagnostics_report(
             "hazard_count": hazard_count,
         },
         "diagnostic_summary": _diagnostic_summary(diagnostics),
+        "slot_mapping_contract": slot_mapping_contract,
         "mtl_attribute_policy_summary": _mtl_attribute_policy_summary(material_items),
         "mtl_flags_policy_summary": _mtl_flags_policy_summary(material_items),
         "mtl_texture_map_policy_summary": _mtl_texture_map_policy_summary(material_items),

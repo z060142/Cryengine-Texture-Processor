@@ -474,6 +474,31 @@ def test_build_material_diagnostics_report_adds_actionable_diagnostic_summary():
     }
 
 
+def test_build_material_diagnostics_report_includes_slot_mapping_contract():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "First", "id": 1},
+            {"name": "Third", "id": 3},
+            {"name": "Removed", "id": 2, "deleted": True, "polygon_count": 0},
+        ],
+        source_model="slot_mapping.fbx",
+    )
+
+    contract = report["slot_mapping_contract"]
+    assert contract["schema"] == "cryengine_material_slot_mapping.v1"
+    assert contract["summary"]["final_slot_count"] == 3
+    assert contract["summary"]["gap_slots"] == [1]
+    assert contract["summary"]["status_counts"] == {
+        "deleted": 1,
+        "emitted_final_slot": 2,
+    }
+    assert [(mapping["name"], mapping["raw_fbx_slot"], mapping["final_sub_index"]) for mapping in contract["mappings"]] == [
+        ("First", 0, 0),
+        ("Third", 2, 2),
+        ("Removed", 1, None),
+    ]
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [
