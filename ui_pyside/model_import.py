@@ -140,6 +140,43 @@ def _rc_unassigned_material_diagnostics(smoke_info):
     return diagnostics
 
 
+def _rc_cgf_material_id_diagnostics(smoke_info):
+    diagnostics = []
+    for check in (smoke_info or {}).get("cgf_material_id_alignment_checks", []):
+        if check.get("ok", False):
+            continue
+        material_id = check.get("material_id")
+        request_name = check.get("request_name", "")
+        mtl_name = check.get("mtl_slot_name", "")
+        if check.get("used_unassigned"):
+            message = "CGF material id uses an unassigned placeholder material."
+        elif not check.get("in_request", False) and not check.get("in_mtl", False):
+            message = "CGF material id is missing from both the RC request and generated MTL slot table."
+        elif not check.get("in_request", False):
+            message = "CGF material id is missing from the RC request material table."
+        elif not check.get("in_mtl", False):
+            message = "CGF material id is missing from the generated MTL slot table."
+        else:
+            message = "CGF material id did not align with the RC request and generated MTL."
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "cgf_material_id_alignment_mismatch",
+                "material": request_name or mtl_name,
+                "fbx_slot": material_id,
+                "sub_index": material_id,
+                "material_id": material_id,
+                "request_name": request_name,
+                "mtl_slot_name": mtl_name,
+                "in_request": check.get("in_request"),
+                "in_mtl": check.get("in_mtl"),
+                "used_unassigned": check.get("used_unassigned"),
+                "message": message,
+            }
+        )
+    return diagnostics
+
+
 def _mtl_texture_map_diagnostics(material_name, record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = (
@@ -158,7 +195,9 @@ def _mtl_texture_map_diagnostics(material_name, record):
 
 def collect_model_material_diagnostics(model_data):
     diagnostics = _degraded_model_load_diagnostics(model_data or {})
-    diagnostics.extend(_rc_unassigned_material_diagnostics((model_data or {}).get("rc_material_smoke", {})))
+    rc_smoke = (model_data or {}).get("rc_material_smoke", {})
+    diagnostics.extend(_rc_unassigned_material_diagnostics(rc_smoke))
+    diagnostics.extend(_rc_cgf_material_id_diagnostics(rc_smoke))
     materials = model_data.get("materials", []) if model_data else []
     records = build_material_slot_records(
         materials,
@@ -256,6 +295,7 @@ def run_model_material_rc_smoke(
         "material_report_path": "",
         "semantic_alignment_ok": None,
         "cgf_material_id_alignment_ok": None,
+        "cgf_material_id_alignment_checks": [],
         "unassigned_slot_diagnostics": [],
         "unassigned_slot_diagnostics_ok": None,
         "material_report_summary": {},
@@ -289,6 +329,7 @@ def run_model_material_rc_smoke(
             "material_report_path": report_path,
             "semantic_alignment_ok": _alignment_ok(report, "fixture_material_semantic_alignment"),
             "cgf_material_id_alignment_ok": material_id_alignment.get("ok"),
+            "cgf_material_id_alignment_checks": material_id_alignment.get("checks", []),
             "unassigned_slot_diagnostics": material_id_alignment.get("unassigned_slot_diagnostics", []),
             "unassigned_slot_diagnostics_ok": material_id_alignment.get("unassigned_slot_diagnostics_ok"),
             "material_report_summary": material_report_summary,

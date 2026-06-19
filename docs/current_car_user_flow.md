@@ -90,6 +90,12 @@ For this car sample, RC generated 16 used material ids from request slots
 `0..15`; slot `16` is the trailing `<unassigned>` placeholder and is not used by
 any CGF mesh subset.
 
+PySide's model import panel now carries the RC material smoke report back into
+the visible Material Slot Diagnostics table. Failed
+`cgf_material_id_alignment.checks[]` entries are shown as hazards, so a CGF
+material id that is missing from the request or generated MTL slot table is no
+longer hidden in the JSON report.
+
 ### Material state
 
 The converter should prefer CE-authored MTL state when available:
@@ -115,7 +121,6 @@ The remaining material work should stay bounded to these items:
 - define the fallback material state when no CE-authored MTL exists
 - document which `PublicParams` and shader masks are evidence-backed versus
   compatibility-preserved
-- expose material id/slot diagnostics in the PySide workflow, not only CLI JSON
 - decide how a Blender plugin supplies or edits `sub_index` and material names
 - keep `<unassigned>` visible as a normal placeholder, while blocking the case
   where a real mesh subset uses it

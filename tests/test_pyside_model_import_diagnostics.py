@@ -400,6 +400,47 @@ def test_collect_model_material_diagnostics_reports_rc_unassigned_placeholders()
     assert diagnostics[1]["used_by_cgf"] is True
 
 
+def test_collect_model_material_diagnostics_reports_rc_cgf_material_id_mismatch():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}],
+            "rc_material_smoke": {
+                "cgf_material_id_alignment_checks": [
+                    {
+                        "ok": True,
+                        "material_id": 0,
+                        "in_request": True,
+                        "in_mtl": True,
+                        "request_name": "Stone",
+                        "mtl_slot_name": "Stone",
+                        "used_unassigned": False,
+                    },
+                    {
+                        "ok": False,
+                        "material_id": 2,
+                        "in_request": False,
+                        "in_mtl": False,
+                        "request_name": "",
+                        "mtl_slot_name": "",
+                        "used_unassigned": False,
+                    },
+                ]
+            },
+        }
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["severity"] == "hazard"
+    assert diagnostics[0]["code"] == "cgf_material_id_alignment_mismatch"
+    assert diagnostics[0]["material_id"] == 2
+    assert diagnostics[0]["sub_index"] == 2
+    assert diagnostics[0]["in_request"] is False
+    assert diagnostics[0]["in_mtl"] is False
+    assert diagnostics[0]["message"] == (
+        "CGF material id is missing from both the RC request and generated MTL slot table."
+    )
+
+
 def test_model_display_name_marks_hazards():
     assert model_display_name({"filename": "tree.fbx", "material_diagnostics": []}) == "tree.fbx"
     assert (
@@ -605,6 +646,17 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
                     "fixture_material_semantic_alignment": {"ok": True},
                     "cgf_material_id_alignment": {
                         "ok": True,
+                        "checks": [
+                            {
+                                "ok": True,
+                                "material_id": 0,
+                                "in_request": True,
+                                "in_mtl": True,
+                                "request_name": "Stone",
+                                "mtl_slot_name": "Stone",
+                                "used_unassigned": False,
+                            }
+                        ],
                         "unassigned_slot_diagnostics_ok": True,
                         "unassigned_slot_diagnostics": [
                             {
@@ -636,6 +688,17 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
     assert smoke_info["material_report_path"] == str(report_path)
     assert smoke_info["semantic_alignment_ok"] is True
     assert smoke_info["cgf_material_id_alignment_ok"] is True
+    assert smoke_info["cgf_material_id_alignment_checks"] == [
+        {
+            "ok": True,
+            "material_id": 0,
+            "in_request": True,
+            "in_mtl": True,
+            "request_name": "Stone",
+            "mtl_slot_name": "Stone",
+            "used_unassigned": False,
+        }
+    ]
     assert smoke_info["unassigned_slot_diagnostics_ok"] is True
     assert smoke_info["material_report_summary"] == {
         "unassigned_placeholder_count": 1,

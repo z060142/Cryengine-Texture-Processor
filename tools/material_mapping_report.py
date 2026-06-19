@@ -1085,6 +1085,7 @@ def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots
                 "material_id": material_id,
                 "in_request": in_request,
                 "in_mtl": in_mtl,
+                "request_name": request_name,
                 "mtl_slot_name": mtl_slot_name,
                 "used_unassigned": used_unassigned,
             }

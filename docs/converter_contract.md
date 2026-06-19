@@ -70,6 +70,8 @@ External tools should block or warn on these conditions before calling RC:
 - material names that differ only by case
 - deleting a known FBX slot unless polygon usage proves it is unused
 - omitting source materials from a non-empty request material list
+- CGF material ids that are absent from the request table or generated MTL slot
+  table after an RC smoke run
 
 The authoritative machine-readable version is:
 

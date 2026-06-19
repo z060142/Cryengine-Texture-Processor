@@ -125,6 +125,13 @@ MATERIAL_SLOT_ASSIGNMENT_POLICY = {
             "code": "rc_omitted_source_material_faces_deleted",
             "meaning": "When request materials are present, source materials omitted from the request can lose their faces.",
         },
+        {
+            "code": "rc_cgf_material_id_missing_slot",
+            "meaning": (
+                "After an RC smoke run, every CGF material id used by mesh subsets must exist in both "
+                "the request material table and generated MTL slot table."
+            ),
+        },
     ],
     "minimal_request_example": {
         "request": {

@@ -119,3 +119,5 @@ def test_exported_material_slot_mapping_schema_documents_external_tool_policy():
     assert policy["placeholder_policy"]["trailing_unassigned"]["assignment_reason"] == (
         "trailing_unassigned_placeholder"
     )
+    hazard_codes = {hazard["code"] for hazard in policy["hazards"]}
+    assert "rc_cgf_material_id_missing_slot" in hazard_codes
