@@ -3,10 +3,10 @@
 """Create material-slot evidence reports for RC smoke outputs."""
 
 import json
-import math
 import os
 import xml.etree.ElementTree as ET
 
+from model_processing.evidence_coercion import coerce_center_x, coerce_request_sub_index
 from model_processing.material_manifest import (
     coerce_material_name,
     coerce_material_slot,
@@ -26,20 +26,7 @@ def _read_json(path):
 
 
 def _coerce_request_sub_index(value):
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value if value >= -1 else None
-    if isinstance(value, str):
-        text = value.strip()
-        if text == "-1":
-            return -1
-        if not text or not all("0" <= char <= "9" for char in text):
-            return None
-        return int(text)
-    return None
+    return coerce_request_sub_index(value)
 
 
 def load_request_materials(json_path):
@@ -466,16 +453,7 @@ def _duplicate_values(values):
 
 
 def _coerce_cgf_subset_center_x(subset):
-    center = subset.get("center")
-    if not isinstance(center, (list, tuple)) or not center:
-        return None
-    try:
-        center_x = float(center[0])
-    except (TypeError, ValueError):
-        return None
-    if not math.isfinite(center_x):
-        return None
-    return round(center_x, 4)
+    return coerce_center_x(subset.get("center"))
 
 
 def _invalid_subset_entry(mesh, subset, error, **extra):

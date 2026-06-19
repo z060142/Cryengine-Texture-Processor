@@ -5,6 +5,8 @@
 import argparse
 import json
 
+from model_processing.evidence_coercion import coerce_center_x, coerce_non_negative_int, coerce_request_sub_index
+
 DEFAULT_POLYGON_SPACING = 3.0
 
 
@@ -31,40 +33,15 @@ def verify_fixture_material_ids(manifest_path, report_path):
 
 
 def _coerce_non_negative_int(value):
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value if value >= 0 else None
-    if isinstance(value, str):
-        text = value.strip()
-        if not text or not all("0" <= char <= "9" for char in text):
-            return None
-        return int(text)
-    return None
+    return coerce_non_negative_int(value)
 
 
 def _coerce_request_sub_index(value):
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value if value >= -1 else None
-    if isinstance(value, str):
-        text = value.strip()
-        if text == "-1":
-            return -1
-        if not text or not all("0" <= char <= "9" for char in text):
-            return None
-        return int(text)
-    return None
+    return coerce_request_sub_index(value)
 
 
 def _coerce_center_x(center):
-    if not isinstance(center, (list, tuple)) or not center:
-        return None
-    try:
-        return round(float(center[0]), 4)
-    except (TypeError, ValueError):
-        return None
+    return coerce_center_x(center)
 
 
 def _iter_manifest_polygon_evidence(manifest):

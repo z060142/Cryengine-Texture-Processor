@@ -5,6 +5,7 @@
 import json
 import os
 
+from model_processing.evidence_coercion import coerce_non_negative_int
 from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS
 
 
@@ -91,22 +92,7 @@ def _manifest_payload(material_manifest_info):
 
 
 def coerce_material_slot(value):
-    if value is None:
-        return None
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        slot = value
-    elif isinstance(value, str):
-        text = value.strip()
-        if not text or not all("0" <= char <= "9" for char in text):
-            return None
-        slot = int(text)
-    else:
-        return None
-    if slot < 0:
-        return None
-    return slot
+    return coerce_non_negative_int(value)
 
 
 def coerce_polygon_index(value):
