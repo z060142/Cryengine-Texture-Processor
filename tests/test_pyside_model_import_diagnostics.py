@@ -72,6 +72,45 @@ def test_collect_model_material_diagnostics_reports_slot_name_conflict_warning()
     assert diagnostics[0]["material_names"] == ["Metal", "Wood"]
 
 
+def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "load_status": "import_only",
+            "load_warning": "filesystem texture scan only",
+            "materials": [{"name": "Asset", "id": 1}],
+        }
+    )
+
+    assert diagnostics[0]["code"] == "degraded_model_load_status"
+    assert diagnostics[0]["severity"] == "warning"
+    assert diagnostics[0]["load_status"] == "import_only"
+
+
+def test_collect_model_material_diagnostics_reports_degraded_texture_source():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [
+                {
+                    "name": "Wall",
+                    "id": 1,
+                    "texture_ref_evidence": [
+                        {
+                            "path": "wall_diff.png",
+                            "filename": "wall_diff.png",
+                            "texture_type": "diffuse",
+                            "source_mode": "filesystem_import_only",
+                        }
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert diagnostics[0]["code"] == "degraded_texture_reference_source"
+    assert diagnostics[0]["source_modes"] == ["filesystem_import_only"]
+    assert diagnostics[0]["texture_ref_evidence"][0]["filename"] == "wall_diff.png"
+
+
 def test_model_display_name_marks_hazards():
     assert model_display_name({"filename": "tree.fbx", "material_diagnostics": []}) == "tree.fbx"
     assert (

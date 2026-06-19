@@ -8,6 +8,41 @@ import os
 from model_processing.material_slot_table import build_material_slot_records
 
 
+AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
+
+
+def _texture_source_modes(texture_ref_evidence):
+    return sorted(
+        {
+            item.get("source_mode", "")
+            for item in texture_ref_evidence or []
+            if item.get("source_mode", "") not in AUTHORITATIVE_TEXTURE_SOURCE_MODES
+        }
+    )
+
+
+def _texture_evidence_diagnostics(report_item):
+    degraded_modes = _texture_source_modes(report_item.get("texture_ref_evidence", []))
+    if not degraded_modes:
+        return []
+
+    return [
+        {
+            "severity": "warning",
+            "code": "degraded_texture_reference_source",
+            "material": report_item["name"],
+            "fbx_slot": report_item["fbx_slot"],
+            "sub_index": report_item["sub_index"],
+            "source_modes": degraded_modes,
+            "texture_ref_evidence": report_item.get("texture_ref_evidence", []),
+            "message": (
+                "Texture references for this material include degraded filesystem-scan evidence. "
+                "Treat them as recovery data, not authoritative FBX/Blender material bindings."
+            ),
+        }
+    ]
+
+
 def _record_to_report_item(record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
@@ -25,6 +60,7 @@ def _record_to_report_item(record):
         "mesh_names": record["material"].get("mesh_names", []),
         "material_names": record["material"].get("material_names", []),
         "slot_name_conflict": record["material"].get("slot_name_conflict", False),
+        "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
         "diagnostics": record.get("diagnostics", []),
     }
 
@@ -39,6 +75,10 @@ def build_material_diagnostics_report(
     material_items = [_record_to_report_item(record) for record in records]
     diagnostics = []
     for item in material_items:
+        item["diagnostics"] = [
+            *item["diagnostics"],
+            *_texture_evidence_diagnostics(item),
+        ]
         for diagnostic in item["diagnostics"]:
             diagnostics.append(
                 {
@@ -51,6 +91,7 @@ def build_material_diagnostics_report(
                     "mesh_names": item["mesh_names"],
                     "material_names": item["material_names"],
                     "slot_name_conflict": item["slot_name_conflict"],
+                    "texture_ref_evidence": item["texture_ref_evidence"],
                 }
             )
 

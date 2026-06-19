@@ -70,6 +70,56 @@ def test_build_material_diagnostics_report_includes_slot_name_conflict_warning()
     assert report["diagnostics"][0]["material_names"] == ["Metal", "Wood"]
 
 
+def test_build_material_diagnostics_report_includes_texture_ref_evidence_warning():
+    evidence = [
+        {
+            "path": "textures/wall_diff.png",
+            "filename": "wall_diff.png",
+            "texture_type": "diffuse",
+            "source_mode": "filesystem_no_bpy",
+        }
+    ]
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Wall",
+                "id": 1,
+                "texture_ref_evidence": evidence,
+            }
+        ],
+        source_model="wall.fbx",
+    )
+
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["summary"]["hazard_count"] == 0
+    assert report["materials"][0]["texture_ref_evidence"] == evidence
+    assert report["materials"][0]["diagnostics"][0]["code"] == "degraded_texture_reference_source"
+    assert report["diagnostics"][0]["source_modes"] == ["filesystem_no_bpy"]
+    assert report["diagnostics"][0]["texture_ref_evidence"] == evidence
+
+
+def test_build_material_diagnostics_report_does_not_warn_for_blender_texture_evidence():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Wall",
+                "id": 1,
+                "texture_ref_evidence": [
+                    {
+                        "path": "textures/wall_diff.png",
+                        "filename": "wall_diff.png",
+                        "texture_type": "diffuse",
+                        "source_mode": "blender",
+                    }
+                ],
+            }
+        ]
+    )
+
+    assert report["summary"]["diagnostic_count"] == 0
+    assert report["diagnostics"] == []
+
+
 def test_build_material_diagnostics_report_allows_deleted_known_unused_slot():
     report = build_material_diagnostics_report(
         [

@@ -36,9 +36,61 @@ from ui_pyside.progress_dialog import ProgressDialog
 from utils.config_manager import ConfigManager
 
 
+AUTHORITATIVE_MODEL_LOAD_STATUS = {"", "loaded"}
+
+
+def _degraded_model_load_diagnostics(model_data):
+    load_status = (model_data or {}).get("load_status", "")
+    if load_status in AUTHORITATIVE_MODEL_LOAD_STATUS:
+        return []
+    return [
+        {
+            "severity": "warning",
+            "code": "degraded_model_load_status",
+            "material": "",
+            "fbx_slot": None,
+            "sub_index": None,
+            "load_status": load_status,
+            "load_warning": model_data.get("load_warning", ""),
+            "load_error": model_data.get("load_error", ""),
+            "message": (
+                "Model was loaded in a degraded mode. Material and texture data may come from fallback recovery paths."
+            ),
+        }
+    ]
+
+
+def _degraded_texture_reference_diagnostics(material_name, material):
+    evidence = material.get("texture_ref_evidence", [])
+    source_modes = sorted(
+        {
+            item.get("source_mode", "")
+            for item in evidence
+            if item.get("source_mode", "") not in {"", "blender"}
+        }
+    )
+    if not source_modes:
+        return []
+    return [
+        {
+            "severity": "warning",
+            "code": "degraded_texture_reference_source",
+            "material": material_name,
+            "fbx_slot": material.get("index"),
+            "sub_index": material.get("sub_index"),
+            "source_modes": source_modes,
+            "texture_ref_evidence": evidence,
+            "message": (
+                "Texture references include filesystem-scan fallback evidence instead of authoritative Blender data."
+            ),
+        }
+    ]
+
+
 def collect_model_material_diagnostics(model_data):
-    diagnostics = []
+    diagnostics = _degraded_model_load_diagnostics(model_data or {})
     for record in assign_material_sub_indices(model_data.get("materials", []) if model_data else []):
+        diagnostics.extend(_degraded_texture_reference_diagnostics(record["clean_name"], record["material"]))
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(
                 {
@@ -275,11 +327,12 @@ class ModelImportPanel(QWidget):
 
         textures_box = QGroupBox(get_text("model_import.extracted_textures", "Extracted Textures"))
         textures_layout = QVBoxLayout(textures_box)
-        self.texture_table = QTableWidget(0, 3)
+        self.texture_table = QTableWidget(0, 4)
         self.texture_table.setHorizontalHeaderLabels(
             [
                 get_text("model_import.col_material", "Material"),
                 get_text("model_import.col_type", "Type"),
+                get_text("model_import.col_source", "Source"),
                 get_text("model_import.col_path", "Path"),
             ]
         )
@@ -500,7 +553,8 @@ class ModelImportPanel(QWidget):
             self.texture_table.insertRow(row)
             self.texture_table.setItem(row, 0, QTableWidgetItem(texture.get("material", "Unknown")))
             self.texture_table.setItem(row, 1, QTableWidgetItem(texture.get("type", "Unknown")))
-            self.texture_table.setItem(row, 2, QTableWidgetItem(texture.get("path") or texture.get("filename", "N/A")))
+            self.texture_table.setItem(row, 2, QTableWidgetItem(texture.get("source_mode", "")))
+            self.texture_table.setItem(row, 3, QTableWidgetItem(texture.get("path") or texture.get("filename", "N/A")))
 
     def _populate_material_table(self, materials):
         self.material_table.setRowCount(0)

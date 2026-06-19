@@ -39,6 +39,8 @@ Phase 47: processed texture evidence capture
 
 ### P1-1: Surface Texture Evidence In Diagnostics
 
+Status: done in `refactor_phase48_diagnostics_texture_evidence.md`.
+
 Problem:
 
 `texture_ref_evidence`, `load_status`, and `source_mode` now exist, but material diagnostics sidecars and the PySide diagnostics view do not show enough of this evidence.
