@@ -262,3 +262,67 @@ def test_verify_fixture_polygon_material_ids_flags_missing_request_material_name
             "request_sub_index_for_name": None,
         }
     ]
+
+
+def test_verify_fixture_polygon_material_ids_surfaces_malformed_evidence(tmp_path):
+    manifest_path = tmp_path / "asset.fixture_manifest.json"
+    report_path = tmp_path / "asset.material_report.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "polygons": [
+                    "bad-polygon-row",
+                    {"polygon": True, "material_slot": 0, "material_name": "BadIndex"},
+                    {"polygon": 0, "material_slot": 0, "material_name": "Stone", "expected_cgf_material_id": 0},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path.write_text(
+        json.dumps(
+            {
+                "cgf_read_error": "",
+                "request_materials": [
+                    "bad-request-row",
+                    {"name": "BadSub", "sub_index": True},
+                    {"name": "Stone", "sub_index": 0},
+                ],
+                "cgf_material_summary": {
+                    "meshes": [
+                        "bad-mesh-row",
+                        {
+                            "chunk_id": 10,
+                            "subsets": [
+                                "bad-subset-row",
+                                {"subset": 0, "center": [], "material_id": 0, "num_indices": 3},
+                                {"subset": 1, "center": [0.0, 0.0, 0.0], "material_id": True, "num_indices": 3},
+                                {"subset": 2, "center": [0.0, 0.0, 0.0], "material_id": 0, "num_indices": 3},
+                            ],
+                        },
+                    ]
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = verify_fixture_polygon_material_ids(str(manifest_path), str(report_path))
+
+    assert not result["ok"]
+    assert result["expected_cgf_material_id_by_polygon"] == {0: 0}
+    assert result["actual_cgf_material_id_by_polygon"] == {0: 0}
+    assert [entry["error"] for entry in result["invalid_manifest_entries"]] == [
+        "invalid_manifest_polygon_row",
+        "invalid_manifest_polygon_index",
+    ]
+    assert [entry["error"] for entry in result["invalid_request_entries"]] == [
+        "invalid_request_material_row",
+        "invalid_request_material_mapping",
+    ]
+    assert [entry["error"] for entry in result["invalid_subset_entries"]] == [
+        "invalid_cgf_mesh_row",
+        "invalid_cgf_subset_row",
+        "invalid_cgf_subset_center",
+        "invalid_cgf_subset_material_id",
+    ]
