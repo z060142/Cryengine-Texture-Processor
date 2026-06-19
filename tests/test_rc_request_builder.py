@@ -118,6 +118,38 @@ def test_request_schema_diagnostics_report_invalid_rc_values():
     assert diagnostics[4]["max_value"] == 127
 
 
+def test_request_schema_diagnostics_report_missing_required_fields():
+    request = build_import_request(sample_model(), "chair.fbx")
+    del request["source_filename"]
+    del request["output_ext"]
+    del request["materials"][0]["physicalize"]
+    del request["materials"][0]["sub_index"]
+    del request["nodes"][0]["path"]
+    del request["jointPhysicsData"][0]["proxyNodePath"]
+    del request["jointPhysicsData"][0]["snapToJoint"]
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_missing_root_field",
+        "rc_request_missing_root_field",
+        "rc_request_missing_material_field",
+        "rc_request_missing_material_field",
+        "rc_request_missing_node_field",
+        "rc_request_missing_joint_physics_field",
+        "rc_request_missing_joint_physics_field",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "output_ext",
+        "source_filename",
+        "materials[0].physicalize",
+        "materials[0].sub_index",
+        "nodes[0].path",
+        "jointPhysicsData[0].proxyNodePath",
+        "jointPhysicsData[0].snapToJoint",
+    ]
+
+
 def test_request_schema_diagnostics_report_invalid_collections_and_rows():
     request = build_import_request(sample_model(), "chair.fbx")
     request["materials"] = ["bad-material-row"]
@@ -135,6 +167,32 @@ def test_request_schema_diagnostics_report_invalid_collections_and_rows():
         "nodes",
         "materials[0]",
         "jointPhysicsData[0]",
+    ]
+
+
+def test_request_schema_diagnostics_report_invalid_node_and_joint_values():
+    request = build_import_request(sample_model(), "chair.fbx")
+    request["nodes"][0]["name"] = ""
+    request["nodes"][0]["path"] = "Root"
+    request["nodes"][0]["nodes"] = "bad-children"
+    request["jointPhysicsData"][0]["jointNodePath"] = "Root"
+    request["jointPhysicsData"][0]["snapToJoint"] = "yes"
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_invalid_node_name",
+        "rc_request_invalid_node_path",
+        "rc_request_invalid_collection",
+        "rc_request_invalid_joint_physics_path",
+        "rc_request_invalid_joint_physics_snap",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "nodes[0].name",
+        "nodes[0].path",
+        "nodes[0].nodes",
+        "jointPhysicsData[0].jointNodePath",
+        "jointPhysicsData[0].snapToJoint",
     ]
 
 
@@ -308,6 +366,14 @@ def test_wrap_import_request_rejects_invalid_rc_values():
     request = build_import_request(sample_model(), "chair.fbx", output_ext="abc")
 
     with pytest.raises(ValueError, match="output_ext"):
+        wrap_import_request(request)
+
+
+def test_wrap_import_request_rejects_missing_required_fields():
+    request = build_import_request(sample_model(), "chair.fbx")
+    del request["source_filename"]
+
+    with pytest.raises(ValueError, match="source_filename"):
         wrap_import_request(request)
 
 

@@ -89,6 +89,10 @@ RC_IMPORT_NODE_FIELDS = {
 }
 
 RC_IMPORT_MATERIAL_FIELDS = {"name", "physicalize", "sub_index"}
+RC_IMPORT_REQUIRED_ROOT_FIELDS = {"source_filename", "output_ext"}
+RC_IMPORT_REQUIRED_MATERIAL_FIELDS = {"name", "physicalize", "sub_index"}
+RC_IMPORT_REQUIRED_NODE_FIELDS = {"path", "name"}
+RC_IMPORT_REQUIRED_JOINT_PHYSICS_FIELDS = {"jointNodePath", "proxyNodePath", "snapToJoint"}
 
 RC_IMPORT_JOINT_PHYSICS_FIELDS = {
     "jointNodePath",
@@ -137,10 +141,40 @@ def _is_list(value):
     return isinstance(value, list)
 
 
+def _missing_fields(mapping, required_fields):
+    if not isinstance(mapping, dict):
+        return []
+    return sorted(field for field in required_fields if field not in mapping)
+
+
 def _list_items(value):
     if not isinstance(value, list):
         return []
     return enumerate(value)
+
+
+def _append_missing_field_diagnostics(
+    diagnostics,
+    *,
+    code,
+    location_prefix,
+    missing_fields,
+    schema_source,
+    message,
+    extra=None,
+):
+    for field in missing_fields:
+        diagnostic = {
+            "severity": "error",
+            "code": code,
+            "location": f"{location_prefix}.{field}" if location_prefix else field,
+            "field": field,
+            "schema_source": schema_source,
+            "message": message,
+        }
+        if extra:
+            diagnostic.update(extra)
+        diagnostics.append(diagnostic)
 
 
 def collect_unknown_request_fields(request):
@@ -203,8 +237,31 @@ def collect_request_value_diagnostics(request):
             }
         ]
 
+    _append_missing_field_diagnostics(
+        diagnostics,
+        code="rc_request_missing_root_field",
+        location_prefix="",
+        missing_fields=_missing_fields(request, RC_IMPORT_REQUIRED_ROOT_FIELDS),
+        schema_source=RC_IMPORT_REQUEST_SOURCE["root_fields"],
+        message="RC import request is missing a source-backed required root field.",
+    )
+
+    source_filename = request.get("source_filename")
+    if "source_filename" in request and not _is_non_empty_string(source_filename):
+        diagnostics.append(
+            {
+                "severity": "error",
+                "code": "rc_request_invalid_source_filename",
+                "location": "source_filename",
+                "value": source_filename,
+                "value_type": _type_name(source_filename),
+                "schema_source": RC_IMPORT_REQUEST_SOURCE["root_fields"],
+                "message": "RC import request source_filename must be a non-empty string.",
+            }
+        )
+
     output_ext = request.get("output_ext")
-    if output_ext not in RC_IMPORT_OUTPUT_EXTENSIONS:
+    if "output_ext" in request and output_ext not in RC_IMPORT_OUTPUT_EXTENSIONS:
         diagnostics.append(
             {
                 "severity": "error",
@@ -249,8 +306,18 @@ def collect_request_value_diagnostics(request):
             )
             continue
 
+        _append_missing_field_diagnostics(
+            diagnostics,
+            code="rc_request_missing_material_field",
+            location_prefix=location,
+            missing_fields=_missing_fields(material, RC_IMPORT_REQUIRED_MATERIAL_FIELDS),
+            schema_source=RC_IMPORT_REQUEST_SOURCE["material_fields"],
+            message="RC import request material is missing a source-backed required field.",
+            extra={"material_index": index},
+        )
+
         name = material.get("name")
-        if not _is_non_empty_string(name):
+        if "name" in material and not _is_non_empty_string(name):
             diagnostics.append(
                 {
                     "severity": "error",
@@ -265,7 +332,7 @@ def collect_request_value_diagnostics(request):
             )
 
         physicalize = material.get("physicalize")
-        if physicalize not in RC_IMPORT_PHYSICALIZE_VALUES:
+        if "physicalize" in material and physicalize not in RC_IMPORT_PHYSICALIZE_VALUES:
             diagnostics.append(
                 {
                     "severity": "error",
@@ -281,7 +348,9 @@ def collect_request_value_diagnostics(request):
             )
 
         sub_index = material.get("sub_index")
-        if not _is_int(sub_index) or sub_index < -1 or sub_index >= RC_IMPORT_MAX_SUB_MATERIALS:
+        if "sub_index" in material and (
+            not _is_int(sub_index) or sub_index < -1 or sub_index >= RC_IMPORT_MAX_SUB_MATERIALS
+        ):
             diagnostics.append(
                 {
                     "severity": "error",
@@ -297,33 +366,133 @@ def collect_request_value_diagnostics(request):
                 }
             )
 
-    nodes = request.get("nodes", [])
-    for index, node in _list_items(nodes):
-        if not isinstance(node, dict):
-            diagnostics.append(
-                {
-                    "severity": "error",
-                    "code": "rc_request_invalid_node_row",
-                    "location": f"nodes[{index}]",
-                    "node_index": index,
-                    "value_type": _type_name(node),
-                    "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
-                    "message": "RC import request node entries must be JSON objects.",
-                }
+    def visit_node_values(nodes, path_prefix):
+        for index, node in _list_items(nodes):
+            location = f"{path_prefix}[{index}]"
+            if not isinstance(node, dict):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_node_row",
+                        "location": location,
+                        "node_index": index,
+                        "value_type": _type_name(node),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                        "message": "RC import request node entries must be JSON objects.",
+                    }
+                )
+                continue
+
+            _append_missing_field_diagnostics(
+                diagnostics,
+                code="rc_request_missing_node_field",
+                location_prefix=location,
+                missing_fields=_missing_fields(node, RC_IMPORT_REQUIRED_NODE_FIELDS),
+                schema_source=RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                message="RC import request node is missing a source-backed required field.",
+                extra={"node_index": index},
             )
+
+            node_name = node.get("name")
+            if "name" in node and not _is_non_empty_string(node_name):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_node_name",
+                        "location": f"{location}.name",
+                        "node_index": index,
+                        "value": node_name,
+                        "value_type": _type_name(node_name),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                        "message": "RC import request node name must be a non-empty string.",
+                    }
+                )
+
+            node_path = node.get("path")
+            if "path" in node and not _is_list(node_path):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_node_path",
+                        "location": f"{location}.path",
+                        "node_index": index,
+                        "value_type": _type_name(node_path),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                        "message": "RC import request node path must be a JSON array.",
+                    }
+                )
+
+            if "nodes" in node and not _is_list(node.get("nodes")):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_collection",
+                        "location": f"{location}.nodes",
+                        "field": "nodes",
+                        "value_type": _type_name(node.get("nodes")),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                        "message": "RC import request collection field must be a JSON array.",
+                    }
+                )
+            visit_node_values(node.get("nodes", []), f"{location}.nodes")
+
+    visit_node_values(request.get("nodes", []), "nodes")
 
     joint_physics_data = request.get("jointPhysicsData", [])
     for index, physics_data in _list_items(joint_physics_data):
+        location = f"jointPhysicsData[{index}]"
         if not isinstance(physics_data, dict):
             diagnostics.append(
                 {
                     "severity": "error",
                     "code": "rc_request_invalid_joint_physics_row",
-                    "location": f"jointPhysicsData[{index}]",
+                    "location": location,
                     "joint_physics_index": index,
                     "value_type": _type_name(physics_data),
                     "schema_source": RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
                     "message": "RC import request joint physics entries must be JSON objects.",
+                }
+            )
+            continue
+
+        _append_missing_field_diagnostics(
+            diagnostics,
+            code="rc_request_missing_joint_physics_field",
+            location_prefix=location,
+            missing_fields=_missing_fields(physics_data, RC_IMPORT_REQUIRED_JOINT_PHYSICS_FIELDS),
+            schema_source=RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
+            message="RC import request joint physics entry is missing a source-backed required field.",
+            extra={"joint_physics_index": index},
+        )
+
+        for field in ("jointNodePath", "proxyNodePath"):
+            value = physics_data.get(field)
+            if field in physics_data and not _is_list(value):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_joint_physics_path",
+                        "location": f"{location}.{field}",
+                        "field": field,
+                        "joint_physics_index": index,
+                        "value_type": _type_name(value),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
+                        "message": "RC import request joint physics node paths must be JSON arrays.",
+                    }
+                )
+
+        snap_to_joint = physics_data.get("snapToJoint")
+        if "snapToJoint" in physics_data and not isinstance(snap_to_joint, bool):
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_invalid_joint_physics_snap",
+                    "location": f"{location}.snapToJoint",
+                    "joint_physics_index": index,
+                    "value": snap_to_joint,
+                    "value_type": _type_name(snap_to_joint),
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
+                    "message": "RC import request joint physics snapToJoint must be a boolean.",
                 }
             )
 
