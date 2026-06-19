@@ -1,0 +1,86 @@
+{
+  "schema": "cryengine_mtl_material_state_compare.v1",
+  "reference_mtl": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.mtl",
+  "candidate_mtl": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_car_user_flow_phase127_material_overrides\\rc_work\\kb3d_citycarsessentialssedan-native.mtl",
+  "reference_summary": {
+    "material_count": 17,
+    "shader_counts": {
+      "Glass": 1,
+      "Illum": 15,
+      "Multilayeredmaterials": 1
+    },
+    "mtl_flags_counts": {
+      "524416": 15,
+      "526464": 1,
+      "526466": 1
+    },
+    "string_gen_mask_counts": {
+      "": 1,
+      "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING": 14,
+      "%NORMAL_MAP%SUBSURFACE_SCATTERING": 1,
+      "%SPECULAR_MAP%TINT_MAP": 1
+    },
+    "public_param_name_counts": {
+      "BackLightScale": 2,
+      "BumpMapTile": 2,
+      "BumpScale": 2,
+      "CloudinessReducesGloss": 1,
+      "EmittanceMapGamma": 16,
+      "Layer0ReflectivityScale": 1,
+      "Layer1ReflectivityScale": 1,
+      "Layer1Smoothness": 1,
+      "Layer1Thickness": 1,
+      "Layer2ReflectivityScale": 1,
+      "Layer2Smoothness": 1,
+      "Layer2Thickness": 1,
+      "SSSIndex": 15,
+      "TintCloudiness": 1,
+      "TintColor": 1
+    }
+  },
+  "candidate_summary": {
+    "material_count": 17,
+    "shader_counts": {
+      "Glass": 1,
+      "Illum": 15,
+      "Multilayeredmaterials": 1
+    },
+    "mtl_flags_counts": {
+      "524416": 15,
+      "526464": 1,
+      "526466": 1
+    },
+    "string_gen_mask_counts": {
+      "": 1,
+      "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING": 14,
+      "%NORMAL_MAP%SUBSURFACE_SCATTERING": 1,
+      "%SPECULAR_MAP%TINT_MAP": 1
+    },
+    "public_param_name_counts": {
+      "BackLightScale": 2,
+      "BumpMapTile": 2,
+      "BumpScale": 2,
+      "CloudinessReducesGloss": 1,
+      "EmittanceMapGamma": 16,
+      "Layer0ReflectivityScale": 1,
+      "Layer1ReflectivityScale": 1,
+      "Layer1Smoothness": 1,
+      "Layer1Thickness": 1,
+      "Layer2ReflectivityScale": 1,
+      "Layer2Smoothness": 1,
+      "Layer2Thickness": 1,
+      "SSSIndex": 15,
+      "TintCloudiness": 1,
+      "TintColor": 1
+    }
+  },
+  "comparison": {
+    "ok": true,
+    "missing_materials": [],
+    "extra_materials": [],
+    "reference_duplicate_names": [],
+    "candidate_duplicate_names": [],
+    "summary_mismatches": [],
+    "material_mismatches": []
+  }
+}

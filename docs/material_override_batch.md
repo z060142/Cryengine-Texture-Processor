@@ -20,8 +20,10 @@ This batch adds an explicit override channel:
 - `tools/rc_smoke_test.py`
 - `output_formats/mtl_exporter.py`
 - `model_processing/material_texture_resolver.py`
+- `tools/mtl_material_state_compare.py`
 - `docs/car_native_material_overrides.json`
 - `docs/car_material_override_mtl_schema_report.json`
+- `docs/car_material_state_compare.json`
 
 ## Override Shape
 
@@ -72,22 +74,25 @@ $overrideJson = 'S:\Crytek\crytek\Stripped to the bone\Cryengine-Texture-Process
 uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif"
 
 uv run python -m tools.mtl_schema_report "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_override_mtl_schema_report.json
+
+uv run python -m tools.mtl_material_state_compare --reference "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --candidate "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_state_compare.json
 ```
 
 Native and generated MTL now match on the high-value material-state counts:
 
 ```json
 {
+  "material_count": 17,
   "shader_counts": {
+    "Glass": 1,
     "Illum": 15,
-    "Multilayeredmaterials": 1,
-    "Glass": 1
+    "Multilayeredmaterials": 1
   },
   "string_gen_masks": {
-    "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING": 14,
     "": 1,
-    "%SPECULAR_MAP%TINT_MAP": 1,
-    "%NORMAL_MAP%SUBSURFACE_SCATTERING": 1
+    "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING": 14,
+    "%NORMAL_MAP%SUBSURFACE_SCATTERING": 1,
+    "%SPECULAR_MAP%TINT_MAP": 1
   },
   "mtl_flags": {
     "524416": 15,
@@ -96,6 +101,10 @@ Native and generated MTL now match on the high-value material-state counts:
   }
 }
 ```
+
+`docs/car_material_state_compare.json` is the gate for this. Its
+`comparison.ok` value is `true`, and it checks per-material shader, MtlFlags,
+GenMask, StringGenMask, and PublicParams values.
 
 Material report result:
 
@@ -132,6 +141,7 @@ larger batch rhythm instead:
 
 ```powershell
 uv run python -m pytest tests/test_mtl_exporter.py tests/test_material_texture_resolver.py tests/test_mtl_override_extractor.py tests/test_rc_smoke_test.py
+uv run python -m pytest tests/test_mtl_material_state_compare.py tests/test_mtl_override_extractor.py tests/test_mtl_exporter.py tests/test_rc_smoke_test.py
 uv run python -m pytest
 uv run python -m compileall model_processing output_formats tools tests
 uv run python tools/converter_schema.py --check docs/converter_schema.json
@@ -141,7 +151,8 @@ uv lock --check
 Result:
 
 - `71 passed`
-- `398 passed`
+- `58 passed`
+- `401 passed`
 - `compileall` completed
 - converter schema snapshot is current
 - `uv lock --check` passed
