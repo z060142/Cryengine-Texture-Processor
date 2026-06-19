@@ -915,6 +915,53 @@ def test_run_rc_smoke_test_writes_preflight_material_diagnostics(tmp_path):
     assert report["preflight_material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 
 
+def test_run_rc_smoke_test_fails_when_material_mapping_report_requires_action(monkeypatch, tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    def fake_material_mapping_report(*args, **kwargs):
+        del args, kwargs
+        return {
+            "summary": {
+                "action_required": True,
+                "failed_material_id_check_count": 1,
+                "used_unassigned_material_count": 0,
+            }
+        }
+
+    monkeypatch.setattr("tools.rc_smoke_test.build_material_mapping_report", fake_material_mapping_report)
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        runner_factory=FakeRunner,
+    )
+
+    assert not result.success
+    assert "Material mapping report requires action" in result.error
+    report = json.loads(open(result.material_report_path, encoding="utf-8").read())
+    assert report["summary"]["action_required"] is True
+    assert report["mtl_schema_gate"]["summary"]["ok"] is True
+
+
 def test_run_rc_smoke_test_embeds_texture_output_gate_report(tmp_path):
     rc_path = tmp_path / "rc.exe"
     rc_path.write_text("fake rc", encoding="utf-8")

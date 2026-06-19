@@ -108,6 +108,11 @@ GenMask, StringGenMask, and PublicParams values. The same report is also embedde
 under `material_state_compare` in the RC smoke material report; a mismatch makes
 `tools.rc_smoke_test` return failure.
 
+The material mapping report is now also a smoke gate. If its summary marks
+`action_required=true`, `tools.rc_smoke_test` returns failure. This keeps used
+`<unassigned>` materials and failed CGF material-id checks from being treated as
+a successful RC conversion just because RC returned `0`.
+
 The same RC smoke run also embeds the texture output gate under
 `texture_output_gate` in the material report. A texture gate mismatch also makes
 `tools.rc_smoke_test` return failure, so the car user flow now checks RC
@@ -179,6 +184,7 @@ uv run python -m pytest tests/test_mtl_exporter.py tests/test_material_texture_r
 uv run python -m pytest tests/test_mtl_material_state_compare.py tests/test_mtl_override_extractor.py tests/test_mtl_exporter.py tests/test_rc_smoke_test.py
 uv run python -m pytest tests/test_rc_smoke_test.py tests/test_texture_output_diagnostics.py
 uv run python -m pytest tests/test_mtl_schema_report.py tests/test_rc_smoke_test.py
+uv run python -m pytest tests/test_rc_smoke_test.py
 uv run python -m pytest
 uv run python -m compileall model_processing output_formats tools tests
 uv run python tools/converter_schema.py --check docs/converter_schema.json
@@ -191,7 +197,8 @@ Result:
 - `58 passed`
 - `46 passed`
 - `45 passed`
-- `411 passed`
+- `40 passed`
+- `412 passed`
 - `compileall` completed
 - converter schema snapshot is current
 - `uv lock --check` passed
