@@ -5,6 +5,7 @@
 import json
 import os
 
+from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 
@@ -86,7 +87,18 @@ def build_material_diagnostics_report(
 ):
     records = build_material_slot_records(materials, existing_submaterial_names)
     material_items = [_record_to_report_item(record) for record in records]
-    diagnostics = []
+    diagnostics = [
+        {
+            **diagnostic,
+            "assignment_reason": diagnostic.get("assignment_reason", "omitted_source_material"),
+            "original_name": diagnostic.get("material", ""),
+            "mesh_names": diagnostic.get("mesh_names", []),
+            "material_names": diagnostic.get("material_names", []),
+            "slot_name_conflict": diagnostic.get("slot_name_conflict", False),
+            "texture_ref_evidence": diagnostic.get("texture_ref_evidence", []),
+        }
+        for diagnostic in build_omitted_material_diagnostics(materials, records)
+    ]
     for item in material_items:
         item["diagnostics"] = [
             *item["diagnostics"],

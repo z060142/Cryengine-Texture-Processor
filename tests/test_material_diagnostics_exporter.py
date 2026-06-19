@@ -175,6 +175,34 @@ def test_build_material_diagnostics_report_keeps_clean_material_records_without_
     assert [item["sub_index"] for item in report["materials"]] == [0, 1]
 
 
+def test_build_material_diagnostics_report_flags_used_ignored_source_material():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Visible", "id": 1},
+            {"name": "Material", "id": 2, "polygon_count": 4, "used_by_polygons": True},
+        ],
+        source_model="default_material.fbx",
+    )
+
+    assert report["summary"]["material_count"] == 1
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["summary"]["hazard_count"] == 1
+    assert report["diagnostics"][0]["code"] == "rc_omitted_source_material_faces_deleted"
+    assert report["diagnostics"][0]["material"] == "Material"
+    assert report["diagnostics"][0]["polygon_count"] == 4
+
+
+def test_build_material_diagnostics_report_does_not_warn_when_only_ignored_materials_are_present():
+    report = build_material_diagnostics_report(
+        [{"name": "Material", "id": 1, "polygon_count": 4, "used_by_polygons": True}],
+        source_model="default_only.fbx",
+    )
+
+    assert report["summary"]["material_count"] == 0
+    assert report["summary"]["diagnostic_count"] == 0
+    assert report["diagnostics"] == []
+
+
 def test_build_material_diagnostics_report_uses_existing_mtl_fallback_when_provided():
     report = build_material_diagnostics_report(
         [

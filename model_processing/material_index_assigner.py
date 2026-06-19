@@ -6,7 +6,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS, normalize_rc_sub_index
-from model_processing.material_texture_resolver import clean_material_name, iter_model_materials
+from model_processing.material_texture_resolver import IGNORED_MATERIAL_NAMES, clean_material_name, iter_model_materials
 
 
 def parse_mtl_submaterial_names(mtl_file_path):
@@ -104,6 +104,48 @@ def _known_polygon_usage(material):
             return bool(value)
 
     return None
+
+
+def build_omitted_material_diagnostics(materials, emitted_records):
+    """
+    Return diagnostics for source materials that will not appear in RC request materials.
+
+    RC only auto-adds source scene materials when the request material list is empty.
+    Once at least one request material exists, any unmatched source material keeps
+    remap id -1 and faces using that material are deleted.
+    """
+    if not emitted_records:
+        return []
+
+    emitted_names = {record["clean_name"].casefold() for record in emitted_records}
+    diagnostics = []
+    for order, material in enumerate(materials or []):
+        material_name = material.get("name", f"Material_{order}")
+        clean_name = clean_material_name(material_name)
+        if clean_name.casefold() in emitted_names:
+            continue
+        if material_name not in IGNORED_MATERIAL_NAMES:
+            continue
+
+        polygon_usage = _known_polygon_usage(material)
+        severity = "hazard" if polygon_usage is not False else "warning"
+        diagnostics.append(
+            {
+                "severity": severity,
+                "code": "rc_omitted_source_material_faces_deleted",
+                "material": clean_name,
+                "source_order": order,
+                "polygon_count": material.get("polygon_count"),
+                "used_by_polygons": material.get("used_by_polygons"),
+                "ignored_material_name": material_name,
+                "message": (
+                    "This source material is omitted from request materials by the converter's default-name filter. "
+                    "RC only falls back to automatic material mapping when request materials is empty; otherwise "
+                    "unmatched source materials keep remap id -1 and faces using them are deleted."
+                ),
+            }
+        )
+    return diagnostics
 
 
 def _fbx_slot(record):
