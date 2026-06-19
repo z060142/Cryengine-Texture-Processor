@@ -622,6 +622,9 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             "invalid_subset_entries": [],
             "invalid_request_entries": [],
             "invalid_mtl_entries": [],
+            "polygon_verification": "",
+            "polygon_checks_skipped": False,
+            "polygon_count": 0,
         }
 
     valid_request_materials = _valid_request_materials(request_materials)
@@ -750,12 +753,22 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             }
         )
 
-    actual_by_polygon, subset_entries, duplicate_polygons, invalid_subset_entries = _fixture_polygon_actual_ids(
-        manifest,
-        cgf_material_summary,
-    )
+    polygon_verification = manifest.get("polygon_verification", "subset_center_heuristic")
+    skip_polygon_checks = polygon_verification == "material_table_only"
+    if skip_polygon_checks:
+        actual_by_polygon = {}
+        subset_entries = []
+        duplicate_polygons = []
+        invalid_subset_entries = []
+    else:
+        actual_by_polygon, subset_entries, duplicate_polygons, invalid_subset_entries = _fixture_polygon_actual_ids(
+            manifest,
+            cgf_material_summary,
+        )
     polygon_checks = []
-    if raw_polygons is not None and not isinstance(raw_polygons, list):
+    if skip_polygon_checks:
+        pass
+    elif raw_polygons is not None and not isinstance(raw_polygons, list):
         ok = False
         polygon_checks.append(
             {
@@ -791,7 +804,12 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
                     }
                 )
 
-    for order, polygon in iter_manifest_polygon_rows(manifest):
+    if not skip_polygon_checks:
+        polygon_iter = iter_manifest_polygon_rows(manifest)
+    else:
+        polygon_iter = ()
+
+    for order, polygon in polygon_iter:
         raw_polygon_index = polygon.get("polygon")
         polygon_index = coerce_polygon_index(raw_polygon_index)
         if polygon_index is None:
@@ -909,6 +927,9 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         "invalid_subset_entries": invalid_subset_entries,
         "invalid_request_entries": invalid_request_entries,
         "invalid_mtl_entries": invalid_mtl_entries,
+        "polygon_verification": polygon_verification,
+        "polygon_checks_skipped": skip_polygon_checks,
+        "polygon_count": len(raw_polygons) if isinstance(raw_polygons, list) else 0,
     }
 
 
@@ -964,7 +985,8 @@ def _extract_cgf_import_settings_materials(cgf_material_summary):
     if not isinstance(payload, dict):
         return [], "invalid_cgf_import_settings_json_root", {"root_type": type(payload).__name__}
 
-    raw_materials = payload.get("materials", [])
+    request = payload.get("request", payload)
+    raw_materials = request.get("materials", []) if isinstance(request, dict) else []
     materials = _normalize_request_material_rows(
         raw_materials,
         invalid_collection_error="invalid_cgf_import_settings_materials_collection",
@@ -1183,6 +1205,93 @@ def build_material_mapping_report(
         },
         "rc": {
             "returncode": rc_returncode,
+            "output_exists": output_exists,
+            "output_size": output_size,
+        },
+        "cgf_material_summary": cgf_material_summary,
+        "cgf_read_error": cgf_read_error,
+        "request_read_error": request_read_error,
+        "request_materials": request_materials,
+        "mtl_slots": mtl_slots,
+        "mtl_read_error": mtl_read_error,
+        "mtl_cryasset_details": cryasset_details,
+        "mtl_cryasset_read_error": cryasset_read_error,
+        "alignment": alignment,
+        "cgf_material_id_alignment": evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots),
+        "cgf_import_settings_alignment": evaluate_cgf_import_settings_roundtrip(
+            cgf_material_summary,
+            request_materials,
+            mtl_slots,
+        ),
+        "source_fixture_manifest": fixture_manifest_path,
+        "fixture_material_semantic_alignment": evaluate_fixture_material_semantics(
+            fixture_manifest,
+            cgf_material_summary,
+            request_materials,
+            mtl_slots,
+        ),
+    }
+
+
+def build_existing_output_material_report(
+    cgf_path,
+    mtl_path,
+    json_path="",
+    source_fbx_path="",
+):
+    cgf_path = cgf_path or ""
+    mtl_path = mtl_path or ""
+    json_path = json_path or ""
+
+    output_exists = bool(cgf_path and os.path.exists(cgf_path))
+    output_size = os.path.getsize(cgf_path) if output_exists else 0
+    cgf_material_summary = {}
+    cgf_read_error = ""
+    if output_exists:
+        try:
+            cgf_material_summary = read_cgf_material_summary(cgf_path)
+        except Exception as e:
+            cgf_read_error = str(e)
+
+    if json_path:
+        request_materials, request_read_error = _load_request_materials_for_report(json_path)
+        request_source = {
+            "type": "request_json",
+            "path": json_path,
+            "error": request_read_error,
+        }
+    else:
+        request_materials, import_settings_error, import_settings_meta = _extract_cgf_import_settings_materials(
+            cgf_material_summary,
+        )
+        request_read_error = import_settings_error
+        request_source = {
+            "type": "cgf_import_settings",
+            "path": cgf_path,
+            "error": import_settings_error,
+            "import_settings_meta": import_settings_meta,
+        }
+
+    mtl_slots, mtl_read_error = _load_mtl_slots_for_report(mtl_path)
+    cryasset_path = f"{mtl_path}.cryasset" if mtl_path else ""
+    cryasset_details, cryasset_read_error = _load_cryasset_details_for_report(cryasset_path)
+    alignment = evaluate_material_slot_alignment(request_materials, mtl_slots)
+    fixture_manifest_path = discover_fixture_manifest(source_fbx_path, "")
+    fixture_manifest = load_fixture_manifest(fixture_manifest_path)
+
+    return {
+        "paths": {
+            "json": json_path,
+            "mtl": mtl_path,
+            "mtl_cryasset": cryasset_path if os.path.exists(cryasset_path) else "",
+            "expected_output": cgf_path,
+            "rc_exe": "",
+            "source_fbx": source_fbx_path,
+            "copied_fbx": "",
+        },
+        "request_source": request_source,
+        "rc": {
+            "returncode": None,
             "output_exists": output_exists,
             "output_size": output_size,
         },

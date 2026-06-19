@@ -36,8 +36,8 @@ bpy.ops.object.delete()
 
 bpy.ops.import_scene.fbx(filepath=fbx_path)
 
-material_slots = []
-material_name_to_slot = {{}}
+material_first_seen = []
+material_first_evidence = {{}}
 objects = []
 polygons = []
 
@@ -52,27 +52,25 @@ for obj in mesh_objects:
             material_name = 'unassigned'
         else:
             material_name = mat.name
-        if material_name not in material_name_to_slot:
-            material_name_to_slot[material_name] = len(material_slots)
-            material_slots.append({{
-                'slot': material_name_to_slot[material_name],
+        if material_name not in material_first_evidence:
+            material_first_evidence[material_name] = {{
                 'name': material_name,
                 'first_object': obj.name,
                 'first_local_slot': local_slot,
-            }})
+            }}
+            material_first_seen.append(material_name)
 
     for polygon in obj.data.polygons:
         local_slot = int(polygon.material_index)
         mat = obj.data.materials[local_slot] if local_slot < len(obj.data.materials) else None
         material_name = mat.name if mat is not None else 'unassigned'
-        material_slot = material_name_to_slot.setdefault(material_name, len(material_slots))
-        if material_slot == len(material_slots):
-            material_slots.append({{
-                'slot': material_slot,
+        if material_name not in material_first_evidence:
+            material_first_evidence[material_name] = {{
                 'name': material_name,
                 'first_object': obj.name,
                 'first_local_slot': local_slot,
-            }})
+            }}
+            material_first_seen.append(material_name)
 
         center = Vector((0.0, 0.0, 0.0))
         for vertex_index in polygon.vertices:
@@ -85,16 +83,55 @@ for obj in mesh_objects:
             'object_polygon': int(polygon.index),
             'vertices': [int(vertex_index) for vertex_index in polygon.vertices],
             'material_slot': local_slot,
-            'material_table_slot': material_slot,
             'material_name': material_name,
-            'expected_cgf_material_id': material_slot,
             'center': [float(center.x), float(center.y), float(center.z)],
             'center_x': float(center.x),
         }})
 
+with open(fbx_path, 'rb') as f:
+    fbx_bytes = f.read()
+
+def fbx_first_offset(material_name):
+    if material_name == 'unassigned':
+        return None
+    offset = fbx_bytes.find(material_name.encode('utf-8'))
+    return offset if offset >= 0 else None
+
+first_seen_order = {{name: index for index, name in enumerate(material_first_seen)}}
+material_offsets = {{name: fbx_first_offset(name) for name in material_first_seen}}
+ordered_material_names = sorted(
+    material_first_seen,
+    key=lambda name: (
+        material_offsets[name] is None,
+        material_offsets[name] if material_offsets[name] is not None else first_seen_order[name],
+        first_seen_order[name],
+    ),
+)
+material_name_to_slot = {{name: index for index, name in enumerate(ordered_material_names)}}
+material_slots = []
+for material_name in ordered_material_names:
+    offset = material_offsets[material_name]
+    evidence = material_first_evidence[material_name]
+    material_slots.append({{
+        'slot': material_name_to_slot[material_name],
+        'name': material_name,
+        'first_object': evidence['first_object'],
+        'first_local_slot': evidence['first_local_slot'],
+        'fbx_first_offset': offset,
+        'slot_source': 'fbx_name_first_offset' if offset is not None else 'blender_first_seen_fallback',
+        'physicalize': 'no',
+    }})
+
+for polygon in polygons:
+    material_slot = material_name_to_slot[polygon['material_name']]
+    polygon['material_table_slot'] = material_slot
+    polygon['expected_cgf_material_id'] = material_slot
+
 manifest = {{
     'manifest_kind': 'blender-fbx-material-inspection',
     'fbx': fbx_path,
+    'material_slot_order_source': 'fbx_name_first_offset',
+    'polygon_verification': 'material_table_only',
     'objects': objects,
     'materials': material_slots,
     'polygons': polygons,

@@ -2,6 +2,7 @@ import json
 import xml.etree.ElementTree as ET
 
 from tools.material_mapping_report import (
+    build_existing_output_material_report,
     build_material_mapping_report,
     discover_fixture_manifest,
     evaluate_cgf_import_settings_roundtrip,
@@ -296,6 +297,34 @@ def test_evaluate_cgf_import_settings_roundtrip_matches_request_mtl_and_cgf_mtl_
     ]
 
 
+def test_evaluate_cgf_import_settings_roundtrip_accepts_request_wrapped_import_settings():
+    result = evaluate_cgf_import_settings_roundtrip(
+        {
+            "import_settings": [
+                {
+                    "chunk_id": 23,
+                    "version": 0,
+                    "json_error": "",
+                    "json": {
+                        "request": {
+                            "materials": [
+                                {"name": "Stone", "physicalize": "no", "sub_index": 0},
+                            ]
+                        }
+                    },
+                }
+            ],
+            "materials": [{"sub_materials": [{"slot": 0, "name": "Stone"}]}],
+            "material_ids": [0],
+        },
+        [{"order": 0, "name": "Stone", "sub_index": 0, "physicalize": "no"}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert result["ok"]
+    assert result["import_settings_meta"] == {"chunk_id": 23, "version": 0, "material_count": 1}
+
+
 def test_evaluate_cgf_import_settings_roundtrip_reports_material_mismatches():
     result = evaluate_cgf_import_settings_roundtrip(
         {
@@ -532,6 +561,41 @@ def test_evaluate_fixture_material_semantics_accepts_preserved_suffix_names():
     assert result["manifest_kind"] == "multi-mesh-name-conflict"
     assert result["duplicate_request_material_names"] == []
     assert result["polygon_checks"][1]["request_names_for_actual_id"] == ["DuplicateSurface.001"]
+
+
+def test_evaluate_fixture_material_semantics_skips_generic_polygon_center_checks():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "polygon_verification": "material_table_only",
+            "materials": [{"slot": 0, "name": "Stone"}],
+            "polygons": [
+                {
+                    "polygon": 0,
+                    "material_name": "Stone",
+                    "expected_cgf_material_id": 0,
+                    "center_x": 999.0,
+                }
+            ],
+        },
+        {
+            "meshes": [
+                {
+                    "chunk_id": 10,
+                    "subsets": [{"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0}],
+                }
+            ]
+        },
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert result["ok"]
+    assert result["polygon_verification"] == "material_table_only"
+    assert result["polygon_checks_skipped"]
+    assert result["polygon_count"] == 1
+    assert result["polygon_checks"] == []
+    assert result["subset_entries"] == []
 
 
 def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
@@ -931,6 +995,41 @@ def test_build_and_write_material_mapping_report(tmp_path):
     report_path = tmp_path / "asset.material_report.json"
     write_material_mapping_report(report, str(report_path))
     assert json.loads(report_path.read_text(encoding="utf-8"))["alignment"]["ok"]
+
+
+def test_build_existing_output_material_report_uses_cgf_import_settings_when_json_missing(monkeypatch, tmp_path):
+    cgf_path = tmp_path / "asset.cgf"
+    cgf_path.write_bytes(b"cgf")
+    mtl_path = tmp_path / "asset.mtl"
+    root = ET.Element("Material")
+    sub_materials = ET.SubElement(root, "SubMaterials")
+    ET.SubElement(sub_materials, "Material", Name="Stone", Shader="Illum")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8", xml_declaration=True)
+
+    monkeypatch.setattr(
+        "tools.material_mapping_report.read_cgf_material_summary",
+        lambda path: {
+            "path": path,
+            "import_settings": [
+                {
+                    "chunk_id": 9,
+                    "version": 0,
+                    "json_error": "",
+                    "json": {"request": {"materials": [{"name": "Stone", "physicalize": "no", "sub_index": 0}]}},
+                }
+            ],
+            "materials": [{"sub_materials": [{"slot": 0, "name": "Stone"}]}],
+            "material_ids": [0],
+        },
+    )
+
+    report = build_existing_output_material_report(str(cgf_path), str(mtl_path))
+
+    assert report["request_source"]["type"] == "cgf_import_settings"
+    assert report["request_source"]["import_settings_meta"] == {"chunk_id": 9, "version": 0, "material_count": 1}
+    assert report["alignment"]["ok"]
+    assert report["cgf_import_settings_alignment"]["ok"]
+    assert report["cgf_material_id_alignment"]["ok"]
 
 
 def test_build_material_mapping_report_surfaces_malformed_mtl_and_cryasset_xml(tmp_path):

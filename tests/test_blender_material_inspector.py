@@ -17,8 +17,13 @@ def test_blender_script_imports_fbx_and_writes_material_table_manifest():
 
     assert "bpy.ops.import_scene.fbx" in script
     assert "'manifest_kind': 'blender-fbx-material-inspection'" in script
-    assert "'material_table_slot': material_slot" in script
-    assert "'expected_cgf_material_id': material_slot" in script
+    assert "polygon['material_table_slot'] = material_slot" in script
+    assert "polygon['expected_cgf_material_id'] = material_slot" in script
+    assert "'fbx_first_offset': offset" in script
+    assert "'slot_source': 'fbx_name_first_offset' if offset is not None else 'blender_first_seen_fallback'" in script
+    assert "'physicalize': 'no'" in script
+    assert "'material_slot_order_source': 'fbx_name_first_offset'" in script
+    assert "'polygon_verification': 'material_table_only'" in script
 
 
 def test_inspect_fbx_materials_rejects_missing_blender(tmp_path):
