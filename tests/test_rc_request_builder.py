@@ -89,6 +89,55 @@ def test_request_schema_diagnostics_report_internal_field_contamination():
     ]
 
 
+def test_request_schema_diagnostics_report_invalid_rc_values():
+    request = build_import_request(sample_model(), "chair.fbx")
+    request["output_ext"] = "abc"
+    request["materials"][0]["name"] = ""
+    request["materials"][0]["physicalize"] = "render_only"
+    request["materials"][0]["sub_index"] = True
+    request["materials"][1]["sub_index"] = 128
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_invalid_output_ext",
+        "rc_request_invalid_material_name",
+        "rc_request_invalid_material_physicalize",
+        "rc_request_invalid_material_sub_index",
+        "rc_request_invalid_material_sub_index",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "output_ext",
+        "materials[0].name",
+        "materials[0].physicalize",
+        "materials[0].sub_index",
+        "materials[1].sub_index",
+    ]
+    assert diagnostics[0]["allowed_values"] == sorted(RC_IMPORT_OUTPUT_EXTENSIONS)
+    assert diagnostics[2]["allowed_values"] == sorted(RC_IMPORT_PHYSICALIZE_VALUES)
+    assert diagnostics[4]["max_value"] == 127
+
+
+def test_request_schema_diagnostics_report_invalid_collections_and_rows():
+    request = build_import_request(sample_model(), "chair.fbx")
+    request["materials"] = ["bad-material-row"]
+    request["nodes"] = "bad-node-collection"
+    request["jointPhysicsData"] = [False]
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_invalid_collection",
+        "rc_request_invalid_material_row",
+        "rc_request_invalid_joint_physics_row",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "nodes",
+        "materials[0]",
+        "jointPhysicsData[0]",
+    ]
+
+
 def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
     request = build_import_request(sample_model(), "chair.fbx")
 
@@ -255,6 +304,13 @@ def test_wrap_import_request_rejects_unknown_rc_fields():
         wrap_import_request(request)
 
 
+def test_wrap_import_request_rejects_invalid_rc_values():
+    request = build_import_request(sample_model(), "chair.fbx", output_ext="abc")
+
+    with pytest.raises(ValueError, match="output_ext"):
+        wrap_import_request(request)
+
+
 def test_export_json_writes_request_wrapper_by_default(tmp_path):
     success, output_file = export_json(sample_model(), "chair.fbx", str(tmp_path))
 
@@ -263,6 +319,14 @@ def test_export_json_writes_request_wrapper_by_default(tmp_path):
     assert set(payload.keys()) == {"request"}
     assert payload["request"]["source_filename"] == "chair.fbx"
     assert output_file.endswith("chair.json")
+
+
+def test_export_json_rejects_invalid_rc_request_values(tmp_path):
+    success, message = export_json(sample_model(), "chair.fbx", str(tmp_path), output_ext="abc")
+
+    assert not success
+    assert "source-unsupported fields: output_ext" in message
+    assert not (tmp_path / "chair.json").exists()
 
 
 def test_export_json_preserves_fbx_slot_order_over_existing_mtl_name_order(tmp_path):
