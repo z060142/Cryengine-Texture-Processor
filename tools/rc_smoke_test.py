@@ -39,6 +39,7 @@ from tools.material_report_summary import compact_material_report_summary, forma
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
 from tools.mtl_material_state_compare import write_material_state_compare_report
 from tools.mtl_schema_report import build_mtl_schema_report, write_mtl_schema_report
+from tools.obj_mtl_report import parse_obj_mtl
 from utils.rc_import_runner import RCImportRunner, RCImportResult
 
 
@@ -146,6 +147,15 @@ def load_material_overrides(overrides_path):
     if isinstance(payload, dict):
         return payload
     raise ValueError(f"Material overrides JSON must be an object: {overrides_path}")
+
+
+def load_external_material_texture_evidence(evidence_path):
+    if not evidence_path:
+        return None
+    if evidence_path.lower().endswith(".json"):
+        with open(evidence_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return parse_obj_mtl(evidence_path)
 
 
 def apply_material_overrides_to_specs(material_specs, material_overrides=None):
@@ -289,6 +299,7 @@ def build_smoke_materials_data(
     texture_output_dir="",
     texture_output_format="tif",
     material_overrides=None,
+    external_material_texture_evidence=None,
     model_loader_factory=None,
     texture_extractor_factory=None,
 ):
@@ -325,6 +336,8 @@ def build_smoke_materials_data(
             model_data["material_manifest"] = manifest_info
         if material_overrides:
             model_data["material_overrides"] = material_overrides
+        if external_material_texture_evidence:
+            model_data["external_material_texture_evidence"] = external_material_texture_evidence
 
         texture_refs = texture_extractor_factory().extract(model_data)
         materials_data = build_mtl_material_data(
@@ -343,6 +356,7 @@ def build_smoke_materials_data(
                 "material_count": len(materials_data),
                 "texture_output_dir": texture_output_dir,
                 "texture_output_format": texture_output_format,
+                "external_material_texture_evidence": bool(external_material_texture_evidence),
             }
         )
         return materials_data or fallback_materials, texture_diagnostics
@@ -368,6 +382,7 @@ def prepare_smoke_bundle(
     texture_output_dir="",
     texture_output_format="tif",
     material_overrides=None,
+    external_material_texture_evidence=None,
 ):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
@@ -389,6 +404,7 @@ def prepare_smoke_bundle(
         texture_output_dir=texture_output_dir,
         texture_output_format=texture_output_format,
         material_overrides=material_overrides,
+        external_material_texture_evidence=external_material_texture_evidence,
     )
     mtl_filename = f"{asset_name}.mtl"
     mtl_success, mtl_result = export_mtl(
@@ -443,6 +459,7 @@ def run_rc_smoke_test(
     texture_output_dir="",
     texture_output_format="tif",
     material_overrides=None,
+    external_material_texture_evidence=None,
     reference_mtl_path="",
     material_state_compare_output_path="",
     mtl_schema_gate_output_path="",
@@ -472,6 +489,7 @@ def run_rc_smoke_test(
             texture_output_dir=texture_output_dir,
             texture_output_format=texture_output_format,
             material_overrides=material_overrides,
+            external_material_texture_evidence=external_material_texture_evidence,
         )
     except Exception as e:
         return RCSmokeResult(False, work_dir, rc_exe_path, source_fbx_path, error=str(e))
@@ -691,6 +709,11 @@ def main(argv=None):
         help="Optional JSON file containing material_overrides keyed by material name.",
     )
     parser.add_argument(
+        "--obj-mtl-evidence",
+        default="",
+        help="Optional Wavefront OBJ .mtl or obj_mtl_report JSON used as fallback material texture evidence.",
+    )
+    parser.add_argument(
         "--reference-mtl",
         default="",
         help="Optional reference/native .mtl to compare against the generated .mtl material state.",
@@ -727,6 +750,11 @@ def main(argv=None):
         else material_specs_from_arg(args.materials)
     )
     material_overrides = load_material_overrides(args.material_overrides) if args.material_overrides else {}
+    external_material_texture_evidence = (
+        load_external_material_texture_evidence(args.obj_mtl_evidence)
+        if args.obj_mtl_evidence
+        else None
+    )
 
     result = run_rc_smoke_test(
         args.rc,
@@ -737,6 +765,7 @@ def main(argv=None):
         texture_output_dir=args.texture_output_dir,
         texture_output_format=args.texture_output_format,
         material_overrides=material_overrides,
+        external_material_texture_evidence=external_material_texture_evidence,
         reference_mtl_path=args.reference_mtl,
         material_state_compare_output_path=args.material_state_compare_output,
         mtl_schema_gate_output_path=args.mtl_schema_gate_output,

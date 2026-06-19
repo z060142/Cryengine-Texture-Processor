@@ -145,6 +145,59 @@ def texture_ref_evidence(material_refs):
     return evidence
 
 
+def _external_material_texture_table(model_data):
+    raw = (
+        model_data.get("external_material_texture_evidence")
+        or model_data.get("obj_mtl_report")
+        or {}
+    )
+    if not raw:
+        return {}
+
+    materials = raw.get("materials", raw) if isinstance(raw, dict) else raw
+    table = {}
+    if isinstance(materials, dict):
+        iterable = materials.items()
+    else:
+        iterable = []
+        if isinstance(materials, list):
+            iterable = ((item.get("name"), item) for item in materials if isinstance(item, dict))
+
+    for material_name, material in iterable:
+        if not material_name or not isinstance(material, dict):
+            continue
+        textures = material.get("textures", [])
+        if isinstance(textures, dict):
+            textures = [
+                {
+                    "texture_type": texture_type,
+                    "file": texture_path,
+                    "filename": os.path.basename(str(texture_path)),
+                }
+                for texture_type, texture_path in textures.items()
+                if texture_path
+            ]
+        table[str(material_name)] = [texture for texture in textures if isinstance(texture, dict)]
+    return table
+
+
+def external_texture_evidence(material_name, model_data):
+    """Return optional OBJ-MTL/native evidence rows for a material name."""
+    rows = _external_material_texture_table(model_data).get(material_name, [])
+    evidence = []
+    for row in rows:
+        ref_path = row.get("file") or row.get("path") or row.get("filename") or ""
+        evidence.append(
+            {
+                "path": ref_path,
+                "filename": os.path.basename(ref_path) if ref_path else row.get("filename", ""),
+                "texture_type": row.get("texture_type") or row.get("type", ""),
+                "source_mode": row.get("source_mode", "external_obj_mtl"),
+            }
+        )
+    return evidence
+
+
 def material_mtl_overrides(material):
     return {
         key: material[key]
@@ -177,7 +230,7 @@ def _material_override_table(model_data):
     return {}
 
 
-def resolve_base_name(material_refs, texture_manager, suffixes=COMMON_TEXTURE_BASE_SUFFIXES):
+def resolve_base_name(material_refs, texture_manager, suffixes=COMMON_TEXTURE_BASE_SUFFIXES, external_refs=None):
     """
     Resolve the processed texture base name for a material.
 
@@ -200,6 +253,22 @@ def resolve_base_name(material_refs, texture_manager, suffixes=COMMON_TEXTURE_BA
         if ref_path:
             filename_no_ext = os.path.splitext(os.path.basename(ref_path))[0]
             return strip_known_texture_suffix(filename_no_ext, suffixes)
+
+    for ref in external_refs or []:
+        ref_path = ref.get("file") or ref.get("path") or ref.get("filename") or ""
+        if not ref_path:
+            continue
+        texture_type = ref.get("texture_type") or ref.get("type", "")
+        if texture_type in {"normal", "bump"} and not any(
+            preferred.get("texture_type") in {"diffuse", "ambient", "specular", "reflection"}
+            for preferred in external_refs or []
+            if isinstance(preferred, dict)
+        ):
+            continue
+        filename_no_ext = os.path.splitext(os.path.basename(ref_path))[0]
+        base_name = strip_known_texture_suffix(filename_no_ext, suffixes)
+        if base_name:
+            return base_name
 
     return None
 
@@ -292,6 +361,7 @@ def build_material_texture_records(
     """
     suffix_map = suffix_map or MTL_OUTPUT_TEXTURE_SUFFIXES
     refs_by_material = group_texture_refs_by_material(texture_refs)
+    external_refs_by_material = _external_material_texture_table(model_data)
     records = []
 
     source_materials = material_manifest_materials(
@@ -305,7 +375,8 @@ def build_material_texture_records(
             **overrides_by_name.get(material_name, {}),
         }
         material_refs = refs_by_material.get(material_name, [])
-        base_name = resolve_base_name(material_refs, texture_manager)
+        external_refs = external_refs_by_material.get(material_name, [])
+        base_name = resolve_base_name(material_refs, texture_manager, external_refs=external_refs)
         processed_textures = find_processed_textures(
             base_name,
             texture_output_dir,
@@ -333,8 +404,10 @@ def build_material_texture_records(
                     "slot_name_conflict": material.get("slot_name_conflict", False),
                     "base_name": base_name,
                     "textures": processed_textures,
-                    "texture_ref_evidence": texture_ref_evidence(material_refs),
+                    "texture_ref_evidence": texture_ref_evidence(material_refs)
+                    + external_texture_evidence(material_name, model_data),
                     "source_texture_count": len(material_refs),
+                    "external_texture_count": len(external_refs),
                     "mtl_overrides": material_mtl_overrides(material),
                 }
             )

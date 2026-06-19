@@ -379,3 +379,44 @@ def test_build_mtl_material_data_resolves_manifest_only_material_textures(tmp_pa
 
     assert [item["name"] for item in result] == ["Stone", "Glass"]
     assert result[1]["textures"]["diffuse"] == str(tmp_path / "Glass_diff.tif")
+
+
+def test_build_mtl_material_data_uses_external_obj_mtl_evidence_when_fbx_refs_missing(tmp_path):
+    (tmp_path / "KB3D_DKF_metalA_diff.tif").write_text("fake diff")
+    (tmp_path / "KB3D_DKF_metalA_spec.tif").write_text("fake spec")
+    (tmp_path / "KB3D_DKF_metalA_ddna.tif").write_text("fake ddna")
+    model_data = {
+        "materials": [{"name": "metalA"}],
+        "external_material_texture_evidence": {
+            "materials": [
+                {
+                    "name": "metalA",
+                    "textures": [
+                        {
+                            "statement": "map_Kd",
+                            "texture_type": "diffuse",
+                            "file": "KB3D_DKF_metalA_Diffuse.jpg",
+                        },
+                        {
+                            "statement": "map_Ks",
+                            "texture_type": "specular",
+                            "file": "KB3D_DKF_metalA_Spec.jpg",
+                        },
+                    ],
+                }
+            ]
+        },
+    }
+
+    result = build_mtl_material_data(
+        model_data,
+        [],
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert result[0]["textures"]["diffuse"] == str(tmp_path / "KB3D_DKF_metalA_diff.tif")
+    assert result[0]["textures"]["specular"] == str(tmp_path / "KB3D_DKF_metalA_spec.tif")
+    assert result[0]["textures"]["normal"] == str(tmp_path / "KB3D_DKF_metalA_ddna.tif")
+    assert result[0]["texture_ref_evidence"][0]["source_mode"] == "external_obj_mtl"
