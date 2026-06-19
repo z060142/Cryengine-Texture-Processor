@@ -263,15 +263,11 @@ def test_exported_material_shader_policy_exposes_current_compatibility_rules():
     )
 
     assert policy["tokens"] == [
-        "%DISPLACEMENT_MAPPING",
         "%NORMAL_MAP",
-        "%PHONG_TESSELLATION",
         "%SPECULAR_MAP",
         "%SUBSURFACE_SCATTERING",
     ]
-    assert policy["string_gen_mask"] == (
-        "%DISPLACEMENT_MAPPING%NORMAL_MAP%PHONG_TESSELLATION%SPECULAR_MAP%SUBSURFACE_SCATTERING"
-    )
+    assert policy["string_gen_mask"] == "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING"
     assert policy["gen_mask"] == exported_gen_mask(policy["tokens"])
     assert policy["gen_mask_policy"] == "compatibility_preserved_until_roundtrip_evidence"
     assert policy["string_gen_mask_source"] == "source_backed_token_names"
@@ -283,11 +279,10 @@ def test_exported_material_shader_policy_exposes_current_compatibility_rules():
         "source": "exporter_default_compatibility",
         "texture_type": "",
     }
-    assert policy["public_params"]["TessellationFactorMax"] == "32"
-    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
-        "source": "displacement_texture_compatibility",
-        "texture_type": "displacement",
-    }
+    assert "%DISPLACEMENT_MAPPING" not in policy["token_reasons"]
+    assert "%PHONG_TESSELLATION" not in policy["token_reasons"]
+    assert "TessellationFactorMax" not in policy["public_params"]
+    assert "TessellationFactorMax" not in policy["public_param_reasons"]
 
 
 def test_exported_material_shader_policy_accepts_ce_map_names_as_texture_keys():
@@ -300,9 +295,7 @@ def test_exported_material_shader_policy_accepts_ce_map_names_as_texture_keys():
     )
 
     assert policy["tokens"] == [
-        "%DISPLACEMENT_MAPPING",
         "%NORMAL_MAP",
-        "%PHONG_TESSELLATION",
         "%SPECULAR_MAP",
         "%SUBSURFACE_SCATTERING",
     ]
@@ -310,15 +303,10 @@ def test_exported_material_shader_policy_accepts_ce_map_names_as_texture_keys():
         "source": "texture_presence",
         "texture_type": "bumpmap",
     }
-    assert policy["token_reasons"]["%DISPLACEMENT_MAPPING"] == {
-        "source": "texture_presence",
-        "texture_type": "heightmap",
-    }
-    assert policy["public_params"]["TessellationFactorMax"] == "32"
-    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
-        "source": "displacement_texture_compatibility",
-        "texture_type": "heightmap",
-    }
+    assert "%DISPLACEMENT_MAPPING" not in policy["token_reasons"]
+    assert "%PHONG_TESSELLATION" not in policy["token_reasons"]
+    assert "TessellationFactorMax" not in policy["public_params"]
+    assert "TessellationFactorMax" not in policy["public_param_reasons"]
 
 
 def test_exported_material_attribute_policy_marks_source_backed_and_compat_defaults():

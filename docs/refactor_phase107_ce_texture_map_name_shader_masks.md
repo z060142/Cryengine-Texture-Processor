@@ -1,5 +1,12 @@
 # Phase 107 - CE Texture Map Name Shader Masks
 
+## Superseded Note
+
+Phase 126 corrects one rule in this document: `Heightmap` texture presence must
+not automatically enable `%DISPLACEMENT_MAPPING`, `%PHONG_TESSELLATION`, or
+tessellation `PublicParams`. `Heightmap` remains a valid CE texture map name, but
+displacement/tessellation is explicit shader material state.
+
 ## Goal
 
 Make MTL shader-mask generation accept CryEngine material texture map names as texture keys.

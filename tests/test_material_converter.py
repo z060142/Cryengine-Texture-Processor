@@ -42,7 +42,7 @@ def test_convert_maps_classified_texture_keys_to_cryengine_fields():
     assert result["Textures"]["Opacity"] == "wall_opacity.tif"
     assert "%NORMAL_MAP" in result["StringGenMask"]
     assert "%SPECULAR_MAP" in result["StringGenMask"]
-    assert "%DISPLACEMENT_MAPPING" in result["StringGenMask"]
+    assert "%DISPLACEMENT_MAPPING" not in result["StringGenMask"]
 
 
 def test_convert_skips_known_non_mtl_texture_channels():

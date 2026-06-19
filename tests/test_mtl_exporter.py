@@ -70,8 +70,8 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     assert material.get("Emittance") == "1,1,1,10"
     assert "%NORMAL_MAP" in material.get("StringGenMask")
     assert "%SPECULAR_MAP" in material.get("StringGenMask")
-    assert "%DISPLACEMENT_MAPPING" in material.get("StringGenMask")
-    assert "%PHONG_TESSELLATION" in material.get("StringGenMask")
+    assert "%DISPLACEMENT_MAPPING" not in material.get("StringGenMask")
+    assert "%PHONG_TESSELLATION" not in material.get("StringGenMask")
 
     texture_maps = {
         texture.get("Map"): texture.get("File")
@@ -87,7 +87,7 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
         "Opacity": "./asset_opacity.dds",
     }
     public_params = material.find("PublicParams")
-    assert public_params.get("TessellationFactorMax") == "32"
+    assert public_params.get("TessellationFactorMax") is None
     diffuse_texmod = next(texture for texture in list(material.find("Textures")) if texture.get("Map") == "Diffuse").find(
         "TexMod"
     )
@@ -120,8 +120,8 @@ def test_build_mtl_document_accepts_cryengine_texture_map_names_for_shader_masks
     material = root.find("SubMaterials").find("Material")
     assert "%NORMAL_MAP" in material.get("StringGenMask")
     assert "%SPECULAR_MAP" in material.get("StringGenMask")
-    assert "%DISPLACEMENT_MAPPING" in material.get("StringGenMask")
-    assert "%PHONG_TESSELLATION" in material.get("StringGenMask")
+    assert "%DISPLACEMENT_MAPPING" not in material.get("StringGenMask")
+    assert "%PHONG_TESSELLATION" not in material.get("StringGenMask")
 
     texture_maps = {
         texture.get("Map"): texture.get("File")

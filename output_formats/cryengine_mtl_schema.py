@@ -341,8 +341,6 @@ EXPORT_SHADER_TOKEN_BY_TEXTURE_TYPE = {
     "normal": ["%NORMAL_MAP"],
     "bumpmap": ["%NORMAL_MAP"],
     "specular": ["%SPECULAR_MAP"],
-    "displacement": ["%DISPLACEMENT_MAPPING", "%PHONG_TESSELLATION"],
-    "heightmap": ["%DISPLACEMENT_MAPPING", "%PHONG_TESSELLATION"],
 }
 
 EXPORT_DEFAULT_SHADER_TOKENS = ["%SUBSURFACE_SCATTERING"]
@@ -365,15 +363,6 @@ BASE_PUBLIC_PARAMS = {
     "EmittanceMapGamma": "1",
     "SSSIndex": "0",
 }
-
-DISPLACEMENT_PUBLIC_PARAMS = {
-    "TessellationDispBias": "0.5",
-    "TessellationFactor": "1",
-    "TessellationFactorMax": "32",
-    "TessellationFactorMin": "1",
-    "TessellationHeightScale": "1",
-}
-
 
 def compose_mtl_flags(*flags):
     value = 0
@@ -665,7 +654,10 @@ def exported_material_shader_policy(textures):
     Return the current exporter shader-mask/PublicParams policy for texture inputs.
 
     This intentionally preserves the current compatibility GenMask values while
-    making the guessed/exporter-owned pieces visible to reports and tests.
+    making the exporter-owned pieces visible to reports and tests. Texture map
+    presence only enables source-observed texture-bound tokens such as normal
+    and specular maps; Heightmap remains a texture slot and does not imply
+    displacement/tessellation shader features by itself.
     """
     texture_keys = {
         str(texture_type).lower()
@@ -694,18 +686,6 @@ def exported_material_shader_policy(textures):
             token_reasons[token] = {
                 "source": "texture_presence",
                 "texture_type": texture_type,
-            }
-
-    displacement_texture_type = "displacement" if "displacement" in texture_keys else ""
-    if not displacement_texture_type and "heightmap" in texture_keys:
-        displacement_texture_type = "heightmap"
-
-    if displacement_texture_type:
-        public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
-        for name in DISPLACEMENT_PUBLIC_PARAMS:
-            public_param_reasons[name] = {
-                "source": "displacement_texture_compatibility",
-                "texture_type": displacement_texture_type,
             }
 
     return {

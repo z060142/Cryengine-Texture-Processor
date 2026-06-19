@@ -520,9 +520,7 @@
       },
       "normal_specular_displacement": {
         "tokens": [
-          "%DISPLACEMENT_MAPPING",
           "%NORMAL_MAP",
-          "%PHONG_TESSELLATION",
           "%SPECULAR_MAP",
           "%SUBSURFACE_SCATTERING"
         ],
@@ -530,14 +528,6 @@
           "%SUBSURFACE_SCATTERING": {
             "source": "exporter_default_compatibility",
             "texture_type": ""
-          },
-          "%DISPLACEMENT_MAPPING": {
-            "source": "texture_presence",
-            "texture_type": "displacement"
-          },
-          "%PHONG_TESSELLATION": {
-            "source": "texture_presence",
-            "texture_type": "displacement"
           },
           "%NORMAL_MAP": {
             "source": "texture_presence",
@@ -548,19 +538,14 @@
             "texture_type": "specular"
           }
         },
-        "gen_mask": 5664683906826272,
+        "gen_mask": 1125899907366944,
         "gen_mask_source": "EXPORT_COMPAT_SHADER_MASKS",
         "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
-        "string_gen_mask": "%DISPLACEMENT_MAPPING%NORMAL_MAP%PHONG_TESSELLATION%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
         "string_gen_mask_source": "source_backed_token_names",
         "public_params": {
           "EmittanceMapGamma": "1",
-          "SSSIndex": "0",
-          "TessellationDispBias": "0.5",
-          "TessellationFactor": "1",
-          "TessellationFactorMax": "32",
-          "TessellationFactorMin": "1",
-          "TessellationHeightScale": "1"
+          "SSSIndex": "0"
         },
         "public_param_reasons": {
           "EmittanceMapGamma": {
@@ -568,26 +553,6 @@
           },
           "SSSIndex": {
             "source": "exporter_base_compatibility"
-          },
-          "TessellationDispBias": {
-            "source": "displacement_texture_compatibility",
-            "texture_type": "displacement"
-          },
-          "TessellationFactor": {
-            "source": "displacement_texture_compatibility",
-            "texture_type": "displacement"
-          },
-          "TessellationFactorMax": {
-            "source": "displacement_texture_compatibility",
-            "texture_type": "displacement"
-          },
-          "TessellationFactorMin": {
-            "source": "displacement_texture_compatibility",
-            "texture_type": "displacement"
-          },
-          "TessellationHeightScale": {
-            "source": "displacement_texture_compatibility",
-            "texture_type": "displacement"
           }
         },
         "public_params_policy": "compatibility_preserved_until_roundtrip_evidence",

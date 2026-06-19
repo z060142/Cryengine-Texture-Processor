@@ -194,9 +194,7 @@ def test_build_material_diagnostics_report_includes_mtl_shader_policy():
     policy = report["materials"][0]["mtl_shader_policy"]
 
     assert policy["tokens"] == [
-        "%DISPLACEMENT_MAPPING",
         "%NORMAL_MAP",
-        "%PHONG_TESSELLATION",
         "%SPECULAR_MAP",
         "%SUBSURFACE_SCATTERING",
     ]
@@ -206,11 +204,8 @@ def test_build_material_diagnostics_report_includes_mtl_shader_policy():
         "source": "texture_presence",
         "texture_type": "normal",
     }
-    assert policy["public_params"]["TessellationFactorMax"] == "32"
-    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
-        "source": "displacement_texture_compatibility",
-        "texture_type": "displacement",
-    }
+    assert "TessellationFactorMax" not in policy["public_params"]
+    assert "TessellationFactorMax" not in policy["public_param_reasons"]
 
 
 def test_build_material_diagnostics_report_includes_mtl_flags_policy():
@@ -570,9 +565,7 @@ def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
 
     assert summary["material_count"] == 2
     assert summary["token_counts"] == {
-        "%DISPLACEMENT_MAPPING": 1,
         "%NORMAL_MAP": 2,
-        "%PHONG_TESSELLATION": 1,
         "%SPECULAR_MAP": 1,
         "%SUBSURFACE_SCATTERING": 2,
     }
@@ -586,7 +579,7 @@ def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
         "compatibility_preserved_until_roundtrip_evidence": 2,
     }
     assert summary["public_param_counts"]["EmittanceMapGamma"] == 2
-    assert summary["public_param_counts"]["TessellationFactorMax"] == 1
+    assert "TessellationFactorMax" not in summary["public_param_counts"]
 
 
 def test_build_material_diagnostics_report_flags_used_ignored_source_material():
