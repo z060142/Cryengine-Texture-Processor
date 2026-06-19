@@ -17,6 +17,7 @@ add_repo_root()
 
 from output_formats.cryengine_mtl_schema import (
     analyze_ce_texture_map_entry,
+    analyze_ce_texture_path_reuse,
     analyze_public_params,
     describe_mtl_flags,
     exported_material_attribute_policy,
@@ -137,6 +138,7 @@ def analyze_material_element(element, location):
     public_params = _child_attributes(element, "PublicParams")
     mtl_flags_analysis = describe_mtl_flags(element.get("MtlFlags", ""))
     attributes = _attributes(element)
+    textures = _texture_entries(element)
     return {
         "location": location,
         "tag": element.tag,
@@ -151,7 +153,17 @@ def analyze_material_element(element, location):
         "attribute_policy_analysis": _analyze_material_attributes(attributes),
         "public_params": public_params,
         "public_param_analysis": analyze_public_params(public_params),
-        "textures": _texture_entries(element),
+        "textures": textures,
+        "texture_path_reuse_diagnostics": analyze_ce_texture_path_reuse(
+            [
+                {
+                    "ce_map_type": texture["map"],
+                    "texture_path": texture["file"],
+                    "suffix_analysis": texture["texture_map_analysis"]["suffix_analysis"],
+                }
+                for texture in textures
+            ]
+        ),
         "child_tags": [child.tag for child in list(element)],
     }
 
@@ -202,6 +214,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     texture_map_unknown_counts = Counter()
     texture_suffix_status_counts = Counter()
     texture_expected_suffix_counts = Counter()
+    texture_path_reuse_diagnostic_counts = Counter()
     texmod_status_counts = Counter()
     texmod_attribute_counts = Counter()
     texmod_extra_attribute_counts = Counter()
@@ -279,6 +292,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                     texmod_attribute_counts[attr_name] += 1
                 for attr_name in texmod_analysis["extra_attrs"]:
                     texmod_extra_attribute_counts[attr_name] += 1
+            for diagnostic in material["texture_path_reuse_diagnostics"]:
+                texture_path_reuse_diagnostic_counts[diagnostic["code"]] += 1
             if material["string_gen_mask"]:
                 string_gen_mask_counts[material["string_gen_mask"]] += 1
             if material["gen_mask"]["literal"]:
@@ -316,6 +331,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "texture_map_unknowns": _counter_to_sorted_pairs(texture_map_unknown_counts),
             "texture_suffix_statuses": _counter_to_sorted_pairs(texture_suffix_status_counts),
             "texture_expected_suffixes": _counter_to_sorted_pairs(texture_expected_suffix_counts),
+            "texture_path_reuse_diagnostics": _counter_to_sorted_pairs(texture_path_reuse_diagnostic_counts),
             "texmod_statuses": _counter_to_sorted_pairs(texmod_status_counts),
             "texmod_attributes": _counter_to_sorted_pairs(texmod_attribute_counts),
             "texmod_extra_attributes": _counter_to_sorted_pairs(texmod_extra_attribute_counts),

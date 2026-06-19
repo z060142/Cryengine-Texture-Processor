@@ -415,6 +415,36 @@ def test_build_material_diagnostics_report_accepts_ddna_bumpmap_alias():
     assert report["diagnostics"] == []
 
 
+def test_build_material_diagnostics_report_warns_for_shared_texture_path_across_ce_maps():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Bush",
+                "id": 1,
+                "textures": {
+                    "diffuse": "rock_face_01_diff.tif",
+                    "specular": "rock_face_01_diff.tif",
+                    "displacement": "rock_face_01_diff.tif",
+                    "opacity": "rock_face_01_diff.tif",
+                },
+            }
+        ],
+        source_model="shared_texture_maps.fbx",
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert codes == [
+        "mismatch_ce_texture_suffix",
+        "mismatch_ce_texture_suffix",
+        "shared_texture_path_across_ce_maps",
+    ]
+    reuse = report["diagnostics"][2]
+    assert reuse["material"] == "Bush"
+    assert reuse["ce_map_types"] == ["Diffuse", "Heightmap", "Opacity", "Specular"]
+    assert reuse["expected_suffixes"] == ["_diff", "_displ", "_spec"]
+    assert reuse["normalized_texture_path"] == "rock_face_01_diff.tif"
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [

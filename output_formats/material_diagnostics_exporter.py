@@ -11,6 +11,7 @@ from model_processing.material_manifest import material_manifest_table_diagnosti
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 from output_formats.cryengine_mtl_schema import (
+    analyze_ce_texture_path_reuse,
     exported_material_attribute_policy,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
@@ -55,7 +56,8 @@ def _texture_evidence_diagnostics(report_item):
 
 def _mtl_texture_source_diagnostics(report_item):
     diagnostics = []
-    for entry in report_item.get("mtl_texture_map_policy", {}).get("exported", []):
+    exported_entries = report_item.get("mtl_texture_map_policy", {}).get("exported", [])
+    for entry in exported_entries:
         extension_analysis = entry.get("rc_source_extension_analysis", {})
         suffix_analysis = entry.get("suffix_analysis", {})
         if extension_analysis and not extension_analysis.get("supported", False):
@@ -93,6 +95,15 @@ def _mtl_texture_source_diagnostics(report_item):
                     "message": "Texture filename does not contain the CryEngine suffix expected for this material map.",
                 }
             )
+    for diagnostic in analyze_ce_texture_path_reuse(exported_entries):
+        diagnostics.append(
+            {
+                **diagnostic,
+                "material": report_item["name"],
+                "fbx_slot": report_item["fbx_slot"],
+                "sub_index": report_item["sub_index"],
+            }
+        )
     return diagnostics
 
 

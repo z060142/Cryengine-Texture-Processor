@@ -171,6 +171,26 @@ def test_build_mtl_schema_report_accepts_ddna_bumpmap_alias(tmp_path):
     assert suffix_analysis["matched_suffix"] == "_ddna"
 
 
+def test_build_mtl_schema_report_flags_shared_texture_path_across_ce_maps(tmp_path):
+    mtl_path = tmp_path / "shared_texture_maps.mtl"
+    root = ET.Element("Material", Name="SharedMaps", Shader="Illum")
+    textures = ET.SubElement(root, "Textures")
+    ET.SubElement(textures, "Texture", Map="Diffuse", File="./rock_face_01_diff.dds")
+    ET.SubElement(textures, "Texture", Map="Specular", File="./rock_face_01_diff.dds")
+    ET.SubElement(textures, "Texture", Map="Heightmap", File="./rock_face_01_diff.dds")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8")
+
+    report = build_mtl_schema_report([str(mtl_path)])
+
+    assert {"name": "shared_texture_path_across_ce_maps", "count": 1} in report["schema"][
+        "texture_path_reuse_diagnostics"
+    ]
+    diagnostics = report["files"][0]["materials"][0]["texture_path_reuse_diagnostics"]
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["ce_map_types"] == ["Diffuse", "Heightmap", "Specular"]
+    assert diagnostics[0]["expected_suffixes"] == ["_diff", "_displ", "_spec"]
+
+
 def test_build_mtl_schema_report_can_omit_per_file_records(tmp_path):
     mtl_path = tmp_path / "asset.mtl"
     write_schema_mtl(mtl_path)

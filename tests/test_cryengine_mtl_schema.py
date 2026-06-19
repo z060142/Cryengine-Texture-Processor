@@ -17,6 +17,7 @@ from output_formats.cryengine_mtl_schema import (
     MTL_SUB_MATERIAL_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
     analyze_ce_texture_map_entry,
+    analyze_ce_texture_path_reuse,
     analyze_ce_texture_suffix,
     analyze_rc_texture_source_extension,
     analyze_public_params,
@@ -112,6 +113,34 @@ def test_analyze_rc_texture_source_extension_follows_texture_compiler_supported_
     png = analyze_rc_texture_source_extension("textures/wall_diff.png")
     assert png["supported"] is False
     assert png["status"] == "unsupported_rc_texture_source_extension"
+
+
+def test_analyze_ce_texture_path_reuse_flags_conflicting_expected_suffixes():
+    diagnostics = analyze_ce_texture_path_reuse(
+        [
+            {"ce_map_type": "Diffuse", "texture_path": "./rock_diff.dds"},
+            {"ce_map_type": "Specular", "texture_path": "rock_diff.dds"},
+            {"ce_map_type": "Opacity", "texture_path": "rock_diff.dds"},
+        ]
+    )
+
+    assert len(diagnostics) == 1
+    diagnostic = diagnostics[0]
+    assert diagnostic["code"] == "shared_texture_path_across_ce_maps"
+    assert diagnostic["ce_map_types"] == ["Diffuse", "Opacity", "Specular"]
+    assert diagnostic["expected_suffixes"] == ["_diff", "_spec"]
+    assert diagnostic["normalized_texture_path"] == "rock_diff.dds"
+
+
+def test_analyze_ce_texture_path_reuse_allows_diffuse_opacity_alpha_sharing():
+    diagnostics = analyze_ce_texture_path_reuse(
+        [
+            {"ce_map_type": "Diffuse", "texture_path": "./leaf_diff.dds"},
+            {"ce_map_type": "Opacity", "texture_path": "leaf_diff.dds"},
+        ]
+    )
+
+    assert diagnostics == []
 
 
 def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():

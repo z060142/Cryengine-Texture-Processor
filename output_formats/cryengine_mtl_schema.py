@@ -82,6 +82,15 @@ CE_TEXTURE_SUFFIX_SOURCE = {
     ),
 }
 
+CE_TEXTURE_PATH_REUSE_SOURCE = {
+    "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "rule": (
+        "Texture Map slots have source-backed CE suffix expectations. Reusing "
+        "one texture path across multiple CE map slots with different expected "
+        "suffixes is treated as suspicious mapping evidence, not an RC blocker."
+    ),
+}
+
 RC_TEXTURE_SOURCE_EXTENSIONS = {"dds", "hdr", "tif"}
 
 RC_TEXTURE_SOURCE_EXTENSION_SOURCE = {
@@ -483,6 +492,61 @@ def analyze_rc_texture_source_extension(texture_path):
         "supported_extensions": sorted(RC_TEXTURE_SOURCE_EXTENSIONS),
         "source_evidence": RC_TEXTURE_SOURCE_EXTENSION_SOURCE,
     }
+
+
+def normalize_texture_path_for_diagnostics(texture_path):
+    normalized = str(texture_path or "").strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized.lower()
+
+
+def analyze_ce_texture_path_reuse(texture_entries):
+    grouped = {}
+    for index, entry in enumerate(texture_entries or []):
+        ce_map_type = entry.get("ce_map_type") or entry.get("map") or ""
+        texture_path = entry.get("texture_path") or entry.get("file") or ""
+        suffix_analysis = entry.get("suffix_analysis", {})
+        if not suffix_analysis and ce_map_type:
+            suffix_analysis = analyze_ce_texture_suffix(ce_map_type, texture_path)
+        normalized_path = normalize_texture_path_for_diagnostics(texture_path)
+        if not normalized_path:
+            continue
+        grouped.setdefault(normalized_path, []).append(
+            {
+                "index": index,
+                "ce_map_type": ce_map_type,
+                "texture_path": texture_path,
+                "expected_suffix": suffix_analysis.get("expected_suffix", ""),
+                "suffix_status": suffix_analysis.get("suffix_status", ""),
+                "matched_suffix": suffix_analysis.get("matched_suffix", ""),
+            }
+        )
+
+    diagnostics = []
+    for normalized_path, entries in sorted(grouped.items()):
+        ce_map_types = sorted({entry["ce_map_type"] for entry in entries if entry["ce_map_type"]})
+        expected_suffixes = sorted({entry["expected_suffix"] for entry in entries if entry["expected_suffix"]})
+        if len(ce_map_types) <= 1 or len(expected_suffixes) <= 1:
+            continue
+        diagnostics.append(
+            {
+                "severity": "warning",
+                "code": "shared_texture_path_across_ce_maps",
+                "texture_path": entries[0]["texture_path"],
+                "normalized_texture_path": normalized_path,
+                "ce_map_types": ce_map_types,
+                "expected_suffixes": expected_suffixes,
+                "suffix_statuses": sorted({entry["suffix_status"] for entry in entries if entry["suffix_status"]}),
+                "entries": entries,
+                "message": (
+                    "One texture path is assigned to multiple CryEngine texture map slots "
+                    "with different source-backed suffix expectations."
+                ),
+                "source_evidence": CE_TEXTURE_PATH_REUSE_SOURCE,
+            }
+        )
+    return diagnostics
 
 
 def resolve_ce_texture_map(texture_type, texture_path=""):
