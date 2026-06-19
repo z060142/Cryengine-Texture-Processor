@@ -53,7 +53,7 @@ Important behavior:
 
 ## Car Batch
 
-Command:
+Standalone command:
 
 ```powershell
 uv run python -m tools.texture_output_gate "S:\Crytek\crytek\Stripped to the bone\example\car" --output docs\car_texture_output_gate.json
@@ -74,15 +74,50 @@ The first raw run produced 79 diagnostics. Those collapsed to zero after the
 scanner ignored `.thmb` sidecars and the shared schema accepted `_emissive` as an
 Emittance alias. No ad hoc cleanup was required in the sample folder.
 
+## RC Smoke Integration
+
+`tools.rc_smoke_test` now runs this same gate automatically when
+`--texture-output-dir` is supplied. The report is written to
+`--texture-output-gate-output` when provided, otherwise beside the generated RC
+request in the work directory.
+
+The material report embeds the gate under `texture_output_gate` and records
+`texture_output_gate_path`. If the gate summary is not ok, the whole RC smoke run
+returns failure. This keeps the user flow coarse:
+
+```text
+FBX + manifest + material overrides + texture folder
+-> generated JSON/MTL
+-> RC.exe CGF
+-> material slot report
+-> material state compare
+-> texture output gate
+```
+
+Car RC smoke texture gate result:
+
+```json
+{
+  "group_count": 17,
+  "output_count": 73,
+  "diagnostic_count": 0,
+  "ok": true
+}
+```
+
 ## Verification
 
 ```powershell
 uv run python -m pytest tests/test_texture_output_diagnostics.py tests/test_texture_output_paths.py tests/test_cryengine_mtl_schema.py
+uv run python -m pytest tests/test_rc_smoke_test.py tests/test_texture_output_diagnostics.py
 uv run python -m tools.texture_output_gate "S:\Crytek\crytek\Stripped to the bone\example\car" --output docs\car_texture_output_gate.json
+uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\kb3d_citycarsessentialssedan-native.fbx" --work-dir "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work" --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides docs\car_native_material_overrides.json --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif" --texture-output-gate-output docs\car_rc_smoke_texture_output_gate.json
 ```
 
 Result:
 
 - `35 passed`
+- `46 passed`
 - car texture gate: `ok: True`, `group_count: 17`, `output_count: 73`,
   `diagnostic_count: 0`
+- RC smoke: `success: True`; embedded texture gate summary is also ok

@@ -71,7 +71,7 @@ RC flow:
 $phase = 'S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides'
 $overrideJson = 'S:\Crytek\crytek\Stripped to the bone\Cryengine-Texture-Processor\docs\car_native_material_overrides.json'
 
-uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif"
+uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif" --texture-output-gate-output docs\car_rc_smoke_texture_output_gate.json
 
 uv run python -m tools.mtl_schema_report "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_override_mtl_schema_report.json
 ```
@@ -106,6 +106,12 @@ GenMask, StringGenMask, and PublicParams values. The same report is also embedde
 under `material_state_compare` in the RC smoke material report; a mismatch makes
 `tools.rc_smoke_test` return failure.
 
+The same RC smoke run also embeds the texture output gate under
+`texture_output_gate` in the material report. A texture gate mismatch also makes
+`tools.rc_smoke_test` return failure, so the car user flow now checks RC
+conversion, material slots, material state, and texture output naming in one
+coarse command.
+
 Material report result:
 
 ```json
@@ -126,6 +132,17 @@ Material report result:
 }
 ```
 
+Texture output gate result:
+
+```json
+{
+  "group_count": 17,
+  "output_count": 73,
+  "diagnostic_count": 0,
+  "ok": true
+}
+```
+
 ## Batch Policy
 
 Going forward, avoid adding one document and one RC run per tiny rule. Use this
@@ -142,6 +159,7 @@ larger batch rhythm instead:
 ```powershell
 uv run python -m pytest tests/test_mtl_exporter.py tests/test_material_texture_resolver.py tests/test_mtl_override_extractor.py tests/test_rc_smoke_test.py
 uv run python -m pytest tests/test_mtl_material_state_compare.py tests/test_mtl_override_extractor.py tests/test_mtl_exporter.py tests/test_rc_smoke_test.py
+uv run python -m pytest tests/test_rc_smoke_test.py tests/test_texture_output_diagnostics.py
 uv run python -m pytest
 uv run python -m compileall model_processing output_formats tools tests
 uv run python tools/converter_schema.py --check docs/converter_schema.json
@@ -152,7 +170,8 @@ Result:
 
 - `71 passed`
 - `58 passed`
-- `403 passed`
+- `46 passed`
+- `408 passed`
 - `compileall` completed
 - converter schema snapshot is current
 - `uv lock --check` passed
