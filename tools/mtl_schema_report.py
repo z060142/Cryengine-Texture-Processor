@@ -8,7 +8,11 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-from output_formats.cryengine_mtl_schema import analyze_public_params, describe_mtl_flags
+from output_formats.cryengine_mtl_schema import (
+    analyze_public_params,
+    describe_mtl_flags,
+    exported_texture_modifier_policy,
+)
 from tools.mtl_mask_report import parse_gen_mask_literal, string_gen_mask_tokens
 
 
@@ -44,6 +48,27 @@ def _child_attributes(element, child_name):
     return _attributes(child)
 
 
+def _analyze_texmod_attrs(texmod_attrs):
+    policy = exported_texture_modifier_policy()
+    expected_attrs = policy["attributes"]
+    if not texmod_attrs:
+        status = "missing_texmod"
+    elif texmod_attrs == expected_attrs:
+        status = "matches_export_minimal_texmod"
+    elif all(texmod_attrs.get(name) == value for name, value in expected_attrs.items() if name in texmod_attrs):
+        status = "partial_export_minimal_texmod"
+    else:
+        status = "custom_texmod"
+
+    return {
+        "status": status,
+        "expected_attrs": expected_attrs,
+        "missing_attrs": sorted(set(expected_attrs) - set(texmod_attrs)),
+        "extra_attrs": sorted(set(texmod_attrs) - set(expected_attrs)),
+        "policy": policy,
+    }
+
+
 def _texture_entries(element):
     textures = element.find("Textures")
     if textures is None:
@@ -52,12 +77,14 @@ def _texture_entries(element):
     for texture in list(textures):
         if texture.tag != "Texture":
             continue
+        texmod_attrs = _child_attributes(texture, "TexMod")
         entries.append(
             {
                 "map": texture.get("Map", ""),
                 "file": texture.get("File", ""),
                 "attributes": _attributes(texture),
-                "texmod": _child_attributes(texture, "TexMod"),
+                "texmod": texmod_attrs,
+                "texmod_analysis": _analyze_texmod_attrs(texmod_attrs),
             }
         )
     return entries
@@ -127,6 +154,9 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     attribute_counts = Counter()
     public_param_counts = Counter()
     texture_map_counts = Counter()
+    texmod_status_counts = Counter()
+    texmod_attribute_counts = Counter()
+    texmod_extra_attribute_counts = Counter()
     string_gen_mask_counts = Counter()
     gen_mask_literal_counts = Counter()
     token_counts = Counter()
@@ -171,6 +201,12 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 texture_map = texture["map"] or "<empty>"
                 texture_map_counts[texture_map] += 1
                 texture_maps_by_shader[shader][texture_map] += 1
+                texmod_analysis = texture["texmod_analysis"]
+                texmod_status_counts[texmod_analysis["status"]] += 1
+                for attr_name in texture["texmod"]:
+                    texmod_attribute_counts[attr_name] += 1
+                for attr_name in texmod_analysis["extra_attrs"]:
+                    texmod_extra_attribute_counts[attr_name] += 1
             if material["string_gen_mask"]:
                 string_gen_mask_counts[material["string_gen_mask"]] += 1
             if material["gen_mask"]["literal"]:
@@ -198,6 +234,9 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "mtl_flag_names": _counter_to_sorted_pairs(mtl_flag_name_counts),
             "mtl_flag_unknown_masks": _counter_to_sorted_pairs(mtl_flag_unknown_mask_counts),
             "texture_maps": _counter_to_sorted_pairs(texture_map_counts),
+            "texmod_statuses": _counter_to_sorted_pairs(texmod_status_counts),
+            "texmod_attributes": _counter_to_sorted_pairs(texmod_attribute_counts),
+            "texmod_extra_attributes": _counter_to_sorted_pairs(texmod_extra_attribute_counts),
             "shaders": _counter_to_sorted_pairs(shader_counts),
             "string_gen_masks": _counter_to_sorted_pairs(string_gen_mask_counts)[:value_limit],
             "gen_mask_literals": _counter_to_sorted_pairs(gen_mask_literal_counts)[:value_limit],

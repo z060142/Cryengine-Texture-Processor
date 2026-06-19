@@ -15,6 +15,16 @@ def write_schema_mtl(path):
     textures = ET.SubElement(root, "Textures")
     texture = ET.SubElement(textures, "Texture", Map="Diffuse", File="./asset_diff.dds")
     ET.SubElement(texture, "TexMod", TexMod_RotateType="0")
+    ET.SubElement(textures, "Texture", Map="Specular", File="./asset_spec.dds")
+    custom_texture = ET.SubElement(textures, "Texture", Map="Bumpmap", File="./asset_ddn.dds")
+    ET.SubElement(
+        custom_texture,
+        "TexMod",
+        TexMod_RotateType="1",
+        TexMod_TexGenType="0",
+        TexMod_bTexGenProjected="0",
+        TileU="2",
+    )
     ET.SubElement(root, "PublicParams", SSSIndex="0", IndirectColor="0.25,0.25,0.25")
     sub_materials = ET.SubElement(root, "SubMaterials")
     ET.SubElement(
@@ -51,6 +61,13 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "MTL_FLAG_PURE_CHILD", "count": 1} in schema["mtl_flag_names"]
     assert schema["mtl_flag_unknown_masks"] == []
     assert {"name": "Diffuse", "count": 1} in schema["texture_maps"]
+    assert {"name": "Specular", "count": 1} in schema["texture_maps"]
+    assert {"name": "Bumpmap", "count": 1} in schema["texture_maps"]
+    assert {"name": "partial_export_minimal_texmod", "count": 1} in schema["texmod_statuses"]
+    assert {"name": "missing_texmod", "count": 1} in schema["texmod_statuses"]
+    assert {"name": "custom_texmod", "count": 1} in schema["texmod_statuses"]
+    assert {"name": "TexMod_RotateType", "count": 2} in schema["texmod_attributes"]
+    assert {"name": "TileU", "count": 1} in schema["texmod_extra_attributes"]
     assert {"name": "%SUBSURFACE_SCATTERING", "count": 2} in schema["tokens"]
     assert report["files"][0]["materials"][0]["mtl_flags_analysis"]["names"] == [
         "MTL_FLAG_MULTI_SUBMTL",
@@ -61,6 +78,12 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
         "MTL_64BIT_SHADERGENMASK",
     ]
     assert report["files"][0]["materials"][0]["textures"][0]["texmod"]["TexMod_RotateType"] == "0"
+    assert report["files"][0]["materials"][0]["textures"][0]["texmod_analysis"]["status"] == (
+        "partial_export_minimal_texmod"
+    )
+    assert report["files"][0]["materials"][0]["textures"][1]["texmod_analysis"]["status"] == "missing_texmod"
+    assert report["files"][0]["materials"][0]["textures"][2]["texmod_analysis"]["status"] == "custom_texmod"
+    assert report["files"][0]["materials"][0]["textures"][2]["texmod_analysis"]["extra_attrs"] == ["TileU"]
     assert report["files"][0]["materials"][0]["public_param_analysis"]["SSSIndex"]["components"] == [
         0.0,
         0.0,
