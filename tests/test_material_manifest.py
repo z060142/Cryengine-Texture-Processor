@@ -1,6 +1,7 @@
 import json
 
 from model_processing.material_manifest import (
+    coerce_material_slot,
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
@@ -9,6 +10,21 @@ from model_processing.material_manifest import (
     material_manifest_summary,
     material_manifest_table_rows,
 )
+
+
+def test_coerce_material_slot_accepts_only_non_negative_integer_evidence():
+    assert coerce_material_slot(0) == 0
+    assert coerce_material_slot(127) == 127
+    assert coerce_material_slot(" 12 ") == 12
+    assert coerce_material_slot("001") == 1
+
+    assert coerce_material_slot(True) is None
+    assert coerce_material_slot(False) is None
+    assert coerce_material_slot(1.0) is None
+    assert coerce_material_slot(1.5) is None
+    assert coerce_material_slot("1.0") is None
+    assert coerce_material_slot("-1") is None
+    assert coerce_material_slot(-1) is None
 
 
 def test_discover_material_manifest_prefers_fixture_manifest(tmp_path):
@@ -142,12 +158,16 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
                 "materials": [
                     {"slot": "bad-slot", "name": "Stone"},
                     {"slot": -1, "name": "DeletedLooking"},
+                    {"slot": True, "name": "BooleanSlot"},
+                    {"slot": 1.5, "name": "FloatSlot"},
                     {"slot": 1, "name": "Metal"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Stone", "material_table_slot": "bad-polygon-slot"},
                     {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
-                    {"polygon": 2, "material_name": "Metal", "material_table_slot": 1},
+                    {"polygon": 2, "material_name": "BooleanSlot", "material_table_slot": True},
+                    {"polygon": 3, "material_name": "FloatSlot", "material_table_slot": 1.5},
+                    {"polygon": 4, "material_name": "Metal", "material_table_slot": 1},
                 ],
             }
         }
@@ -156,6 +176,10 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
     assert [diagnostic["code"] for diagnostic in diagnostics] == [
         "material_manifest_invalid_material_slot",
         "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_polygon_slot",
+        "material_manifest_invalid_polygon_slot",
         "material_manifest_invalid_polygon_slot",
         "material_manifest_invalid_polygon_slot",
     ]
@@ -163,10 +187,18 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
     assert diagnostics[0]["slot"] == "bad-slot"
     assert diagnostics[1]["material"] == "DeletedLooking"
     assert diagnostics[1]["slot"] == -1
-    assert diagnostics[2]["polygon_material_name"] == "Stone"
-    assert diagnostics[2]["slot"] == "bad-polygon-slot"
-    assert diagnostics[3]["polygon_material_name"] == "DeletedLooking"
-    assert diagnostics[3]["slot"] == -1
+    assert diagnostics[2]["material"] == "BooleanSlot"
+    assert diagnostics[2]["slot"] is True
+    assert diagnostics[3]["material"] == "FloatSlot"
+    assert diagnostics[3]["slot"] == 1.5
+    assert diagnostics[4]["polygon_material_name"] == "Stone"
+    assert diagnostics[4]["slot"] == "bad-polygon-slot"
+    assert diagnostics[5]["polygon_material_name"] == "DeletedLooking"
+    assert diagnostics[5]["slot"] == -1
+    assert diagnostics[6]["polygon_material_name"] == "BooleanSlot"
+    assert diagnostics[6]["slot"] is True
+    assert diagnostics[7]["polygon_material_name"] == "FloatSlot"
+    assert diagnostics[7]["slot"] == 1.5
 
 
 def test_material_manifest_materials_skips_invalid_manifest_slots():
@@ -178,12 +210,16 @@ def test_material_manifest_materials_skips_invalid_manifest_slots():
                 "materials": [
                     {"slot": "bad-slot", "name": "Stone"},
                     {"slot": -1, "name": "DeletedLooking"},
+                    {"slot": True, "name": "BooleanSlot"},
+                    {"slot": 1.5, "name": "FloatSlot"},
                     {"slot": 1, "name": "Metal"},
                 ],
                 "polygons": [
                     {"polygon": 0, "object": "MeshA", "expected_cgf_material_id": "bad-polygon-slot"},
                     {"polygon": 1, "object": "MeshDeleted", "expected_cgf_material_id": -1},
-                    {"polygon": 2, "object": "MeshB", "expected_cgf_material_id": 1},
+                    {"polygon": 2, "object": "MeshBool", "expected_cgf_material_id": True},
+                    {"polygon": 3, "object": "MeshFloat", "expected_cgf_material_id": 1.5},
+                    {"polygon": 4, "object": "MeshB", "expected_cgf_material_id": 1},
                 ],
             }
         },

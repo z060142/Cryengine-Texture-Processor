@@ -92,12 +92,16 @@ def test_source_material_specs_from_manifest_skips_invalid_slots(tmp_path):
                 "materials": [
                     {"slot": "bad-slot", "name": "Broken"},
                     {"slot": -1, "name": "DeletedLooking"},
+                    {"slot": True, "name": "BooleanSlot"},
+                    {"slot": 1.5, "name": "FloatSlot"},
                     {"slot": 1, "name": "Visible"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Broken", "material_table_slot": "bad-polygon-slot"},
                     {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
-                    {"polygon": 2, "material_name": "Visible", "material_table_slot": 1},
+                    {"polygon": 2, "material_name": "BooleanSlot", "material_table_slot": True},
+                    {"polygon": 3, "material_name": "FloatSlot", "material_table_slot": 1.5},
+                    {"polygon": 4, "material_name": "Visible", "material_table_slot": 1},
                 ],
             }
         ),
@@ -306,12 +310,16 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
                 "materials": [
                     {"slot": "bad-slot", "name": "Broken"},
                     {"slot": -1, "name": "DeletedLooking"},
+                    {"slot": True, "name": "BooleanSlot"},
+                    {"slot": 1.5, "name": "FloatSlot"},
                     {"slot": 1, "name": "Visible"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Broken", "material_table_slot": "bad-polygon-slot"},
                     {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
-                    {"polygon": 2, "material_name": "Visible", "material_table_slot": 1},
+                    {"polygon": 2, "material_name": "BooleanSlot", "material_table_slot": True},
+                    {"polygon": 3, "material_name": "FloatSlot", "material_table_slot": 1.5},
+                    {"polygon": 4, "material_name": "Visible", "material_table_slot": 1},
                 ],
             }
         ),
@@ -327,8 +335,8 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
     )
 
     codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
-    assert codes.count("material_manifest_invalid_material_slot") == 2
-    assert codes.count("material_manifest_invalid_polygon_slot") == 2
+    assert codes.count("material_manifest_invalid_material_slot") == 4
+    assert codes.count("material_manifest_invalid_polygon_slot") == 4
 
 
 def test_prepare_smoke_bundle_reports_out_of_range_manifest_slots(tmp_path):

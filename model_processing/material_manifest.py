@@ -69,9 +69,16 @@ def _manifest_payload(material_manifest_info):
 def coerce_material_slot(value):
     if value is None:
         return None
-    try:
-        slot = int(value)
-    except (TypeError, ValueError):
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        slot = value
+    elif isinstance(value, str):
+        text = value.strip()
+        if not text or not all("0" <= char <= "9" for char in text):
+            return None
+        slot = int(text)
+    else:
         return None
     if slot < 0:
         return None
