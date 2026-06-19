@@ -963,6 +963,80 @@ def test_run_rc_smoke_test_embeds_texture_output_gate_report(tmp_path):
     assert report["texture_output_gate_path"] == result.texture_output_gate_path
 
 
+def test_run_rc_smoke_test_embeds_mtl_schema_gate_report(tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        runner_factory=FakeRunner,
+    )
+
+    assert result.success
+    assert result.mtl_schema_gate_path.endswith("asset.mtl_schema_gate.json")
+    gate_report = json.loads(open(result.mtl_schema_gate_path, encoding="utf-8").read())
+    assert gate_report["gate"]["summary"]["ok"] is True
+    report = json.loads(open(result.material_report_path, encoding="utf-8").read())
+    assert report["mtl_schema_gate"]["summary"]["ok"] is True
+    assert report["mtl_schema_gate_path"] == result.mtl_schema_gate_path
+
+
+def test_run_rc_smoke_test_fails_when_mtl_schema_gate_fails(tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        material_specs=[{"name": "Stone", "id": 1, "index": 0}],
+        material_overrides={"Stone": {"textures": {"diffuse": "stone_basecolor.png"}}},
+        runner_factory=FakeRunner,
+    )
+
+    assert not result.success
+    assert "MTL schema gate failed" in result.error
+    gate_report = json.loads(open(result.mtl_schema_gate_path, encoding="utf-8").read())
+    assert gate_report["gate"]["summary"]["ok"] is False
+    assert gate_report["gate"]["diagnostics"][0]["code"] == "mismatch_ce_texture_suffix"
+
+
 def test_run_rc_smoke_test_fails_when_texture_output_gate_fails(tmp_path):
     rc_path = tmp_path / "rc.exe"
     rc_path.write_text("fake rc", encoding="utf-8")

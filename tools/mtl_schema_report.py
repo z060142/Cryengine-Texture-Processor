@@ -26,6 +26,28 @@ from output_formats.cryengine_mtl_schema import (
 from tools.mtl_mask_report import parse_gen_mask_literal, string_gen_mask_tokens
 
 
+MTL_SCHEMA_ERROR_COUNTERS = {
+    "texture_map_unknowns": "unknown_ce_texture_map",
+    "mtl_flag_unknown_masks": "unknown_mtl_flag_mask",
+}
+
+MTL_SCHEMA_ERROR_STATUS_COUNTERS = {
+    "texture_suffix_statuses": {
+        "mismatch_expected_suffix": "mismatch_ce_texture_suffix",
+    },
+}
+
+MTL_SCHEMA_WARNING_COUNTERS = {
+    "texture_path_reuse_diagnostics": "shared_texture_path_across_ce_maps",
+}
+
+MTL_SCHEMA_WARNING_STATUS_COUNTERS = {
+    "texture_suffix_statuses": {
+        "no_source_backed_suffix": "no_source_backed_texture_suffix",
+    },
+}
+
+
 def iter_mtl_files(paths):
     for path in paths:
         if os.path.isdir(path):
@@ -194,6 +216,74 @@ def _top_values(mapping, limit):
     }
 
 
+def _counter_pairs_by_name(schema, key):
+    return {
+        row.get("name", ""): int(row.get("count", 0))
+        for row in schema.get(key, [])
+        if row.get("name")
+    }
+
+
+def _append_counter_diagnostics(diagnostics, schema, key, code, severity):
+    for name, count in _counter_pairs_by_name(schema, key).items():
+        if count <= 0:
+            continue
+        diagnostics.append(
+            {
+                "severity": severity,
+                "code": code,
+                "schema_counter": key,
+                "name": name,
+                "count": count,
+                "message": f"MTL schema counter {key} contains {count} occurrence(s) of {name}.",
+            }
+        )
+
+
+def _append_status_diagnostics(diagnostics, schema, key, status_codes, severity):
+    counters = _counter_pairs_by_name(schema, key)
+    for status, code in status_codes.items():
+        count = counters.get(status, 0)
+        if count <= 0:
+            continue
+        diagnostics.append(
+            {
+                "severity": severity,
+                "code": code,
+                "schema_counter": key,
+                "name": status,
+                "count": count,
+                "message": f"MTL schema status {status} appears {count} time(s) in {key}.",
+            }
+        )
+
+
+def build_mtl_schema_gate(report):
+    schema = (report or {}).get("schema", {})
+    diagnostics = []
+    for key, code in MTL_SCHEMA_ERROR_COUNTERS.items():
+        _append_counter_diagnostics(diagnostics, schema, key, code, "error")
+    for key, status_codes in MTL_SCHEMA_ERROR_STATUS_COUNTERS.items():
+        _append_status_diagnostics(diagnostics, schema, key, status_codes, "error")
+    for key, code in MTL_SCHEMA_WARNING_COUNTERS.items():
+        _append_counter_diagnostics(diagnostics, schema, key, code, "warning")
+    for key, status_codes in MTL_SCHEMA_WARNING_STATUS_COUNTERS.items():
+        _append_status_diagnostics(diagnostics, schema, key, status_codes, "warning")
+
+    error_count = sum(1 for diagnostic in diagnostics if diagnostic["severity"] == "error")
+    warning_count = sum(1 for diagnostic in diagnostics if diagnostic["severity"] == "warning")
+    return {
+        "schema": "cryengine_mtl_schema_gate.v1",
+        "summary": {
+            "ok": error_count == 0,
+            "diagnostic_count": len(diagnostics),
+            "error_count": error_count,
+            "warning_count": warning_count,
+        },
+        "diagnostics": diagnostics,
+    }
+
+
 def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=True):
     files = []
     file_count = 0
@@ -309,7 +399,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
         "multi_material_file_count": multi_material_file_count,
         "tokenized_material_count": tokenized_material_count,
     }
-    return {
+    report = {
         "files": files,
         "summary": summary,
         "schema": {
@@ -344,6 +434,16 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "texture_maps_by_shader": _top_values(texture_maps_by_shader, value_limit),
         },
     }
+    report["gate"] = build_mtl_schema_gate(report)
+    return report
+
+
+def write_mtl_schema_report(report, output_path):
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    return output_path
 
 
 def main(argv=None):
@@ -363,10 +463,7 @@ def main(argv=None):
     )
     output = json.dumps(report, indent=2)
     if args.output:
-        os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
-        with open(args.output, "w", encoding="utf-8") as f:
-            f.write(output)
-            f.write("\n")
+        write_mtl_schema_report(report, args.output)
     else:
         print(output)
     return 0

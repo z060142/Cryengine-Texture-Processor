@@ -21,9 +21,11 @@ This batch adds an explicit override channel:
 - `output_formats/mtl_exporter.py`
 - `model_processing/material_texture_resolver.py`
 - `tools/mtl_material_state_compare.py`
+- `tools/mtl_schema_report.py`
 - `docs/car_native_material_overrides.json`
 - `docs/car_material_override_mtl_schema_report.json`
 - `docs/car_material_state_compare.json`
+- `docs/car_rc_smoke_mtl_schema_gate.json`
 
 ## Override Shape
 
@@ -71,7 +73,7 @@ RC flow:
 $phase = 'S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides'
 $overrideJson = 'S:\Crytek\crytek\Stripped to the bone\Cryengine-Texture-Processor\docs\car_native_material_overrides.json'
 
-uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif" --texture-output-gate-output docs\car_rc_smoke_texture_output_gate.json
+uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --mtl-schema-gate-output docs\car_rc_smoke_mtl_schema_gate.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif" --texture-output-gate-output docs\car_rc_smoke_texture_output_gate.json
 
 uv run python -m tools.mtl_schema_report "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_override_mtl_schema_report.json
 ```
@@ -112,6 +114,11 @@ The same RC smoke run also embeds the texture output gate under
 conversion, material slots, material state, and texture output naming in one
 coarse command.
 
+The generated MTL is also scanned by `tools.mtl_schema_report` during the RC
+smoke run. Its gate fails on unknown CryEngine texture maps, mismatched
+source-backed texture suffixes, and unknown `MtlFlags` masks. The material report
+embeds the MTL gate under `mtl_schema_gate`.
+
 Material report result:
 
 ```json
@@ -143,6 +150,17 @@ Texture output gate result:
 }
 ```
 
+MTL schema gate result:
+
+```json
+{
+  "ok": true,
+  "diagnostic_count": 0,
+  "error_count": 0,
+  "warning_count": 0
+}
+```
+
 ## Batch Policy
 
 Going forward, avoid adding one document and one RC run per tiny rule. Use this
@@ -160,6 +178,7 @@ larger batch rhythm instead:
 uv run python -m pytest tests/test_mtl_exporter.py tests/test_material_texture_resolver.py tests/test_mtl_override_extractor.py tests/test_rc_smoke_test.py
 uv run python -m pytest tests/test_mtl_material_state_compare.py tests/test_mtl_override_extractor.py tests/test_mtl_exporter.py tests/test_rc_smoke_test.py
 uv run python -m pytest tests/test_rc_smoke_test.py tests/test_texture_output_diagnostics.py
+uv run python -m pytest tests/test_mtl_schema_report.py tests/test_rc_smoke_test.py
 uv run python -m pytest
 uv run python -m compileall model_processing output_formats tools tests
 uv run python tools/converter_schema.py --check docs/converter_schema.json
@@ -171,7 +190,8 @@ Result:
 - `71 passed`
 - `58 passed`
 - `46 passed`
-- `408 passed`
+- `45 passed`
+- `411 passed`
 - `compileall` completed
 - converter schema snapshot is current
 - `uv lock --check` passed

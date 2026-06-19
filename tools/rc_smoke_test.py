@@ -37,6 +37,7 @@ from output_formats.texture_output_diagnostics import (
 )
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
 from tools.mtl_material_state_compare import write_material_state_compare_report
+from tools.mtl_schema_report import build_mtl_schema_report, write_mtl_schema_report
 from utils.rc_import_runner import RCImportRunner, RCImportResult
 
 
@@ -63,6 +64,7 @@ class RCSmokeResult:
     expected_output_path: str = ""
     material_report_path: str = ""
     material_state_compare_path: str = ""
+    mtl_schema_gate_path: str = ""
     texture_output_gate_path: str = ""
     rc_result: RCImportResult | None = None
     error: str = ""
@@ -442,6 +444,7 @@ def run_rc_smoke_test(
     material_overrides=None,
     reference_mtl_path="",
     material_state_compare_output_path="",
+    mtl_schema_gate_output_path="",
     texture_output_gate_output_path="",
     runner_factory=RCImportRunner,
 ):
@@ -478,6 +481,12 @@ def run_rc_smoke_test(
     material_state_compare_path = ""
     material_state_compare_report = None
     material_state_compare_error = ""
+    mtl_schema_gate_path = mtl_schema_gate_output_path or os.path.join(
+        work_dir,
+        f"{os.path.splitext(os.path.basename(bundle['json_path']))[0]}.mtl_schema_gate.json",
+    )
+    mtl_schema_gate_report = None
+    mtl_schema_gate_error = ""
     texture_output_gate_path = ""
     texture_output_gate_report = None
     texture_output_gate_error = ""
@@ -494,6 +503,11 @@ def run_rc_smoke_test(
             )
         except Exception as e:
             material_state_compare_error = f"Failed to compare material state: {e}"
+    try:
+        mtl_schema_gate_report = build_mtl_schema_report([bundle["mtl_path"]])
+        write_mtl_schema_report(mtl_schema_gate_report, mtl_schema_gate_path)
+    except Exception as e:
+        mtl_schema_gate_error = f"Failed to run MTL schema gate: {e}"
     if texture_output_dir:
         texture_output_gate_path = texture_output_gate_output_path or os.path.join(
             work_dir,
@@ -523,6 +537,11 @@ def run_rc_smoke_test(
             report["material_state_compare"] = material_state_compare_report
         if material_state_compare_error:
             report["material_state_compare_error"] = material_state_compare_error
+        if mtl_schema_gate_report is not None:
+            report["mtl_schema_gate"] = mtl_schema_gate_report.get("gate", {})
+            report["mtl_schema_gate_path"] = mtl_schema_gate_path
+        if mtl_schema_gate_error:
+            report["mtl_schema_gate_error"] = mtl_schema_gate_error
         if texture_output_gate_report is not None:
             report["texture_output_gate"] = texture_output_gate_report
             report["texture_output_gate_path"] = texture_output_gate_path
@@ -554,6 +573,17 @@ def run_rc_smoke_test(
             stderr=rc_result.stderr,
             error=material_state_compare_error,
         )
+    if rc_result.success and mtl_schema_gate_error:
+        rc_result = RCImportResult(
+            success=False,
+            command=rc_result.command,
+            json_path=rc_result.json_path,
+            expected_output_path=rc_result.expected_output_path,
+            returncode=rc_result.returncode,
+            stdout=rc_result.stdout,
+            stderr=rc_result.stderr,
+            error=mtl_schema_gate_error,
+        )
     if rc_result.success and texture_output_gate_error:
         rc_result = RCImportResult(
             success=False,
@@ -575,6 +605,17 @@ def run_rc_smoke_test(
             stdout=rc_result.stdout,
             stderr=rc_result.stderr,
             error=f"Material state compare failed: {material_state_compare_path}",
+        )
+    if rc_result.success and mtl_schema_gate_report is not None and not mtl_schema_gate_report["gate"]["summary"]["ok"]:
+        rc_result = RCImportResult(
+            success=False,
+            command=rc_result.command,
+            json_path=rc_result.json_path,
+            expected_output_path=rc_result.expected_output_path,
+            returncode=rc_result.returncode,
+            stdout=rc_result.stdout,
+            stderr=rc_result.stderr,
+            error=f"MTL schema gate failed: {mtl_schema_gate_path}",
         )
     if rc_result.success and texture_output_gate_report is not None and not texture_output_gate_report["summary"]["ok"]:
         rc_result = RCImportResult(
@@ -599,6 +640,7 @@ def run_rc_smoke_test(
         expected_output_path=rc_result.expected_output_path,
         material_report_path=report_path,
         material_state_compare_path=material_state_compare_path,
+        mtl_schema_gate_path=mtl_schema_gate_path,
         texture_output_gate_path=texture_output_gate_path,
         rc_result=rc_result,
         error=rc_result.error,
@@ -643,6 +685,11 @@ def main(argv=None):
         help="Optional output path for the material-state compare JSON report.",
     )
     parser.add_argument(
+        "--mtl-schema-gate-output",
+        default="",
+        help="Optional output path for the generated MTL schema gate JSON report.",
+    )
+    parser.add_argument(
         "--texture-output-gate-output",
         default="",
         help="Optional output path for the texture output gate JSON report.",
@@ -666,6 +713,7 @@ def main(argv=None):
         material_overrides=material_overrides,
         reference_mtl_path=args.reference_mtl,
         material_state_compare_output_path=args.material_state_compare_output,
+        mtl_schema_gate_output_path=args.mtl_schema_gate_output,
         texture_output_gate_output_path=args.texture_output_gate_output,
     )
 
@@ -678,6 +726,7 @@ def main(argv=None):
     print(f"expected_output: {result.expected_output_path}")
     print(f"material_report: {result.material_report_path}")
     print(f"material_state_compare: {result.material_state_compare_path}")
+    print(f"mtl_schema_gate: {result.mtl_schema_gate_path}")
     print(f"texture_output_gate: {result.texture_output_gate_path}")
     if result.error:
         print(f"error: {result.error}")

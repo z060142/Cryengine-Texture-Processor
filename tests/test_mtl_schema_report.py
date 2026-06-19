@@ -65,6 +65,17 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
         "multi_material_file_count": 1,
         "tokenized_material_count": 2,
     }
+    assert report["gate"]["summary"] == {
+        "ok": False,
+        "diagnostic_count": 3,
+        "error_count": 2,
+        "warning_count": 1,
+    }
+    assert [diagnostic["code"] for diagnostic in report["gate"]["diagnostics"]] == [
+        "unknown_ce_texture_map",
+        "mismatch_ce_texture_suffix",
+        "no_source_backed_texture_suffix",
+    ]
     schema = report["schema"]
     assert {"name": "Shader", "count": 2} in schema["material_attributes"]
     assert {"name": "matches_export_attribute", "count": 5} in schema["material_attribute_policy_statuses"]
@@ -164,6 +175,7 @@ def test_build_mtl_schema_report_accepts_ddna_bumpmap_alias(tmp_path):
 
     report = build_mtl_schema_report([str(mtl_path)])
 
+    assert report["gate"]["summary"]["ok"] is True
     assert {"name": "matches_accepted_alias_suffix", "count": 1} in report["schema"]["texture_suffix_statuses"]
     suffix_analysis = report["files"][0]["materials"][0]["textures"][0]["texture_map_analysis"]["suffix_analysis"]
     assert suffix_analysis["expected_suffix"] == "_ddn"
@@ -180,6 +192,7 @@ def test_build_mtl_schema_report_accepts_observed_roughness_opacity_suffix(tmp_p
 
     report = build_mtl_schema_report([str(mtl_path)])
 
+    assert report["gate"]["summary"]["ok"] is True
     assert {"name": "matches_observed_sample_suffix", "count": 1} in report["schema"]["texture_suffix_statuses"]
     suffix_analysis = report["files"][0]["materials"][0]["textures"][0]["texture_map_analysis"]["suffix_analysis"]
     assert suffix_analysis["expected_suffix"] == ""
@@ -198,6 +211,13 @@ def test_build_mtl_schema_report_flags_shared_texture_path_across_ce_maps(tmp_pa
 
     report = build_mtl_schema_report([str(mtl_path)])
 
+    assert report["gate"]["summary"]["ok"] is False
+    assert report["gate"]["summary"]["error_count"] == 1
+    assert report["gate"]["summary"]["warning_count"] == 1
+    assert [diagnostic["code"] for diagnostic in report["gate"]["diagnostics"]] == [
+        "mismatch_ce_texture_suffix",
+        "shared_texture_path_across_ce_maps",
+    ]
     assert {"name": "shared_texture_path_across_ce_maps", "count": 1} in report["schema"][
         "texture_path_reuse_diagnostics"
     ]
