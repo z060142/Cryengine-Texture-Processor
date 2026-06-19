@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 from tools.material_mapping_report import (
     build_material_mapping_report,
     discover_fixture_manifest,
+    evaluate_cgf_import_settings_roundtrip,
     evaluate_cgf_material_ids,
     evaluate_fixture_material_semantics,
     evaluate_material_slot_alignment,
@@ -237,6 +238,161 @@ def test_evaluate_cgf_material_ids_ignores_invalid_mtl_slots():
     assert result["ok"]
     assert result["checks"] == [
         {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Stone"},
+    ]
+
+
+def test_evaluate_cgf_import_settings_roundtrip_matches_request_mtl_and_cgf_mtl_name():
+    request_materials = [
+        {"order": 0, "name": "Bark", "sub_index": 0, "physicalize": "no"},
+        {"order": 1, "name": "Leaves", "sub_index": 1, "physicalize": "no"},
+        {"order": 2, "name": "<unassigned>", "sub_index": 2, "physicalize": "no"},
+    ]
+    cgf_summary = {
+        "import_settings": [
+            {
+                "chunk_id": 23,
+                "version": 0,
+                "json_error": "",
+                "json": {
+                    "materials": [
+                        {"name": "Bark", "physicalize": "no", "sub_index": 0},
+                        {"name": "Leaves", "physicalize": "no", "sub_index": 1},
+                        {"name": "<unassigned>", "physicalize": "no", "sub_index": 2},
+                    ]
+                },
+            }
+        ],
+        "materials": [
+            {
+                "chunk_id": 2,
+                "name": "asset",
+                "sub_materials": [
+                    {"slot": 0, "name": "Bark", "physicalize_type": -1},
+                    {"slot": 1, "name": "Leaves", "physicalize_type": -1},
+                ],
+            }
+        ],
+        "material_ids": [0, 1],
+    }
+
+    result = evaluate_cgf_import_settings_roundtrip(
+        cgf_summary,
+        request_materials,
+        [
+            {"slot": 0, "name": "Bark"},
+            {"slot": 1, "name": "Leaves"},
+            {"slot": 2, "name": "<unassigned>"},
+        ],
+    )
+
+    assert result["ok"]
+    assert result["import_settings_present"]
+    assert result["import_settings_meta"] == {"chunk_id": 23, "version": 0, "material_count": 3}
+    assert result["request_vs_import_settings"]["ok"]
+    assert result["import_settings_vs_mtl"]["ok"]
+    assert result["import_settings_vs_cgf_mtl_name"]["ok"]
+    assert result["import_settings_vs_cgf_mtl_name"]["extra_import_settings_slots"] == [
+        {"sub_index": 2, "name": "<unassigned>"}
+    ]
+
+
+def test_evaluate_cgf_import_settings_roundtrip_reports_material_mismatches():
+    result = evaluate_cgf_import_settings_roundtrip(
+        {
+            "import_settings": [
+                {
+                    "chunk_id": 23,
+                    "version": 0,
+                    "json_error": "",
+                    "json": {"materials": [{"name": "Wrong", "physicalize": "proxy_only", "sub_index": 1}]},
+                }
+            ],
+            "materials": [
+                {
+                    "chunk_id": 2,
+                    "name": "asset",
+                    "sub_materials": [{"slot": 1, "name": "WrongInCgf"}],
+                }
+            ],
+            "material_ids": [1, 2],
+        },
+        [{"order": 0, "name": "Bark", "sub_index": 0, "physicalize": "no"}],
+        [{"slot": 0, "name": "Bark"}, {"slot": 1, "name": "Wrong"}],
+    )
+
+    assert not result["ok"]
+    assert result["request_vs_import_settings"]["checks"][0]["type"] == "request_import_settings_mismatch"
+    assert result["import_settings_vs_mtl"]["ok"]
+    assert result["import_settings_vs_cgf_mtl_name"]["checks"][0] == {
+        "ok": False,
+        "type": "cgf_mtl_name_mismatch",
+        "sub_index": 1,
+        "import_settings_name": "Wrong",
+        "cgf_mtl_name": "WrongInCgf",
+    }
+    assert result["import_settings_material_id_alignment"]["checks"][-1] == {
+        "ok": False,
+        "material_id": 2,
+        "in_request": False,
+        "in_mtl": False,
+        "mtl_slot_name": "",
+    }
+
+
+def test_evaluate_cgf_import_settings_roundtrip_reports_missing_or_invalid_import_settings():
+    missing_result = evaluate_cgf_import_settings_roundtrip(
+        {},
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not missing_result["ok"]
+    assert not missing_result["import_settings_present"]
+    assert missing_result["import_settings_error"] == "missing_cgf_import_settings"
+
+    invalid_result = evaluate_cgf_import_settings_roundtrip(
+        {"import_settings": [{"json_error": "bad-json", "json": None}]},
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not invalid_result["ok"]
+    assert invalid_result["import_settings_error"] == "invalid_cgf_import_settings_json"
+
+
+def test_evaluate_cgf_import_settings_roundtrip_reports_invalid_request_rows():
+    result = evaluate_cgf_import_settings_roundtrip(
+        {
+            "import_settings": [
+                {
+                    "chunk_id": 23,
+                    "version": 0,
+                    "json_error": "",
+                    "json": {"materials": [{"name": "Stone", "physicalize": "no", "sub_index": 0}]},
+                }
+            ],
+            "materials": [{"sub_materials": [{"slot": 0, "name": "Stone"}]}],
+            "material_ids": [0],
+        },
+        [{"name": "", "sub_index": 0, "errors": ["invalid_request_material_name"], "name_type": "str"}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    assert result["invalid_request_entries"] == [
+        {
+            "ok": False,
+            "order": 0,
+            "error": "invalid_request_material_name",
+            "name": "",
+            "sub_index": 0,
+            "row_type": None,
+            "collection_type": None,
+            "name_type": "str",
+            "sub_index_type": None,
+            "path": None,
+            "read_error": None,
+        }
     ]
 
 
@@ -770,6 +926,7 @@ def test_build_and_write_material_mapping_report(tmp_path):
     assert report["mtl_read_error"] == ""
     assert report["mtl_cryasset_read_error"] == ""
     assert report["cgf_material_id_alignment"]["material_ids"] == []
+    assert report["cgf_import_settings_alignment"]["import_settings_error"] == "missing_cgf_import_settings"
 
     report_path = tmp_path / "asset.material_report.json"
     write_material_mapping_report(report, str(report_path))

@@ -29,10 +29,11 @@ def _coerce_request_sub_index(value):
     return coerce_request_sub_index(value)
 
 
-def load_request_materials(json_path):
-    payload = _read_json(json_path)
-    request = payload.get("request", payload) if isinstance(payload, dict) else {}
-    raw_materials = request.get("materials", []) if isinstance(request, dict) else []
+def _normalize_request_material_rows(
+    raw_materials,
+    invalid_collection_error="invalid_request_materials_collection",
+    invalid_row_error="invalid_request_material_row",
+):
     if not isinstance(raw_materials, list):
         return [
             {
@@ -41,7 +42,7 @@ def load_request_materials(json_path):
                 "sub_index": None,
                 "physicalize": "",
                 "ok": False,
-                "errors": ["invalid_request_materials_collection"],
+                "errors": [invalid_collection_error],
                 "collection_type": type(raw_materials).__name__,
             }
         ]
@@ -56,7 +57,7 @@ def load_request_materials(json_path):
                     "sub_index": None,
                     "physicalize": "",
                     "ok": False,
-                    "errors": ["invalid_request_material_row"],
+                    "errors": [invalid_row_error],
                     "row_type": type(material).__name__,
                 }
             )
@@ -86,6 +87,13 @@ def load_request_materials(json_path):
             entry["errors"] = errors
         materials.append(entry)
     return materials
+
+
+def load_request_materials(json_path):
+    payload = _read_json(json_path)
+    request = payload.get("request", payload) if isinstance(payload, dict) else {}
+    raw_materials = request.get("materials", []) if isinstance(request, dict) else []
+    return _normalize_request_material_rows(raw_materials)
 
 
 def _request_read_error_entry(json_path, error):
@@ -933,6 +941,209 @@ def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots
     return {"ok": ok, "checks": checks, "material_ids": material_ids}
 
 
+def _extract_cgf_import_settings_materials(cgf_material_summary):
+    import_settings = cgf_material_summary.get("import_settings", []) if isinstance(cgf_material_summary, dict) else []
+    if not import_settings:
+        return [], "missing_cgf_import_settings", {}
+    if not isinstance(import_settings, list):
+        return [], "invalid_cgf_import_settings_collection", {"collection_type": type(import_settings).__name__}
+
+    first_entry = None
+    for entry in import_settings:
+        if isinstance(entry, dict):
+            first_entry = entry
+            break
+    if first_entry is None:
+        return [], "invalid_cgf_import_settings_entry", {}
+
+    json_error = first_entry.get("json_error", "")
+    if json_error:
+        return [], "invalid_cgf_import_settings_json", {"json_error": json_error}
+
+    payload = first_entry.get("json")
+    if not isinstance(payload, dict):
+        return [], "invalid_cgf_import_settings_json_root", {"root_type": type(payload).__name__}
+
+    raw_materials = payload.get("materials", [])
+    materials = _normalize_request_material_rows(
+        raw_materials,
+        invalid_collection_error="invalid_cgf_import_settings_materials_collection",
+        invalid_row_error="invalid_cgf_import_settings_material_row",
+    )
+    return materials, "", {
+        "chunk_id": first_entry.get("chunk_id"),
+        "version": first_entry.get("version"),
+        "material_count": len(raw_materials) if isinstance(raw_materials, list) else None,
+    }
+
+
+def _valid_cgf_mtl_name_sub_materials(cgf_material_summary):
+    raw_material_chunks = cgf_material_summary.get("materials", []) if isinstance(cgf_material_summary, dict) else []
+    if not isinstance(raw_material_chunks, list):
+        return []
+
+    sub_materials = []
+    for chunk in raw_material_chunks:
+        if not isinstance(chunk, dict):
+            continue
+        raw_sub_materials = chunk.get("sub_materials", [])
+        if not isinstance(raw_sub_materials, list):
+            continue
+        for sub_material in raw_sub_materials:
+            if not isinstance(sub_material, dict):
+                continue
+            slot = coerce_material_slot(sub_material.get("slot"))
+            name = coerce_material_name(sub_material.get("name", ""))
+            if slot is None or not name:
+                continue
+            normalized = dict(sub_material)
+            normalized["slot"] = slot
+            normalized["name"] = name
+            sub_materials.append(normalized)
+    return sub_materials
+
+
+def _request_materials_equal(left, right):
+    left_valid = _valid_request_materials(left)
+    right_valid = _valid_request_materials(right)
+    max_len = max(len(left_valid), len(right_valid))
+    checks = []
+    ok = len(left_valid) == len(right_valid)
+    for index in range(max_len):
+        left_material = left_valid[index] if index < len(left_valid) else None
+        right_material = right_valid[index] if index < len(right_valid) else None
+        if left_material is None or right_material is None:
+            ok = False
+            checks.append(
+                {
+                    "ok": False,
+                    "type": "material_count_mismatch",
+                    "order": index,
+                    "request_name": left_material.get("name", "") if left_material else "",
+                    "import_settings_name": right_material.get("name", "") if right_material else "",
+                }
+            )
+            continue
+
+        request_name = coerce_material_name(left_material.get("name", ""))
+        import_name = coerce_material_name(right_material.get("name", ""))
+        request_sub_index = _coerce_request_sub_index(left_material.get("sub_index"))
+        import_sub_index = _coerce_request_sub_index(right_material.get("sub_index"))
+        request_physicalize = left_material.get("physicalize", "")
+        import_physicalize = right_material.get("physicalize", "")
+        check_ok = (
+            request_name == import_name
+            and request_sub_index == import_sub_index
+            and request_physicalize == import_physicalize
+        )
+        ok = ok and check_ok
+        checks.append(
+            {
+                "ok": check_ok,
+                "type": "request_import_settings_match" if check_ok else "request_import_settings_mismatch",
+                "order": index,
+                "request_name": request_name,
+                "import_settings_name": import_name,
+                "request_sub_index": request_sub_index,
+                "import_settings_sub_index": import_sub_index,
+                "request_physicalize": request_physicalize,
+                "import_settings_physicalize": import_physicalize,
+            }
+        )
+    return {"ok": ok, "checks": checks}
+
+
+def _evaluate_import_settings_vs_cgf_mtl_name(import_settings_materials, cgf_material_summary):
+    cgf_sub_materials = _valid_cgf_mtl_name_sub_materials(cgf_material_summary)
+    import_by_index = {
+        _coerce_request_sub_index(material.get("sub_index")): material
+        for material in _valid_request_materials(import_settings_materials)
+        if _coerce_request_sub_index(material.get("sub_index")) is not None
+        and _coerce_request_sub_index(material.get("sub_index")) >= 0
+    }
+    cgf_by_index = {entry["slot"]: entry for entry in cgf_sub_materials}
+    checks = []
+    ok = True
+
+    for slot in sorted(cgf_by_index):
+        cgf_entry = cgf_by_index[slot]
+        import_entry = import_by_index.get(slot)
+        import_name = coerce_material_name(import_entry.get("name", "")) if import_entry else ""
+        cgf_name = cgf_entry.get("name", "")
+        check_ok = import_entry is not None and import_name == cgf_name
+        ok = ok and check_ok
+        checks.append(
+            {
+                "ok": check_ok,
+                "type": "cgf_mtl_name_match" if check_ok else "cgf_mtl_name_mismatch",
+                "sub_index": slot,
+                "import_settings_name": import_name,
+                "cgf_mtl_name": cgf_name,
+            }
+        )
+
+    extra_import_settings_slots = []
+    for slot in sorted(import_by_index):
+        if slot in cgf_by_index:
+            continue
+        material = import_by_index[slot]
+        extra_import_settings_slots.append(
+            {
+                "sub_index": slot,
+                "name": coerce_material_name(material.get("name", "")),
+            }
+        )
+
+    return {
+        "ok": ok,
+        "checks": checks,
+        "extra_import_settings_slots": extra_import_settings_slots,
+        "cgf_mtl_name_sub_material_count": len(cgf_sub_materials),
+    }
+
+
+def evaluate_cgf_import_settings_roundtrip(cgf_material_summary, request_materials, mtl_slots):
+    import_settings_materials, import_settings_error, import_settings_meta = _extract_cgf_import_settings_materials(
+        cgf_material_summary,
+    )
+    invalid_request_entries = _invalid_request_entries(request_materials)
+    invalid_import_settings_entries = _invalid_request_entries(import_settings_materials)
+    request_vs_import_settings = _request_materials_equal(request_materials, import_settings_materials)
+    import_settings_vs_mtl = evaluate_material_slot_alignment(import_settings_materials, mtl_slots)
+    import_settings_vs_cgf_mtl_name = _evaluate_import_settings_vs_cgf_mtl_name(
+        import_settings_materials,
+        cgf_material_summary,
+    )
+    import_settings_material_id_alignment = evaluate_cgf_material_ids(
+        cgf_material_summary,
+        import_settings_materials,
+        mtl_slots,
+    )
+    ok = (
+        not import_settings_error
+        and not invalid_request_entries
+        and not invalid_import_settings_entries
+        and request_vs_import_settings["ok"]
+        and import_settings_vs_mtl["ok"]
+        and import_settings_vs_cgf_mtl_name["ok"]
+        and import_settings_material_id_alignment["ok"]
+    )
+
+    return {
+        "ok": ok,
+        "import_settings_present": not import_settings_error,
+        "import_settings_error": import_settings_error,
+        "import_settings_meta": import_settings_meta,
+        "import_settings_materials": import_settings_materials,
+        "invalid_request_entries": invalid_request_entries,
+        "invalid_import_settings_entries": invalid_import_settings_entries,
+        "request_vs_import_settings": request_vs_import_settings,
+        "import_settings_vs_mtl": import_settings_vs_mtl,
+        "import_settings_vs_cgf_mtl_name": import_settings_vs_cgf_mtl_name,
+        "import_settings_material_id_alignment": import_settings_material_id_alignment,
+    }
+
+
 def build_material_mapping_report(
     json_path,
     mtl_path,
@@ -985,6 +1196,11 @@ def build_material_mapping_report(
         "mtl_cryasset_read_error": cryasset_read_error,
         "alignment": alignment,
         "cgf_material_id_alignment": evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots),
+        "cgf_import_settings_alignment": evaluate_cgf_import_settings_roundtrip(
+            cgf_material_summary,
+            request_materials,
+            mtl_slots,
+        ),
         "source_fixture_manifest": fixture_manifest_path,
         "fixture_material_semantic_alignment": evaluate_fixture_material_semantics(
             fixture_manifest,
