@@ -224,8 +224,22 @@ def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
 
     assert not result["ok"]
     assert result["checks"] == [
-        {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Bark"},
-        {"ok": False, "material_id": 2, "in_request": False, "in_mtl": True, "mtl_slot_name": "Proxy"},
+        {
+            "ok": True,
+            "material_id": 0,
+            "in_request": True,
+            "in_mtl": True,
+            "mtl_slot_name": "Bark",
+            "used_unassigned": False,
+        },
+        {
+            "ok": False,
+            "material_id": 2,
+            "in_request": False,
+            "in_mtl": True,
+            "mtl_slot_name": "Proxy",
+            "used_unassigned": False,
+        },
     ]
 
 
@@ -238,7 +252,88 @@ def test_evaluate_cgf_material_ids_ignores_invalid_mtl_slots():
 
     assert result["ok"]
     assert result["checks"] == [
-        {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Stone"},
+        {
+            "ok": True,
+            "material_id": 0,
+            "in_request": True,
+            "in_mtl": True,
+            "mtl_slot_name": "Stone",
+            "used_unassigned": False,
+        },
+    ]
+
+
+def test_evaluate_cgf_material_ids_classifies_unassigned_placeholders():
+    result = evaluate_cgf_material_ids(
+        {"material_ids": [0, 2]},
+        [
+            {"name": "Bark", "sub_index": 0},
+            {"name": "unassigned", "sub_index": 1},
+            {"name": "Leaves", "sub_index": 2},
+            {"name": "<unassigned>", "sub_index": 3},
+        ],
+        [
+            {"slot": 0, "name": "Bark"},
+            {"slot": 1, "name": "unassigned"},
+            {"slot": 2, "name": "Leaves"},
+            {"slot": 3, "name": "<unassigned>"},
+        ],
+    )
+
+    assert result["ok"]
+    assert result["unassigned_slot_diagnostics_ok"]
+    assert result["unassigned_slot_diagnostics"] == [
+        {
+            "ok": True,
+            "type": "gap_unassigned_placeholder",
+            "slot": 1,
+            "request_name": "unassigned",
+            "mtl_slot_name": "unassigned",
+            "source": ["request", "mtl"],
+            "used_by_cgf": False,
+            "max_used_material_id": 2,
+        },
+        {
+            "ok": True,
+            "type": "trailing_unassigned_placeholder",
+            "slot": 3,
+            "request_name": "<unassigned>",
+            "mtl_slot_name": "<unassigned>",
+            "source": ["request", "mtl"],
+            "used_by_cgf": False,
+            "max_used_material_id": 2,
+        },
+    ]
+
+
+def test_evaluate_cgf_material_ids_rejects_used_unassigned_material():
+    result = evaluate_cgf_material_ids(
+        {"material_ids": [0, 1]},
+        [{"name": "Stone", "sub_index": 0}, {"name": "unassigned", "sub_index": 1}],
+        [{"slot": 0, "name": "Stone"}, {"slot": 1, "name": "unassigned"}],
+    )
+
+    assert not result["ok"]
+    assert not result["unassigned_slot_diagnostics_ok"]
+    assert result["checks"][1] == {
+        "ok": False,
+        "material_id": 1,
+        "in_request": True,
+        "in_mtl": True,
+        "mtl_slot_name": "unassigned",
+        "used_unassigned": True,
+    }
+    assert result["unassigned_slot_diagnostics"] == [
+        {
+            "ok": False,
+            "type": "used_unassigned_material",
+            "slot": 1,
+            "request_name": "unassigned",
+            "mtl_slot_name": "unassigned",
+            "source": ["request", "mtl"],
+            "used_by_cgf": True,
+            "max_used_material_id": 1,
+        }
     ]
 
 
@@ -420,6 +515,7 @@ def test_evaluate_cgf_import_settings_roundtrip_reports_material_mismatches():
         "in_request": False,
         "in_mtl": False,
         "mtl_slot_name": "",
+        "used_unassigned": False,
     }
 
 

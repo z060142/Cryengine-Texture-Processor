@@ -933,21 +933,99 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
     }
 
 
+def _is_unassigned_slot_name(name):
+    normalized = coerce_material_name(name).strip().lower()
+    return normalized in {"<unassigned>", "unassigned"}
+
+
+def _unassigned_slot_diagnostic(slot, request_name, mtl_name, material_ids):
+    used = slot in material_ids
+    max_used_slot = max(material_ids) if material_ids else -1
+    request_unassigned = _is_unassigned_slot_name(request_name)
+    mtl_unassigned = _is_unassigned_slot_name(mtl_name)
+    source = []
+    if request_unassigned:
+        source.append("request")
+    if mtl_unassigned:
+        source.append("mtl")
+    if used:
+        diagnostic_type = "used_unassigned_material"
+        ok = False
+    elif slot > max_used_slot:
+        diagnostic_type = "trailing_unassigned_placeholder"
+        ok = True
+    else:
+        diagnostic_type = "gap_unassigned_placeholder"
+        ok = True
+
+    return {
+        "ok": ok,
+        "type": diagnostic_type,
+        "slot": slot,
+        "request_name": request_name,
+        "mtl_slot_name": mtl_name,
+        "source": source,
+        "used_by_cgf": used,
+        "max_used_material_id": max_used_slot,
+    }
+
+
+def _evaluate_unassigned_slots(material_ids, request_materials, mtl_slots_by_index):
+    request_by_index = {}
+    for material in _valid_request_materials(request_materials):
+        slot = _coerce_request_sub_index(material.get("sub_index"))
+        if slot is None or slot < 0:
+            continue
+        request_by_index[slot] = coerce_material_name(material.get("name", ""))
+
+    candidate_slots = set()
+    for slot, name in request_by_index.items():
+        if _is_unassigned_slot_name(name):
+            candidate_slots.add(slot)
+    for slot, mtl_slot in mtl_slots_by_index.items():
+        if _is_unassigned_slot_name(mtl_slot.get("name", "")):
+            candidate_slots.add(slot)
+
+    diagnostics = []
+    for slot in sorted(candidate_slots):
+        diagnostics.append(
+            _unassigned_slot_diagnostic(
+                slot,
+                request_by_index.get(slot, ""),
+                mtl_slots_by_index.get(slot, {}).get("name", ""),
+                material_ids,
+            )
+        )
+    return diagnostics
+
+
 def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots):
     material_ids = cgf_material_summary.get("material_ids", []) if cgf_material_summary else []
+    request_names_by_index = {}
+    for material in _valid_request_materials(request_materials):
+        slot = _coerce_request_sub_index(material.get("sub_index"))
+        if slot is not None and slot >= 0:
+            request_names_by_index[slot] = coerce_material_name(material.get("name", ""))
     request_slots = {
         _coerce_request_sub_index(material.get("sub_index"))
         for material in _valid_request_materials(request_materials)
         if _coerce_request_sub_index(material.get("sub_index")) is not None
     }
     mtl_slots_by_index = {slot["slot"]: slot for slot in _valid_mtl_slots(mtl_slots)}
+    unassigned_slot_diagnostics = _evaluate_unassigned_slots(material_ids, request_materials, mtl_slots_by_index)
+    unassigned_slot_diagnostics_ok = all(diagnostic["ok"] for diagnostic in unassigned_slot_diagnostics)
     checks = []
-    ok = True
+    ok = unassigned_slot_diagnostics_ok
 
     for material_id in material_ids:
         in_request = material_id in request_slots
         in_mtl = material_id in mtl_slots_by_index
+        mtl_slot_name = mtl_slots_by_index.get(material_id, {}).get("name", "")
+        request_name = request_names_by_index.get(material_id, "")
+        used_unassigned = _is_unassigned_slot_name(request_name) or _is_unassigned_slot_name(mtl_slot_name)
         check_ok = in_request and in_mtl
+        if used_unassigned:
+            check_ok = False
         ok = ok and check_ok
         checks.append(
             {
@@ -955,11 +1033,18 @@ def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots
                 "material_id": material_id,
                 "in_request": in_request,
                 "in_mtl": in_mtl,
-                "mtl_slot_name": mtl_slots_by_index.get(material_id, {}).get("name", ""),
+                "mtl_slot_name": mtl_slot_name,
+                "used_unassigned": used_unassigned,
             }
         )
 
-    return {"ok": ok, "checks": checks, "material_ids": material_ids}
+    return {
+        "ok": ok,
+        "checks": checks,
+        "material_ids": material_ids,
+        "unassigned_slot_diagnostics": unassigned_slot_diagnostics,
+        "unassigned_slot_diagnostics_ok": unassigned_slot_diagnostics_ok,
+    }
 
 
 def _extract_cgf_import_settings_materials(cgf_material_summary):
@@ -1073,11 +1158,6 @@ def _request_materials_equal(left, right):
             }
         )
     return {"ok": ok, "checks": checks}
-
-
-def _is_unassigned_slot_name(name):
-    normalized = coerce_material_name(name).strip().lower()
-    return normalized in {"<unassigned>", "unassigned"}
 
 
 def _classify_extra_import_settings_slot(slot, material, cgf_sub_material_count):
