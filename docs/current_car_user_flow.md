@@ -34,7 +34,7 @@ Result:
 - material report: `S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_current\rc_work\kb3d_citycarsessentialssedan-native.material_report.json`
 - material state compare: `ok: True`
 - MTL schema gate: `ok: True`, `material_count: 18`, `diagnostic_count: 0`
-- MTL fallback provenance: `compatibility_preserved_default_count: 146`
+- MTL fallback provenance: `compatibility_preserved_default_count: 84`
 - texture output gate: `ok: True`, `group_count: 17`, `output_count: 73`, `diagnostic_count: 0`
 - slot alignment: `slot_alignment_ok: True`
 - CGF material id alignment: `cgf_material_id_alignment_ok: True`
@@ -121,9 +121,11 @@ instead of letting them masquerade as fully proven CryEngine material state. In
 the current car run:
 
 ```text
-compatibility_preserved_default_count = 146
-material_attribute_compatibility_defaults = Emittance=0,0,0,0 x17, Shininess=255 x17, Specular=1,1,1 x14
-public_param_compatibility_defaults = EmittanceMapGamma=1 x17, SSSIndex=0 x16
+compatibility_preserved_default_count = 84
+material_attribute_compatibility_defaults = Emittance=0,0,0,0 x17
+material_attribute_override_backed_values = Shininess=255 x17, Specular=1,1,1 x14, plus source MTL values for Shader/MtlFlags/etc.
+public_param_compatibility_defaults = EmittanceMapGamma=1 x1, SSSIndex=0 x1
+public_param_override_backed_values = EmittanceMapGamma=1 x16, SSSIndex=0 x15, plus shader-specific params
 texmod_compatibility_statuses = matches_export_minimal_texmod x65
 ```
 

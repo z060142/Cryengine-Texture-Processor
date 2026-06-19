@@ -37,55 +37,64 @@
                 "status": "differs_from_export_attribute",
                 "actual": "524544",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": false
               },
               "Shader": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": false
               },
               "SurfaceType": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": false
               },
               "MatTemplate": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": false
               },
               "Diffuse": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": false
               },
               "Specular": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": false
               },
               "Emittance": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": false
               },
               "Shininess": {
                 "status": "missing_export_attribute",
                 "actual": "",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": false
               }
             },
             "missing_attrs": [
@@ -161,7 +170,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": false
             },
             "SSSIndex": {
               "raw": "0",
@@ -180,7 +190,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": false
             }
           },
           "textures": [],
@@ -243,55 +254,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -356,7 +376,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -375,7 +396,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -716,55 +738,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -829,7 +860,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -848,7 +880,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -1189,55 +1222,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -1302,7 +1344,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -1321,7 +1364,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -1662,55 +1706,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "differs_from_export_attribute",
                 "actual": "0.98225087,0.98225087,0.98225087",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -1777,7 +1830,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -1796,7 +1850,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -2137,55 +2192,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -2250,7 +2314,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -2269,7 +2334,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -2610,55 +2676,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -2723,7 +2798,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -2742,7 +2818,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -3083,55 +3160,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -3196,7 +3282,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -3215,7 +3302,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -3553,55 +3641,64 @@
                 "status": "differs_from_export_attribute",
                 "actual": "526464",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "differs_from_export_attribute",
                 "actual": "Multilayeredmaterials",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -3678,7 +3775,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "BumpMapTile": {
               "raw": "1",
@@ -3697,7 +3795,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "BumpScale": {
               "raw": "0.1",
@@ -3716,7 +3815,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "EmittanceMapGamma": {
               "raw": "1",
@@ -3735,7 +3835,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer0ReflectivityScale": {
               "raw": "1.5",
@@ -3754,7 +3855,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer1ReflectivityScale": {
               "raw": "1.5",
@@ -3773,7 +3875,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer1Smoothness": {
               "raw": "0.1",
@@ -3792,7 +3895,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer1Thickness": {
               "raw": "0.1",
@@ -3811,7 +3915,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer2ReflectivityScale": {
               "raw": "1.5",
@@ -3830,7 +3935,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer2Smoothness": {
               "raw": "0.1",
@@ -3849,7 +3955,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "Layer2Thickness": {
               "raw": "0.1",
@@ -3868,7 +3975,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -4278,55 +4386,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "differs_from_export_attribute",
                 "actual": "0.77582246,0.77582246,0.77582246",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -4393,7 +4510,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -4412,7 +4530,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -4753,55 +4872,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -4866,7 +4994,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -4885,7 +5014,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -5226,55 +5356,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -5339,7 +5478,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -5358,7 +5498,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -5699,55 +5840,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -5812,7 +5962,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -5831,7 +5982,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -6172,55 +6324,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -6285,7 +6446,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -6304,7 +6466,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -6645,55 +6808,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -6758,7 +6930,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -6777,7 +6950,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -7118,55 +7292,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -7231,7 +7414,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -7250,7 +7434,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -7592,55 +7777,64 @@
                 "status": "differs_from_export_attribute",
                 "actual": "526466",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "differs_from_export_attribute",
                 "actual": "Glass",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -7712,7 +7906,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "BumpMapTile": {
               "raw": "1",
@@ -7731,7 +7926,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "BumpScale": {
               "raw": "0.1",
@@ -7750,7 +7946,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "CloudinessReducesGloss": {
               "raw": "0.1",
@@ -7769,7 +7966,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "TintCloudiness": {
               "raw": "0.050000001",
@@ -7788,7 +7986,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "TintColor": {
               "raw": "0.16078432,0.16078432,0.16078432",
@@ -7807,7 +8006,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [
@@ -8147,55 +8347,64 @@
                 "status": "matches_export_attribute",
                 "actual": "524416",
                 "expected": "524416",
-                "policy_status": "covered_by_mtl_flags_policy"
+                "policy_status": "covered_by_mtl_flags_policy",
+                "override_backed": true
               },
               "Shader": {
                 "status": "matches_export_attribute",
                 "actual": "Illum",
                 "expected": "Illum",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "SurfaceType": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "MatTemplate": {
                 "status": "matches_export_attribute",
                 "actual": "",
                 "expected": "",
-                "policy_status": "source_loaded_empty_export_default"
+                "policy_status": "source_loaded_empty_export_default",
+                "override_backed": true
               },
               "Diffuse": {
                 "status": "matches_export_attribute",
                 "actual": "1,1,1",
                 "expected": "1,1,1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Specular": {
                 "status": "differs_from_export_attribute",
                 "actual": "0.046964195,0.046964195,0.046964195",
                 "expected": "1,1,1",
-                "policy_status": "compatibility_preserved_until_roundtrip_evidence"
+                "policy_status": "compatibility_preserved_until_roundtrip_evidence",
+                "override_backed": true
               },
               "Emittance": {
                 "status": "matches_export_attribute",
                 "actual": "0,0,0,0",
                 "expected": "0,0,0,0",
-                "policy_status": "source_loaded_compatibility_default"
+                "policy_status": "source_loaded_compatibility_default",
+                "override_backed": false
               },
               "Opacity": {
                 "status": "matches_export_attribute",
                 "actual": "1",
                 "expected": "1",
-                "policy_status": "source_backed_editor_default"
+                "policy_status": "source_backed_editor_default",
+                "override_backed": true
               },
               "Shininess": {
                 "status": "matches_export_attribute",
                 "actual": "255",
                 "expected": "255",
-                "policy_status": "compatibility_preserved_editor_default_differs"
+                "policy_status": "compatibility_preserved_editor_default_differs",
+                "override_backed": true
               }
             },
             "missing_attrs": [],
@@ -8262,7 +8471,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             },
             "SSSIndex": {
               "raw": "0",
@@ -8281,7 +8491,8 @@
                 "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
                 "editor_cache_lines": "523-533",
                 "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
-              }
+              },
+              "override_backed": true
             }
           },
           "textures": [],
@@ -8299,7 +8510,7 @@
     "material_count": 18,
     "multi_material_file_count": 1,
     "tokenized_material_count": 16,
-    "compatibility_preserved_default_count": 146
+    "compatibility_preserved_default_count": 84
   },
   "schema": {
     "material_tags": [
@@ -8428,14 +8639,68 @@
       {
         "name": "Emittance=0,0,0,0",
         "count": 17
+      }
+    ],
+    "material_attribute_override_backed_values": [
+      {
+        "name": "Diffuse=1,1,1",
+        "count": 17
+      },
+      {
+        "name": "MatTemplate=",
+        "count": 17
+      },
+      {
+        "name": "Opacity=1",
+        "count": 17
       },
       {
         "name": "Shininess=255",
         "count": 17
       },
       {
+        "name": "SurfaceType=",
+        "count": 17
+      },
+      {
+        "name": "MtlFlags=524416",
+        "count": 15
+      },
+      {
+        "name": "Shader=Illum",
+        "count": 15
+      },
+      {
         "name": "Specular=1,1,1",
         "count": 14
+      },
+      {
+        "name": "MtlFlags=526464",
+        "count": 1
+      },
+      {
+        "name": "MtlFlags=526466",
+        "count": 1
+      },
+      {
+        "name": "Shader=Glass",
+        "count": 1
+      },
+      {
+        "name": "Shader=Multilayeredmaterials",
+        "count": 1
+      },
+      {
+        "name": "Specular=0.046964195,0.046964195,0.046964195",
+        "count": 1
+      },
+      {
+        "name": "Specular=0.77582246,0.77582246,0.77582246",
+        "count": 1
+      },
+      {
+        "name": "Specular=0.98225087,0.98225087,0.98225087",
+        "count": 1
       }
     ],
     "material_attribute_policy_missing": [
@@ -8621,11 +8886,77 @@
     "public_param_compatibility_defaults": [
       {
         "name": "EmittanceMapGamma=1",
-        "count": 17
+        "count": 1
       },
       {
         "name": "SSSIndex=0",
+        "count": 1
+      }
+    ],
+    "public_param_override_backed_values": [
+      {
+        "name": "EmittanceMapGamma=1",
         "count": 16
+      },
+      {
+        "name": "SSSIndex=0",
+        "count": 15
+      },
+      {
+        "name": "BumpMapTile=1",
+        "count": 2
+      },
+      {
+        "name": "BumpScale=0.1",
+        "count": 2
+      },
+      {
+        "name": "BackLightScale=0.050000001",
+        "count": 1
+      },
+      {
+        "name": "BackLightScale=0.5",
+        "count": 1
+      },
+      {
+        "name": "CloudinessReducesGloss=0.1",
+        "count": 1
+      },
+      {
+        "name": "Layer0ReflectivityScale=1.5",
+        "count": 1
+      },
+      {
+        "name": "Layer1ReflectivityScale=1.5",
+        "count": 1
+      },
+      {
+        "name": "Layer1Smoothness=0.1",
+        "count": 1
+      },
+      {
+        "name": "Layer1Thickness=0.1",
+        "count": 1
+      },
+      {
+        "name": "Layer2ReflectivityScale=1.5",
+        "count": 1
+      },
+      {
+        "name": "Layer2Smoothness=0.1",
+        "count": 1
+      },
+      {
+        "name": "Layer2Thickness=0.1",
+        "count": 1
+      },
+      {
+        "name": "TintCloudiness=0.050000001",
+        "count": 1
+      },
+      {
+        "name": "TintColor=0.16078432,0.16078432,0.16078432",
+        "count": 1
       }
     ],
     "public_param_component_counts": [

@@ -530,7 +530,9 @@ def exported_material_state_contract():
             "report_counters": [
                 "compatibility_preserved_default_count",
                 "material_attribute_compatibility_defaults",
+                "material_attribute_override_backed_values",
                 "public_param_compatibility_defaults",
+                "public_param_override_backed_values",
                 "texmod_compatibility_statuses",
             ],
             "rule": (

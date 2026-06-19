@@ -239,6 +239,63 @@ def test_build_mtl_schema_report_flags_shared_texture_path_across_ce_maps(tmp_pa
     assert diagnostics[0]["expected_suffixes"] == ["_diff", "_displ", "_spec"]
 
 
+def test_build_mtl_schema_report_separates_override_backed_values_from_fallback_defaults(tmp_path):
+    mtl_path = tmp_path / "override_backed.mtl"
+    root = ET.Element("Material")
+    sub_materials = ET.SubElement(root, "SubMaterials")
+    material = ET.SubElement(
+        sub_materials,
+        "Material",
+        Name="Stone",
+        MtlFlags="524416",
+        Shader="Illum",
+        Diffuse="1,1,1",
+        Specular="1,1,1",
+        Emittance="0,0,0,0",
+        Opacity="1",
+        Shininess="255",
+    )
+    ET.SubElement(material, "PublicParams", EmittanceMapGamma="1", SSSIndex="0")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8")
+
+    report = build_mtl_schema_report(
+        [str(mtl_path)],
+        material_overrides={
+            "Stone": {
+                "cryengine_material": {
+                    "Specular": "1,1,1",
+                    "Emittance": "0,0,0,0",
+                    "Shininess": "255",
+                    "PublicParams": {
+                        "EmittanceMapGamma": "1",
+                        "SSSIndex": "0",
+                    },
+                }
+            }
+        },
+    )
+
+    assert report["summary"]["compatibility_preserved_default_count"] == 0
+    assert {"name": "Specular=1,1,1", "count": 1} in report["schema"][
+        "material_attribute_override_backed_values"
+    ]
+    assert {"name": "Emittance=0,0,0,0", "count": 1} in report["schema"][
+        "material_attribute_override_backed_values"
+    ]
+    assert {"name": "Shininess=255", "count": 1} in report["schema"][
+        "material_attribute_override_backed_values"
+    ]
+    assert report["schema"]["material_attribute_compatibility_defaults"] == []
+    assert report["schema"]["public_param_override_backed_values"] == [
+        {"name": "EmittanceMapGamma=1", "count": 1},
+        {"name": "SSSIndex=0", "count": 1},
+    ]
+    assert report["schema"]["public_param_compatibility_defaults"] == []
+    material_report = report["files"][0]["materials"][1]
+    assert material_report["attribute_policy_analysis"]["entries"]["Specular"]["override_backed"] is True
+    assert material_report["public_param_analysis"]["SSSIndex"]["override_backed"] is True
+
+
 def test_build_mtl_schema_report_can_omit_per_file_records(tmp_path):
     mtl_path = tmp_path / "asset.mtl"
     write_schema_mtl(mtl_path)

@@ -505,7 +505,10 @@ def run_rc_smoke_test(
         except Exception as e:
             material_state_compare_error = f"Failed to compare material state: {e}"
     try:
-        mtl_schema_gate_report = build_mtl_schema_report([bundle["mtl_path"]])
+        mtl_schema_gate_report = build_mtl_schema_report(
+            [bundle["mtl_path"]],
+            material_overrides=material_overrides,
+        )
         write_mtl_schema_report(mtl_schema_gate_report, mtl_schema_gate_path)
     except Exception as e:
         mtl_schema_gate_error = f"Failed to run MTL schema gate: {e}"

@@ -182,15 +182,21 @@ proven material state. In the current car flow the generated MTL records:
 
 ```json
 {
-  "compatibility_preserved_default_count": 146,
+  "compatibility_preserved_default_count": 84,
   "material_attribute_compatibility_defaults": {
-    "Emittance=0,0,0,0": 17,
+    "Emittance=0,0,0,0": 17
+  },
+  "material_attribute_override_backed_values": {
     "Shininess=255": 17,
     "Specular=1,1,1": 14
   },
   "public_param_compatibility_defaults": {
-    "EmittanceMapGamma=1": 17,
-    "SSSIndex=0": 16
+    "EmittanceMapGamma=1": 1,
+    "SSSIndex=0": 1
+  },
+  "public_param_override_backed_values": {
+    "EmittanceMapGamma=1": 16,
+    "SSSIndex=0": 15
   },
   "texmod_compatibility_statuses": {
     "matches_export_minimal_texmod": 65

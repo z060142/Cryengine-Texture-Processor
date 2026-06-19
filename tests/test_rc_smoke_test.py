@@ -1035,6 +1035,18 @@ def test_run_rc_smoke_test_embeds_mtl_schema_gate_report(tmp_path):
         str(source_fbx),
         str(tmp_path / "work"),
         asset_name="asset",
+        material_overrides={
+            "Default": {
+                "cryengine_material": {
+                    "Specular": "1,1,1",
+                    "Shininess": "255",
+                    "PublicParams": {
+                        "EmittanceMapGamma": "1",
+                        "SSSIndex": "0",
+                    },
+                }
+            }
+        },
         runner_factory=FakeRunner,
     )
 
@@ -1042,6 +1054,15 @@ def test_run_rc_smoke_test_embeds_mtl_schema_gate_report(tmp_path):
     assert result.mtl_schema_gate_path.endswith("asset.mtl_schema_gate.json")
     gate_report = json.loads(open(result.mtl_schema_gate_path, encoding="utf-8").read())
     assert gate_report["gate"]["summary"]["ok"] is True
+    assert {"name": "Specular=1,1,1", "count": 1} in gate_report["schema"][
+        "material_attribute_override_backed_values"
+    ]
+    assert {"name": "Shininess=255", "count": 1} in gate_report["schema"][
+        "material_attribute_override_backed_values"
+    ]
+    assert {"name": "EmittanceMapGamma=1", "count": 1} in gate_report["schema"][
+        "public_param_override_backed_values"
+    ]
     report = json.loads(open(result.material_report_path, encoding="utf-8").read())
     assert report["mtl_schema_gate"]["summary"]["ok"] is True
     assert report["mtl_schema_gate_path"] == result.mtl_schema_gate_path

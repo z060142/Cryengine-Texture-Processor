@@ -111,9 +111,20 @@ def _analyze_texmod_attrs(texmod_attrs):
     }
 
 
-def _analyze_material_attributes(attrs):
+def _material_override_state(material_overrides, material_name):
+    override = (material_overrides or {}).get(material_name, {})
+    if not isinstance(override, dict):
+        return {}
+    cryengine_material = override.get("cryengine_material")
+    if isinstance(cryengine_material, dict):
+        return cryengine_material
+    return override
+
+
+def _analyze_material_attributes(attrs, override_attrs=None):
     policy = exported_material_attribute_policy()
     expected_attrs = policy["attributes"]
+    override_attrs = override_attrs or {}
     entry_statuses = {}
     for name, expected_value in expected_attrs.items():
         if name not in attrs:
@@ -127,6 +138,7 @@ def _analyze_material_attributes(attrs):
             "actual": attrs.get(name, ""),
             "expected": expected_value,
             "policy_status": policy["attribute_status"].get(name, ""),
+            "override_backed": name in override_attrs and str(override_attrs.get(name, "")) == attrs.get(name, ""),
         }
 
     return {
@@ -161,16 +173,33 @@ def _texture_entries(element):
     return entries
 
 
-def analyze_material_element(element, location):
+def _apply_public_param_override_backing(public_param_analysis, public_params, override_public_params=None):
+    override_public_params = override_public_params or {}
+    for name, analysis in public_param_analysis.items():
+        analysis["override_backed"] = (
+            name in override_public_params
+            and str(override_public_params.get(name, "")) == public_params.get(name, "")
+        )
+    return public_param_analysis
+
+
+def analyze_material_element(element, location, material_overrides=None):
     gen_mask = parse_gen_mask_literal(
         element.get("GenMask", ""),
         prefer_hex_for_string_mask=bool(element.get("StringGenMask", "")),
     )
     tokens = string_gen_mask_tokens(element.get("StringGenMask", ""))
     public_params = _child_attributes(element, "PublicParams")
+    override_state = _material_override_state(material_overrides, element.get("Name", ""))
+    override_public_params = (
+        override_state.get("PublicParams", {})
+        if isinstance(override_state.get("PublicParams"), dict)
+        else {}
+    )
     mtl_flags_analysis = describe_mtl_flags(element.get("MtlFlags", ""))
     attributes = _attributes(element)
     textures = _texture_entries(element)
+    public_param_analysis = analyze_public_params(public_params)
     return {
         "location": location,
         "tag": element.tag,
@@ -182,9 +211,13 @@ def analyze_material_element(element, location):
         "string_gen_mask": element.get("StringGenMask", ""),
         "tokens": tokens,
         "attributes": attributes,
-        "attribute_policy_analysis": _analyze_material_attributes(attributes),
+        "attribute_policy_analysis": _analyze_material_attributes(attributes, override_state),
         "public_params": public_params,
-        "public_param_analysis": analyze_public_params(public_params),
+        "public_param_analysis": _apply_public_param_override_backing(
+            public_param_analysis,
+            public_params,
+            override_public_params,
+        ),
         "textures": textures,
         "texture_path_reuse_diagnostics": analyze_ce_texture_path_reuse(
             [
@@ -200,10 +233,10 @@ def analyze_material_element(element, location):
     }
 
 
-def analyze_mtl_file(mtl_path):
+def analyze_mtl_file(mtl_path, material_overrides=None):
     root = ET.parse(mtl_path).getroot()
     materials = [
-        analyze_material_element(element, location)
+        analyze_material_element(element, location, material_overrides=material_overrides)
         for element, location in _material_elements(root)
     ]
     return {
@@ -294,7 +327,7 @@ def build_mtl_schema_gate(report):
     }
 
 
-def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=True):
+def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=True, material_overrides=None):
     files = []
     file_count = 0
     material_count = 0
@@ -309,6 +342,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     attribute_policy_status_counts = Counter()
     attribute_policy_source_counts = Counter()
     attribute_policy_compatibility_default_counts = Counter()
+    attribute_override_backed_counts = Counter()
     attribute_policy_diff_counts = Counter()
     attribute_policy_missing_counts = Counter()
     texture_map_counts = Counter()
@@ -326,6 +360,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     token_counts = Counter()
     public_param_component_counts = Counter()
     public_param_compatibility_default_counts = Counter()
+    public_param_override_backed_counts = Counter()
     mtl_flag_name_counts = Counter()
     mtl_flag_unknown_mask_counts = Counter()
     attributes_by_shader = defaultdict(Counter)
@@ -338,7 +373,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
         if limit is not None and index >= limit:
             break
         file_count += 1
-        file_info = analyze_mtl_file(mtl_path)
+        file_info = analyze_mtl_file(mtl_path, material_overrides=material_overrides)
         if include_files:
             files.append(file_info)
         if len(file_info["materials"]) > 1:
@@ -359,11 +394,17 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 policy_status = analysis.get("policy_status", "")
                 attribute_policy_status_counts.update([status])
                 attribute_policy_source_counts.update([policy_status or "unknown_policy_status"])
+                if analysis.get("override_backed"):
+                    attribute_override_backed_counts.update([f"{attr_name}={analysis['actual']}"])
                 if status == "missing_export_attribute":
                     attribute_policy_missing_counts.update([attr_name])
                 elif status == "differs_from_export_attribute":
                     attribute_policy_diff_counts.update([f"{attr_name}={analysis['actual']}"])
-                elif status == "matches_export_attribute" and _is_compatibility_policy_status(policy_status):
+                elif (
+                    status == "matches_export_attribute"
+                    and _is_compatibility_policy_status(policy_status)
+                    and not analysis.get("override_backed")
+                ):
                     attribute_policy_compatibility_default_counts.update([f"{attr_name}={analysis['actual']}"])
             for param_name in material["public_params"]:
                 public_param_counts[param_name] += 1
@@ -371,7 +412,10 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 param_value = material["public_params"][param_name]
                 public_param_value_counts[f"{param_name}={param_value}"] += 1
                 public_param_values_by_name[param_name][param_value] += 1
-                if BASE_PUBLIC_PARAMS.get(param_name) == param_value:
+                param_analysis = material["public_param_analysis"].get(param_name, {})
+                if param_analysis.get("override_backed"):
+                    public_param_override_backed_counts[f"{param_name}={param_value}"] += 1
+                elif BASE_PUBLIC_PARAMS.get(param_name) == param_value:
                     public_param_compatibility_default_counts[f"{param_name}={param_value}"] += 1
             for param_info in material["public_param_analysis"].values():
                 public_param_component_counts[str(param_info["parsed_component_count"])] += 1
@@ -438,6 +482,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "material_attribute_compatibility_defaults": _counter_to_sorted_pairs(
                 attribute_policy_compatibility_default_counts
             ),
+            "material_attribute_override_backed_values": _counter_to_sorted_pairs(attribute_override_backed_counts),
             "material_attribute_policy_missing": _counter_to_sorted_pairs(attribute_policy_missing_counts),
             "material_attribute_policy_differences": _counter_to_sorted_pairs(attribute_policy_diff_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
@@ -445,6 +490,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "public_param_compatibility_defaults": _counter_to_sorted_pairs(
                 public_param_compatibility_default_counts
             ),
+            "public_param_override_backed_values": _counter_to_sorted_pairs(public_param_override_backed_counts),
             "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
             "public_param_values_by_name": _top_values(public_param_values_by_name, value_limit),
             "public_param_component_counts_by_name": _top_values(public_param_component_counts_by_name, value_limit),
@@ -481,20 +527,35 @@ def write_mtl_schema_report(report, output_path):
     return output_path
 
 
+def load_material_overrides(overrides_path):
+    if not overrides_path:
+        return {}
+    with open(overrides_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    if isinstance(payload, dict) and isinstance(payload.get("material_overrides"), dict):
+        return payload["material_overrides"]
+    if isinstance(payload, dict):
+        return payload
+    raise ValueError(f"Material overrides JSON must be an object: {overrides_path}")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Summarize CryEngine .mtl XML schema usage.")
     parser.add_argument("paths", nargs="+", help="MTL files or directories to scan")
     parser.add_argument("--limit", type=int, default=None, help="Maximum number of .mtl files to scan")
     parser.add_argument("--value-limit", type=int, default=12, help="Maximum example values per grouped field")
     parser.add_argument("--summary-only", action="store_true", help="Omit per-file material records")
+    parser.add_argument("--material-overrides", default="", help="Optional material override JSON for provenance")
     parser.add_argument("--output", default="", help="Optional JSON output path")
     args = parser.parse_args(argv)
 
+    material_overrides = load_material_overrides(args.material_overrides) if args.material_overrides else {}
     report = build_mtl_schema_report(
         args.paths,
         limit=args.limit,
         value_limit=args.value_limit,
         include_files=not args.summary_only,
+        material_overrides=material_overrides,
     )
     output = json.dumps(report, indent=2)
     if args.output:

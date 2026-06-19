@@ -117,6 +117,10 @@ material state.
 as `compatibility_preserved_default_count`,
 `material_attribute_compatibility_defaults`,
 `public_param_compatibility_defaults`, and `texmod_compatibility_statuses`.
+When a reference override is supplied, matching values are separated into
+`material_attribute_override_backed_values` and
+`public_param_override_backed_values` instead of being counted as fallback
+defaults.
 
 Machine-readable entry:
 
