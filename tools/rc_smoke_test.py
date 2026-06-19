@@ -12,6 +12,7 @@ from model_processing.material_manifest import (
     load_material_manifest,
     material_manifest_materials,
 )
+from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
@@ -110,6 +111,50 @@ def material_specs_from_manifest(source_fbx_path):
     return material_manifest_materials([], {"path": manifest_path, "manifest": manifest})
 
 
+def source_material_specs_from_manifest(source_fbx_path):
+    manifest_path = discover_material_manifest(source_fbx_path)
+    manifest = load_material_manifest(manifest_path)
+    if not manifest:
+        return []
+
+    materials_by_name = {}
+    for material in manifest.get("materials", []):
+        name = material.get("name", "")
+        if not name:
+            continue
+        slot = int(material.get("slot", len(materials_by_name)))
+        materials_by_name[name] = {
+            "name": name,
+            "id": slot + 1,
+            "index": slot,
+            "material_table_slot": slot,
+            "polygon_count": 0,
+            "used_by_polygons": False,
+        }
+
+    for polygon in manifest.get("polygons", []):
+        name = polygon.get("material_name", "")
+        if not name:
+            continue
+        slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot", 0)))
+        slot = int(slot)
+        material = materials_by_name.setdefault(
+            name,
+            {
+                "name": name,
+                "id": slot + 1,
+                "index": slot,
+                "material_table_slot": slot,
+                "polygon_count": 0,
+                "used_by_polygons": False,
+            },
+        )
+        material["polygon_count"] = int(material.get("polygon_count", 0)) + 1
+        material["used_by_polygons"] = True
+
+    return sorted(materials_by_name.values(), key=lambda item: int(item.get("index", 0)))
+
+
 def _normalize_material_specs(material_names=None, material_specs=None):
     if material_specs is not None:
         return [
@@ -154,9 +199,26 @@ def _copy_material_manifest(source_fbx_path, copied_fbx_path):
     return copied_manifest_path
 
 
-def collect_material_slot_diagnostics(material_specs, existing_submaterial_names=None):
-    diagnostics = []
-    for record in build_material_slot_records(material_specs, existing_submaterial_names):
+def collect_material_slot_diagnostics(
+    material_specs,
+    existing_submaterial_names=None,
+    material_manifest_info=None,
+    source_materials=None,
+):
+    records = build_material_slot_records(
+        material_specs,
+        existing_submaterial_names,
+        material_manifest_info=material_manifest_info,
+    )
+    diagnostics = [
+        {
+            **diagnostic,
+            "assignment_reason": diagnostic.get("assignment_reason", "omitted_source_material"),
+            "original_name": diagnostic.get("material", ""),
+        }
+        for diagnostic in build_omitted_material_diagnostics(source_materials if source_materials is not None else material_specs, records)
+    ]
+    for record in records:
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(
                 {
@@ -180,6 +242,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
     if os.path.abspath(source_fbx_path) != os.path.abspath(copied_fbx_path):
         shutil.copy2(source_fbx_path, copied_fbx_path)
     copied_manifest_path = _copy_material_manifest(source_fbx_path, copied_fbx_path)
+    source_materials = source_material_specs_from_manifest(source_fbx_path)
 
     materials_data = [{**spec, "textures": {}} for spec in material_specs]
     mtl_filename = f"{asset_name}.mtl"
@@ -202,7 +265,10 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
         "copied_manifest_path": copied_manifest_path,
         "mtl_path": mtl_result,
         "json_path": json_result,
-        "material_diagnostics": collect_material_slot_diagnostics(materials_data),
+        "material_diagnostics": collect_material_slot_diagnostics(
+            materials_data,
+            source_materials=source_materials or materials_data,
+        ),
     }
 
 

@@ -10,6 +10,7 @@ from tools.rc_smoke_test import (
     material_specs_from_arg,
     prepare_smoke_bundle,
     run_rc_smoke_test,
+    source_material_specs_from_manifest,
 )
 from utils.rc_import_runner import RCImportResult
 import xml.etree.ElementTree as ET
@@ -51,6 +52,32 @@ def test_material_specs_from_manifest_uses_rc_material_table(tmp_path):
     assert [(spec["name"], spec["id"], spec["sub_index"], spec["auto_assigned"]) for spec in specs] == [
         ("Stone", 1, 0, False),
         ("Stone.001", 2, 1, False),
+    ]
+
+
+def test_source_material_specs_from_manifest_includes_polygon_only_materials(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+    manifest_path = tmp_path / "asset.fbx_material_manifest.json"
+    fbx_path.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Visible"}],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Visible", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": "Missing", "material_table_slot": 1},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    specs = source_material_specs_from_manifest(str(fbx_path))
+
+    assert [(spec["name"], spec["polygon_count"], spec["used_by_polygons"]) for spec in specs] == [
+        ("Visible", 1, True),
+        ("Missing", 1, True),
     ]
 
 
@@ -143,6 +170,36 @@ def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
     root = ET.parse(bundle["mtl_path"]).getroot()
     sub_materials = root.find("SubMaterials")
     assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001"]
+
+
+def test_prepare_smoke_bundle_reports_manifest_omitted_source_material(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Visible"}],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Visible", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": "Missing", "material_table_slot": 1},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    assert bundle["material_diagnostics"][0]["code"] == "rc_omitted_source_material_faces_deleted"
+    assert bundle["material_diagnostics"][0]["material"] == "Missing"
 
 
 def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):
