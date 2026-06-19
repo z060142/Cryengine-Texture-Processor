@@ -91,11 +91,13 @@ def test_source_material_specs_from_manifest_skips_invalid_slots(tmp_path):
                 "manifest_kind": "blender-fbx-material-inspection",
                 "materials": [
                     {"slot": "bad-slot", "name": "Broken"},
+                    {"slot": -1, "name": "DeletedLooking"},
                     {"slot": 1, "name": "Visible"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Broken", "material_table_slot": "bad-polygon-slot"},
-                    {"polygon": 1, "material_name": "Visible", "material_table_slot": 1},
+                    {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
+                    {"polygon": 2, "material_name": "Visible", "material_table_slot": 1},
                 ],
             }
         ),
@@ -303,11 +305,13 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
                 "manifest_kind": "blender-fbx-material-inspection",
                 "materials": [
                     {"slot": "bad-slot", "name": "Broken"},
+                    {"slot": -1, "name": "DeletedLooking"},
                     {"slot": 1, "name": "Visible"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Broken", "material_table_slot": "bad-polygon-slot"},
-                    {"polygon": 1, "material_name": "Visible", "material_table_slot": 1},
+                    {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
+                    {"polygon": 2, "material_name": "Visible", "material_table_slot": 1},
                 ],
             }
         ),
@@ -323,8 +327,8 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
     )
 
     codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
-    assert "material_manifest_invalid_material_slot" in codes
-    assert "material_manifest_invalid_polygon_slot" in codes
+    assert codes.count("material_manifest_invalid_material_slot") == 2
+    assert codes.count("material_manifest_invalid_polygon_slot") == 2
 
 
 def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):

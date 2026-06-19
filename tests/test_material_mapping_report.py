@@ -232,6 +232,7 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
         "manifest_kind": "blender-fbx-material-inspection",
         "materials": [
             {"slot": "bad-slot", "name": "Broken"},
+            {"slot": -1, "name": "DeletedLooking"},
             {"slot": 1, "name": "Visible"},
         ],
         "polygons": [
@@ -243,6 +244,12 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
             },
             {
                 "polygon": 1,
+                "material_slot": -1,
+                "material_name": "DeletedLooking",
+                "expected_cgf_material_id": -1,
+            },
+            {
+                "polygon": 2,
                 "material_slot": 1,
                 "material_name": "Visible",
                 "expected_cgf_material_id": 1,
@@ -260,8 +267,12 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
     assert not result["ok"]
     assert result["material_checks"][0]["error"] == "invalid_manifest_material_slot"
     assert result["material_checks"][0]["slot"] == "bad-slot"
+    assert result["material_checks"][1]["error"] == "invalid_manifest_material_slot"
+    assert result["material_checks"][1]["slot"] == -1
     assert result["polygon_checks"][0]["error"] == "invalid_manifest_polygon_slot"
     assert result["polygon_checks"][0]["expected_cgf_material_id"] == "bad-polygon-slot"
+    assert result["polygon_checks"][1]["error"] == "invalid_manifest_polygon_slot"
+    assert result["polygon_checks"][1]["expected_cgf_material_id"] == -1
 
 
 def test_build_and_write_material_mapping_report(tmp_path):

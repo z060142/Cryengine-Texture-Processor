@@ -68,9 +68,12 @@ def coerce_material_slot(value):
     if value is None:
         return None
     try:
-        return int(value)
+        slot = int(value)
     except (TypeError, ValueError):
         return None
+    if slot < 0:
+        return None
+    return slot
 
 
 def material_manifest_table_diagnostics(material_manifest_info=None):
@@ -96,7 +99,7 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
                     "material": name,
                     "slot": raw_slot,
                     "message": (
-                        "The material manifest has a material row with a non-integer slot. "
+                        "The material manifest has a material row with a non-negative integer slot violation. "
                         "Request JSON and MTL generation cannot map this source material to a stable RC sub-index."
                     ),
                 }
@@ -162,7 +165,7 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
                     "polygon_material_name": name,
                     "slot": raw_slot,
                     "message": (
-                        "The material manifest has polygon evidence with a non-integer material slot. "
+                        "The material manifest has polygon evidence with a non-negative integer slot violation. "
                         "The converter cannot prove which RC material id this polygon should use."
                     ),
                 }

@@ -141,11 +141,13 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
                 "manifest_kind": "blender-fbx-material-inspection",
                 "materials": [
                     {"slot": "bad-slot", "name": "Stone"},
+                    {"slot": -1, "name": "DeletedLooking"},
                     {"slot": 1, "name": "Metal"},
                 ],
                 "polygons": [
                     {"polygon": 0, "material_name": "Stone", "material_table_slot": "bad-polygon-slot"},
-                    {"polygon": 1, "material_name": "Metal", "material_table_slot": 1},
+                    {"polygon": 1, "material_name": "DeletedLooking", "material_table_slot": -1},
+                    {"polygon": 2, "material_name": "Metal", "material_table_slot": 1},
                 ],
             }
         }
@@ -153,12 +155,18 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
 
     assert [diagnostic["code"] for diagnostic in diagnostics] == [
         "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_polygon_slot",
         "material_manifest_invalid_polygon_slot",
     ]
     assert diagnostics[0]["material"] == "Stone"
     assert diagnostics[0]["slot"] == "bad-slot"
-    assert diagnostics[1]["polygon_material_name"] == "Stone"
-    assert diagnostics[1]["slot"] == "bad-polygon-slot"
+    assert diagnostics[1]["material"] == "DeletedLooking"
+    assert diagnostics[1]["slot"] == -1
+    assert diagnostics[2]["polygon_material_name"] == "Stone"
+    assert diagnostics[2]["slot"] == "bad-polygon-slot"
+    assert diagnostics[3]["polygon_material_name"] == "DeletedLooking"
+    assert diagnostics[3]["slot"] == -1
 
 
 def test_material_manifest_materials_skips_invalid_manifest_slots():
@@ -169,11 +177,13 @@ def test_material_manifest_materials_skips_invalid_manifest_slots():
                 "manifest_kind": "blender-fbx-material-inspection",
                 "materials": [
                     {"slot": "bad-slot", "name": "Stone"},
+                    {"slot": -1, "name": "DeletedLooking"},
                     {"slot": 1, "name": "Metal"},
                 ],
                 "polygons": [
                     {"polygon": 0, "object": "MeshA", "expected_cgf_material_id": "bad-polygon-slot"},
-                    {"polygon": 1, "object": "MeshB", "expected_cgf_material_id": 1},
+                    {"polygon": 1, "object": "MeshDeleted", "expected_cgf_material_id": -1},
+                    {"polygon": 2, "object": "MeshB", "expected_cgf_material_id": 1},
                 ],
             }
         },
