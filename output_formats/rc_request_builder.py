@@ -8,6 +8,11 @@ import re
 import traceback
 
 from model_processing.material_slot_table import build_material_slot_records
+from model_processing.rc_material_policy import (
+    infer_rc_physicalize_from_name,
+    rc_physicalize_diagnostics,
+    resolve_rc_physicalize,
+)
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
 
@@ -53,11 +58,7 @@ def detect_node_type(node_name):
 
 
 def get_material_physicalize_type(material_name):
-    name_lower = (material_name or "").lower()
-    proxy_patterns = ["proxy", "phys", "physics", "collision", "collider"]
-    if any(pattern in name_lower for pattern in proxy_patterns):
-        return "proxy_only"
-    return "no_collide"
+    return infer_rc_physicalize_from_name(material_name)
 
 
 def extract_blender_scene_hierarchy():
@@ -178,13 +179,21 @@ def build_material_requests(
         existing_submaterial_names=existing_submaterial_names,
         material_manifest_info=material_manifest_info,
     ):
+        physicalize_resolution = resolve_rc_physicalize(
+            material["material"],
+            fallback_name=material["original_name"],
+        )
         request_material = {
             "name": material["clean_name"],
-            "physicalize": get_material_physicalize_type(material["original_name"]),
+            "physicalize": physicalize_resolution["value"],
             "sub_index": material["sub_index"],
         }
-        if include_diagnostics and material.get("diagnostics"):
-            request_material["diagnostics"] = material["diagnostics"]
+        diagnostics = [
+            *material.get("diagnostics", []),
+            *rc_physicalize_diagnostics(material["clean_name"], physicalize_resolution),
+        ]
+        if include_diagnostics and diagnostics:
+            request_material["diagnostics"] = diagnostics
         material_requests.append(request_material)
     return material_requests
 

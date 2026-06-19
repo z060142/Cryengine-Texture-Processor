@@ -96,6 +96,52 @@ def test_material_requests_follow_material_manifest_table_order():
     ]
 
 
+def test_material_requests_preserve_explicit_physicalize_metadata():
+    request = build_import_request(
+        {
+            "path": "wall.fbx",
+            "materials": [
+                {"name": "Visible", "physicalize": "no"},
+                {"name": "Solid", "physicalize": "default"},
+            ],
+        },
+        "wall.fbx",
+    )
+
+    assert request["materials"] == [
+        {"name": "Visible", "physicalize": "no", "sub_index": 0},
+        {"name": "Solid", "physicalize": "default", "sub_index": 1},
+    ]
+
+
+def test_material_requests_normalize_unknown_physicalize_like_rc():
+    materials = build_material_requests(
+        [{"name": "Odd", "physicalize": "render_only"}],
+        include_diagnostics=True,
+    )
+
+    assert materials[0]["physicalize"] == "no"
+    assert materials[0]["diagnostics"][0]["code"] == "rc_unknown_physicalize_defaults_to_no"
+    assert materials[0]["diagnostics"][0]["requested_physicalize"] == "render_only"
+
+
+def test_manifest_physicalize_metadata_overrides_name_heuristic():
+    model = {
+        "path": "proxy.fbx",
+        "materials": [],
+        "material_manifest": {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "collision_proxy", "physicalize": "no"}],
+            }
+        },
+    }
+
+    request = build_import_request(model, "proxy.fbx")
+
+    assert request["materials"] == [{"name": "collision_proxy", "physicalize": "no", "sub_index": 0}]
+
+
 def test_material_requests_can_include_slot_diagnostics():
     materials = build_material_requests(
         [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}],

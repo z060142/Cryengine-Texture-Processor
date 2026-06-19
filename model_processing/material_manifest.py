@@ -107,6 +107,7 @@ def material_manifest_materials(source_materials, material_manifest_info=None):
                 "mesh_names": merged.get("mesh_names", sorted(mesh_names_by_slot.get(slot, set()))),
                 "material_names": merged.get("material_names", [name]),
                 "textures": merged.get("textures", {}),
+                "physicalize": merged.get("physicalize", material.get("physicalize")),
             }
         )
         materials.append(merged)

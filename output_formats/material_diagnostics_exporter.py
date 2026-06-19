@@ -6,6 +6,7 @@ import json
 import os
 
 from model_processing.material_slot_table import build_material_slot_records
+from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 
 
 AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
@@ -46,6 +47,7 @@ def _texture_evidence_diagnostics(report_item):
 def _record_to_report_item(record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
+    physicalize_resolution = resolve_rc_physicalize(record["material"], fallback_name=record["original_name"])
     return {
         "name": record["clean_name"],
         "original_name": record["original_name"],
@@ -55,6 +57,9 @@ def _record_to_report_item(record):
         "sub_index": record["sub_index"],
         "requested_sub_index": record.get("requested_sub_index"),
         "assignment_reason": record["reason"],
+        "physicalize": physicalize_resolution["value"],
+        "physicalize_source": physicalize_resolution["source"],
+        "requested_physicalize": physicalize_resolution.get("raw_value", ""),
         "deleted": record["deleted"],
         "polygon_count": record["material"].get("polygon_count"),
         "used_by_polygons": record["material"].get("used_by_polygons"),
@@ -62,7 +67,10 @@ def _record_to_report_item(record):
         "material_names": record["material"].get("material_names", []),
         "slot_name_conflict": record["material"].get("slot_name_conflict", False),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
-        "diagnostics": record.get("diagnostics", []),
+        "diagnostics": [
+            *record.get("diagnostics", []),
+            *rc_physicalize_diagnostics(record["clean_name"], physicalize_resolution),
+        ],
     }
 
 

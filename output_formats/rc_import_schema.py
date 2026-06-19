@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 """Source-backed CryEngine RC FBX import request schema."""
 
-from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS, normalize_rc_sub_index
+from model_processing.rc_material_policy import (
+    RC_MAX_SUB_MATERIALS,
+    RC_PHYSICALIZE_VALUES,
+    normalize_rc_sub_index,
+)
 
 RC_IMPORT_REQUEST_SOURCE = {
     "request_wrapper": {
@@ -102,13 +106,7 @@ RC_IMPORT_JOINT_LIMIT_FIELDS = {
     "max_z",
 }
 
-RC_IMPORT_PHYSICALIZE_VALUES = {
-    "no": "PHYS_GEOM_TYPE_NONE",
-    "default": "PHYS_GEOM_TYPE_DEFAULT",
-    "obstruct": "PHYS_GEOM_TYPE_OBSTRUCT",
-    "no_collide": "PHYS_GEOM_TYPE_NO_COLLIDE",
-    "proxy_only": "PHYS_GEOM_TYPE_DEFAULT_PROXY",
-}
+RC_IMPORT_PHYSICALIZE_VALUES = RC_PHYSICALIZE_VALUES
 
 RC_IMPORT_PRIMITIVE_VALUES = {
     "default",

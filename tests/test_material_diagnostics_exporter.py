@@ -184,6 +184,19 @@ def test_build_material_diagnostics_report_flags_rc_sub_index_limit():
     assert report["diagnostics"][0]["code"] == "rc_sub_index_out_of_range_deleted"
 
 
+def test_build_material_diagnostics_report_flags_unknown_physicalize():
+    report = build_material_diagnostics_report(
+        [{"name": "Odd", "physicalize": "render_only"}],
+        source_model="odd.fbx",
+    )
+
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["summary"]["hazard_count"] == 0
+    assert report["materials"][0]["physicalize"] == "no"
+    assert report["materials"][0]["requested_physicalize"] == "render_only"
+    assert report["diagnostics"][0]["code"] == "rc_unknown_physicalize_defaults_to_no"
+
+
 def test_export_material_diagnostics_writes_json(tmp_path):
     output_path = export_material_diagnostics(
         [{"name": "Removed", "id": 1, "deleted": True}],
