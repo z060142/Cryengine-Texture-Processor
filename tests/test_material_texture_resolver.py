@@ -7,6 +7,7 @@ from model_processing.material_texture_resolver import (
     clean_material_name,
     iter_unique_clean_materials,
     strip_known_texture_suffix,
+    texture_output_extensions,
 )
 
 
@@ -150,6 +151,32 @@ def test_build_mtl_material_data_maps_roughness_output_to_opacity(tmp_path):
     assert result[0]["textures"]["opacity"] == str(tmp_path / "carpaint_roughness.tif")
 
 
+def test_build_mtl_material_data_probes_multiple_output_extensions(tmp_path):
+    source = tmp_path / "carpaint_roughness.png"
+    source.write_text("fake source")
+    (tmp_path / "carpaint_diff.dds").write_text("fake diff")
+    (tmp_path / "carpaint_roughness.tif").write_text("fake roughness")
+    model_data = {"materials": [{"name": "CarPaint"}]}
+    refs = [TextureRef(str(source), "CarPaint", texture_type="roughness")]
+
+    result = build_mtl_material_data(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="dds,tif",
+    )
+
+    assert result[0]["textures"]["diffuse"] == str(tmp_path / "carpaint_diff.dds")
+    assert result[0]["textures"]["opacity"] == str(tmp_path / "carpaint_roughness.tif")
+
+
+def test_texture_output_extensions_normalizes_lists_auto_and_csv():
+    assert texture_output_extensions("dds,tif;png") == ["dds", "tif", "png"]
+    assert texture_output_extensions([".dds", "dds", "TIF"]) == ["dds", "tif"]
+    assert texture_output_extensions("auto")[:3] == ["dds", "tif", "tiff"]
+
+
 def test_build_mtl_material_data_finds_ce_emissive_output_suffix(tmp_path):
     source = tmp_path / "wall_emissive.png"
     source.write_text("fake source")
@@ -226,3 +253,33 @@ def test_build_mtl_material_data_follows_material_manifest_order(tmp_path):
     assert [item["name"] for item in result] == ["Stone", "Stone.001"]
     assert [item["sub_index"] for item in result] == [0, 1]
     assert [item["auto_assigned"] for item in result] == [False, False]
+
+
+def test_build_mtl_material_data_resolves_manifest_only_material_textures(tmp_path):
+    source = tmp_path / "Glass_basecolor.png"
+    source.write_text("fake source")
+    (tmp_path / "Glass_diff.tif").write_text("fake diff")
+    model_data = {
+        "materials": [{"name": "Stone"}],
+        "material_manifest": {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Glass"},
+                ],
+            }
+        },
+    }
+    refs = [TextureRef(str(source), "Glass", texture_type="diffuse")]
+
+    result = build_mtl_material_data(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert [item["name"] for item in result] == ["Stone", "Glass"]
+    assert result[1]["textures"]["diffuse"] == str(tmp_path / "Glass_diff.tif")

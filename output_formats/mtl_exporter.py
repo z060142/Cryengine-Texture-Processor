@@ -42,6 +42,8 @@ def _has_alpha_channel(image_path):
     try:
         if not os.path.exists(image_path):
             return False
+        if os.path.splitext(str(image_path))[1].lower() == ".dds":
+            return False
             
         image = Image.open(image_path)
         

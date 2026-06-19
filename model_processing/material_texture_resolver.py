@@ -155,18 +155,43 @@ def find_processed_textures(base_name, texture_output_dir, output_format, suffix
     if not base_name or not texture_output_dir:
         return processed_textures
 
-    ext = (output_format or "tif").lstrip(".")
+    extensions = texture_output_extensions(output_format)
     for texture_key, suffix_templates in suffix_map.items():
         if isinstance(suffix_templates, str):
             suffix_templates = (suffix_templates,)
-        for suffix_template in suffix_templates:
-            expected_filename = f"{base_name}{suffix_template.format(ext=ext)}"
-            expected_path = os.path.join(texture_output_dir, expected_filename)
-            if os.path.exists(expected_path):
-                processed_textures[texture_key] = expected_path
+        for ext in extensions:
+            for suffix_template in suffix_templates:
+                expected_filename = f"{base_name}{suffix_template.format(ext=ext)}"
+                expected_path = os.path.join(texture_output_dir, expected_filename)
+                if os.path.exists(expected_path):
+                    processed_textures[texture_key] = expected_path
+                    break
+            if texture_key in processed_textures:
                 break
 
     return processed_textures
+
+
+def texture_output_extensions(output_format):
+    """Return the processed texture extensions to probe, in priority order."""
+    if isinstance(output_format, (list, tuple)):
+        raw_extensions = output_format
+    else:
+        raw_value = str(output_format or "tif")
+        if raw_value.strip().lower() == "auto":
+            raw_extensions = ("dds", "tif", "tiff", "png", "tga")
+        else:
+            raw_extensions = raw_value.replace(";", ",").split(",")
+
+    extensions = []
+    seen = set()
+    for ext in raw_extensions:
+        normalized = str(ext or "").strip().lstrip(".").lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        extensions.append(normalized)
+    return extensions or ["tif"]
 
 
 def build_material_texture_records(
@@ -197,7 +222,11 @@ def build_material_texture_records(
     refs_by_material = group_texture_refs_by_material(texture_refs)
     records = []
 
-    for material_name, material in iter_model_materials(model_data.get("materials", [])):
+    source_materials = material_manifest_materials(
+        model_data.get("materials", []),
+        model_data.get("material_manifest"),
+    )
+    for material_name, material in iter_model_materials(source_materials):
         material_refs = refs_by_material.get(material_name, [])
         base_name = resolve_base_name(material_refs, texture_manager)
         processed_textures = find_processed_textures(

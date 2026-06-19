@@ -2,6 +2,7 @@ import json
 import os
 
 from tools.rc_smoke_test import (
+    build_smoke_materials_data,
     build_smoke_model_data,
     collect_material_slot_diagnostics,
     discover_default_fbx,
@@ -14,6 +15,15 @@ from tools.rc_smoke_test import (
 )
 from utils.rc_import_runner import RCImportResult
 import xml.etree.ElementTree as ET
+
+
+class TextureRef:
+    def __init__(self, path, material_name, texture_type):
+        self.path = path
+        self.material_name = material_name
+        self.texture_type = texture_type
+        self.filename = os.path.basename(path)
+        self.source_mode = "test"
 
 
 def test_material_names_from_arg_uses_default_when_empty():
@@ -636,6 +646,56 @@ def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_pa
         "<unassigned>",
     ]
     assert bundle["material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
+
+
+def test_build_smoke_materials_data_uses_texture_outputs_and_manifest_order(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    source_texture = tmp_path / "Glass_roughness.png"
+    source_texture.write_text("fake source", encoding="utf-8")
+    stone_texture = tmp_path / "Stone_basecolor.png"
+    stone_texture.write_text("fake source", encoding="utf-8")
+    (tmp_path / "Stone_diff.dds").write_text("fake diff", encoding="utf-8")
+    (tmp_path / "Glass_roughness.tif").write_text("fake roughness", encoding="utf-8")
+    manifest_info = {
+        "manifest": {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [
+                {"slot": 0, "name": "Stone"},
+                {"slot": 1, "name": "Glass"},
+            ],
+        }
+    }
+
+    class FakeLoader:
+        def load(self, path):
+            return {
+                "path": path,
+                "materials": [{"name": "Stone"}],
+            }
+
+    class FakeExtractor:
+        def extract(self, model_data):
+            return [
+                TextureRef(str(stone_texture), "Stone", "diffuse"),
+                TextureRef(str(source_texture), "Glass", "roughness"),
+            ]
+
+    materials_data, diagnostics = build_smoke_materials_data(
+        str(source_fbx),
+        [{"name": "Stone", "id": 1, "index": 0}, {"name": "Glass", "id": 2, "index": 1}],
+        manifest_info=manifest_info,
+        texture_output_dir=str(tmp_path),
+        texture_output_format="dds,tif",
+        model_loader_factory=FakeLoader,
+        texture_extractor_factory=FakeExtractor,
+    )
+
+    assert [material["name"] for material in materials_data] == ["Stone", "Glass"]
+    assert materials_data[0]["textures"]["diffuse"] == str(tmp_path / "Stone_diff.dds")
+    assert materials_data[1]["textures"]["opacity"] == str(tmp_path / "Glass_roughness.tif")
+    assert diagnostics[0]["code"] == "texture_backed_mtl_material_summary"
+    assert diagnostics[0]["texture_material_count"] == 2
 
 
 def test_run_rc_smoke_test_reports_missing_rc(tmp_path):

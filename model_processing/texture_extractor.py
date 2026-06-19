@@ -149,6 +149,11 @@ class TextureExtractor:
         Returns:
             Texture type string
         """
+        image = getattr(node, "image", None)
+        texture_type = infer_texture_type_from_path(getattr(image, "filepath", ""))
+        if texture_type:
+            return texture_type
+
         # Check node connections
         if node.outputs and len(node.outputs) > 0:
             for output in node.outputs:
@@ -163,9 +168,7 @@ class TextureExtractor:
             if texture_type:
                 return texture_type
 
-        image = getattr(node, "image", None)
-        texture_type = infer_texture_type_from_path(getattr(image, "filepath", ""))
-        return texture_type or "diffuse"
+        return "diffuse"
     
     def _create_filesystem_references(self, model, source_mode="filesystem_import_only"):
         """

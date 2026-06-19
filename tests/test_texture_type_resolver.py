@@ -3,6 +3,30 @@ from model_processing.texture_type_resolver import (
     infer_texture_type_from_text,
     normalize_texture_type,
 )
+from model_processing.texture_extractor import TextureExtractor
+
+
+class ImageStub:
+    filepath = "wall_normal.png"
+
+
+class SocketStub:
+    name = "Base Color"
+
+
+class LinkStub:
+    to_socket = SocketStub()
+
+
+class OutputStub:
+    links = [LinkStub()]
+
+
+class NodeStub:
+    image = ImageStub()
+    outputs = [OutputStub()]
+    label = ""
+    name = "Image Texture"
 
 
 def test_normalize_texture_type_handles_blender_socket_names_and_ce_maps():
@@ -36,3 +60,9 @@ def test_infer_texture_type_from_text_uses_socket_and_node_hints():
     assert infer_texture_type_from_text("Metallic Factor") == "metallic"
     assert infer_texture_type_from_text("Displace Height") == "displacement"
     assert infer_texture_type_from_text("unrelated") is None
+
+
+def test_texture_extractor_prefers_filename_suffix_over_socket_hint():
+    extractor = TextureExtractor.__new__(TextureExtractor)
+
+    assert extractor._determine_texture_type(NodeStub(), material=None) == "normal"

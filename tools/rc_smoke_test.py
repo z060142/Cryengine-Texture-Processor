@@ -27,6 +27,7 @@ from model_processing.material_manifest import (
 )
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
+from model_processing.material_texture_resolver import build_mtl_material_data
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
@@ -248,7 +249,86 @@ def collect_material_slot_diagnostics(
     return diagnostics
 
 
-def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_names=None, material_specs=None):
+def build_smoke_materials_data(
+    source_fbx_path,
+    material_specs,
+    manifest_info=None,
+    texture_output_dir="",
+    texture_output_format="tif",
+    model_loader_factory=None,
+    texture_extractor_factory=None,
+):
+    fallback_materials = [{**spec, "textures": {}} for spec in material_specs]
+    texture_diagnostics = []
+    if not texture_output_dir:
+        return fallback_materials, texture_diagnostics
+
+    try:
+        from model_processing.model_loader import ModelLoader
+        from model_processing.texture_extractor import TextureExtractor
+
+        model_loader_factory = model_loader_factory or ModelLoader
+        texture_extractor_factory = texture_extractor_factory or TextureExtractor
+        model_data = model_loader_factory().load(source_fbx_path)
+        if not isinstance(model_data, dict) or model_data.get("is_dummy"):
+            texture_diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "texture_backed_mtl_model_load_failed",
+                    "message": "Texture-backed MTL export requested, but the source FBX could not be loaded.",
+                    "load_status": model_data.get("load_status") if isinstance(model_data, dict) else "",
+                    "load_error": model_data.get("load_error") if isinstance(model_data, dict) else "",
+                }
+            )
+            return fallback_materials, texture_diagnostics
+
+        if not model_data.get("materials"):
+            model_data["materials"] = material_specs
+        if manifest_info:
+            model_data["material_manifest"] = manifest_info
+
+        texture_refs = texture_extractor_factory().extract(model_data)
+        materials_data = build_mtl_material_data(
+            model_data,
+            texture_refs,
+            None,
+            texture_output_dir,
+            texture_output_format,
+        )
+        texture_diagnostics.append(
+            {
+                "severity": "info",
+                "code": "texture_backed_mtl_material_summary",
+                "source_texture_ref_count": len(texture_refs),
+                "texture_material_count": sum(1 for material in materials_data if material.get("textures")),
+                "material_count": len(materials_data),
+                "texture_output_dir": texture_output_dir,
+                "texture_output_format": texture_output_format,
+            }
+        )
+        return materials_data or fallback_materials, texture_diagnostics
+    except Exception as e:
+        texture_diagnostics.append(
+            {
+                "severity": "warning",
+                "code": "texture_backed_mtl_export_failed",
+                "message": str(e),
+                "texture_output_dir": texture_output_dir,
+                "texture_output_format": texture_output_format,
+            }
+        )
+        return fallback_materials, texture_diagnostics
+
+
+def prepare_smoke_bundle(
+    source_fbx_path,
+    work_dir,
+    asset_name=None,
+    material_names=None,
+    material_specs=None,
+    texture_output_dir="",
+    texture_output_format="tif",
+):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
     asset_name = asset_name or os.path.splitext(os.path.basename(source_fbx_path))[0]
@@ -262,7 +342,13 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
     manifest_info = {"path": copied_manifest_path, "manifest": load_material_manifest(copied_manifest_path)} if copied_manifest_path else None
     source_materials = source_material_specs_from_manifest(source_fbx_path)
 
-    materials_data = [{**spec, "textures": {}} for spec in material_specs]
+    materials_data, texture_diagnostics = build_smoke_materials_data(
+        source_fbx_path,
+        material_specs,
+        manifest_info=manifest_info,
+        texture_output_dir=texture_output_dir,
+        texture_output_format=texture_output_format,
+    )
     mtl_filename = f"{asset_name}.mtl"
     mtl_success, mtl_result = export_mtl(
         materials_data,
@@ -301,6 +387,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
             material_manifest_info=manifest_info,
             source_materials=source_materials or materials_data,
         ),
+        "texture_diagnostics": texture_diagnostics,
     }
 
 
@@ -311,6 +398,8 @@ def run_rc_smoke_test(
     asset_name=None,
     material_names=None,
     material_specs=None,
+    texture_output_dir="",
+    texture_output_format="tif",
     runner_factory=RCImportRunner,
 ):
     rc_exe_path = rc_exe_path or ""
@@ -333,6 +422,8 @@ def run_rc_smoke_test(
             asset_name=asset_name,
             material_names=material_names,
             material_specs=material_specs,
+            texture_output_dir=texture_output_dir,
+            texture_output_format=texture_output_format,
         )
     except Exception as e:
         return RCSmokeResult(False, work_dir, rc_exe_path, source_fbx_path, error=str(e))
@@ -351,6 +442,7 @@ def run_rc_smoke_test(
             rc_returncode=rc_result.returncode,
         )
         report["preflight_material_diagnostics"] = bundle.get("material_diagnostics", [])
+        report["preflight_texture_diagnostics"] = bundle.get("texture_diagnostics", [])
         write_material_mapping_report(report, report_path)
     except Exception as e:
         report_path = ""
@@ -393,6 +485,16 @@ def main(argv=None):
         action="store_true",
         help="Use the source FBX material manifest sidecar to build request and MTL materials",
     )
+    parser.add_argument(
+        "--texture-output-dir",
+        default="",
+        help="Optional directory containing processed texture outputs to reference from the generated MTL.",
+    )
+    parser.add_argument(
+        "--texture-output-format",
+        default="tif",
+        help="Processed texture extension(s) to probe, for example 'tif', 'dds', 'dds,tif', or 'auto'.",
+    )
     args = parser.parse_args(argv)
     material_specs = (
         material_specs_from_manifest(args.fbx)
@@ -406,6 +508,8 @@ def main(argv=None):
         args.work_dir,
         asset_name=args.asset_name,
         material_specs=material_specs,
+        texture_output_dir=args.texture_output_dir,
+        texture_output_format=args.texture_output_format,
     )
 
     print(f"success: {result.success}")

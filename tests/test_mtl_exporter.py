@@ -182,6 +182,25 @@ def test_build_mtl_document_exports_roughness_as_observed_opacity_map(tmp_path):
     assert texture_maps == {"Opacity": "./asset_roughness.dds"}
 
 
+def test_build_mtl_document_does_not_probe_dds_diffuse_alpha_with_pillow(tmp_path, capsys):
+    diffuse_path = tmp_path / "asset_diff.dds"
+    diffuse_path.write_text("dds", encoding="utf-8")
+
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "Stone",
+                "textures": {"diffuse": str(diffuse_path)},
+            }
+        ],
+        str(tmp_path),
+    )
+
+    material = root.find("SubMaterials").find("Material")
+    assert material.get("AlphaTest") is None
+    assert "Error checking alpha channel" not in capsys.readouterr().out
+
+
 def test_calculate_relative_path_preserves_cryengine_aliases():
     assert (
         mtl_exporter._calculate_relative_path(
