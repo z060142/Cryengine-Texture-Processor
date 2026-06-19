@@ -1,0 +1,263 @@
+{
+  "sample": {
+    "root": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car",
+    "cgf": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.cgf",
+    "fbx": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.fbx",
+    "mtl": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.mtl"
+  },
+  "import_settings_chunk": {
+    "chunk_id": 173,
+    "version": 0,
+    "json_error": "",
+    "top_level_keys": [
+      "animation",
+      "autolodsettings",
+      "editorMaterialMeta",
+      "editorNodeMeta",
+      "forward_up_axes",
+      "globalSettings",
+      "ignore_custom_normals",
+      "ignore_uv",
+      "material_filename",
+      "materials",
+      "merge_all_nodes",
+      "nodes",
+      "output_ext",
+      "scale",
+      "scene_origin",
+      "source_filename",
+      "unit_size",
+      "use_32_bit_positions",
+      "version"
+    ]
+  },
+  "request_core_fields": {
+    "version": 1,
+    "source_filename": "kb3d_citycarsessentialssedan-native.fbx",
+    "output_ext": "cgf",
+    "material_filename": "kb3d_citycarsessentialssedan-native",
+    "unit_size": "file",
+    "scale": 1.0,
+    "forward_up_axes": "+Z+Y",
+    "merge_all_nodes": false,
+    "scene_origin": false,
+    "ignore_custom_normals": false,
+    "ignore_uv": false,
+    "use_32_bit_positions": false
+  },
+  "counts": {
+    "request_material_count": 17,
+    "request_node_root_count": 1,
+    "cgf_mtl_name_sub_material_count": 16,
+    "mtl_sub_material_count": 17,
+    "cgf_used_material_id_count": 16
+  },
+  "request_materials": [
+    {
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 0,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 1,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TiresSedans",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 2,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_WheelRimsA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 3,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_RubberTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 4,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_PlasticTileableA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 5,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_PlasticTrimA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 6,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 7,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_CarAtlas",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 8,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 9,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TapesTrimA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 10,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 11,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_FeltA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 12,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_FeltB",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 13,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_GlassMirror",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 14,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TranslElemSedans",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 15,
+      "ui_autoflag": true
+    },
+    {
+      "name": "<unassigned>",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 16,
+      "ui_autoflag": true
+    }
+  ],
+  "request_sub_index_order": [
+    "KB3D_CEV_UndercarriageTrim",
+    "KB3D_CEV_SeatsDriverATrim",
+    "KB3D_CEV_TiresSedans",
+    "KB3D_CEV_WheelRimsA",
+    "KB3D_CEV_RubberTrim",
+    "KB3D_CEV_PlasticTileableA",
+    "KB3D_CEV_PlasticTrimA",
+    "KB3D_CEV_SedanExteriorBody",
+    "KB3D_CEV_CarAtlas",
+    "KB3D_CEV_CarsLicensePlates",
+    "KB3D_CEV_TapesTrimA",
+    "KB3D_CEV_WindowFritsTrim",
+    "KB3D_CEV_FeltA",
+    "KB3D_CEV_FeltB",
+    "KB3D_CEV_GlassMirror",
+    "KB3D_CEV_TranslElemSedans",
+    "<unassigned>"
+  ],
+  "cgf_mtl_name_order": [
+    "KB3D_CEV_UndercarriageTrim",
+    "KB3D_CEV_SeatsDriverATrim",
+    "KB3D_CEV_TiresSedans",
+    "KB3D_CEV_WheelRimsA",
+    "KB3D_CEV_RubberTrim",
+    "KB3D_CEV_PlasticTileableA",
+    "KB3D_CEV_PlasticTrimA",
+    "KB3D_CEV_SedanExteriorBody",
+    "KB3D_CEV_CarAtlas",
+    "KB3D_CEV_CarsLicensePlates",
+    "KB3D_CEV_TapesTrimA",
+    "KB3D_CEV_WindowFritsTrim",
+    "KB3D_CEV_FeltA",
+    "KB3D_CEV_FeltB",
+    "KB3D_CEV_GlassMirror",
+    "KB3D_CEV_TranslElemSedans"
+  ],
+  "mtl_order": [
+    "KB3D_CEV_UndercarriageTrim",
+    "KB3D_CEV_SeatsDriverATrim",
+    "KB3D_CEV_TiresSedans",
+    "KB3D_CEV_WheelRimsA",
+    "KB3D_CEV_RubberTrim",
+    "KB3D_CEV_PlasticTileableA",
+    "KB3D_CEV_PlasticTrimA",
+    "KB3D_CEV_SedanExteriorBody",
+    "KB3D_CEV_CarAtlas",
+    "KB3D_CEV_CarsLicensePlates",
+    "KB3D_CEV_TapesTrimA",
+    "KB3D_CEV_WindowFritsTrim",
+    "KB3D_CEV_FeltA",
+    "KB3D_CEV_FeltB",
+    "KB3D_CEV_GlassMirror",
+    "KB3D_CEV_TranslElemSedans",
+    "<unassigned>"
+  ],
+  "observations": {
+    "request_order_matches_mtl_order": true,
+    "request_sub_index_order_matches_mtl_order": true,
+    "request_sub_index_order_matches_cgf_mtl_name_prefix": true,
+    "cgf_mtl_name_matches_mtl_prefix": true,
+    "request_extra_slots_not_in_cgf_mtl_name": [
+      {
+        "sub_index": 16,
+        "name": "<unassigned>"
+      }
+    ],
+    "cgf_material_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "phase98_fbx_first_seen_match": false
+  }
+}

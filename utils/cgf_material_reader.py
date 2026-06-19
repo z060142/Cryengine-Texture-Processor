@@ -8,6 +8,7 @@ full mesh.
 """
 
 from dataclasses import dataclass
+import json
 import os
 import struct
 
@@ -15,6 +16,7 @@ import struct
 CHUNK_TYPE_MESH = 0x1000
 CHUNK_TYPE_MTL_NAME = 0x1014
 CHUNK_TYPE_MESH_SUBSETS = 0x1017
+CHUNK_TYPE_IMPORT_SETTINGS = 0x1019
 MESH_CHUNK_VERSION_0801 = 0x0801
 MTL_NAME_CHUNK_VERSION_0802 = 0x0802
 MESH_SUBSETS_CHUNK_VERSION_0800 = 0x0800
@@ -28,7 +30,7 @@ CHUNK_TYPE_NAMES = {
     0x1016: "DataStream",
     CHUNK_TYPE_MESH_SUBSETS: "MeshSubsets",
     0x1018: "MeshPhysicsData",
-    0x1019: "ImportSettings",
+    CHUNK_TYPE_IMPORT_SETTINGS: "ImportSettings",
     0x101B: "AssetMetadata",
 }
 
@@ -239,11 +241,34 @@ def read_mtl_name_chunk(cgf_path, chunk):
     }
 
 
+def read_import_settings_chunk(cgf_path, chunk):
+    if chunk.chunk_type != CHUNK_TYPE_IMPORT_SETTINGS:
+        raise ValueError(f"Chunk {chunk.chunk_id} is not an ImportSettings chunk")
+    if chunk.big_endian:
+        raise ValueError("Big-endian CGF chunks are not supported by this reader")
+
+    data = _read_chunk_data(cgf_path, chunk)
+    text = data.decode("utf-8-sig", errors="replace").rstrip("\0")
+    result = {
+        "chunk_id": chunk.chunk_id,
+        "version": chunk.version,
+        "text": text,
+    }
+    try:
+        result["json"] = json.loads(text)
+        result["json_error"] = ""
+    except json.JSONDecodeError as e:
+        result["json"] = None
+        result["json_error"] = str(e)
+    return result
+
+
 def read_cgf_material_summary(cgf_path):
     chunks = read_chunk_table(cgf_path)
     chunks_by_id = _chunk_map(chunks)
     mesh_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MESH]
     mtl_name_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MTL_NAME]
+    import_settings_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_IMPORT_SETTINGS]
     subset_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MESH_SUBSETS]
 
     meshes = []
@@ -271,6 +296,7 @@ def read_cgf_material_summary(cgf_path):
         }
     )
     materials = [read_mtl_name_chunk(cgf_path, chunk) for chunk in mtl_name_chunks if chunk.version == MTL_NAME_CHUNK_VERSION_0802]
+    import_settings = [read_import_settings_chunk(cgf_path, chunk) for chunk in import_settings_chunks]
 
     return {
         "path": cgf_path,
@@ -278,6 +304,7 @@ def read_cgf_material_summary(cgf_path):
         "chunk_count": len(chunks),
         "chunks": [chunk.to_dict() for chunk in chunks],
         "materials": materials,
+        "import_settings": import_settings,
         "meshes": meshes,
         "standalone_mesh_subsets": standalone_subset_chunks,
         "material_ids": material_ids,

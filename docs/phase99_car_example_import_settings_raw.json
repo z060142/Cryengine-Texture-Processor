@@ -1,0 +1,582 @@
+{
+  "version": 1,
+  "source_filename": "kb3d_citycarsessentialssedan-native.fbx",
+  "output_ext": "cgf",
+  "material_filename": "kb3d_citycarsessentialssedan-native",
+  "unit_size": "file",
+  "scale": 1.0,
+  "forward_up_axes": "+Z+Y",
+  "merge_all_nodes": false,
+  "scene_origin": false,
+  "ignore_custom_normals": false,
+  "ignore_uv": false,
+  "materials": [
+    {
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 0,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 1,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TiresSedans",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 2,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_WheelRimsA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 3,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_RubberTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 4,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_PlasticTileableA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 5,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_PlasticTrimA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 6,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 7,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_CarAtlas",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 8,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 9,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TapesTrimA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 10,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 11,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_FeltA",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 12,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_FeltB",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 13,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_GlassMirror",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 14,
+      "ui_autoflag": true
+    },
+    {
+      "name": "KB3D_CEV_TranslElemSedans",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 15,
+      "ui_autoflag": true
+    },
+    {
+      "name": "<unassigned>",
+      "file": "",
+      "physicalize": "no",
+      "sub_index": 16,
+      "ui_autoflag": true
+    }
+  ],
+  "nodes": [
+    {
+      "name": "KB3D_CEV_VehicSedan_A_grp",
+      "path": [
+        "KB3D_CEV_VehicSedan_A_grp"
+      ],
+      "mass": -1.0,
+      "density": -1.0,
+      "nodes": [
+        {
+          "name": "KB3D_CEV_VehicSedan_A_BodyTranslElem",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_BodyTranslElem"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearDoorRTranslElem",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearDoorRTranslElem"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearDoorLTranslElem",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearDoorLTranslElem"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_Key",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_Key"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_Body",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_Body"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearWheelR",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearWheelR"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_SuspensionRear",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_SuspensionRear"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_SuspensionFront",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_SuspensionFront"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontWheelL",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontWheelL"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_SteeringWheel",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_SteeringWheel"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearDoorR",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearDoorR"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_WiperB",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_WiperB"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_WiperA",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_WiperA"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontDoorL",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontDoorL"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearDoorL",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearDoorL"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontDoorR",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontDoorR"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_FrontWheelR",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_FrontWheelR"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_RearWheelL",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_RearWheelL"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        },
+        {
+          "name": "KB3D_CEV_VehicSedan_A_Shifter",
+          "path": [
+            "KB3D_CEV_VehicSedan_A_grp",
+            "KB3D_CEV_VehicSedan_A_Shifter"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        }
+      ]
+    }
+  ],
+  "animation": {
+    "name": "",
+    "motionNodePath": [],
+    "startFrame": -1,
+    "endFrame": -1
+  },
+  "globalSettings": {
+    "general_settings": {
+      "input_filename": "kb3d_citycarsessentialssedan-native",
+      "output_filename": "kb3d_citycarsessentialssedan-native"
+    },
+    "static_mesh_settings": {
+      "merge_all_nodes": false,
+      "scene_origin": false,
+      "compute_normals": false,
+      "compute_uv": false
+    },
+    "conversion_settings": {
+      "unit": "file (cm)",
+      "scale": 1.0,
+      "forward": "+Z",
+      "up": "+Y"
+    },
+    "output_settings": {
+      "use_32_bit_positions": false
+    }
+  },
+  "editorNodeMeta": [],
+  "editorMaterialMeta": [
+    {
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "physicalize_setting": "no",
+      "sub_material_index": 0,
+      "auto_id": true,
+      "color": {
+        "r": 0.62409,
+        "g": 0.80309,
+        "b": 0.61794,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "physicalize_setting": "no",
+      "sub_material_index": 1,
+      "auto_id": true,
+      "color": {
+        "r": 0.49292,
+        "g": 0.91367,
+        "b": 0.93723,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_TiresSedans",
+      "physicalize_setting": "no",
+      "sub_material_index": 2,
+      "auto_id": true,
+      "color": {
+        "r": 0.33956,
+        "g": 0.58636,
+        "b": 0.58283,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_WheelRimsA",
+      "physicalize_setting": "no",
+      "sub_material_index": 3,
+      "auto_id": true,
+      "color": {
+        "r": 0.46758,
+        "g": 0.69311,
+        "b": 0.78125,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_RubberTrim",
+      "physicalize_setting": "no",
+      "sub_material_index": 4,
+      "auto_id": true,
+      "color": {
+        "r": 0.64028,
+        "g": 0.57624,
+        "b": 0.82641,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_PlasticTileableA",
+      "physicalize_setting": "no",
+      "sub_material_index": 5,
+      "auto_id": true,
+      "color": {
+        "r": 0.5019,
+        "g": 0.48547,
+        "b": 0.77342,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_PlasticTrimA",
+      "physicalize_setting": "no",
+      "sub_material_index": 6,
+      "auto_id": true,
+      "color": {
+        "r": 0.41631,
+        "g": 0.80115,
+        "b": 0.78289,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "physicalize_setting": "no",
+      "sub_material_index": 7,
+      "auto_id": true,
+      "color": {
+        "r": 0.5019,
+        "g": 0.7785,
+        "b": 0.70191,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_CarAtlas",
+      "physicalize_setting": "no",
+      "sub_material_index": 8,
+      "auto_id": true,
+      "color": {
+        "r": 0.80871,
+        "g": 0.71148,
+        "b": 0.77346,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "physicalize_setting": "no",
+      "sub_material_index": 9,
+      "auto_id": true,
+      "color": {
+        "r": 0.55341,
+        "g": 0.64747,
+        "b": 0.72496,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_TapesTrimA",
+      "physicalize_setting": "no",
+      "sub_material_index": 10,
+      "auto_id": true,
+      "color": {
+        "r": 0.7336,
+        "g": 0.80081,
+        "b": 0.93788,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "physicalize_setting": "no",
+      "sub_material_index": 11,
+      "auto_id": true,
+      "color": {
+        "r": 0.3499,
+        "g": 0.55281,
+        "b": 0.90017,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_FeltA",
+      "physicalize_setting": "no",
+      "sub_material_index": 12,
+      "auto_id": true,
+      "color": {
+        "r": 0.79555,
+        "g": 0.81837,
+        "b": 0.91434,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_FeltB",
+      "physicalize_setting": "no",
+      "sub_material_index": 13,
+      "auto_id": true,
+      "color": {
+        "r": 0.46275,
+        "g": 0.69078,
+        "b": 0.66908,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_GlassMirror",
+      "physicalize_setting": "no",
+      "sub_material_index": 14,
+      "auto_id": true,
+      "color": {
+        "r": 0.41983,
+        "g": 0.53168,
+        "b": 0.84191,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "KB3D_CEV_TranslElemSedans",
+      "physicalize_setting": "no",
+      "sub_material_index": 15,
+      "auto_id": true,
+      "color": {
+        "r": 0.82937,
+        "g": 0.91422,
+        "b": 0.92946,
+        "a": 1.0
+      }
+    },
+    {
+      "name": "<unassigned>",
+      "physicalize_setting": "no",
+      "sub_material_index": 16,
+      "auto_id": true,
+      "color": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      }
+    }
+  ],
+  "use_32_bit_positions": false,
+  "autolodsettings": {
+    "globalparams": {
+      "viewresolution": 26.69321,
+      "viewsaround": 12,
+      "viewelevations": 3,
+      "silhouetteweight": 5.0,
+      "vertexwelding": 0.001,
+      "checktopology": true,
+      "objecthasbase": false
+    },
+    "nodeparams": []
+  }
+}

@@ -47,6 +47,26 @@ def _write_synthetic_cgf_with_mtl_name(path):
     )
 
 
+def _write_synthetic_cgf_with_import_settings(path):
+    settings_chunk_id = 3
+    settings_chunk = (
+        b'{"version":1,"source_filename":"asset.fbx",'
+        b'"materials":[{"name":"Paint","physicalize":"no","sub_index":0}]}'
+    )
+
+    header_size = 16
+    table_entry_size = 16
+    chunk_count = 1
+    table_offset = header_size
+    settings_offset = header_size + table_entry_size * chunk_count
+
+    path.write_bytes(
+        struct.pack("<4sIII", b"CrCh", 0x746, chunk_count, table_offset)
+        + struct.pack("<HHIII", 0x1019, 0, settings_chunk_id, len(settings_chunk), settings_offset)
+        + settings_chunk
+    )
+
+
 def test_cgf_material_probe_prints_summary(tmp_path, capsys):
     cgf_path = tmp_path / "asset.cgf"
     _write_synthetic_cgf(cgf_path)
@@ -75,4 +95,19 @@ def test_cgf_material_probe_reads_mtl_name_chunk_0802(tmp_path, capsys):
                 {"slot": 1, "name": "Glass", "physicalize_type": 1},
             ],
         }
+    ]
+
+
+def test_cgf_material_probe_reads_import_settings_chunk(tmp_path, capsys):
+    cgf_path = tmp_path / "asset.cgf"
+    _write_synthetic_cgf_with_import_settings(cgf_path)
+
+    assert main([str(cgf_path)]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["import_settings"][0]["chunk_id"] == 3
+    assert output["import_settings"][0]["json_error"] == ""
+    assert output["import_settings"][0]["json"]["source_filename"] == "asset.fbx"
+    assert output["import_settings"][0]["json"]["materials"] == [
+        {"name": "Paint", "physicalize": "no", "sub_index": 0}
     ]

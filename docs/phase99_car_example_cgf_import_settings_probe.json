@@ -1,0 +1,3486 @@
+{
+  "path": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.cgf",
+  "file_version": "0x746",
+  "chunk_count": 173,
+  "chunks": [
+    {
+      "type": 4117,
+      "type_name": "ExportFlags",
+      "version": 1,
+      "chunk_id": 1,
+      "size": 164,
+      "offset": 2784,
+      "big_endian": false
+    },
+    {
+      "type": 4116,
+      "type_name": "MtlName",
+      "version": 2050,
+      "chunk_id": 2,
+      "size": 552,
+      "offset": 2948,
+      "big_endian": false
+    },
+    {
+      "type": 4097,
+      "type_name": "0x1001",
+      "version": 1860,
+      "chunk_id": 3,
+      "size": 16,
+      "offset": 3500,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 4,
+      "size": 471,
+      "offset": 3516,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 5,
+      "size": 88,
+      "offset": 3988,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 6,
+      "size": 4568,
+      "offset": 4076,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 7,
+      "size": 6840,
+      "offset": 8644,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 8,
+      "size": 4568,
+      "offset": 15484,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 9,
+      "size": 8664,
+      "offset": 20052,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 10,
+      "size": 9112,
+      "offset": 28716,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 11,
+      "size": 264,
+      "offset": 37828,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 12,
+      "size": 471,
+      "offset": 38092,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 13,
+      "size": 160,
+      "offset": 38564,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 14,
+      "size": 53488,
+      "offset": 38724,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 15,
+      "size": 80220,
+      "offset": 92212,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 16,
+      "size": 53488,
+      "offset": 172432,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 17,
+      "size": 99144,
+      "offset": 225920,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 18,
+      "size": 106952,
+      "offset": 325064,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 19,
+      "size": 264,
+      "offset": 432016,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 20,
+      "size": 471,
+      "offset": 432280,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 21,
+      "size": 160,
+      "offset": 432752,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 22,
+      "size": 53560,
+      "offset": 432912,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 23,
+      "size": 80328,
+      "offset": 486472,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 24,
+      "size": 53560,
+      "offset": 566800,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 25,
+      "size": 99144,
+      "offset": 620360,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 26,
+      "size": 107096,
+      "offset": 719504,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 27,
+      "size": 264,
+      "offset": 826600,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 28,
+      "size": 471,
+      "offset": 826864,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 29,
+      "size": 196,
+      "offset": 827336,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 30,
+      "size": 52496,
+      "offset": 827532,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 31,
+      "size": 78732,
+      "offset": 880028,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 32,
+      "size": 52496,
+      "offset": 958760,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 33,
+      "size": 104760,
+      "offset": 1011256,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 34,
+      "size": 104968,
+      "offset": 1116016,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 35,
+      "size": 264,
+      "offset": 1220984,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 36,
+      "size": 471,
+      "offset": 1221248,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 37,
+      "size": 196,
+      "offset": 1221720,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 38,
+      "size": 34048,
+      "offset": 1221916,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 39,
+      "size": 51060,
+      "offset": 1255964,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 40,
+      "size": 34048,
+      "offset": 1307024,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 41,
+      "size": 64296,
+      "offset": 1341072,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 42,
+      "size": 68072,
+      "offset": 1405368,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 43,
+      "size": 264,
+      "offset": 1473440,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 44,
+      "size": 471,
+      "offset": 1473704,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 45,
+      "size": 196,
+      "offset": 1474176,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 46,
+      "size": 50128,
+      "offset": 1474372,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 47,
+      "size": 75180,
+      "offset": 1524500,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 48,
+      "size": 50128,
+      "offset": 1599680,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 49,
+      "size": 102360,
+      "offset": 1649808,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 50,
+      "size": 100232,
+      "offset": 1752168,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 51,
+      "size": 264,
+      "offset": 1852400,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 52,
+      "size": 471,
+      "offset": 1852664,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 53,
+      "size": 52,
+      "offset": 1853136,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 54,
+      "size": 4480,
+      "offset": 1853188,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 55,
+      "size": 6708,
+      "offset": 1857668,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 56,
+      "size": 4480,
+      "offset": 1864376,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 57,
+      "size": 5568,
+      "offset": 1868856,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 58,
+      "size": 8936,
+      "offset": 1874424,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 59,
+      "size": 264,
+      "offset": 1883360,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 60,
+      "size": 471,
+      "offset": 1883624,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 61,
+      "size": 52,
+      "offset": 1884096,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 62,
+      "size": 4480,
+      "offset": 1884148,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 63,
+      "size": 6708,
+      "offset": 1888628,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 64,
+      "size": 4480,
+      "offset": 1895336,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 65,
+      "size": 5568,
+      "offset": 1899816,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 66,
+      "size": 8936,
+      "offset": 1905384,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 67,
+      "size": 264,
+      "offset": 1914320,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 68,
+      "size": 471,
+      "offset": 1914584,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 69,
+      "size": 196,
+      "offset": 1915056,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 70,
+      "size": 34048,
+      "offset": 1915252,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 71,
+      "size": 51060,
+      "offset": 1949300,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 72,
+      "size": 34048,
+      "offset": 2000360,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 73,
+      "size": 64296,
+      "offset": 2034408,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 74,
+      "size": 68072,
+      "offset": 2098704,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 75,
+      "size": 264,
+      "offset": 2166776,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 76,
+      "size": 471,
+      "offset": 2167040,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 77,
+      "size": 88,
+      "offset": 2167512,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 78,
+      "size": 15088,
+      "offset": 2167600,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 79,
+      "size": 22620,
+      "offset": 2182688,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 80,
+      "size": 15088,
+      "offset": 2205308,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 81,
+      "size": 34056,
+      "offset": 2220396,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 82,
+      "size": 30152,
+      "offset": 2254452,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 83,
+      "size": 264,
+      "offset": 2284604,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 84,
+      "size": 471,
+      "offset": 2284868,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 85,
+      "size": 160,
+      "offset": 2285340,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 86,
+      "size": 53488,
+      "offset": 2285500,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 87,
+      "size": 80220,
+      "offset": 2338988,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 88,
+      "size": 53488,
+      "offset": 2419208,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 89,
+      "size": 99144,
+      "offset": 2472696,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 90,
+      "size": 106952,
+      "offset": 2571840,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 91,
+      "size": 264,
+      "offset": 2678792,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 92,
+      "size": 471,
+      "offset": 2679056,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 93,
+      "size": 124,
+      "offset": 2679528,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 94,
+      "size": 172024,
+      "offset": 2679652,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 95,
+      "size": 258024,
+      "offset": 2851676,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 96,
+      "size": 172024,
+      "offset": 3109700,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 97,
+      "size": 236712,
+      "offset": 3281724,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 98,
+      "size": 344024,
+      "offset": 3518436,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 99,
+      "size": 264,
+      "offset": 3862460,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 100,
+      "size": 471,
+      "offset": 3862724,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 101,
+      "size": 124,
+      "offset": 3863196,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 102,
+      "size": 224432,
+      "offset": 3863320,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 103,
+      "size": 336636,
+      "offset": 4087752,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 104,
+      "size": 224432,
+      "offset": 4424388,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 105,
+      "size": 309768,
+      "offset": 4648820,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 106,
+      "size": 448840,
+      "offset": 4958588,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 107,
+      "size": 264,
+      "offset": 5407428,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 108,
+      "size": 471,
+      "offset": 5407692,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 109,
+      "size": 160,
+      "offset": 5408164,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 110,
+      "size": 53560,
+      "offset": 5408324,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 111,
+      "size": 80328,
+      "offset": 5461884,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 112,
+      "size": 53560,
+      "offset": 5542212,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 113,
+      "size": 99144,
+      "offset": 5595772,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 114,
+      "size": 107096,
+      "offset": 5694916,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 115,
+      "size": 264,
+      "offset": 5802012,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 116,
+      "size": 471,
+      "offset": 5802276,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 117,
+      "size": 484,
+      "offset": 5802748,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 118,
+      "size": 641536,
+      "offset": 5803232,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 119,
+      "size": 962292,
+      "offset": 6444768,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 120,
+      "size": 641536,
+      "offset": 7407060,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 121,
+      "size": 1203684,
+      "offset": 8048596,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 122,
+      "size": 1283048,
+      "offset": 9252280,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 123,
+      "size": 264,
+      "offset": 10535328,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 124,
+      "size": 471,
+      "offset": 10535592,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 125,
+      "size": 88,
+      "offset": 10536064,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 126,
+      "size": 2664,
+      "offset": 10536152,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 127,
+      "size": 3984,
+      "offset": 10538816,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 128,
+      "size": 2664,
+      "offset": 10542800,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 129,
+      "size": 3672,
+      "offset": 10545464,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 130,
+      "size": 5304,
+      "offset": 10549136,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 131,
+      "size": 264,
+      "offset": 10554440,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 132,
+      "size": 471,
+      "offset": 10554704,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 133,
+      "size": 52,
+      "offset": 10555176,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 134,
+      "size": 1000,
+      "offset": 10555228,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 135,
+      "size": 1488,
+      "offset": 10556228,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 136,
+      "size": 1000,
+      "offset": 10557716,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 137,
+      "size": 1656,
+      "offset": 10558716,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 138,
+      "size": 1976,
+      "offset": 10560372,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 139,
+      "size": 264,
+      "offset": 10562348,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 140,
+      "size": 471,
+      "offset": 10562612,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 141,
+      "size": 52,
+      "offset": 10563084,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 142,
+      "size": 1464,
+      "offset": 10563136,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 143,
+      "size": 2184,
+      "offset": 10564600,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 144,
+      "size": 1464,
+      "offset": 10566784,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 145,
+      "size": 2232,
+      "offset": 10568248,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 146,
+      "size": 2904,
+      "offset": 10570480,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 147,
+      "size": 264,
+      "offset": 10573384,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 148,
+      "size": 471,
+      "offset": 10573648,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 149,
+      "size": 52,
+      "offset": 10574120,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 150,
+      "size": 1000,
+      "offset": 10574172,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 151,
+      "size": 1488,
+      "offset": 10575172,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 152,
+      "size": 1000,
+      "offset": 10576660,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 153,
+      "size": 1656,
+      "offset": 10577660,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 154,
+      "size": 1976,
+      "offset": 10579316,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 155,
+      "size": 264,
+      "offset": 10581292,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 156,
+      "size": 471,
+      "offset": 10581556,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 157,
+      "size": 52,
+      "offset": 10582028,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 158,
+      "size": 1464,
+      "offset": 10582080,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 159,
+      "size": 2184,
+      "offset": 10583544,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 160,
+      "size": 1464,
+      "offset": 10585728,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 161,
+      "size": 2232,
+      "offset": 10587192,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 162,
+      "size": 2904,
+      "offset": 10589424,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 163,
+      "size": 264,
+      "offset": 10592328,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 164,
+      "size": 471,
+      "offset": 10592592,
+      "big_endian": false
+    },
+    {
+      "type": 4119,
+      "type_name": "MeshSubsets",
+      "version": 2048,
+      "chunk_id": 165,
+      "size": 52,
+      "offset": 10593064,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 166,
+      "size": 19184,
+      "offset": 10593116,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 167,
+      "size": 28764,
+      "offset": 10612300,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 168,
+      "size": 19184,
+      "offset": 10641064,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 169,
+      "size": 42228,
+      "offset": 10660248,
+      "big_endian": false
+    },
+    {
+      "type": 4118,
+      "type_name": "DataStream",
+      "version": 2048,
+      "chunk_id": 170,
+      "size": 38344,
+      "offset": 10702476,
+      "big_endian": false
+    },
+    {
+      "type": 4096,
+      "type_name": "Mesh",
+      "version": 2049,
+      "chunk_id": 171,
+      "size": 264,
+      "offset": 10740820,
+      "big_endian": false
+    },
+    {
+      "type": 4107,
+      "type_name": "Node",
+      "version": 2084,
+      "chunk_id": 172,
+      "size": 471,
+      "offset": 10741084,
+      "big_endian": false
+    },
+    {
+      "type": 4121,
+      "type_name": "ImportSettings",
+      "version": 0,
+      "chunk_id": 173,
+      "size": 10828,
+      "offset": 10741556,
+      "big_endian": false
+    }
+  ],
+  "materials": [
+    {
+      "chunk_id": 2,
+      "name": "kb3d_citycarsessentialssedan-native",
+      "sub_material_count": 16,
+      "physicalize_types": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ],
+      "sub_materials": [
+        {
+          "slot": 0,
+          "name": "KB3D_CEV_UndercarriageTrim",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 1,
+          "name": "KB3D_CEV_SeatsDriverATrim",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 2,
+          "name": "KB3D_CEV_TiresSedans",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 3,
+          "name": "KB3D_CEV_WheelRimsA",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 4,
+          "name": "KB3D_CEV_RubberTrim",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 5,
+          "name": "KB3D_CEV_PlasticTileableA",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 6,
+          "name": "KB3D_CEV_PlasticTrimA",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 7,
+          "name": "KB3D_CEV_SedanExteriorBody",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 8,
+          "name": "KB3D_CEV_CarAtlas",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 9,
+          "name": "KB3D_CEV_CarsLicensePlates",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 10,
+          "name": "KB3D_CEV_TapesTrimA",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 11,
+          "name": "KB3D_CEV_WindowFritsTrim",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 12,
+          "name": "KB3D_CEV_FeltA",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 13,
+          "name": "KB3D_CEV_FeltB",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 14,
+          "name": "KB3D_CEV_GlassMirror",
+          "physicalize_type": -1
+        },
+        {
+          "slot": 15,
+          "name": "KB3D_CEV_TranslElemSedans",
+          "physicalize_type": -1
+        }
+      ]
+    }
+  ],
+  "import_settings": [
+    {
+      "chunk_id": 173,
+      "version": 0,
+      "text": "{\n\t\"version\": 1,\n\t\"source_filename\": \"kb3d_citycarsessentialssedan-native.fbx\",\n\t\"output_ext\": \"cgf\",\n\t\"material_filename\": \"kb3d_citycarsessentialssedan-native\",\n\t\"unit_size\": \"file\",\n\t\"scale\": 1.0,\n\t\"forward_up_axes\": \"+Z+Y\",\n\t\"merge_all_nodes\": false,\n\t\"scene_origin\": false,\n\t\"ignore_custom_normals\": false,\n\t\"ignore_uv\": false,\n\t\"materials\": [\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_UndercarriageTrim\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 0,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_SeatsDriverATrim\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 1,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TiresSedans\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 2,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_WheelRimsA\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 3,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_RubberTrim\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 4,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_PlasticTileableA\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 5,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_PlasticTrimA\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 6,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_SedanExteriorBody\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 7,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_CarAtlas\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 8,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_CarsLicensePlates\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 9,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TapesTrimA\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 10,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_WindowFritsTrim\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 11,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_FeltA\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 12,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_FeltB\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 13,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_GlassMirror\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 14,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TranslElemSedans\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 15,\n\t\t\t\"ui_autoflag\": true\n\t\t},\n\t\t{\n\t\t\t\"name\": \"<unassigned>\",\n\t\t\t\"file\": \"\",\n\t\t\t\"physicalize\": \"no\",\n\t\t\t\"sub_index\": 16,\n\t\t\t\"ui_autoflag\": true\n\t\t}\n\t],\n\t\"nodes\": [\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\" ],\n\t\t\t\"mass\": -1.0,\n\t\t\t\"density\": -1.0,\n\t\t\t\"nodes\": [\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_BodyTranslElem\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_BodyTranslElem\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearDoorRTranslElem\",\n\t\t\t\t\t\"path\": [\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_RearDoorRTranslElem\"\n\t\t\t\t\t],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem\",\n\t\t\t\t\t\"path\": [\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem\"\n\t\t\t\t\t],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearDoorLTranslElem\",\n\t\t\t\t\t\"path\": [\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_RearDoorLTranslElem\"\n\t\t\t\t\t],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem\",\n\t\t\t\t\t\"path\": [\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem\"\n\t\t\t\t\t],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_Key\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_Key\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_Body\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_Body\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearWheelR\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_RearWheelR\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_SuspensionRear\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_SuspensionRear\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_SuspensionFront\",\n\t\t\t\t\t\"path\": [\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_grp\",\n\t\t\t\t\t\t\"KB3D_CEV_VehicSedan_A_SuspensionFront\"\n\t\t\t\t\t],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontWheelL\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_FrontWheelL\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_SteeringWheel\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_SteeringWheel\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearDoorR\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_RearDoorR\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_WiperB\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_WiperB\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_WiperA\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_WiperA\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontDoorL\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_FrontDoorL\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearDoorL\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_RearDoorL\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontDoorR\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_FrontDoorR\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_FrontWheelR\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_FrontWheelR\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_RearWheelL\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_RearWheelL\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t},\n\t\t\t\t{\n\t\t\t\t\t\"name\": \"KB3D_CEV_VehicSedan_A_Shifter\",\n\t\t\t\t\t\"path\": [ \"KB3D_CEV_VehicSedan_A_grp\", \"KB3D_CEV_VehicSedan_A_Shifter\" ],\n\t\t\t\t\t\"mass\": -1.0,\n\t\t\t\t\t\"density\": -1.0\n\t\t\t\t}\n\t\t\t]\n\t\t}\n\t],\n\t\"animation\": {\n\t\t\"name\": \"\",\n\t\t\"motionNodePath\": [ ],\n\t\t\"startFrame\": -1,\n\t\t\"endFrame\": -1\n\t},\n\t\"globalSettings\": {\n\t\t\"general_settings\": {\n\t\t\t\"input_filename\": \"kb3d_citycarsessentialssedan-native\",\n\t\t\t\"output_filename\": \"kb3d_citycarsessentialssedan-native\"\n\t\t},\n\t\t\"static_mesh_settings\": {\n\t\t\t\"merge_all_nodes\": false,\n\t\t\t\"scene_origin\": false,\n\t\t\t\"compute_normals\": false,\n\t\t\t\"compute_uv\": false\n\t\t},\n\t\t\"conversion_settings\": {\n\t\t\t\"unit\": \"file (cm)\",\n\t\t\t\"scale\": 1.0,\n\t\t\t\"forward\": \"+Z\",\n\t\t\t\"up\": \"+Y\"\n\t\t},\n\t\t\"output_settings\": { \"use_32_bit_positions\": false }\n\t},\n\t\"editorNodeMeta\": [ ],\n\t\"editorMaterialMeta\": [\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_UndercarriageTrim\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 0,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.62409, \"g\": 0.80309, \"b\": 0.61794, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_SeatsDriverATrim\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 1,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.49292, \"g\": 0.91367, \"b\": 0.93723, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TiresSedans\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 2,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.33956, \"g\": 0.58636, \"b\": 0.58283, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_WheelRimsA\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 3,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.46758, \"g\": 0.69311, \"b\": 0.78125, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_RubberTrim\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 4,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.64028, \"g\": 0.57624, \"b\": 0.82641, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_PlasticTileableA\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 5,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.5019, \"g\": 0.48547, \"b\": 0.77342, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_PlasticTrimA\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 6,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.41631, \"g\": 0.80115, \"b\": 0.78289, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_SedanExteriorBody\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 7,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.5019, \"g\": 0.7785, \"b\": 0.70191, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_CarAtlas\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 8,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.80871, \"g\": 0.71148, \"b\": 0.77346, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_CarsLicensePlates\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 9,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.55341, \"g\": 0.64747, \"b\": 0.72496, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TapesTrimA\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 10,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.7336, \"g\": 0.80081, \"b\": 0.93788, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_WindowFritsTrim\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 11,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.3499, \"g\": 0.55281, \"b\": 0.90017, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_FeltA\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 12,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.79555, \"g\": 0.81837, \"b\": 0.91434, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_FeltB\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 13,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.46275, \"g\": 0.69078, \"b\": 0.66908, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_GlassMirror\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 14,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.41983, \"g\": 0.53168, \"b\": 0.84191, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"KB3D_CEV_TranslElemSedans\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 15,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 0.82937, \"g\": 0.91422, \"b\": 0.92946, \"a\": 1.0 }\n\t\t},\n\t\t{\n\t\t\t\"name\": \"<unassigned>\",\n\t\t\t\"physicalize_setting\": \"no\",\n\t\t\t\"sub_material_index\": 16,\n\t\t\t\"auto_id\": true,\n\t\t\t\"color\": { \"r\": 1.0, \"g\": 1.0, \"b\": 1.0, \"a\": 1.0 }\n\t\t}\n\t],\n\t\"use_32_bit_positions\": false,\n\t\"autolodsettings\": {\n\t\t\"globalparams\": {\n\t\t\t\"viewresolution\": 26.69321,\n\t\t\t\"viewsaround\": 12,\n\t\t\t\"viewelevations\": 3,\n\t\t\t\"silhouetteweight\": 5.0,\n\t\t\t\"vertexwelding\": 0.001,\n\t\t\t\"checktopology\": true,\n\t\t\t\"objecthasbase\": false\n\t\t},\n\t\t\"nodeparams\": [ ]\n\t}\n}",
+      "json": {
+        "version": 1,
+        "source_filename": "kb3d_citycarsessentialssedan-native.fbx",
+        "output_ext": "cgf",
+        "material_filename": "kb3d_citycarsessentialssedan-native",
+        "unit_size": "file",
+        "scale": 1.0,
+        "forward_up_axes": "+Z+Y",
+        "merge_all_nodes": false,
+        "scene_origin": false,
+        "ignore_custom_normals": false,
+        "ignore_uv": false,
+        "materials": [
+          {
+            "name": "KB3D_CEV_UndercarriageTrim",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 0,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_SeatsDriverATrim",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 1,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_TiresSedans",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 2,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_WheelRimsA",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 3,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_RubberTrim",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 4,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_PlasticTileableA",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 5,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_PlasticTrimA",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 6,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_SedanExteriorBody",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 7,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_CarAtlas",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 8,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_CarsLicensePlates",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 9,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_TapesTrimA",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 10,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_WindowFritsTrim",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 11,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_FeltA",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 12,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_FeltB",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 13,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_GlassMirror",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 14,
+            "ui_autoflag": true
+          },
+          {
+            "name": "KB3D_CEV_TranslElemSedans",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 15,
+            "ui_autoflag": true
+          },
+          {
+            "name": "<unassigned>",
+            "file": "",
+            "physicalize": "no",
+            "sub_index": 16,
+            "ui_autoflag": true
+          }
+        ],
+        "nodes": [
+          {
+            "name": "KB3D_CEV_VehicSedan_A_grp",
+            "path": [
+              "KB3D_CEV_VehicSedan_A_grp"
+            ],
+            "mass": -1.0,
+            "density": -1.0,
+            "nodes": [
+              {
+                "name": "KB3D_CEV_VehicSedan_A_BodyTranslElem",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_BodyTranslElem"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearDoorRTranslElem",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearDoorRTranslElem"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontDoorLTranslElem"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearDoorLTranslElem",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearDoorLTranslElem"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontDoorRTranslElem"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_Key",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_Key"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_Body",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_Body"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearWheelR",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearWheelR"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_SuspensionRear",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_SuspensionRear"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_SuspensionFront",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_SuspensionFront"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontWheelL",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontWheelL"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_SteeringWheel",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_SteeringWheel"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearDoorR",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearDoorR"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_WiperB",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_WiperB"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_WiperA",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_WiperA"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontDoorL",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontDoorL"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearDoorL",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearDoorL"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontDoorR",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontDoorR"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_FrontWheelR",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_FrontWheelR"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_RearWheelL",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_RearWheelL"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              },
+              {
+                "name": "KB3D_CEV_VehicSedan_A_Shifter",
+                "path": [
+                  "KB3D_CEV_VehicSedan_A_grp",
+                  "KB3D_CEV_VehicSedan_A_Shifter"
+                ],
+                "mass": -1.0,
+                "density": -1.0
+              }
+            ]
+          }
+        ],
+        "animation": {
+          "name": "",
+          "motionNodePath": [],
+          "startFrame": -1,
+          "endFrame": -1
+        },
+        "globalSettings": {
+          "general_settings": {
+            "input_filename": "kb3d_citycarsessentialssedan-native",
+            "output_filename": "kb3d_citycarsessentialssedan-native"
+          },
+          "static_mesh_settings": {
+            "merge_all_nodes": false,
+            "scene_origin": false,
+            "compute_normals": false,
+            "compute_uv": false
+          },
+          "conversion_settings": {
+            "unit": "file (cm)",
+            "scale": 1.0,
+            "forward": "+Z",
+            "up": "+Y"
+          },
+          "output_settings": {
+            "use_32_bit_positions": false
+          }
+        },
+        "editorNodeMeta": [],
+        "editorMaterialMeta": [
+          {
+            "name": "KB3D_CEV_UndercarriageTrim",
+            "physicalize_setting": "no",
+            "sub_material_index": 0,
+            "auto_id": true,
+            "color": {
+              "r": 0.62409,
+              "g": 0.80309,
+              "b": 0.61794,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_SeatsDriverATrim",
+            "physicalize_setting": "no",
+            "sub_material_index": 1,
+            "auto_id": true,
+            "color": {
+              "r": 0.49292,
+              "g": 0.91367,
+              "b": 0.93723,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_TiresSedans",
+            "physicalize_setting": "no",
+            "sub_material_index": 2,
+            "auto_id": true,
+            "color": {
+              "r": 0.33956,
+              "g": 0.58636,
+              "b": 0.58283,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_WheelRimsA",
+            "physicalize_setting": "no",
+            "sub_material_index": 3,
+            "auto_id": true,
+            "color": {
+              "r": 0.46758,
+              "g": 0.69311,
+              "b": 0.78125,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_RubberTrim",
+            "physicalize_setting": "no",
+            "sub_material_index": 4,
+            "auto_id": true,
+            "color": {
+              "r": 0.64028,
+              "g": 0.57624,
+              "b": 0.82641,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_PlasticTileableA",
+            "physicalize_setting": "no",
+            "sub_material_index": 5,
+            "auto_id": true,
+            "color": {
+              "r": 0.5019,
+              "g": 0.48547,
+              "b": 0.77342,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_PlasticTrimA",
+            "physicalize_setting": "no",
+            "sub_material_index": 6,
+            "auto_id": true,
+            "color": {
+              "r": 0.41631,
+              "g": 0.80115,
+              "b": 0.78289,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_SedanExteriorBody",
+            "physicalize_setting": "no",
+            "sub_material_index": 7,
+            "auto_id": true,
+            "color": {
+              "r": 0.5019,
+              "g": 0.7785,
+              "b": 0.70191,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_CarAtlas",
+            "physicalize_setting": "no",
+            "sub_material_index": 8,
+            "auto_id": true,
+            "color": {
+              "r": 0.80871,
+              "g": 0.71148,
+              "b": 0.77346,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_CarsLicensePlates",
+            "physicalize_setting": "no",
+            "sub_material_index": 9,
+            "auto_id": true,
+            "color": {
+              "r": 0.55341,
+              "g": 0.64747,
+              "b": 0.72496,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_TapesTrimA",
+            "physicalize_setting": "no",
+            "sub_material_index": 10,
+            "auto_id": true,
+            "color": {
+              "r": 0.7336,
+              "g": 0.80081,
+              "b": 0.93788,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_WindowFritsTrim",
+            "physicalize_setting": "no",
+            "sub_material_index": 11,
+            "auto_id": true,
+            "color": {
+              "r": 0.3499,
+              "g": 0.55281,
+              "b": 0.90017,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_FeltA",
+            "physicalize_setting": "no",
+            "sub_material_index": 12,
+            "auto_id": true,
+            "color": {
+              "r": 0.79555,
+              "g": 0.81837,
+              "b": 0.91434,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_FeltB",
+            "physicalize_setting": "no",
+            "sub_material_index": 13,
+            "auto_id": true,
+            "color": {
+              "r": 0.46275,
+              "g": 0.69078,
+              "b": 0.66908,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_GlassMirror",
+            "physicalize_setting": "no",
+            "sub_material_index": 14,
+            "auto_id": true,
+            "color": {
+              "r": 0.41983,
+              "g": 0.53168,
+              "b": 0.84191,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "KB3D_CEV_TranslElemSedans",
+            "physicalize_setting": "no",
+            "sub_material_index": 15,
+            "auto_id": true,
+            "color": {
+              "r": 0.82937,
+              "g": 0.91422,
+              "b": 0.92946,
+              "a": 1.0
+            }
+          },
+          {
+            "name": "<unassigned>",
+            "physicalize_setting": "no",
+            "sub_material_index": 16,
+            "auto_id": true,
+            "color": {
+              "r": 1.0,
+              "g": 1.0,
+              "b": 1.0,
+              "a": 1.0
+            }
+          }
+        ],
+        "use_32_bit_positions": false,
+        "autolodsettings": {
+          "globalparams": {
+            "viewresolution": 26.69321,
+            "viewsaround": 12,
+            "viewelevations": 3,
+            "silhouetteweight": 5.0,
+            "vertexwelding": 0.001,
+            "checktopology": true,
+            "objecthasbase": false
+          },
+          "nodeparams": []
+        }
+      },
+      "json_error": ""
+    }
+  ],
+  "meshes": [
+    {
+      "chunk_id": 11,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 568,
+      "indices": 2160,
+      "subset_count": 2,
+      "subsets_chunk_id": 5,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 378,
+          "first_vert": 0,
+          "num_verts": 132,
+          "material_id": 0,
+          "radius": 0.09297900646924973,
+          "center": [
+            0.02115725725889206,
+            -0.009583469480276108,
+            -0.011335860937833786
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 378,
+          "num_indices": 1782,
+          "first_vert": 132,
+          "num_verts": 436,
+          "material_id": 1,
+          "radius": 0.0762004479765892,
+          "center": [
+            -0.006205406039953232,
+            2.60770320892334e-08,
+            0.046150948852300644
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 19,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6683,
+      "indices": 24780,
+      "subset_count": 4,
+      "subsets_chunk_id": 13,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 240,
+          "first_vert": 0,
+          "num_verts": 150,
+          "material_id": 0,
+          "radius": 0.1305139809846878,
+          "center": [
+            -0.0710105299949646,
+            -0.000217389315366745,
+            0.00820457935333252
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 240,
+          "num_indices": 10080,
+          "first_vert": 150,
+          "num_verts": 2379,
+          "material_id": 2,
+          "radius": 0.6292361617088318,
+          "center": [
+            0.0,
+            8.940696716308594e-08,
+            -1.4901161193847656e-08
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 10320,
+          "num_indices": 14100,
+          "first_vert": 2529,
+          "num_verts": 4070,
+          "material_id": 3,
+          "radius": 0.46244293451309204,
+          "center": [
+            -0.0028507113456726074,
+            -1.6391277313232422e-07,
+            -1.4901161193847656e-07
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 24420,
+          "num_indices": 360,
+          "first_vert": 6599,
+          "num_verts": 84,
+          "material_id": 4,
+          "radius": 0.012370903044939041,
+          "center": [
+            -0.09097838401794434,
+            -9.225052781403065e-05,
+            -0.2776184678077698
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 27,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6692,
+      "indices": 24780,
+      "subset_count": 4,
+      "subsets_chunk_id": 21,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 240,
+          "first_vert": 0,
+          "num_verts": 150,
+          "material_id": 0,
+          "radius": 0.1305139809846878,
+          "center": [
+            0.0710102915763855,
+            -0.00021721050143241882,
+            0.008204158395528793
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 240,
+          "num_indices": 10080,
+          "first_vert": 150,
+          "num_verts": 2379,
+          "material_id": 2,
+          "radius": 0.6292359828948975,
+          "center": [
+            0.0,
+            1.4901161193847656e-08,
+            1.4901161193847656e-08
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 10320,
+          "num_indices": 14100,
+          "first_vert": 2529,
+          "num_verts": 4079,
+          "material_id": 3,
+          "radius": 0.46244290471076965,
+          "center": [
+            0.0028505325317382812,
+            1.4901161193847656e-08,
+            -5.662441253662109e-07
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 24420,
+          "num_indices": 360,
+          "first_vert": 6608,
+          "num_verts": 84,
+          "material_id": 4,
+          "radius": 0.012370876036584377,
+          "center": [
+            0.09097808599472046,
+            -9.208358824253082e-05,
+            -0.2776188850402832
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 35,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6559,
+      "indices": 26184,
+      "subset_count": 5,
+      "subsets_chunk_id": 29,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1272,
+          "first_vert": 0,
+          "num_verts": 279,
+          "material_id": 1,
+          "radius": 0.5501943826675415,
+          "center": [
+            -0.11389166116714478,
+            -0.048830464482307434,
+            -0.2675616145133972
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 1272,
+          "num_indices": 1044,
+          "first_vert": 279,
+          "num_verts": 256,
+          "material_id": 4,
+          "radius": 1.0412671566009521,
+          "center": [
+            -0.0854155421257019,
+            0.007655978202819824,
+            0.01103287935256958
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 2316,
+          "num_indices": 2058,
+          "first_vert": 535,
+          "num_verts": 443,
+          "material_id": 5,
+          "radius": 0.7521225810050964,
+          "center": [
+            -0.08935549855232239,
+            -0.009786665439605713,
+            -0.20059950649738312
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 4374,
+          "num_indices": 5046,
+          "first_vert": 978,
+          "num_verts": 1422,
+          "material_id": 6,
+          "radius": 0.6636971831321716,
+          "center": [
+            -0.13707074522972107,
+            -0.044342219829559326,
+            -0.23633027076721191
+          ]
+        },
+        {
+          "subset": 4,
+          "first_index": 9420,
+          "num_indices": 16764,
+          "first_vert": 2400,
+          "num_verts": 4159,
+          "material_id": 7,
+          "radius": 1.1112338304519653,
+          "center": [
+            -2.9802322387695312e-08,
+            2.9802322387695312e-08,
+            -2.9802322387695312e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 43,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 4253,
+      "indices": 16068,
+      "subset_count": 5,
+      "subsets_chunk_id": 37,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1338,
+          "first_vert": 0,
+          "num_verts": 291,
+          "material_id": 1,
+          "radius": 0.5237964987754822,
+          "center": [
+            0.05145511031150818,
+            -0.08076439797878265,
+            -0.2364557683467865
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 1338,
+          "num_indices": 1134,
+          "first_vert": 291,
+          "num_verts": 260,
+          "material_id": 4,
+          "radius": 0.9734961986541748,
+          "center": [
+            -0.012959301471710205,
+            0.00634494423866272,
+            0.016475141048431396
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 2472,
+          "num_indices": 2583,
+          "first_vert": 551,
+          "num_verts": 538,
+          "material_id": 5,
+          "radius": 0.8607195615768433,
+          "center": [
+            0.05080631375312805,
+            0.006347686052322388,
+            0.006744056940078735
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 5055,
+          "num_indices": 3489,
+          "first_vert": 1089,
+          "num_verts": 911,
+          "material_id": 6,
+          "radius": 0.5583527088165283,
+          "center": [
+            0.06770843267440796,
+            -0.08159524202346802,
+            -0.16563209891319275
+          ]
+        },
+        {
+          "subset": 4,
+          "first_index": 8544,
+          "num_indices": 7524,
+          "first_vert": 2000,
+          "num_verts": 2253,
+          "material_id": 7,
+          "radius": 1.0221335887908936,
+          "center": [
+            -2.9802322387695312e-08,
+            -5.960464477539063e-08,
+            2.9802322387695312e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 51,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6263,
+      "indices": 25584,
+      "subset_count": 5,
+      "subsets_chunk_id": 45,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1272,
+          "first_vert": 0,
+          "num_verts": 279,
+          "material_id": 1,
+          "radius": 0.5501943826675415,
+          "center": [
+            0.11389148235321045,
+            -0.04883040487766266,
+            -0.2675616145133972
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 1272,
+          "num_indices": 1044,
+          "first_vert": 279,
+          "num_verts": 256,
+          "material_id": 4,
+          "radius": 1.0412671566009521,
+          "center": [
+            0.0854155421257019,
+            0.0076560378074646,
+            0.01103287935256958
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 2316,
+          "num_indices": 2058,
+          "first_vert": 535,
+          "num_verts": 446,
+          "material_id": 5,
+          "radius": 0.7521225810050964,
+          "center": [
+            0.08935537934303284,
+            -0.009786605834960938,
+            -0.20059950649738312
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 4374,
+          "num_indices": 4446,
+          "first_vert": 981,
+          "num_verts": 1123,
+          "material_id": 6,
+          "radius": 0.6636971831321716,
+          "center": [
+            0.13707059621810913,
+            -0.04434216022491455,
+            -0.23633027076721191
+          ]
+        },
+        {
+          "subset": 4,
+          "first_index": 8820,
+          "num_indices": 16764,
+          "first_vert": 2104,
+          "num_verts": 4159,
+          "material_id": 7,
+          "radius": 1.1112337112426758,
+          "center": [
+            2.9802322387695312e-08,
+            2.9802322387695312e-08,
+            -2.9802322387695312e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 59,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 557,
+      "indices": 1386,
+      "subset_count": 1,
+      "subsets_chunk_id": 53,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1386,
+          "first_vert": 0,
+          "num_verts": 557,
+          "material_id": 7,
+          "radius": 0.46214428544044495,
+          "center": [
+            -1.4901161193847656e-08,
+            -1.1175870895385742e-08,
+            5.587935447692871e-09
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 67,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 557,
+      "indices": 1386,
+      "subset_count": 1,
+      "subsets_chunk_id": 61,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1386,
+          "first_vert": 0,
+          "num_verts": 557,
+          "material_id": 7,
+          "radius": 0.47225332260131836,
+          "center": [
+            1.4901161193847656e-08,
+            1.862645149230957e-08,
+            5.21540641784668e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 75,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 4253,
+      "indices": 16068,
+      "subset_count": 5,
+      "subsets_chunk_id": 69,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 1338,
+          "first_vert": 0,
+          "num_verts": 291,
+          "material_id": 1,
+          "radius": 0.5237964987754822,
+          "center": [
+            -0.05145508050918579,
+            -0.08076439797878265,
+            -0.2364557683467865
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 1338,
+          "num_indices": 1134,
+          "first_vert": 291,
+          "num_verts": 260,
+          "material_id": 4,
+          "radius": 0.9734961986541748,
+          "center": [
+            0.012959331274032593,
+            0.00634494423866272,
+            0.016475141048431396
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 2472,
+          "num_indices": 2583,
+          "first_vert": 551,
+          "num_verts": 538,
+          "material_id": 5,
+          "radius": 0.8607195615768433,
+          "center": [
+            -0.05080634355545044,
+            0.006347686052322388,
+            0.006744056940078735
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 5055,
+          "num_indices": 3489,
+          "first_vert": 1089,
+          "num_verts": 911,
+          "material_id": 6,
+          "radius": 0.5583527684211731,
+          "center": [
+            -0.06770849227905273,
+            -0.08159524202346802,
+            -0.16563209891319275
+          ]
+        },
+        {
+          "subset": 4,
+          "first_index": 8544,
+          "num_indices": 7524,
+          "first_vert": 2000,
+          "num_verts": 2253,
+          "material_id": 7,
+          "radius": 1.0221335887908936,
+          "center": [
+            0.0,
+            -5.960464477539063e-08,
+            2.9802322387695312e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 83,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 1883,
+      "indices": 8508,
+      "subset_count": 2,
+      "subsets_chunk_id": 77,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 4428,
+          "first_vert": 0,
+          "num_verts": 838,
+          "material_id": 1,
+          "radius": 0.33791178464889526,
+          "center": [
+            2.9802322387695312e-08,
+            0.014340817928314209,
+            1.4901161193847656e-08
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 4428,
+          "num_indices": 4080,
+          "first_vert": 838,
+          "num_verts": 1045,
+          "material_id": 6,
+          "radius": 0.2473241686820984,
+          "center": [
+            -0.00012201815843582153,
+            -0.0330049991607666,
+            -0.039602383971214294
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 91,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6683,
+      "indices": 24780,
+      "subset_count": 4,
+      "subsets_chunk_id": 85,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 240,
+          "first_vert": 0,
+          "num_verts": 150,
+          "material_id": 0,
+          "radius": 0.1305139809846878,
+          "center": [
+            -0.0710105448961258,
+            -0.00021721050143241882,
+            0.00820445641875267
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 240,
+          "num_indices": 10080,
+          "first_vert": 150,
+          "num_verts": 2379,
+          "material_id": 2,
+          "radius": 0.6292360424995422,
+          "center": [
+            -4.470348358154297e-08,
+            1.4901161193847656e-08,
+            1.4901161193847656e-08
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 10320,
+          "num_indices": 14100,
+          "first_vert": 2529,
+          "num_verts": 4070,
+          "material_id": 3,
+          "radius": 0.46244290471076965,
+          "center": [
+            -0.002850756049156189,
+            1.4901161193847656e-08,
+            -2.682209014892578e-07
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 24420,
+          "num_indices": 360,
+          "first_vert": 6599,
+          "num_verts": 84,
+          "material_id": 4,
+          "radius": 0.012370888143777847,
+          "center": [
+            -0.09097842872142792,
+            -9.208358824253082e-05,
+            -0.2776185870170593
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 99,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 21500,
+      "indices": 59172,
+      "subset_count": 3,
+      "subsets_chunk_id": 93,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 55404,
+          "first_vert": 0,
+          "num_verts": 20178,
+          "material_id": 0,
+          "radius": 1.1949645280838013,
+          "center": [
+            5.960464477539063e-08,
+            -2.9802322387695312e-08,
+            2.9802322387695312e-08
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 55404,
+          "num_indices": 1080,
+          "first_vert": 20178,
+          "num_verts": 370,
+          "material_id": 3,
+          "radius": 1.0471994876861572,
+          "center": [
+            4.172325134277344e-07,
+            -0.04269345477223396,
+            -0.1061030700802803
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 56484,
+          "num_indices": 2688,
+          "first_vert": 20548,
+          "num_verts": 952,
+          "material_id": 4,
+          "radius": 0.7407694458961487,
+          "center": [
+            8.940696716308594e-08,
+            -0.22212226688861847,
+            -0.12220437824726105
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 107,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 28051,
+      "indices": 77436,
+      "subset_count": 3,
+      "subsets_chunk_id": 101,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 68580,
+          "first_vert": 0,
+          "num_verts": 25155,
+          "material_id": 0,
+          "radius": 1.2819569110870361,
+          "center": [
+            0.0,
+            -2.9802322387695312e-08,
+            2.9802322387695312e-08
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 68580,
+          "num_indices": 1080,
+          "first_vert": 25155,
+          "num_verts": 370,
+          "material_id": 3,
+          "radius": 1.0471993684768677,
+          "center": [
+            2.980232238769531e-07,
+            -0.020755913108587265,
+            -0.10742565989494324
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 69660,
+          "num_indices": 7776,
+          "first_vert": 25525,
+          "num_verts": 2526,
+          "material_id": 4,
+          "radius": 0.8871471881866455,
+          "center": [
+            8.940696716308594e-08,
+            -0.02078530564904213,
+            -0.11442019045352936
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 115,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 6692,
+      "indices": 24780,
+      "subset_count": 4,
+      "subsets_chunk_id": 109,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 240,
+          "first_vert": 0,
+          "num_verts": 150,
+          "material_id": 0,
+          "radius": 0.1305139809846878,
+          "center": [
+            0.07101035118103027,
+            -0.00021747872233390808,
+            0.00820431113243103
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 240,
+          "num_indices": 10080,
+          "first_vert": 150,
+          "num_verts": 2379,
+          "material_id": 2,
+          "radius": 0.629236102104187,
+          "center": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 10320,
+          "num_indices": 14100,
+          "first_vert": 2529,
+          "num_verts": 4079,
+          "material_id": 3,
+          "radius": 0.46244290471076965,
+          "center": [
+            0.0028505325317382812,
+            -2.5331974029541016e-07,
+            -4.172325134277344e-07
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 24420,
+          "num_indices": 360,
+          "first_vert": 6608,
+          "num_verts": 84,
+          "material_id": 4,
+          "radius": 0.012370912358164787,
+          "center": [
+            0.09097814559936523,
+            -9.233993478119373e-05,
+            -0.27761876583099365
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 123,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 80189,
+      "indices": 300915,
+      "subset_count": 13,
+      "subsets_chunk_id": 117,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 24246,
+          "first_vert": 0,
+          "num_verts": 6418,
+          "material_id": 0,
+          "radius": 3.238154411315918,
+          "center": [
+            -2.384185791015625e-07,
+            0.0003514289855957031,
+            -0.25442397594451904
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 24246,
+          "num_indices": 71520,
+          "first_vert": 6418,
+          "num_verts": 16143,
+          "material_id": 1,
+          "radius": 1.6777291297912598,
+          "center": [
+            0.0,
+            0.3277823030948639,
+            -0.0692656934261322
+          ]
+        },
+        {
+          "subset": 2,
+          "first_index": 95766,
+          "num_indices": 5502,
+          "first_vert": 22561,
+          "num_verts": 1338,
+          "material_id": 4,
+          "radius": 1.9691158533096313,
+          "center": [
+            0.0,
+            0.058344125747680664,
+            0.019199848175048828
+          ]
+        },
+        {
+          "subset": 3,
+          "first_index": 101268,
+          "num_indices": 24315,
+          "first_vert": 23899,
+          "num_verts": 5716,
+          "material_id": 5,
+          "radius": 2.290003776550293,
+          "center": [
+            0.0,
+            0.47096914052963257,
+            0.04395925998687744
+          ]
+        },
+        {
+          "subset": 4,
+          "first_index": 125583,
+          "num_indices": 54306,
+          "first_vert": 29615,
+          "num_verts": 18784,
+          "material_id": 6,
+          "radius": 2.2103941440582275,
+          "center": [
+            -1.4901161193847656e-07,
+            0.48509496450424194,
+            0.04477667808532715
+          ]
+        },
+        {
+          "subset": 5,
+          "first_index": 179889,
+          "num_indices": 108396,
+          "first_vert": 48399,
+          "num_verts": 28078,
+          "material_id": 7,
+          "radius": 3.3849127292633057,
+          "center": [
+            0.0,
+            0.0,
+            0.006756335496902466
+          ]
+        },
+        {
+          "subset": 6,
+          "first_index": 288285,
+          "num_indices": 264,
+          "first_vert": 76477,
+          "num_verts": 98,
+          "material_id": 8,
+          "radius": 0.48512884974479675,
+          "center": [
+            0.29750505089759827,
+            -0.6624441146850586,
+            -0.11521478742361069
+          ]
+        },
+        {
+          "subset": 7,
+          "first_index": 288549,
+          "num_indices": 468,
+          "first_vert": 76575,
+          "num_verts": 160,
+          "material_id": 9,
+          "radius": 0.21305041015148163,
+          "center": [
+            2.1606683731079102e-07,
+            2.897697687149048,
+            0.04020436853170395
+          ]
+        },
+        {
+          "subset": 8,
+          "first_index": 289017,
+          "num_indices": 2256,
+          "first_vert": 76735,
+          "num_verts": 828,
+          "material_id": 10,
+          "radius": 1.2924727201461792,
+          "center": [
+            0.0,
+            0.777553141117096,
+            -0.042360082268714905
+          ]
+        },
+        {
+          "subset": 9,
+          "first_index": 291273,
+          "num_indices": 1464,
+          "first_vert": 77563,
+          "num_verts": 808,
+          "material_id": 11,
+          "radius": 2.1502022743225098,
+          "center": [
+            0.0,
+            0.47128915786743164,
+            0.47602468729019165
+          ]
+        },
+        {
+          "subset": 10,
+          "first_index": 292737,
+          "num_indices": 4368,
+          "first_vert": 78371,
+          "num_verts": 968,
+          "material_id": 12,
+          "radius": 1.6469107866287231,
+          "center": [
+            -5.960464477539063e-08,
+            -0.005230307579040527,
+            -0.4679301381111145
+          ]
+        },
+        {
+          "subset": 11,
+          "first_index": 297105,
+          "num_indices": 3732,
+          "first_vert": 79339,
+          "num_verts": 822,
+          "material_id": 13,
+          "radius": 1.3353935480117798,
+          "center": [
+            -2.9802322387695312e-08,
+            0.5033569931983948,
+            0.7130714654922485
+          ]
+        },
+        {
+          "subset": 12,
+          "first_index": 300837,
+          "num_indices": 78,
+          "first_vert": 80161,
+          "num_verts": 28,
+          "material_id": 14,
+          "radius": 0.1498534083366394,
+          "center": [
+            0.0004865899682044983,
+            -0.6356034278869629,
+            0.5978522896766663
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 131,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 330,
+      "indices": 912,
+      "subset_count": 2,
+      "subsets_chunk_id": 125,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 54,
+          "first_vert": 0,
+          "num_verts": 32,
+          "material_id": 0,
+          "radius": 0.022404039278626442,
+          "center": [
+            0.020490258932113647,
+            -0.0017519593238830566,
+            -0.0010594724444672465
+          ]
+        },
+        {
+          "subset": 1,
+          "first_index": 54,
+          "num_indices": 858,
+          "first_vert": 32,
+          "num_verts": 298,
+          "material_id": 6,
+          "radius": 0.028383517637848854,
+          "center": [
+            -0.020604431629180908,
+            -2.9802322387695312e-08,
+            -5.960464477539063e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 139,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 122,
+      "indices": 408,
+      "subset_count": 1,
+      "subsets_chunk_id": 133,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 408,
+          "first_vert": 0,
+          "num_verts": 122,
+          "material_id": 15,
+          "radius": 0.6498338580131531,
+          "center": [
+            0.0,
+            -2.9802322387695312e-08,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 147,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 180,
+      "indices": 552,
+      "subset_count": 1,
+      "subsets_chunk_id": 141,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 552,
+          "first_vert": 0,
+          "num_verts": 180,
+          "material_id": 15,
+          "radius": 0.6241603493690491,
+          "center": [
+            0.0,
+            -2.9802322387695312e-08,
+            2.2351741790771484e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 155,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 122,
+      "indices": 408,
+      "subset_count": 1,
+      "subsets_chunk_id": 149,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 408,
+          "first_vert": 0,
+          "num_verts": 122,
+          "material_id": 15,
+          "radius": 0.6498338580131531,
+          "center": [
+            0.0,
+            -2.9802322387695312e-08,
+            0.0
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 163,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 180,
+      "indices": 552,
+      "subset_count": 1,
+      "subsets_chunk_id": 157,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 552,
+          "first_vert": 0,
+          "num_verts": 180,
+          "material_id": 15,
+          "radius": 0.6241603493690491,
+          "center": [
+            0.0,
+            -2.9802322387695312e-08,
+            2.2351741790771484e-08
+          ]
+        }
+      ]
+    },
+    {
+      "chunk_id": 171,
+      "flags": 10,
+      "flags2": 0,
+      "verts": 2395,
+      "indices": 10551,
+      "subset_count": 1,
+      "subsets_chunk_id": 165,
+      "vert_anim_id": 0,
+      "subsets": [
+        {
+          "subset": 0,
+          "first_index": 0,
+          "num_indices": 10551,
+          "first_vert": 0,
+          "num_verts": 2395,
+          "material_id": 15,
+          "radius": 3.2266125679016113,
+          "center": [
+            0.0,
+            0.0,
+            1.1920928955078125e-07
+          ]
+        }
+      ]
+    }
+  ],
+  "standalone_mesh_subsets": [],
+  "material_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ]
+}
