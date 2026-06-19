@@ -88,6 +88,40 @@ texture links -> RC JSON -> `.cgf`.
 
 Machine gate:
 
+Recommended one-step runner:
+
+```powershell
+uv run python -m tools.asset_flow_baseline_runner `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --output-dir "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed\work" `
+  --limit 3 `
+  --max-mb 2 `
+  --max-textures-per-case 2
+```
+
+Observed runner result:
+
+```text
+ok: True
+case_count: 6
+ok_count: 6
+failed_count: 0
+gate_ok: True
+```
+
+Runner artifacts:
+
+```text
+S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed\asset_flow_baseline_spec.json
+S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed\asset_flow_baseline_report.json
+S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed\asset_flow_baseline_report.md
+S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\baseline_runner_texture_backed\asset_flow_baseline_gate.json
+```
+
+Manual gate command for an existing validator report:
+
 ```powershell
 uv run python -m tools.asset_flow_acceptance_gate `
   --report "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_batch_report.json" `

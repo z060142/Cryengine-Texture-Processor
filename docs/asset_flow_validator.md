@@ -249,6 +249,8 @@ Use `tools.asset_flow_acceptance_gate` when a report must be promoted to a
 machine-checked acceptance baseline. It reads the validator JSON report and
 enforces minimum PASS counts plus zero FAIL counts for required checks. The
 current strong baseline is available as `--preset texture-backed-baseline`.
+Use `tools.asset_flow_baseline_runner` to build the spec, run validation, and
+apply that gate in one command.
 
 That batch included two auto-generated raw texture processing cases:
 
