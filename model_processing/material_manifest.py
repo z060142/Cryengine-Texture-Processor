@@ -67,8 +67,9 @@ def _manifest_payload(material_manifest_info):
 def material_manifest_table_diagnostics(material_manifest_info=None):
     manifest = _manifest_payload(material_manifest_info)
     manifest_materials = manifest.get("materials", [])
+    manifest_polygons = manifest.get("polygons", [])
     diagnostics = []
-    if not manifest_materials:
+    if not manifest_materials and not manifest_polygons:
         return diagnostics
 
     by_slot = {}
@@ -111,6 +112,62 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
                 "message": (
                     "The material manifest lists the same material name multiple times. "
                     "The converter collapses exact duplicate request names, so one manifest row can disappear."
+                ),
+            }
+        )
+
+    table_name_by_slot = {
+        slot: rows[0]["name"]
+        for slot, rows in by_slot.items()
+        if len(rows) == 1 and rows[0]["name"]
+    }
+    polygon_slots_by_name = {}
+    polygon_mismatches = []
+    for order, polygon in enumerate(manifest_polygons):
+        name = polygon.get("material_name", "")
+        slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot")))
+        if slot is None or not name:
+            continue
+        slot = int(slot)
+        polygon_slots_by_name.setdefault(name, set()).add(slot)
+        table_name = table_name_by_slot.get(slot)
+        if table_name and table_name != name:
+            polygon_mismatches.append(
+                {
+                    "polygon_order": order,
+                    "slot": slot,
+                    "polygon_material_name": name,
+                    "table_material_name": table_name,
+                }
+            )
+
+    for mismatch in polygon_mismatches:
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_polygon_slot_name_mismatch",
+                **mismatch,
+                "message": (
+                    "A manifest polygon references a material name that does not match the material table row "
+                    "for the same slot. Request/MTL generation follows the material table, while polygon evidence "
+                    "says the source geometry uses a different material."
+                ),
+            }
+        )
+
+    for name, slots in sorted(polygon_slots_by_name.items()):
+        if len(slots) <= 1:
+            continue
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_polygon_name_multiple_slots",
+                "material": name,
+                "slots": sorted(slots),
+                "message": (
+                    "Manifest polygon evidence maps the same material name to multiple table slots. "
+                    "RC request materials are matched by material name, so this source material cannot "
+                    "reliably target multiple final sub-indices."
                 ),
             }
         )

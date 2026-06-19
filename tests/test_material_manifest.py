@@ -106,3 +106,29 @@ def test_material_manifest_table_diagnostics_reports_duplicate_slots_and_names()
     assert diagnostics[0]["material_names"] == ["Stone", "Metal"]
     assert diagnostics[1]["material"] == "Stone"
     assert diagnostics[1]["slots"] == [0, 2]
+
+
+def test_material_manifest_table_diagnostics_reports_polygon_slot_name_mismatch():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": "Stone", "material_table_slot": 1},
+                ],
+            }
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert "material_manifest_polygon_slot_name_mismatch" in codes
+    assert "material_manifest_polygon_name_multiple_slots" in codes
+    mismatch = next(diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_polygon_slot_name_mismatch")
+    assert mismatch["slot"] == 1
+    assert mismatch["polygon_material_name"] == "Stone"
+    assert mismatch["table_material_name"] == "Metal"

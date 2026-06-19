@@ -116,6 +116,31 @@ def test_collect_model_material_diagnostics_reports_manifest_duplicate_name():
     assert diagnostics[0]["material"] == "Stone"
 
 
+def test_collect_model_material_diagnostics_reports_manifest_polygon_mismatch():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}, {"name": "Metal", "id": 2}],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [
+                        {"slot": 0, "name": "Stone"},
+                        {"slot": 1, "name": "Metal"},
+                    ],
+                    "polygons": [
+                        {"polygon": 0, "material_name": "Stone", "material_table_slot": 0},
+                        {"polygon": 1, "material_name": "Stone", "material_table_slot": 1},
+                    ],
+                }
+            },
+        }
+    )
+
+    assert diagnostics[0]["code"] == "material_manifest_polygon_slot_name_mismatch"
+    assert diagnostics[0]["polygon_material_name"] == "Stone"
+    assert diagnostics[0]["table_material_name"] == "Metal"
+
+
 def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
     diagnostics = collect_model_material_diagnostics(
         {

@@ -236,6 +236,29 @@ def test_build_material_diagnostics_report_includes_manifest_table_diagnostics()
     assert "material_manifest_duplicate_name" in codes
 
 
+def test_build_material_diagnostics_report_includes_manifest_polygon_diagnostics():
+    report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}, {"name": "Metal", "id": 2}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": "Stone", "material_table_slot": 1},
+                ],
+            }
+        },
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert "material_manifest_polygon_slot_name_mismatch" in codes
+    assert "material_manifest_polygon_name_multiple_slots" in codes
+
+
 def test_build_material_diagnostics_report_checks_source_materials_separately_from_output_materials():
     report = build_material_diagnostics_report(
         [{"name": "Visible", "id": 1}],
