@@ -66,6 +66,8 @@ def _record_to_report_item(record):
         "mesh_names": record["material"].get("mesh_names", []),
         "material_names": record["material"].get("material_names", []),
         "slot_name_conflict": record["material"].get("slot_name_conflict", False),
+        "case_insensitive_name_conflict": record.get("case_insensitive_name_conflict", False),
+        "case_insensitive_material_names": record.get("case_insensitive_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
         "diagnostics": [
             *record.get("diagnostics", []),
@@ -100,6 +102,8 @@ def build_material_diagnostics_report(
                     "mesh_names": item["mesh_names"],
                     "material_names": item["material_names"],
                     "slot_name_conflict": item["slot_name_conflict"],
+                    "case_insensitive_name_conflict": item["case_insensitive_name_conflict"],
+                    "case_insensitive_material_names": item["case_insensitive_material_names"],
                     "texture_ref_evidence": item["texture_ref_evidence"],
                 }
             )

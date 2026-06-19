@@ -70,6 +70,23 @@ def test_build_material_diagnostics_report_includes_slot_name_conflict_warning()
     assert report["diagnostics"][0]["material_names"] == ["Metal", "Wood"]
 
 
+def test_build_material_diagnostics_report_includes_case_insensitive_name_collision():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Wood", "id": 1},
+            {"name": "wood", "id": 2},
+        ],
+        source_model="case.fbx",
+    )
+
+    assert report["summary"]["diagnostic_count"] == 2
+    assert report["summary"]["hazard_count"] == 2
+    assert report["materials"][0]["case_insensitive_name_conflict"] is True
+    assert report["materials"][0]["case_insensitive_material_names"] == ["Wood", "wood"]
+    assert report["diagnostics"][0]["code"] == "rc_case_insensitive_material_name_collision"
+    assert report["diagnostics"][0]["case_insensitive_material_names"] == ["Wood", "wood"]
+
+
 def test_build_material_diagnostics_report_includes_texture_ref_evidence_warning():
     evidence = [
         {

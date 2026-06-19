@@ -120,6 +120,23 @@ def diagnose_material_record(record):
     material_names = record["material"].get("material_names", [])
     requested_sub_index = record.get("requested_sub_index")
 
+    if record.get("case_insensitive_name_conflict", False):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "rc_case_insensitive_material_name_collision",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "conflicting_material_names": record.get("case_insensitive_material_names", []),
+                "message": (
+                    "RC matches request materials to FBX scene materials case-insensitively. "
+                    "Materials whose names differ only by case cannot be targeted independently; "
+                    "the first request material with a case-insensitive match will win."
+                ),
+            }
+        )
+
     if requested_sub_index is not None:
         diagnostics.append(
             {
@@ -229,6 +246,18 @@ def _normalized_records(materials):
                 "diagnostics": [],
             }
         )
+
+    by_casefold_name = {}
+    for record in records:
+        by_casefold_name.setdefault(record["clean_name"].casefold(), []).append(record)
+
+    for collisions in by_casefold_name.values():
+        if len(collisions) <= 1:
+            continue
+        names = [record["clean_name"] for record in collisions]
+        for record in collisions:
+            record["case_insensitive_name_conflict"] = True
+            record["case_insensitive_material_names"] = names
 
     return records
 

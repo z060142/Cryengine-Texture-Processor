@@ -152,6 +152,16 @@ def test_material_requests_can_include_slot_diagnostics():
     assert materials[1]["diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 
 
+def test_material_requests_can_include_case_insensitive_collision_diagnostics():
+    materials = build_material_requests(
+        [{"name": "Wood", "id": 1}, {"name": "wood", "id": 2}],
+        include_diagnostics=True,
+    )
+
+    assert materials[0]["diagnostics"][0]["code"] == "rc_case_insensitive_material_name_collision"
+    assert materials[1]["diagnostics"][0]["code"] == "rc_case_insensitive_material_name_collision"
+
+
 def test_nodes_and_joint_physics_use_path_arrays():
     request = build_import_request(sample_model(), "chair.fbx")
     root = request["nodes"][0]

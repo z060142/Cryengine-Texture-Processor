@@ -163,6 +163,21 @@ def test_slot_name_conflict_reports_warning():
     assert diagnostic["mesh_names"] == ["MeshA", "MeshB"]
 
 
+def test_case_insensitive_material_name_collision_reports_hazard():
+    records = assign_material_sub_indices(
+        [{"name": "Wood", "id": 1}, {"name": "wood", "id": 2}],
+        existing_submaterial_names=[],
+    )
+
+    diagnostics = diagnostics_by_name(records)
+
+    assert sub_index_by_name(records) == {"Wood": 0, "wood": 1}
+    assert diagnostics["Wood"][0]["code"] == "rc_case_insensitive_material_name_collision"
+    assert diagnostics["Wood"][0]["conflicting_material_names"] == ["Wood", "wood"]
+    assert diagnostics["wood"][0]["code"] == "rc_case_insensitive_material_name_collision"
+    assert diagnostics["wood"][0]["conflicting_material_names"] == ["Wood", "wood"]
+
+
 def test_blender_duplicate_suffix_is_preserved_as_distinct_material():
     records = assign_material_sub_indices(
         [{"name": "Stone", "id": 1}, {"name": "Stone.001", "id": 2}],
