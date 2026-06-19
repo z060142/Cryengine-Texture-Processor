@@ -37,6 +37,77 @@ def test_load_request_materials_reads_rc_request(tmp_path):
     ]
 
 
+def test_load_request_materials_surfaces_malformed_request_rows(tmp_path):
+    json_path = tmp_path / "asset.json"
+    json_path.write_text(
+        json.dumps(
+            {
+                "request": {
+                    "materials": [
+                        "bad-row",
+                        {"name": "", "sub_index": 0},
+                        {"name": "BadSub", "sub_index": True},
+                        {"name": "StringSub", "sub_index": "2"},
+                        {"name": "Deleted", "sub_index": "-1"},
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_request_materials(str(json_path)) == [
+        {
+            "order": 0,
+            "name": "",
+            "sub_index": None,
+            "physicalize": "",
+            "ok": False,
+            "errors": ["invalid_request_material_row"],
+            "row_type": "str",
+        },
+        {
+            "order": 1,
+            "name": "",
+            "sub_index": 0,
+            "physicalize": "",
+            "raw_name": "",
+            "name_type": "str",
+            "ok": False,
+            "errors": ["invalid_request_material_name"],
+        },
+        {
+            "order": 2,
+            "name": "BadSub",
+            "sub_index": None,
+            "physicalize": "",
+            "raw_sub_index": True,
+            "sub_index_type": "bool",
+            "ok": False,
+            "errors": ["invalid_request_sub_index"],
+        },
+        {"order": 3, "name": "StringSub", "sub_index": 2, "physicalize": ""},
+        {"order": 4, "name": "Deleted", "sub_index": -1, "physicalize": ""},
+    ]
+
+
+def test_load_request_materials_surfaces_malformed_materials_collection(tmp_path):
+    json_path = tmp_path / "asset.json"
+    json_path.write_text(json.dumps({"request": {"materials": {"name": "Stone"}}}), encoding="utf-8")
+
+    assert load_request_materials(str(json_path)) == [
+        {
+            "order": None,
+            "name": "",
+            "sub_index": None,
+            "physicalize": "",
+            "ok": False,
+            "errors": ["invalid_request_materials_collection"],
+            "collection_type": "dict",
+        }
+    ]
+
+
 def test_load_mtl_slots_reads_submaterial_order(tmp_path):
     mtl_path = tmp_path / "asset.mtl"
     root = ET.Element("Material")
@@ -73,6 +144,39 @@ def test_evaluate_material_slot_alignment_reports_mismatch():
 
     assert not result["ok"]
     assert result["checks"][0]["type"] == "slot_name_mismatch"
+
+
+def test_evaluate_material_slot_alignment_reports_invalid_request_materials():
+    result = evaluate_material_slot_alignment(
+        [
+            "bad-row",
+            {"order": 1, "name": "", "sub_index": 0, "errors": ["invalid_request_material_name"], "name_type": "str"},
+            {
+                "order": 2,
+                "name": "BadSub",
+                "sub_index": None,
+                "raw_sub_index": True,
+                "errors": ["invalid_request_sub_index"],
+                "sub_index_type": "bool",
+            },
+            {"order": 3, "name": 123, "sub_index": 0},
+            {"order": 4, "name": "RawBadSub", "sub_index": 1.5},
+            {"order": 5, "name": "Stone", "sub_index": 0},
+        ],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    assert [check["type"] for check in result["checks"]] == [
+        "invalid_request_material_row",
+        "invalid_request_material_name",
+        "invalid_request_sub_index",
+        "invalid_request_material_name",
+        "invalid_request_sub_index",
+        "slot_name_match",
+    ]
+    assert result["checks"][2]["sub_index"] is True
+    assert result["checks"][4]["sub_index"] == 1.5
 
 
 def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
@@ -456,6 +560,54 @@ def test_evaluate_fixture_material_semantics_reports_invalid_cgf_subset_evidence
         "invalid_cgf_subset_center",
         "invalid_cgf_subset_material_id",
     ]
+
+
+def test_evaluate_fixture_material_semantics_reports_invalid_request_material_evidence():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [{"slot": 0, "name": "Stone"}],
+            "polygons": [{"polygon": 0, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 0.0}],
+        },
+        {
+            "meshes": [
+                {
+                    "chunk_id": 10,
+                    "subsets": [{"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0}],
+                }
+            ]
+        },
+        [
+            "bad-row",
+            {"order": 1, "name": "", "sub_index": 0, "errors": ["invalid_request_material_name"], "name_type": "str"},
+            {
+                "order": 2,
+                "name": "BadSub",
+                "sub_index": None,
+                "raw_sub_index": True,
+                "errors": ["invalid_request_sub_index"],
+                "sub_index_type": "bool",
+            },
+            {"order": 3, "name": 123, "sub_index": 0},
+            {"order": 4, "name": "RawBadSub", "sub_index": 1.5},
+            {"order": 5, "name": "Stone", "sub_index": 0},
+        ],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    assert result["polygon_checks"][-1]["ok"]
+    assert result["duplicate_request_material_names"] == []
+    assert result["duplicate_request_sub_indices"] == []
+    assert [entry["error"] for entry in result["invalid_request_entries"]] == [
+        "invalid_request_material_row",
+        "invalid_request_material_name",
+        "invalid_request_sub_index",
+        "invalid_request_material_name",
+        "invalid_request_sub_index",
+    ]
+    assert result["invalid_request_entries"][2]["sub_index"] is True
+    assert result["invalid_request_entries"][4]["sub_index"] == 1.5
 
 
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():

@@ -25,19 +25,79 @@ def _read_json(path):
         return json.load(f)
 
 
+def _coerce_request_sub_index(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= -1 else None
+    if isinstance(value, str):
+        text = value.strip()
+        if text == "-1":
+            return -1
+        if not text or not all("0" <= char <= "9" for char in text):
+            return None
+        return int(text)
+    return None
+
+
 def load_request_materials(json_path):
     payload = _read_json(json_path)
-    request = payload.get("request", payload)
-    materials = []
-    for order, material in enumerate(request.get("materials", [])):
-        materials.append(
+    request = payload.get("request", payload) if isinstance(payload, dict) else {}
+    raw_materials = request.get("materials", []) if isinstance(request, dict) else []
+    if not isinstance(raw_materials, list):
+        return [
             {
-                "order": order,
-                "name": material.get("name", ""),
-                "sub_index": material.get("sub_index"),
-                "physicalize": material.get("physicalize", ""),
+                "order": None,
+                "name": "",
+                "sub_index": None,
+                "physicalize": "",
+                "ok": False,
+                "errors": ["invalid_request_materials_collection"],
+                "collection_type": type(raw_materials).__name__,
             }
-        )
+        ]
+
+    materials = []
+    for order, material in enumerate(raw_materials):
+        if not isinstance(material, dict):
+            materials.append(
+                {
+                    "order": order,
+                    "name": "",
+                    "sub_index": None,
+                    "physicalize": "",
+                    "ok": False,
+                    "errors": ["invalid_request_material_row"],
+                    "row_type": type(material).__name__,
+                }
+            )
+            continue
+
+        raw_name = material.get("name", "")
+        name = coerce_material_name(raw_name)
+        raw_sub_index = material.get("sub_index")
+        sub_index = _coerce_request_sub_index(raw_sub_index)
+        errors = []
+        entry = {
+            "order": order,
+            "name": name,
+            "sub_index": sub_index,
+            "physicalize": material.get("physicalize", ""),
+        }
+        if not name:
+            errors.append("invalid_request_material_name")
+            entry["raw_name"] = raw_name
+            entry["name_type"] = type(raw_name).__name__
+        if raw_sub_index is not None and sub_index is None:
+            errors.append("invalid_request_sub_index")
+            entry["raw_sub_index"] = raw_sub_index
+            entry["sub_index_type"] = type(raw_sub_index).__name__
+        if errors:
+            entry["ok"] = False
+            entry["errors"] = errors
+        materials.append(entry)
     return materials
 
 
@@ -96,13 +156,71 @@ def evaluate_material_slot_alignment(request_materials, mtl_slots):
     ok = True
 
     for material in request_materials:
-        sub_index = material.get("sub_index")
+        if not isinstance(material, dict):
+            ok = False
+            checks.append(
+                {
+                    "ok": False,
+                    "type": "invalid_request_material_row",
+                    "name": "",
+                    "sub_index": None,
+                    "row_type": type(material).__name__,
+                }
+            )
+            continue
+        material_errors = material.get("errors") or []
+        if material_errors:
+            ok = False
+            for error in material_errors:
+                checks.append(
+                    {
+                        "ok": False,
+                        "type": error,
+                        "name": material.get("name", ""),
+                        "sub_index": material.get("raw_sub_index", material.get("sub_index")),
+                        "order": material.get("order"),
+                        "row_type": material.get("row_type"),
+                        "collection_type": material.get("collection_type"),
+                        "name_type": material.get("name_type"),
+                        "sub_index_type": material.get("sub_index_type"),
+                    }
+                )
+            continue
+        raw_sub_index = material.get("sub_index")
+        sub_index = _coerce_request_sub_index(raw_sub_index)
+        name = coerce_material_name(material.get("name", ""))
+        if not name:
+            ok = False
+            checks.append(
+                {
+                    "ok": False,
+                    "type": "invalid_request_material_name",
+                    "name": material.get("name", ""),
+                    "sub_index": raw_sub_index,
+                    "order": material.get("order"),
+                    "name_type": type(material.get("name", "")).__name__,
+                }
+            )
+            continue
+        if raw_sub_index is not None and sub_index is None:
+            ok = False
+            checks.append(
+                {
+                    "ok": False,
+                    "type": "invalid_request_sub_index",
+                    "name": name,
+                    "sub_index": raw_sub_index,
+                    "order": material.get("order"),
+                    "sub_index_type": type(raw_sub_index).__name__,
+                }
+            )
+            continue
         if sub_index is None or sub_index < 0:
             checks.append(
                 {
                     "ok": True,
                     "type": "deleted_or_unassigned",
-                    "name": material.get("name", ""),
+                    "name": name,
                     "sub_index": sub_index,
                 }
             )
@@ -115,19 +233,19 @@ def evaluate_material_slot_alignment(request_materials, mtl_slots):
                 {
                     "ok": False,
                     "type": "missing_mtl_slot",
-                    "name": material.get("name", ""),
+                    "name": name,
                     "sub_index": sub_index,
                 }
             )
             continue
 
-        names_match = material.get("name", "") == slot.get("name", "")
+        names_match = name == slot.get("name", "")
         ok = ok and names_match
         checks.append(
             {
                 "ok": names_match,
                 "type": "slot_name_match" if names_match else "slot_name_mismatch",
-                "name": material.get("name", ""),
+                "name": name,
                 "sub_index": sub_index,
                 "mtl_slot_name": slot.get("name", ""),
             }
@@ -139,11 +257,90 @@ def evaluate_material_slot_alignment(request_materials, mtl_slots):
 def _request_names_by_sub_index(request_materials):
     names_by_index = {}
     for material in request_materials:
-        sub_index = material.get("sub_index")
+        if not isinstance(material, dict) or material.get("errors"):
+            continue
+        sub_index = _coerce_request_sub_index(material.get("sub_index"))
         if sub_index is None or sub_index < 0:
             continue
-        names_by_index.setdefault(sub_index, []).append(material.get("name", ""))
+        name = coerce_material_name(material.get("name", ""))
+        if not name:
+            continue
+        names_by_index.setdefault(sub_index, []).append(name)
     return names_by_index
+
+
+def _valid_request_materials(request_materials):
+    materials = []
+    for material in request_materials:
+        if not isinstance(material, dict) or material.get("errors"):
+            continue
+        name = coerce_material_name(material.get("name", ""))
+        raw_sub_index = material.get("sub_index")
+        sub_index = _coerce_request_sub_index(raw_sub_index)
+        if not name:
+            continue
+        if raw_sub_index is not None and sub_index is None:
+            continue
+        materials.append(material)
+    return materials
+
+
+def _invalid_request_entries(request_materials):
+    entries = []
+    for order, material in enumerate(request_materials):
+        if not isinstance(material, dict):
+            entries.append(
+                {
+                    "ok": False,
+                    "order": order,
+                    "error": "invalid_request_material_row",
+                    "row_type": type(material).__name__,
+                    "name": "",
+                    "sub_index": None,
+                }
+            )
+            continue
+        for error in material.get("errors") or []:
+            entries.append(
+                {
+                    "ok": False,
+                    "order": material.get("order", order),
+                    "error": error,
+                    "name": material.get("name", ""),
+                    "sub_index": material.get("raw_sub_index", material.get("sub_index")),
+                    "row_type": material.get("row_type"),
+                    "collection_type": material.get("collection_type"),
+                    "name_type": material.get("name_type"),
+                    "sub_index_type": material.get("sub_index_type"),
+                }
+            )
+        if material.get("errors"):
+            continue
+        name = coerce_material_name(material.get("name", ""))
+        if not name:
+            entries.append(
+                {
+                    "ok": False,
+                    "order": material.get("order", order),
+                    "error": "invalid_request_material_name",
+                    "name": material.get("name", ""),
+                    "sub_index": material.get("sub_index"),
+                    "name_type": type(material.get("name", "")).__name__,
+                }
+            )
+        raw_sub_index = material.get("sub_index")
+        if raw_sub_index is not None and _coerce_request_sub_index(raw_sub_index) is None:
+            entries.append(
+                {
+                    "ok": False,
+                    "order": material.get("order", order),
+                    "error": "invalid_request_sub_index",
+                    "name": name,
+                    "sub_index": raw_sub_index,
+                    "sub_index_type": type(raw_sub_index).__name__,
+                }
+            )
+    return entries
 
 
 def _duplicate_values(values):
@@ -322,15 +519,23 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             "duplicate_request_sub_indices": [],
             "subset_entries": [],
             "invalid_subset_entries": [],
+            "invalid_request_entries": [],
         }
 
+    valid_request_materials = _valid_request_materials(request_materials)
+    invalid_request_entries = _invalid_request_entries(request_materials)
     request_names_by_index = _request_names_by_sub_index(request_materials)
     request_sub_indices = [
-        material.get("sub_index")
-        for material in request_materials
-        if material.get("sub_index") is not None and material.get("sub_index") >= 0
+        _coerce_request_sub_index(material.get("sub_index"))
+        for material in valid_request_materials
+        if _coerce_request_sub_index(material.get("sub_index")) is not None
+        and _coerce_request_sub_index(material.get("sub_index")) >= 0
     ]
-    request_names = [material.get("name", "") for material in request_materials]
+    request_names = [
+        coerce_material_name(material.get("name", ""))
+        for material in valid_request_materials
+        if coerce_material_name(material.get("name", ""))
+    ]
     mtl_slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
 
     material_checks = []
@@ -584,6 +789,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         and not duplicate_request_names
         and not duplicate_request_sub_indices
         and not invalid_subset_entries
+        and not invalid_request_entries
     )
 
     return {
@@ -596,12 +802,17 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         "duplicate_request_sub_indices": duplicate_request_sub_indices,
         "subset_entries": subset_entries,
         "invalid_subset_entries": invalid_subset_entries,
+        "invalid_request_entries": invalid_request_entries,
     }
 
 
 def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots):
     material_ids = cgf_material_summary.get("material_ids", []) if cgf_material_summary else []
-    request_slots = {material.get("sub_index") for material in request_materials if material.get("sub_index") is not None}
+    request_slots = {
+        _coerce_request_sub_index(material.get("sub_index"))
+        for material in _valid_request_materials(request_materials)
+        if _coerce_request_sub_index(material.get("sub_index")) is not None
+    }
     mtl_slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
     checks = []
     ok = True
