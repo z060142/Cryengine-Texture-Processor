@@ -179,6 +179,40 @@ def test_evaluate_material_slot_alignment_reports_invalid_request_materials():
     assert result["checks"][4]["sub_index"] == 1.5
 
 
+def test_evaluate_material_slot_alignment_reports_invalid_mtl_slots():
+    result = evaluate_material_slot_alignment(
+        [{"name": "Stone", "sub_index": 0}],
+        [
+            "bad-row",
+            {"name": "MissingSlot"},
+            {"slot": True, "name": "BoolSlot"},
+            {"slot": "0", "name": "Stone"},
+        ],
+    )
+
+    assert not result["ok"]
+    assert [check["type"] for check in result["checks"]] == [
+        "invalid_mtl_slot_row",
+        "invalid_mtl_slot_index",
+        "invalid_mtl_slot_index",
+        "slot_name_match",
+    ]
+    assert result["checks"][1]["slot"] is None
+    assert result["checks"][2]["slot"] is True
+
+
+def test_evaluate_material_slot_alignment_reports_invalid_mtl_slots_collection():
+    result = evaluate_material_slot_alignment(
+        [{"name": "Stone", "sub_index": 0}],
+        {"slot": 0, "name": "Stone"},
+    )
+
+    assert not result["ok"]
+    assert result["checks"][0]["type"] == "invalid_mtl_slots_collection"
+    assert result["checks"][0]["collection_type"] == "dict"
+    assert result["checks"][1]["type"] == "missing_mtl_slot"
+
+
 def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
     result = evaluate_cgf_material_ids(
         {"material_ids": [0, 2]},
@@ -190,6 +224,19 @@ def test_evaluate_cgf_material_ids_checks_request_and_mtl_presence():
     assert result["checks"] == [
         {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Bark"},
         {"ok": False, "material_id": 2, "in_request": False, "in_mtl": True, "mtl_slot_name": "Proxy"},
+    ]
+
+
+def test_evaluate_cgf_material_ids_ignores_invalid_mtl_slots():
+    result = evaluate_cgf_material_ids(
+        {"material_ids": [0]},
+        [{"name": "Stone", "sub_index": 0}],
+        ["bad-row", {"slot": True, "name": "BoolSlot"}, {"slot": "0", "name": "Stone"}],
+    )
+
+    assert result["ok"]
+    assert result["checks"] == [
+        {"ok": True, "material_id": 0, "in_request": True, "in_mtl": True, "mtl_slot_name": "Stone"},
     ]
 
 
@@ -608,6 +655,41 @@ def test_evaluate_fixture_material_semantics_reports_invalid_request_material_ev
     ]
     assert result["invalid_request_entries"][2]["sub_index"] is True
     assert result["invalid_request_entries"][4]["sub_index"] == 1.5
+
+
+def test_evaluate_fixture_material_semantics_reports_invalid_mtl_slot_evidence():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [{"slot": 0, "name": "Stone"}],
+            "polygons": [{"polygon": 0, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 0.0}],
+        },
+        {
+            "meshes": [
+                {
+                    "chunk_id": 10,
+                    "subsets": [{"subset": 0, "center": [0.0, 0.0, 0.0], "material_id": 0}],
+                }
+            ]
+        },
+        [{"name": "Stone", "sub_index": 0}],
+        [
+            "bad-row",
+            {"name": "MissingSlot"},
+            {"slot": True, "name": "BoolSlot"},
+            {"slot": "0", "name": "Stone"},
+        ],
+    )
+
+    assert not result["ok"]
+    assert result["material_checks"][0]["ok"]
+    assert result["polygon_checks"][-1]["ok"]
+    assert [entry["error"] for entry in result["invalid_mtl_entries"]] == [
+        "invalid_mtl_slot_row",
+        "invalid_mtl_slot_index",
+        "invalid_mtl_slot_index",
+    ]
+    assert result["invalid_mtl_entries"][2]["slot"] is True
 
 
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():

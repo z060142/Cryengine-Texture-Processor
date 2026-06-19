@@ -185,10 +185,86 @@ def load_fixture_manifest(manifest_path):
     return load_material_manifest(manifest_path)
 
 
+def _coerce_mtl_slot_index(value):
+    return coerce_material_slot(value)
+
+
+def _valid_mtl_slots(mtl_slots):
+    slots = []
+    if not isinstance(mtl_slots, list):
+        return slots
+    for slot in mtl_slots:
+        if not isinstance(slot, dict):
+            continue
+        slot_index = _coerce_mtl_slot_index(slot.get("slot"))
+        if slot_index is None:
+            continue
+        normalized = dict(slot)
+        normalized["slot"] = slot_index
+        slots.append(normalized)
+    return slots
+
+
+def _invalid_mtl_entries(mtl_slots):
+    entries = []
+    if not isinstance(mtl_slots, list):
+        return [
+            {
+                "ok": False,
+                "order": None,
+                "error": "invalid_mtl_slots_collection",
+                "slot": None,
+                "name": "",
+                "collection_type": type(mtl_slots).__name__,
+            }
+        ]
+    for order, slot in enumerate(mtl_slots):
+        if not isinstance(slot, dict):
+            entries.append(
+                {
+                    "ok": False,
+                    "order": order,
+                    "error": "invalid_mtl_slot_row",
+                    "slot": None,
+                    "name": "",
+                    "row_type": type(slot).__name__,
+                }
+            )
+            continue
+        slot_index = _coerce_mtl_slot_index(slot.get("slot"))
+        if slot_index is None:
+            entries.append(
+                {
+                    "ok": False,
+                    "order": order,
+                    "error": "invalid_mtl_slot_index",
+                    "slot": slot.get("slot"),
+                    "name": slot.get("name", ""),
+                    "slot_type": type(slot.get("slot")).__name__,
+                }
+            )
+    return entries
+
+
 def evaluate_material_slot_alignment(request_materials, mtl_slots):
-    slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
+    valid_mtl_slots = _valid_mtl_slots(mtl_slots)
+    invalid_mtl_entries = _invalid_mtl_entries(mtl_slots)
+    slots_by_index = {slot["slot"]: slot for slot in valid_mtl_slots}
     checks = []
-    ok = True
+    ok = not invalid_mtl_entries
+    for entry in invalid_mtl_entries:
+        checks.append(
+            {
+                "ok": False,
+                "type": entry["error"],
+                "slot": entry.get("slot"),
+                "name": entry.get("name", ""),
+                "order": entry.get("order"),
+                "row_type": entry.get("row_type"),
+                "collection_type": entry.get("collection_type"),
+                "slot_type": entry.get("slot_type"),
+            }
+        )
 
     for material in request_materials:
         if not isinstance(material, dict):
@@ -559,10 +635,13 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             "subset_entries": [],
             "invalid_subset_entries": [],
             "invalid_request_entries": [],
+            "invalid_mtl_entries": [],
         }
 
     valid_request_materials = _valid_request_materials(request_materials)
     invalid_request_entries = _invalid_request_entries(request_materials)
+    valid_mtl_slots = _valid_mtl_slots(mtl_slots)
+    invalid_mtl_entries = _invalid_mtl_entries(mtl_slots)
     request_names_by_index = _request_names_by_sub_index(request_materials)
     request_sub_indices = [
         _coerce_request_sub_index(material.get("sub_index"))
@@ -575,7 +654,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         for material in valid_request_materials
         if coerce_material_name(material.get("name", ""))
     ]
-    mtl_slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
+    mtl_slots_by_index = {slot["slot"]: slot for slot in valid_mtl_slots}
 
     material_checks = []
     ok = True
@@ -829,6 +908,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         and not duplicate_request_sub_indices
         and not invalid_subset_entries
         and not invalid_request_entries
+        and not invalid_mtl_entries
     )
 
     return {
@@ -842,6 +922,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         "subset_entries": subset_entries,
         "invalid_subset_entries": invalid_subset_entries,
         "invalid_request_entries": invalid_request_entries,
+        "invalid_mtl_entries": invalid_mtl_entries,
     }
 
 
@@ -852,7 +933,7 @@ def evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots
         for material in _valid_request_materials(request_materials)
         if _coerce_request_sub_index(material.get("sub_index")) is not None
     }
-    mtl_slots_by_index = {slot["slot"]: slot for slot in mtl_slots}
+    mtl_slots_by_index = {slot["slot"]: slot for slot in _valid_mtl_slots(mtl_slots)}
     checks = []
     ok = True
 
