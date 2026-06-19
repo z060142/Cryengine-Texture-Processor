@@ -12,6 +12,8 @@ practical acceptance bar:
   slot manifest.
 - Generated MTL passes the CryEngine schema gate.
 - Optional processed texture outputs pass the texture output gate.
+- Optional raw texture inputs can be processed through the existing
+  `TextureManager + BatchProcessor` path before RC validation.
 - Optional OBJ MTL evidence can connect FBX material names to processed texture
   names.
 
@@ -27,10 +29,19 @@ Example:
   "texture_output_format": "tif",
   "cases": [
     {
+      "name": "Weed_b_raw_textures",
+      "type": "texture_process",
+      "textures": [
+        "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Textures\\Weed_B_a.tga",
+        "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Textures\\Weed_B_n.tga"
+      ],
+      "output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures"
+    },
+    {
       "name": "Weed_b_texture_backed",
       "type": "rc",
       "fbx": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\FBX\\Weed_b.fbx",
-      "texture_output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures",
+      "texture_output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures",
       "obj_mtl_evidence": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\OBJ\\Weed_b.mtl"
     },
     {
@@ -63,12 +74,31 @@ Observed result:
 
 ```text
 ok: True
-case_count: 3
-ok_count: 3
+case_count: 4
+ok_count: 4
 failed_count: 0
+Weed_b_raw_textures: True
 Weed_b_texture_backed: True
 Trash_Paper_D_model_only: True
 Weed_b_texture_outputs: True
+```
+
+The raw texture process case checks:
+
+```json
+{
+  "raw_textures_found": true,
+  "texture_processing_started": true,
+  "texture_format_ok": true
+}
+```
+
+Observed processed outputs:
+
+```text
+Weed_B_diff.tif
+Weed_B_spec.tif
+Weed_B_ddn.tif
 ```
 
 The texture-backed case checks:

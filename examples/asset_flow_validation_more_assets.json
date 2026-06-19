@@ -3,10 +3,27 @@
   "texture_output_format": "tif",
   "cases": [
     {
+      "name": "Weed_b_raw_textures",
+      "type": "texture_process",
+      "textures": [
+        "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Textures\\Weed_B_a.tga",
+        "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Textures\\Weed_B_n.tga"
+      ],
+      "output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures",
+      "texture_types": {
+        "diff": true,
+        "spec": true,
+        "ddna": true,
+        "displ": false,
+        "emissive": false,
+        "sss": false
+      }
+    },
+    {
       "name": "Weed_b_texture_backed",
       "type": "rc",
       "fbx": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\FBX\\Weed_b.fbx",
-      "texture_output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures",
+      "texture_output_dir": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures",
       "obj_mtl_evidence": "D:\\DATA\\00_DATA2\\Art Assets\\Models\\Unreal Engine\\polypixel\\PostApocalypticWorld\\Models\\OBJ\\Weed_b.mtl"
     },
     {
@@ -18,7 +35,7 @@
       "name": "Weed_b_texture_outputs",
       "type": "texture_gate",
       "paths": [
-        "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures"
+        "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures"
       ]
     }
   ]

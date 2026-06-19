@@ -22,6 +22,63 @@ def test_texture_gate_case_reports_processed_outputs(tmp_path):
     assert report["cases"][0]["checks"]["texture_format_ok"] is True
 
 
+def test_texture_process_case_reports_raw_to_processed_flow(monkeypatch, tmp_path):
+    source = tmp_path / "wall_a.tga"
+    source.write_text("fake")
+    output_dir = tmp_path / "out"
+
+    class FakeProcessor:
+        def __init__(self, texture_manager):
+            self.texture_manager = texture_manager
+            self.texture_output_report_path = str(output_dir / "texture_output_diagnostics.json")
+            self.texture_output_report = {
+                "summary": {
+                    "group_count": 1,
+                    "output_count": 1,
+                    "diagnostic_count": 0,
+                    "ok": True,
+                }
+            }
+
+        def set_output_dir(self, value):
+            output_dir.mkdir(exist_ok=True)
+
+        def set_settings(self, value):
+            self.settings = value
+
+        def set_progress_callback(self, callback):
+            self.callback = callback
+
+        def process_all_groups(self):
+            group = self.texture_manager.get_all_groups()[0]
+            group.output["diff"] = str(output_dir / "wall_diff.tif")
+            return True
+
+        def is_processing(self):
+            return False
+
+    monkeypatch.setattr(asset_flow_validator, "BatchProcessor", FakeProcessor)
+
+    report = asset_flow_validator.run_validation(
+        {
+            "cases": [
+                {
+                    "name": "raw_textures",
+                    "type": "texture_process",
+                    "textures": [str(source)],
+                    "output_dir": str(output_dir),
+                }
+            ]
+        }
+    )
+
+    assert report["summary"]["ok"] is True
+    case = report["cases"][0]
+    assert case["checks"]["raw_textures_found"] is True
+    assert case["checks"]["texture_format_ok"] is True
+    assert case["groups"][0]["outputs"]["diff"].endswith("wall_diff.tif")
+
+
 def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     fbx = tmp_path / "asset.fbx"
     fbx.write_text("fake")

@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import time
 from pathlib import Path
 
 try:
@@ -15,6 +16,8 @@ except ModuleNotFoundError:
 
 add_repo_root()
 
+from core.batch_processor import BatchProcessor
+from core.texture_manager import TextureManager
 from output_formats.texture_output_diagnostics import build_texture_output_report_from_paths
 from tools.blender_material_inspector import inspect_fbx_materials
 from tools.material_report_summary import compact_material_report_summary, load_report
@@ -145,6 +148,99 @@ def _texture_gate_case(case):
     }
 
 
+def _texture_process_settings(case):
+    settings = {
+        "diff_format": "albedo",
+        "normal_flip_green": False,
+        "generate_missing_spec": True,
+        "process_metallic": True,
+        "normal_from_height_strength": 10.0,
+        "normalize_height": True,
+        "texture_types": {
+            "diff": True,
+            "spec": True,
+            "ddna": True,
+            "displ": False,
+            "emissive": False,
+            "sss": False,
+        },
+    }
+    settings.update(case.get("settings", {}))
+    if case.get("texture_types"):
+        settings["texture_types"] = {**settings["texture_types"], **case["texture_types"]}
+    return settings
+
+
+def _texture_process_case(case):
+    name = case.get("name") or "texture_process"
+    texture_paths = case.get("textures", [])
+    output_dir = case["output_dir"]
+    texture_manager = TextureManager()
+    added = []
+    missing = []
+    for texture_path in texture_paths:
+        if not os.path.exists(texture_path):
+            missing.append(texture_path)
+            continue
+        texture = texture_manager.add_texture(texture_path)
+        if texture:
+            added.append(texture)
+
+    processor = BatchProcessor(texture_manager)
+    processor.set_output_dir(output_dir)
+    processor.set_settings(_texture_process_settings(case))
+    progress = []
+    processor.set_progress_callback(
+        lambda percent, stage, current, status: progress.append(
+            {
+                "progress": percent,
+                "stage": stage,
+                "current": current,
+                "status": status,
+            }
+        )
+    )
+    started = processor.process_all_groups()
+    while processor.is_processing():
+        time.sleep(0.1)
+
+    report = processor.texture_output_report or build_texture_output_report_from_paths(
+        [output_dir],
+        source="asset_flow_validator_texture_process",
+    )
+    summary = report.get("summary", {})
+    ok = bool(started) and not missing and bool(summary.get("ok"))
+    groups = [
+        {
+            "base_name": group.base_name,
+            "textures": {
+                texture_type: texture.get("filename", "")
+                for texture_type, texture in group.textures.items()
+                if texture_type != "unknown" and texture
+            },
+            "outputs": group.output,
+        }
+        for group in texture_manager.get_all_groups()
+    ]
+    return {
+        "name": name,
+        "type": "texture_process",
+        "ok": ok,
+        "textures": texture_paths,
+        "output_dir": output_dir,
+        "texture_output_report": processor.texture_output_report_path,
+        "checks": {
+            "raw_textures_found": not missing,
+            "texture_processing_started": bool(started),
+            "texture_format_ok": bool(summary.get("ok")),
+        },
+        "summary": summary,
+        "groups": groups,
+        "missing": missing,
+        "progress_tail": progress[-5:],
+    }
+
+
 def run_validation(spec):
     defaults = {
         "work_root": spec.get("work_root", os.path.abspath("asset_flow_validation")),
@@ -158,6 +254,8 @@ def run_validation(spec):
         try:
             if case_type == "rc":
                 cases.append(_rc_case(case, defaults))
+            elif case_type == "texture_process":
+                cases.append(_texture_process_case(case))
             elif case_type == "texture_gate":
                 cases.append(_texture_gate_case(case))
             else:
