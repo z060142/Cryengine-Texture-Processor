@@ -16,6 +16,9 @@ practical acceptance bar:
   `TextureManager + BatchProcessor` path before RC validation.
 - Optional OBJ MTL evidence can connect FBX material names to processed texture
   names.
+- Markdown reports include generated MTL values and the MTL schema gate report
+  path, so Shader/MtlFlags/GenMask/StringGenMask/Texture Map choices have an
+  evidence trail instead of being invisible pass/fail flags.
 
 It is intentionally a small JSON-driven tool, not a polished UI.
 
@@ -118,6 +121,21 @@ The texture-backed case checks:
   "material_texture_ok": true
 }
 ```
+
+The Markdown report also includes an `MTL Values` section. Example from the
+texture-backed case:
+
+```text
+Material: Weed_B_mat
+Shader: Illum
+MtlFlags: 524416
+GenMask: 1125899907366944
+StringGenMask: %NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING
+Textures: Diffuse -> Weed_B_diff.tif, Bumpmap -> Weed_B_ddn.tif, Specular -> Weed_B_spec.tif
+```
+
+The same case lists the generated `.mtl_schema_gate.json` path as evidence for
+CryEngine-backed value policy checks.
 
 The model-only case checks:
 

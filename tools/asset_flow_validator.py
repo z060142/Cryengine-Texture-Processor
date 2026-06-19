@@ -8,6 +8,7 @@ import os
 import re
 import time
 from pathlib import Path
+import xml.etree.ElementTree as ET
 
 try:
     from _repo_path import add_repo_root
@@ -70,6 +71,42 @@ def _md_escape(value):
 
 def _summary_ok(summary):
     return bool(summary.get("rc_success")) and not bool(summary.get("action_required"))
+
+
+def _mtl_value_summary(mtl_path):
+    if not mtl_path or not os.path.exists(mtl_path):
+        return []
+    root = ET.parse(mtl_path).getroot()
+    sub_materials = root.find("SubMaterials")
+    if sub_materials is None:
+        candidates = [root]
+    else:
+        candidates = [element for element in list(sub_materials) if element.tag == "Material"]
+    values = []
+    for material in candidates:
+        textures = []
+        texture_root = material.find("Textures")
+        if texture_root is not None:
+            for texture in list(texture_root):
+                if texture.tag != "Texture":
+                    continue
+                textures.append(
+                    {
+                        "map": texture.get("Map", ""),
+                        "file": texture.get("File", ""),
+                    }
+                )
+        values.append(
+            {
+                "name": material.get("Name", ""),
+                "shader": material.get("Shader", ""),
+                "mtl_flags": material.get("MtlFlags", ""),
+                "gen_mask": material.get("GenMask", ""),
+                "string_gen_mask": material.get("StringGenMask", ""),
+                "textures": textures,
+            }
+        )
+    return values
 
 
 def _rc_case(case, defaults):
@@ -143,10 +180,12 @@ def _rc_case(case, defaults):
         "work_dir": work_dir,
         "manifest": manifest_path,
         "material_report": result.material_report_path,
+        "mtl_schema_gate": result.mtl_schema_gate_path,
         "mtl": result.mtl_path,
         "json": result.json_path,
         "cgf": result.expected_output_path,
         "checks": checks,
+        "mtl_values": _mtl_value_summary(result.mtl_path),
         "summary": material_summary,
         "error": result.error,
     }
@@ -288,6 +327,7 @@ def format_markdown_report(report):
         evidence_values = [
             case.get("texture_output_report"),
             case.get("material_report"),
+            case.get("mtl_schema_gate"),
             case.get("mtl"),
             case.get("json"),
             case.get("cgf"),
@@ -302,6 +342,33 @@ def format_markdown_report(report):
                 evidence=evidence,
             )
         )
+
+    rc_cases_with_mtl = [
+        case for case in report.get("cases", [])
+        if case.get("type") == "rc" and case.get("mtl_values")
+    ]
+    if rc_cases_with_mtl:
+        lines.extend(["", "## MTL Values", ""])
+        for case in rc_cases_with_mtl:
+            lines.extend([f"### {_md_escape(case.get('name', ''))}", ""])
+            lines.append("| Material | Shader | MtlFlags | GenMask | StringGenMask | Textures |")
+            lines.append("|---|---|---|---|---|---|")
+            for material in case.get("mtl_values", []):
+                textures = ", ".join(
+                    f"{texture.get('map', '')}:{texture.get('file', '')}"
+                    for texture in material.get("textures", [])
+                )
+                lines.append(
+                    "| {name} | {shader} | {mtl_flags} | {gen_mask} | {string_gen_mask} | {textures} |".format(
+                        name=_md_escape(material.get("name", "")),
+                        shader=_md_escape(material.get("shader", "")),
+                        mtl_flags=_md_escape(material.get("mtl_flags", "")),
+                        gen_mask=_md_escape(material.get("gen_mask", "")),
+                        string_gen_mask=_md_escape(material.get("string_gen_mask", "")),
+                        textures=_md_escape(textures),
+                    )
+                )
+            lines.append("")
 
     failed = [case for case in report.get("cases", []) if not case.get("ok")]
     if failed:

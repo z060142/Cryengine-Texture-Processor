@@ -4,6 +4,41 @@ from types import SimpleNamespace
 from tools import asset_flow_validator
 
 
+def test_mtl_value_summary_reads_material_shader_flags_and_textures(tmp_path):
+    mtl = tmp_path / "asset.mtl"
+    mtl.write_text(
+        """<?xml version="1.0" ?>
+<Material MtlFlags="524544">
+ <SubMaterials>
+  <Material Name="Weed_B_mat" MtlFlags="524416" Shader="Illum" GenMask="123" StringGenMask="%NORMAL_MAP%">
+   <Textures>
+    <Texture Map="Diffuse" File="../textures/Weed_B_diff.tif" />
+    <Texture Map="Bumpmap" File="../textures/Weed_B_ddn.tif" />
+   </Textures>
+  </Material>
+ </SubMaterials>
+</Material>
+""",
+        encoding="utf-8",
+    )
+
+    values = asset_flow_validator._mtl_value_summary(str(mtl))
+
+    assert values == [
+        {
+            "name": "Weed_B_mat",
+            "shader": "Illum",
+            "mtl_flags": "524416",
+            "gen_mask": "123",
+            "string_gen_mask": "%NORMAL_MAP%",
+            "textures": [
+                {"map": "Diffuse", "file": "../textures/Weed_B_diff.tif"},
+                {"map": "Bumpmap", "file": "../textures/Weed_B_ddn.tif"},
+            ],
+        }
+    ]
+
+
 def test_texture_gate_case_reports_processed_outputs(tmp_path):
     (tmp_path / "wall_diff.tif").write_text("fake")
     report = asset_flow_validator.run_validation(
@@ -97,6 +132,16 @@ def test_format_markdown_report_summarizes_cases():
                         "model_format_ok": True,
                         "texture_format_ok": None,
                     },
+                    "mtl_values": [
+                        {
+                            "name": "Mat",
+                            "shader": "Illum",
+                            "mtl_flags": "524416",
+                            "gen_mask": "32",
+                            "string_gen_mask": "%NORMAL_MAP%",
+                            "textures": [{"map": "Diffuse", "file": "Mat_diff.tif"}],
+                        }
+                    ],
                     "cgf": "S:/out/asset.cgf",
                 }
             ],
@@ -108,6 +153,8 @@ def test_format_markdown_report_summarizes_cases():
     assert "model_format_ok=PASS" in markdown
     assert "texture_format_ok=N/A" in markdown
     assert "S:/out/asset.cgf" in markdown
+    assert "## MTL Values" in markdown
+    assert "Diffuse:Mat_diff.tif" in markdown
 
 
 def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
@@ -118,6 +165,11 @@ def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     cgf.parent.mkdir()
     cgf.write_text("fake")
     material_report = tmp_path / "work" / "asset.material_report.json"
+    mtl = tmp_path / "work" / "asset.mtl"
+    mtl.write_text(
+        """<?xml version="1.0" ?><Material><SubMaterials><Material Name="Mat" Shader="Illum" MtlFlags="524416"><Textures /></Material></SubMaterials></Material>""",
+        encoding="utf-8",
+    )
     material_report.write_text(
         json.dumps(
             {
@@ -147,14 +199,15 @@ def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     monkeypatch.setattr(
         asset_flow_validator,
         "run_rc_smoke_test",
-        lambda *args, **kwargs: SimpleNamespace(
-            success=True,
-            expected_output_path=str(cgf),
-            material_report_path=str(material_report),
-            mtl_path=str(tmp_path / "work" / "asset.mtl"),
-            json_path=str(tmp_path / "work" / "asset.json"),
-            error="",
-        ),
+            lambda *args, **kwargs: SimpleNamespace(
+                success=True,
+                expected_output_path=str(cgf),
+                material_report_path=str(material_report),
+                mtl_path=str(mtl),
+                mtl_schema_gate_path=str(tmp_path / "work" / "asset.mtl_schema_gate.json"),
+                json_path=str(tmp_path / "work" / "asset.json"),
+                error="",
+            ),
     )
 
     report = asset_flow_validator.run_validation(
