@@ -292,8 +292,63 @@ def test_evaluate_cgf_import_settings_roundtrip_matches_request_mtl_and_cgf_mtl_
     assert result["request_vs_import_settings"]["ok"]
     assert result["import_settings_vs_mtl"]["ok"]
     assert result["import_settings_vs_cgf_mtl_name"]["ok"]
+    assert result["import_settings_vs_cgf_mtl_name"]["extra_import_settings_slots_ok"]
     assert result["import_settings_vs_cgf_mtl_name"]["extra_import_settings_slots"] == [
-        {"sub_index": 2, "name": "<unassigned>"}
+        {
+            "ok": True,
+            "type": "trailing_unassigned_slot_omitted_from_cgf",
+            "sub_index": 2,
+            "name": "<unassigned>",
+            "physicalize": "no",
+            "trailing": True,
+            "unassigned": True,
+            "cgf_mtl_name_sub_material_count": 2,
+        }
+    ]
+
+
+def test_evaluate_cgf_import_settings_roundtrip_rejects_real_extra_cgf_mtl_name_slot():
+    result = evaluate_cgf_import_settings_roundtrip(
+        {
+            "import_settings": [
+                {
+                    "chunk_id": 23,
+                    "version": 0,
+                    "json_error": "",
+                    "json": {
+                        "materials": [
+                            {"name": "Bark", "physicalize": "no", "sub_index": 0},
+                            {"name": "Leaves", "physicalize": "no", "sub_index": 1},
+                            {"name": "Proxy", "physicalize": "proxy_only", "sub_index": 2},
+                        ]
+                    },
+                }
+            ],
+            "materials": [{"sub_materials": [{"slot": 0, "name": "Bark"}, {"slot": 1, "name": "Leaves"}]}],
+            "material_ids": [0, 1],
+        },
+        [
+            {"order": 0, "name": "Bark", "sub_index": 0, "physicalize": "no"},
+            {"order": 1, "name": "Leaves", "sub_index": 1, "physicalize": "no"},
+            {"order": 2, "name": "Proxy", "sub_index": 2, "physicalize": "proxy_only"},
+        ],
+        [{"slot": 0, "name": "Bark"}, {"slot": 1, "name": "Leaves"}, {"slot": 2, "name": "Proxy"}],
+    )
+
+    assert not result["ok"]
+    assert not result["import_settings_vs_cgf_mtl_name"]["ok"]
+    assert not result["import_settings_vs_cgf_mtl_name"]["extra_import_settings_slots_ok"]
+    assert result["import_settings_vs_cgf_mtl_name"]["extra_import_settings_slots"] == [
+        {
+            "ok": False,
+            "type": "missing_cgf_mtl_name_slot",
+            "sub_index": 2,
+            "name": "Proxy",
+            "physicalize": "proxy_only",
+            "trailing": True,
+            "unassigned": False,
+            "cgf_mtl_name_sub_material_count": 2,
+        }
     ]
 
 

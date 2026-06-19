@@ -27,7 +27,8 @@ The new report section contains:
 - `import_settings_vs_cgf_mtl_name`: CGF `MtlName` sub-material name checks by slot
 - `import_settings_material_id_alignment`: used CGF material ids must exist in ImportSettings and MTL
 - `invalid_request_entries` and `invalid_import_settings_entries`: malformed material rows on either side
-- `extra_import_settings_slots`: request slots that are not present in CGF `MtlName`; this is expected for unused slots such as `<unassigned>`
+- `extra_import_settings_slots`: request slots that are not present in CGF `MtlName`, with per-slot classification
+- `extra_import_settings_slots_ok`: true only when every extra slot is an expected trailing placeholder
 
 This deliberately does not remove fixture-level `expected_cgf_material_id`. Controlled fixtures still need explicit expected polygon ids; the new checker covers real RC output metadata.
 
@@ -50,8 +51,14 @@ Result from the new evaluator:
   "material_id_alignment_ok": true,
   "extra_import_settings_slots": [
     {
+      "ok": true,
+      "type": "trailing_unassigned_slot_omitted_from_cgf",
       "sub_index": 16,
-      "name": "<unassigned>"
+      "name": "<unassigned>",
+      "physicalize": "no",
+      "trailing": true,
+      "unassigned": true,
+      "cgf_mtl_name_sub_material_count": 16
     }
   ],
   "cgf_mtl_name_sub_material_count": 16,
@@ -64,7 +71,8 @@ Interpretation:
 - CGF embeds the RC request material table.
 - The embedded `materials[].sub_index` values align with MTL slots.
 - CGF `MtlName` contains the used sub-material prefix, not every request/MTL slot.
-- An unused `<unassigned>` request slot can remain in ImportSettings and MTL without appearing in CGF `MtlName`.
+- An unused trailing `<unassigned>` request slot can remain in ImportSettings and MTL without appearing in CGF `MtlName`.
+- A missing real material slot is a mapping failure and should not be treated like the placeholder case.
 
 ## Verification
 

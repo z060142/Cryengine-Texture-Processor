@@ -1075,6 +1075,28 @@ def _request_materials_equal(left, right):
     return {"ok": ok, "checks": checks}
 
 
+def _is_unassigned_slot_name(name):
+    normalized = coerce_material_name(name).strip().lower()
+    return normalized in {"<unassigned>", "unassigned"}
+
+
+def _classify_extra_import_settings_slot(slot, material, cgf_sub_material_count):
+    name = coerce_material_name(material.get("name", ""))
+    trailing = slot >= cgf_sub_material_count
+    unassigned = _is_unassigned_slot_name(name)
+    ok = trailing and unassigned
+    return {
+        "ok": ok,
+        "type": "trailing_unassigned_slot_omitted_from_cgf" if ok else "missing_cgf_mtl_name_slot",
+        "sub_index": slot,
+        "name": name,
+        "physicalize": material.get("physicalize", ""),
+        "trailing": trailing,
+        "unassigned": unassigned,
+        "cgf_mtl_name_sub_material_count": cgf_sub_material_count,
+    }
+
+
 def _evaluate_import_settings_vs_cgf_mtl_name(import_settings_materials, cgf_material_summary):
     cgf_sub_materials = _valid_cgf_mtl_name_sub_materials(cgf_material_summary)
     import_by_index = {
@@ -1110,16 +1132,16 @@ def _evaluate_import_settings_vs_cgf_mtl_name(import_settings_materials, cgf_mat
             continue
         material = import_by_index[slot]
         extra_import_settings_slots.append(
-            {
-                "sub_index": slot,
-                "name": coerce_material_name(material.get("name", "")),
-            }
+            _classify_extra_import_settings_slot(slot, material, len(cgf_sub_materials))
         )
+
+    ok = ok and all(slot["ok"] for slot in extra_import_settings_slots)
 
     return {
         "ok": ok,
         "checks": checks,
         "extra_import_settings_slots": extra_import_settings_slots,
+        "extra_import_settings_slots_ok": all(slot["ok"] for slot in extra_import_settings_slots),
         "cgf_mtl_name_sub_material_count": len(cgf_sub_materials),
     }
 
