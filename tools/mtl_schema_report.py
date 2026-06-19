@@ -9,6 +9,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from output_formats.cryengine_mtl_schema import (
+    analyze_ce_texture_map_entry,
     analyze_public_params,
     describe_mtl_flags,
     exported_material_attribute_policy,
@@ -105,11 +106,14 @@ def _texture_entries(element):
         if texture.tag != "Texture":
             continue
         texmod_attrs = _child_attributes(texture, "TexMod")
+        ce_map_type = texture.get("Map", "")
+        texture_file = texture.get("File", "")
         entries.append(
             {
-                "map": texture.get("Map", ""),
-                "file": texture.get("File", ""),
+                "map": ce_map_type,
+                "file": texture_file,
                 "attributes": _attributes(texture),
+                "texture_map_analysis": analyze_ce_texture_map_entry(ce_map_type, texture_file),
                 "texmod": texmod_attrs,
                 "texmod_analysis": _analyze_texmod_attrs(texmod_attrs),
             }
@@ -186,6 +190,10 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     attribute_policy_diff_counts = Counter()
     attribute_policy_missing_counts = Counter()
     texture_map_counts = Counter()
+    texture_map_reason_counts = Counter()
+    texture_map_unknown_counts = Counter()
+    texture_suffix_status_counts = Counter()
+    texture_expected_suffix_counts = Counter()
     texmod_status_counts = Counter()
     texmod_attribute_counts = Counter()
     texmod_extra_attribute_counts = Counter()
@@ -240,6 +248,15 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 texture_map = texture["map"] or "<empty>"
                 texture_map_counts[texture_map] += 1
                 texture_maps_by_shader[shader][texture_map] += 1
+                texture_map_analysis = texture["texture_map_analysis"]
+                texture_map_reason_counts[texture_map_analysis["reason"]] += 1
+                if not texture_map_analysis["known_ce_map"]:
+                    texture_map_unknown_counts[texture_map] += 1
+                suffix_analysis = texture_map_analysis["suffix_analysis"]
+                texture_suffix_status_counts[suffix_analysis["suffix_status"]] += 1
+                expected_suffix = suffix_analysis["expected_suffix"]
+                if expected_suffix:
+                    texture_expected_suffix_counts[expected_suffix] += 1
                 texmod_analysis = texture["texmod_analysis"]
                 texmod_status_counts[texmod_analysis["status"]] += 1
                 for attr_name in texture["texmod"]:
@@ -276,6 +293,10 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "mtl_flag_names": _counter_to_sorted_pairs(mtl_flag_name_counts),
             "mtl_flag_unknown_masks": _counter_to_sorted_pairs(mtl_flag_unknown_mask_counts),
             "texture_maps": _counter_to_sorted_pairs(texture_map_counts),
+            "texture_map_policy_reasons": _counter_to_sorted_pairs(texture_map_reason_counts),
+            "texture_map_unknowns": _counter_to_sorted_pairs(texture_map_unknown_counts),
+            "texture_suffix_statuses": _counter_to_sorted_pairs(texture_suffix_status_counts),
+            "texture_expected_suffixes": _counter_to_sorted_pairs(texture_expected_suffix_counts),
             "texmod_statuses": _counter_to_sorted_pairs(texmod_status_counts),
             "texmod_attributes": _counter_to_sorted_pairs(texmod_attribute_counts),
             "texmod_extra_attributes": _counter_to_sorted_pairs(texmod_extra_attribute_counts),

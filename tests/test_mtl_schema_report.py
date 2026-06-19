@@ -17,7 +17,7 @@ def write_schema_mtl(path):
     textures = ET.SubElement(root, "Textures")
     texture = ET.SubElement(textures, "Texture", Map="Diffuse", File="./asset_diff.dds")
     ET.SubElement(texture, "TexMod", TexMod_RotateType="0")
-    ET.SubElement(textures, "Texture", Map="Specular", File="./asset_spec.dds")
+    ET.SubElement(textures, "Texture", Map="Specular", File="./asset_s.dds")
     custom_texture = ET.SubElement(textures, "Texture", Map="Bumpmap", File="./asset_ddn.dds")
     ET.SubElement(
         custom_texture,
@@ -27,6 +27,7 @@ def write_schema_mtl(path):
         TexMod_bTexGenProjected="0",
         TileU="2",
     )
+    ET.SubElement(textures, "Texture", Map="PackedORM", File="./asset_orm.dds")
     ET.SubElement(root, "PublicParams", SSSIndex="0", IndirectColor="0.25,0.25,0.25")
     sub_materials = ET.SubElement(root, "SubMaterials")
     ET.SubElement(
@@ -73,8 +74,18 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "Diffuse", "count": 1} in schema["texture_maps"]
     assert {"name": "Specular", "count": 1} in schema["texture_maps"]
     assert {"name": "Bumpmap", "count": 1} in schema["texture_maps"]
+    assert {"name": "PackedORM", "count": 1} in schema["texture_maps"]
+    assert {"name": "source_backed_ce_map", "count": 3} in schema["texture_map_policy_reasons"]
+    assert {"name": "unknown_ce_map_type", "count": 1} in schema["texture_map_policy_reasons"]
+    assert {"name": "PackedORM", "count": 1} in schema["texture_map_unknowns"]
+    assert {"name": "matches_expected_suffix", "count": 2} in schema["texture_suffix_statuses"]
+    assert {"name": "mismatch_expected_suffix", "count": 1} in schema["texture_suffix_statuses"]
+    assert {"name": "no_source_backed_suffix", "count": 1} in schema["texture_suffix_statuses"]
+    assert {"name": "_diff", "count": 1} in schema["texture_expected_suffixes"]
+    assert {"name": "_ddn", "count": 1} in schema["texture_expected_suffixes"]
+    assert {"name": "_spec", "count": 1} in schema["texture_expected_suffixes"]
     assert {"name": "partial_export_minimal_texmod", "count": 1} in schema["texmod_statuses"]
-    assert {"name": "missing_texmod", "count": 1} in schema["texmod_statuses"]
+    assert {"name": "missing_texmod", "count": 2} in schema["texmod_statuses"]
     assert {"name": "custom_texmod", "count": 1} in schema["texmod_statuses"]
     assert {"name": "TexMod_RotateType", "count": 2} in schema["texmod_attributes"]
     assert {"name": "TileU", "count": 1} in schema["texmod_extra_attributes"]
@@ -96,6 +107,15 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert sub_attribute_policy["entries"]["Shininess"]["status"] == "differs_from_export_attribute"
     assert sub_attribute_policy["entries"]["Shininess"]["actual"] == "10"
     assert report["files"][0]["materials"][0]["textures"][0]["texmod"]["TexMod_RotateType"] == "0"
+    assert report["files"][0]["materials"][0]["textures"][0]["texture_map_analysis"]["reason"] == (
+        "source_backed_ce_map"
+    )
+    assert report["files"][0]["materials"][0]["textures"][1]["texture_map_analysis"]["suffix_analysis"][
+        "suffix_status"
+    ] == "mismatch_expected_suffix"
+    assert report["files"][0]["materials"][0]["textures"][3]["texture_map_analysis"]["reason"] == (
+        "unknown_ce_map_type"
+    )
     assert report["files"][0]["materials"][0]["textures"][0]["texmod_analysis"]["status"] == (
         "partial_export_minimal_texmod"
     )

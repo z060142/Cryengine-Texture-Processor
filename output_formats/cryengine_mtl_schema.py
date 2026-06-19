@@ -42,6 +42,12 @@ CE_TEXTURE_SUFFIXES = {
     "Emittance": "_em",
 }
 
+CE_TEXTURE_MAP_NAMES = {
+    ce_map_type
+    for ce_map_type in CE_TEXTURE_MAP_TYPES.values()
+    if ce_map_type
+}
+
 CE_TEXTURE_MAP_SOURCE = {
     "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
     "map_type_lines": "source-backed CE Texture Map names",
@@ -443,6 +449,28 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
     if policy["exported"]:
         policy["texmod_policy"] = exported_texture_modifier_policy()
     return policy
+
+
+def analyze_ce_texture_map_entry(ce_map_type, texture_path=""):
+    ce_map_type = str(ce_map_type or "")
+    texture_path = str(texture_path or "")
+    known_ce_map = ce_map_type in CE_TEXTURE_MAP_NAMES
+
+    if not ce_map_type:
+        reason = "missing_ce_map_type"
+    elif known_ce_map:
+        reason = "source_backed_ce_map"
+    else:
+        reason = "unknown_ce_map_type"
+
+    return {
+        "ce_map_type": ce_map_type,
+        "texture_path": texture_path,
+        "known_ce_map": known_ce_map,
+        "reason": reason,
+        "suffix_analysis": analyze_ce_texture_suffix(ce_map_type, texture_path),
+        "source_evidence": CE_TEXTURE_MAP_SOURCE,
+    }
 
 
 def exported_texture_map_policy(textures):

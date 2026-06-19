@@ -1,5 +1,6 @@
 from output_formats.cryengine_mtl_schema import (
     CE_TEXTURE_MAP_TYPES,
+    CE_TEXTURE_MAP_NAMES,
     CE_TEXTURE_SUFFIXES,
     COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,
@@ -14,6 +15,7 @@ from output_formats.cryengine_mtl_schema import (
     MTL_SHADER_MASK_LOAD_POLICY,
     MTL_SUB_MATERIAL_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
+    analyze_ce_texture_map_entry,
     analyze_ce_texture_suffix,
     analyze_public_params,
     compose_mtl_flags,
@@ -40,6 +42,8 @@ def test_ce_texture_map_types_follow_material_helpers_names():
     assert CE_TEXTURE_MAP_TYPES["opacity"] == "Opacity"
     assert CE_TEXTURE_MAP_TYPES["emissive"] == "Emittance"
     assert CE_TEXTURE_MAP_TYPES["ao"] is None
+    assert "Diffuse" in CE_TEXTURE_MAP_NAMES
+    assert "Bumpmap" in CE_TEXTURE_MAP_NAMES
 
 
 def test_ce_texture_suffixes_follow_material_helpers_suffixes():
@@ -62,6 +66,23 @@ def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
 
     missing = analyze_ce_texture_suffix("", "")
     assert missing["suffix_status"] == "not_applicable"
+
+
+def test_analyze_ce_texture_map_entry_reports_known_unknown_and_suffix_status():
+    known = analyze_ce_texture_map_entry("Diffuse", "./wall_diff.dds")
+    assert known["known_ce_map"] is True
+    assert known["reason"] == "source_backed_ce_map"
+    assert known["suffix_analysis"]["suffix_status"] == "matches_expected_suffix"
+
+    mismatch = analyze_ce_texture_map_entry("Specular", "./wall_s.dds")
+    assert mismatch["known_ce_map"] is True
+    assert mismatch["reason"] == "source_backed_ce_map"
+    assert mismatch["suffix_analysis"]["suffix_status"] == "mismatch_expected_suffix"
+
+    unknown = analyze_ce_texture_map_entry("PackedORM", "./wall_orm.dds")
+    assert unknown["known_ce_map"] is False
+    assert unknown["reason"] == "unknown_ce_map_type"
+    assert unknown["suffix_analysis"]["suffix_status"] == "no_source_backed_suffix"
 
 
 def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
