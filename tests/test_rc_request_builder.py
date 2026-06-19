@@ -162,6 +162,19 @@ def test_material_requests_can_include_case_insensitive_collision_diagnostics():
     assert materials[1]["diagnostics"][0]["code"] == "rc_case_insensitive_material_name_collision"
 
 
+def test_material_requests_can_include_duplicate_sub_index_diagnostics():
+    materials = build_material_requests(
+        [
+            {"name": "Wood", "id": 1, "sub_index": 0, "auto_assigned": False},
+            {"name": "Metal", "id": 2, "sub_index": 0, "auto_assigned": False},
+        ],
+        include_diagnostics=True,
+    )
+
+    assert materials[0]["diagnostics"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"
+    assert materials[1]["diagnostics"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"
+
+
 def test_nodes_and_joint_physics_use_path_arrays():
     request = build_import_request(sample_model(), "chair.fbx")
     root = request["nodes"][0]

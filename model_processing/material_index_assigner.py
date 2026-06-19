@@ -137,6 +137,23 @@ def diagnose_material_record(record):
             }
         )
 
+    if record.get("duplicate_sub_index_conflict", False):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "rc_duplicate_sub_index_overwrites_material",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "conflicting_material_names": record.get("duplicate_sub_index_material_names", []),
+                "message": (
+                    "Multiple request materials map to the same non-negative sub_index. "
+                    "RC writes the final CGF sub-material name and physicalize type into that slot each time, "
+                    "so one material can overwrite another while source geometry still remaps through the shared id."
+                ),
+            }
+        )
+
     if requested_sub_index is not None:
         diagnostics.append(
             {
@@ -218,6 +235,24 @@ def diagnose_material_record(record):
 def attach_material_diagnostics(records):
     for record in records:
         record["diagnostics"] = diagnose_material_record(record)
+    return records
+
+
+def mark_duplicate_sub_index_conflicts(records):
+    by_sub_index = {}
+    for record in records:
+        sub_index = record.get("sub_index")
+        if sub_index is None or sub_index < 0:
+            continue
+        by_sub_index.setdefault(sub_index, []).append(record)
+
+    for collisions in by_sub_index.values():
+        if len(collisions) <= 1:
+            continue
+        names = [record["clean_name"] for record in collisions]
+        for record in collisions:
+            record["duplicate_sub_index_conflict"] = True
+            record["duplicate_sub_index_material_names"] = names
     return records
 
 
@@ -327,6 +362,7 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
         if record["sub_index"] >= 0:
             occupied.add(record["sub_index"])
 
+    mark_duplicate_sub_index_conflicts(records)
     attach_material_diagnostics(records)
     return records
 

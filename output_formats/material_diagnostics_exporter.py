@@ -68,6 +68,8 @@ def _record_to_report_item(record):
         "slot_name_conflict": record["material"].get("slot_name_conflict", False),
         "case_insensitive_name_conflict": record.get("case_insensitive_name_conflict", False),
         "case_insensitive_material_names": record.get("case_insensitive_material_names", []),
+        "duplicate_sub_index_conflict": record.get("duplicate_sub_index_conflict", False),
+        "duplicate_sub_index_material_names": record.get("duplicate_sub_index_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
         "diagnostics": [
             *record.get("diagnostics", []),
@@ -104,6 +106,8 @@ def build_material_diagnostics_report(
                     "slot_name_conflict": item["slot_name_conflict"],
                     "case_insensitive_name_conflict": item["case_insensitive_name_conflict"],
                     "case_insensitive_material_names": item["case_insensitive_material_names"],
+                    "duplicate_sub_index_conflict": item["duplicate_sub_index_conflict"],
+                    "duplicate_sub_index_material_names": item["duplicate_sub_index_material_names"],
                     "texture_ref_evidence": item["texture_ref_evidence"],
                 }
             )

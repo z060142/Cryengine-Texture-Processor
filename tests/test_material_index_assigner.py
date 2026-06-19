@@ -140,6 +140,24 @@ def test_sub_index_different_from_fbx_slot_reports_hazard_when_usage_unknown():
     assert diagnostics["Moved"][0]["sub_index"] == 1
 
 
+def test_duplicate_explicit_sub_index_reports_overwrite_hazard():
+    records = assign_material_sub_indices(
+        [
+            {"name": "Wood", "id": 1, "sub_index": 0, "auto_assigned": False},
+            {"name": "Metal", "id": 2, "sub_index": 0, "auto_assigned": False},
+        ],
+        existing_submaterial_names=[],
+    )
+
+    diagnostics = diagnostics_by_name(records)
+
+    assert sub_index_by_name(records) == {"Wood": 0, "Metal": 0}
+    assert diagnostics["Wood"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"
+    assert diagnostics["Wood"][0]["conflicting_material_names"] == ["Wood", "Metal"]
+    assert diagnostics["Metal"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"
+    assert diagnostics["Metal"][0]["conflicting_material_names"] == ["Wood", "Metal"]
+
+
 def test_slot_name_conflict_reports_warning():
     records = assign_material_sub_indices(
         [

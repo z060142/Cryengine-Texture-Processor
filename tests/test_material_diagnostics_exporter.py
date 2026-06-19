@@ -189,6 +189,22 @@ def test_build_material_diagnostics_report_uses_existing_mtl_fallback_when_provi
     assert report["diagnostics"][0]["code"] == "sub_index_differs_from_fbx_slot_usage_unknown"
 
 
+def test_build_material_diagnostics_report_flags_duplicate_sub_index():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Wood", "id": 1, "sub_index": 0, "auto_assigned": False},
+            {"name": "Metal", "id": 2, "sub_index": 0, "auto_assigned": False},
+        ],
+        source_model="duplicate.fbx",
+    )
+
+    assert report["summary"]["hazard_count"] == 3
+    assert report["materials"][0]["duplicate_sub_index_conflict"] is True
+    assert report["materials"][0]["duplicate_sub_index_material_names"] == ["Wood", "Metal"]
+    assert report["diagnostics"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"
+    assert report["diagnostics"][0]["duplicate_sub_index_material_names"] == ["Wood", "Metal"]
+
+
 def test_build_material_diagnostics_report_flags_rc_sub_index_limit():
     report = build_material_diagnostics_report(
         [{"name": "TooHigh", "sub_index": 128, "auto_assigned": False}],
