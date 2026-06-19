@@ -3,6 +3,7 @@
 """Create material-slot evidence reports for RC smoke outputs."""
 
 import json
+import math
 import os
 import xml.etree.ElementTree as ET
 
@@ -152,6 +153,31 @@ def _duplicate_values(values):
     return sorted(value for value, count in counts.items() if count > 1)
 
 
+def _coerce_cgf_subset_center_x(subset):
+    center = subset.get("center")
+    if not isinstance(center, (list, tuple)) or not center:
+        return None
+    try:
+        center_x = float(center[0])
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(center_x):
+        return None
+    return round(center_x, 4)
+
+
+def _invalid_subset_entry(mesh, subset, error, **extra):
+    return {
+        "mesh_chunk_id": mesh.get("chunk_id") if isinstance(mesh, dict) else None,
+        "subset": subset.get("subset") if isinstance(subset, dict) else None,
+        "center": subset.get("center") if isinstance(subset, dict) else None,
+        "material_id": subset.get("material_id") if isinstance(subset, dict) else None,
+        "ok": False,
+        "error": error,
+        **extra,
+    }
+
+
 def _fixture_polygon_actual_ids(manifest, cgf_material_summary):
     center_lookup = {}
     for _, polygon in iter_manifest_polygon_rows(manifest):
@@ -159,38 +185,115 @@ def _fixture_polygon_actual_ids(manifest, cgf_material_summary):
             polygon_index = coerce_polygon_index(polygon.get("polygon"))
             if polygon_index is None:
                 continue
-            try:
-                center_x = round(float(polygon["center_x"]), 4)
-            except (TypeError, ValueError):
+            center_x = _coerce_cgf_subset_center_x({"center": [polygon.get("center_x")]})
+            if center_x is None:
                 continue
             center_lookup[center_x] = polygon_index
 
     actual_by_polygon = {}
     subset_entries = []
+    invalid_subset_entries = []
     duplicate_polygons = []
-    for mesh in cgf_material_summary.get("meshes", []) if cgf_material_summary else []:
-        for subset in mesh.get("subsets", []):
-            center = subset.get("center") or []
-            if not center:
+    raw_meshes = cgf_material_summary.get("meshes", []) if isinstance(cgf_material_summary, dict) else []
+    if not isinstance(raw_meshes, list):
+        return actual_by_polygon, subset_entries, duplicate_polygons, [
+            {
+                "mesh_chunk_id": None,
+                "subset": None,
+                "center": None,
+                "material_id": None,
+                "ok": False,
+                "error": "invalid_cgf_meshes_collection",
+                "collection_type": type(raw_meshes).__name__,
+            }
+        ]
+    for mesh_order, mesh in enumerate(raw_meshes):
+        if not isinstance(mesh, dict):
+            invalid_subset_entries.append(
+                {
+                    "mesh_chunk_id": None,
+                    "subset": None,
+                    "center": None,
+                    "material_id": None,
+                    "ok": False,
+                    "error": "invalid_cgf_mesh_row",
+                    "mesh_order": mesh_order,
+                    "row_type": type(mesh).__name__,
+                }
+            )
+            continue
+        raw_subsets = mesh.get("subsets", [])
+        if raw_subsets is None:
+            raw_subsets = []
+        if not isinstance(raw_subsets, list):
+            invalid_subset_entries.append(
+                {
+                    "mesh_chunk_id": mesh.get("chunk_id"),
+                    "subset": None,
+                    "center": None,
+                    "material_id": None,
+                    "ok": False,
+                    "error": "invalid_cgf_mesh_subsets_collection",
+                    "collection_type": type(raw_subsets).__name__,
+                }
+            )
+            continue
+        for subset_order, subset in enumerate(raw_subsets):
+            if not isinstance(subset, dict):
+                invalid_subset_entries.append(
+                    {
+                        "mesh_chunk_id": mesh.get("chunk_id"),
+                        "subset": None,
+                        "center": None,
+                        "material_id": None,
+                        "ok": False,
+                        "error": "invalid_cgf_subset_row",
+                        "subset_order": subset_order,
+                        "row_type": type(subset).__name__,
+                    }
+                )
                 continue
-            center_x = round(float(center[0]), 4)
+            center_x = _coerce_cgf_subset_center_x(subset)
+            if center_x is None:
+                invalid_subset_entries.append(
+                    _invalid_subset_entry(
+                        mesh,
+                        subset,
+                        "invalid_cgf_subset_center",
+                        subset_order=subset_order,
+                        center_type=type(subset.get("center")).__name__,
+                    )
+                )
+                continue
+            material_id = coerce_material_slot(subset.get("material_id"))
+            if material_id is None:
+                invalid_subset_entries.append(
+                    _invalid_subset_entry(
+                        mesh,
+                        subset,
+                        "invalid_cgf_subset_material_id",
+                        subset_order=subset_order,
+                        material_id_type=type(subset.get("material_id")).__name__,
+                    )
+                )
+                continue
             polygon = center_lookup.get(center_x)
             if polygon is None:
-                polygon = int(round(float(center[0]) / 3.0))
+                polygon = int(round(center_x / 3.0))
             if polygon in actual_by_polygon:
                 duplicate_polygons.append(polygon)
-            actual_by_polygon[polygon] = int(subset.get("material_id"))
+            actual_by_polygon[polygon] = material_id
             subset_entries.append(
                 {
                     "mesh_chunk_id": mesh.get("chunk_id"),
                     "subset": subset.get("subset"),
                     "polygon": polygon,
                     "center": subset.get("center"),
-                    "material_id": int(subset.get("material_id")),
+                    "material_id": material_id,
                 }
             )
 
-    return actual_by_polygon, subset_entries, duplicate_polygons
+    return actual_by_polygon, subset_entries, duplicate_polygons, invalid_subset_entries
 
 
 def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_materials, mtl_slots):
@@ -218,6 +321,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             "duplicate_request_material_names": [],
             "duplicate_request_sub_indices": [],
             "subset_entries": [],
+            "invalid_subset_entries": [],
         }
 
     request_names_by_index = _request_names_by_sub_index(request_materials)
@@ -337,7 +441,10 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
             }
         )
 
-    actual_by_polygon, subset_entries, duplicate_polygons = _fixture_polygon_actual_ids(manifest, cgf_material_summary)
+    actual_by_polygon, subset_entries, duplicate_polygons, invalid_subset_entries = _fixture_polygon_actual_ids(
+        manifest,
+        cgf_material_summary,
+    )
     polygon_checks = []
     if raw_polygons is not None and not isinstance(raw_polygons, list):
         ok = False
@@ -471,7 +578,13 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
 
     duplicate_request_names = _duplicate_values(request_names)
     duplicate_request_sub_indices = _duplicate_values(request_sub_indices)
-    ok = ok and not duplicate_polygons and not duplicate_request_names and not duplicate_request_sub_indices
+    ok = (
+        ok
+        and not duplicate_polygons
+        and not duplicate_request_names
+        and not duplicate_request_sub_indices
+        and not invalid_subset_entries
+    )
 
     return {
         "ok": ok,
@@ -482,6 +595,7 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         "duplicate_request_material_names": duplicate_request_names,
         "duplicate_request_sub_indices": duplicate_request_sub_indices,
         "subset_entries": subset_entries,
+        "invalid_subset_entries": invalid_subset_entries,
     }
 
 

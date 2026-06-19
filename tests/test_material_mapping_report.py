@@ -408,6 +408,56 @@ def test_evaluate_fixture_material_semantics_reports_invalid_polygon_indices():
     assert result["polygon_checks"][-1]["ok"]
 
 
+def test_evaluate_fixture_material_semantics_reports_invalid_cgf_subset_evidence():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [{"slot": 0, "name": "Stone"}],
+            "polygons": [
+                {"polygon": 0, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 0.0},
+            ],
+        },
+        {
+            "meshes": [
+                "bad-mesh-row",
+                {"chunk_id": 10, "subsets": "bad-subsets"},
+                {
+                    "chunk_id": 11,
+                    "subsets": [
+                        "bad-subset-row",
+                        {"subset": 1, "center": [], "material_id": 0},
+                        {"subset": 2, "center": ["bad-center"], "material_id": 0},
+                        {"subset": 3, "center": [3.0, 0.0, 0.0], "material_id": True},
+                        {"subset": 4, "center": [0.0, 0.0, 0.0], "material_id": "0"},
+                    ],
+                },
+            ]
+        },
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    assert result["polygon_checks"][-1]["ok"]
+    assert result["subset_entries"] == [
+        {
+            "mesh_chunk_id": 11,
+            "subset": 4,
+            "polygon": 0,
+            "center": [0.0, 0.0, 0.0],
+            "material_id": 0,
+        }
+    ]
+    assert [entry["error"] for entry in result["invalid_subset_entries"]] == [
+        "invalid_cgf_mesh_row",
+        "invalid_cgf_mesh_subsets_collection",
+        "invalid_cgf_subset_row",
+        "invalid_cgf_subset_center",
+        "invalid_cgf_subset_center",
+        "invalid_cgf_subset_material_id",
+    ]
+
+
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():
     manifest = {
         "manifest_kind": "blender-fbx-material-inspection",
