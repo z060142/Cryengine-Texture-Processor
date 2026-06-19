@@ -31,6 +31,19 @@ CE_TEXTURE_MAP_TYPES = {
     "glossiness": None,
 }
 
+CE_TEXTURE_OBSERVED_MAP_ALIASES = {
+    "roughness": {
+        "ce_map_type": "Opacity",
+        "source": "docs/phase98_car_example_material_alignment.json",
+        "rule": (
+            "The real car sample stores a roughness texture in the CryEngine "
+            "MTL Opacity map. Treat roughness as an exporter compatibility "
+            "alias for Opacity, while keeping the source-backed CE map name "
+            "itself as Opacity."
+        ),
+    }
+}
+
 CE_TEXTURE_SUFFIXES = {
     "Diffuse": "_diff",
     "Bumpmap": "_ddn",
@@ -42,6 +55,10 @@ CE_TEXTURE_SUFFIXES = {
     "SubSurface": "_sss",
     "Translucency": "_trans",
     "Emittance": "_em",
+}
+
+CE_TEXTURE_OBSERVED_SUFFIXES = {
+    "Opacity": ("_roughness",),
 }
 
 CE_TEXTURE_ACCEPTED_SUFFIXES = {
@@ -439,16 +456,24 @@ def exported_material_attribute_policy():
 def analyze_ce_texture_suffix(ce_map_type, texture_path):
     expected_suffix = CE_TEXTURE_SUFFIXES.get(ce_map_type or "", "")
     accepted_suffixes = CE_TEXTURE_ACCEPTED_SUFFIXES.get(ce_map_type or "", ())
+    observed_suffixes = CE_TEXTURE_OBSERVED_SUFFIXES.get(ce_map_type or "", ())
     filename = os.path.basename(str(texture_path or "")).replace("\\", "/")
     stem = os.path.splitext(filename)[0].lower()
     expected_lower = expected_suffix.lower()
     accepted_lower = tuple(suffix.lower() for suffix in accepted_suffixes)
+    observed_lower = tuple(suffix.lower() for suffix in observed_suffixes)
     matched_suffix = ""
 
     if not ce_map_type or not texture_path:
         suffix_status = "not_applicable"
     elif not expected_suffix:
-        suffix_status = "no_source_backed_suffix"
+        for suffix, suffix_lower in zip(observed_suffixes, observed_lower):
+            if stem.endswith(suffix_lower):
+                suffix_status = "matches_observed_sample_suffix"
+                matched_suffix = suffix
+                break
+        else:
+            suffix_status = "no_source_backed_suffix"
     elif stem.endswith(expected_lower):
         suffix_status = "matches_expected_suffix"
         matched_suffix = expected_suffix
@@ -464,6 +489,7 @@ def analyze_ce_texture_suffix(ce_map_type, texture_path):
     return {
         "expected_suffix": expected_suffix,
         "accepted_suffixes": list(accepted_suffixes),
+        "observed_suffixes": list(observed_suffixes),
         "matched_suffix": matched_suffix,
         "suffix_status": suffix_status,
         "filename": filename,
@@ -552,11 +578,18 @@ def analyze_ce_texture_path_reuse(texture_entries):
 def resolve_ce_texture_map(texture_type, texture_path=""):
     normalized_type = str(texture_type or "").lower()
     texture_path = str(texture_path or "")
-    ce_map_type = CE_TEXTURE_MAP_TYPES.get(normalized_type)
-    known_type = normalized_type in CE_TEXTURE_MAP_TYPES
+    observed_alias = CE_TEXTURE_OBSERVED_MAP_ALIASES.get(normalized_type)
+    ce_map_type = (
+        observed_alias.get("ce_map_type")
+        if observed_alias
+        else CE_TEXTURE_MAP_TYPES.get(normalized_type)
+    )
+    known_type = normalized_type in CE_TEXTURE_MAP_TYPES or observed_alias is not None
 
     if not texture_path:
         reason = "missing_texture_path"
+    elif observed_alias:
+        reason = "observed_ce_sample_texture_map_alias"
     elif ce_map_type:
         reason = "source_backed_texture_map"
     elif known_type:
@@ -574,6 +607,8 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
         "rc_source_extension_analysis": analyze_rc_texture_source_extension(texture_path),
         "source_evidence": CE_TEXTURE_MAP_SOURCE,
     }
+    if observed_alias:
+        policy["observed_alias_evidence"] = observed_alias
     if policy["exported"]:
         policy["texmod_policy"] = exported_texture_modifier_policy()
     return policy

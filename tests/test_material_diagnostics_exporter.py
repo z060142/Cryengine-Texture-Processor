@@ -415,6 +415,30 @@ def test_build_material_diagnostics_report_accepts_ddna_bumpmap_alias():
     assert report["diagnostics"] == []
 
 
+def test_build_material_diagnostics_report_exports_roughness_as_observed_opacity_alias():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "CarPaint",
+                "id": 1,
+                "textures": {
+                    "roughness": "carpaint_roughness.dds",
+                },
+            }
+        ],
+        source_model="car.fbx",
+    )
+
+    exported = report["materials"][0]["mtl_texture_map_policy"]["exported"][0]
+    assert exported["ce_map_type"] == "Opacity"
+    assert exported["reason"] == "observed_ce_sample_texture_map_alias"
+    assert exported["suffix_analysis"]["suffix_status"] == "matches_observed_sample_suffix"
+    assert report["mtl_texture_map_policy_summary"]["exported_ce_map_counts"] == {
+        "Opacity": 1,
+    }
+    assert report["diagnostics"] == []
+
+
 def test_build_material_diagnostics_report_warns_for_shared_texture_path_across_ce_maps():
     report = build_material_diagnostics_report(
         [

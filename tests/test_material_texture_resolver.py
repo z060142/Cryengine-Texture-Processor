@@ -132,6 +132,24 @@ def test_material_texture_records_capture_texture_ref_evidence(tmp_path):
     ]
 
 
+def test_build_mtl_material_data_maps_roughness_output_to_opacity(tmp_path):
+    source = tmp_path / "carpaint_roughness.png"
+    source.write_text("fake source")
+    (tmp_path / "carpaint_roughness.tif").write_text("fake roughness")
+    model_data = {"materials": [{"name": "CarPaint"}]}
+    refs = [TextureRef(str(source), "CarPaint", texture_type="roughness")]
+
+    result = build_mtl_material_data(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert result[0]["textures"]["opacity"] == str(tmp_path / "carpaint_roughness.tif")
+
+
 def test_build_mtl_material_data_finds_ce_emissive_output_suffix(tmp_path):
     source = tmp_path / "wall_emissive.png"
     source.write_text("fake source")

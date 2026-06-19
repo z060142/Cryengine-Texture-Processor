@@ -33,7 +33,7 @@ MTL_OUTPUT_TEXTURE_SUFFIXES = {
     "specular": (_suffix_template("spec"),),
     "displacement": (_suffix_template("displ"),),
     "emissive": (_suffix_template("emissive"),),
-    "opacity": "_opacity.{ext}",
+    "opacity": ("_opacity.{ext}", "_roughness.{ext}"),
     "sss": (_suffix_template("sss"),),
 }
 

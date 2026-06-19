@@ -83,6 +83,15 @@ def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
     assert missing["suffix_status"] == "not_applicable"
 
 
+def test_analyze_ce_texture_suffix_accepts_observed_roughness_opacity_suffix():
+    roughness = analyze_ce_texture_suffix("Opacity", "./carpaint_roughness.dds")
+
+    assert roughness["expected_suffix"] == ""
+    assert roughness["observed_suffixes"] == ["_roughness"]
+    assert roughness["matched_suffix"] == "_roughness"
+    assert roughness["suffix_status"] == "matches_observed_sample_suffix"
+
+
 def test_analyze_ce_texture_map_entry_reports_known_unknown_and_suffix_status():
     known = analyze_ce_texture_map_entry("Diffuse", "./wall_diff.dds")
     assert known["known_ce_map"] is True
@@ -167,6 +176,16 @@ def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
     assert unknown["exported"] is False
     assert unknown["reason"] == "unknown_texture_type"
     assert unknown["suffix_analysis"]["suffix_status"] == "not_applicable"
+
+
+def test_resolve_ce_texture_map_exports_roughness_as_observed_opacity_alias():
+    roughness = resolve_ce_texture_map("roughness", "carpaint_roughness.dds")
+
+    assert roughness["ce_map_type"] == "Opacity"
+    assert roughness["exported"] is True
+    assert roughness["reason"] == "observed_ce_sample_texture_map_alias"
+    assert roughness["suffix_analysis"]["suffix_status"] == "matches_observed_sample_suffix"
+    assert roughness["observed_alias_evidence"]["source"] == "docs/phase98_car_example_material_alignment.json"
 
 
 def test_exported_texture_map_policy_splits_exported_and_skipped_entries():

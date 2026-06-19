@@ -171,6 +171,22 @@ def test_build_mtl_schema_report_accepts_ddna_bumpmap_alias(tmp_path):
     assert suffix_analysis["matched_suffix"] == "_ddna"
 
 
+def test_build_mtl_schema_report_accepts_observed_roughness_opacity_suffix(tmp_path):
+    mtl_path = tmp_path / "roughness_opacity.mtl"
+    root = ET.Element("Material", Name="CarPaint", Shader="Illum")
+    textures = ET.SubElement(root, "Textures")
+    ET.SubElement(textures, "Texture", Map="Opacity", File="./carpaint_roughness.dds")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8")
+
+    report = build_mtl_schema_report([str(mtl_path)])
+
+    assert {"name": "matches_observed_sample_suffix", "count": 1} in report["schema"]["texture_suffix_statuses"]
+    suffix_analysis = report["files"][0]["materials"][0]["textures"][0]["texture_map_analysis"]["suffix_analysis"]
+    assert suffix_analysis["expected_suffix"] == ""
+    assert suffix_analysis["observed_suffixes"] == ["_roughness"]
+    assert suffix_analysis["matched_suffix"] == "_roughness"
+
+
 def test_build_mtl_schema_report_flags_shared_texture_path_across_ce_maps(tmp_path):
     mtl_path = tmp_path / "shared_texture_maps.mtl"
     root = ET.Element("Material", Name="SharedMaps", Shader="Illum")

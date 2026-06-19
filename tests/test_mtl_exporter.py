@@ -160,6 +160,28 @@ def test_build_mtl_document_skips_known_non_mtl_texture_channels(tmp_path):
     assert texture_maps == ["Diffuse"]
 
 
+def test_build_mtl_document_exports_roughness_as_observed_opacity_map(tmp_path):
+    roughness_path = tmp_path / "asset_roughness.dds"
+    roughness_path.write_text("dds", encoding="utf-8")
+
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "CarPaint",
+                "textures": {"roughness": str(roughness_path)},
+            }
+        ],
+        str(tmp_path),
+    )
+
+    texture_maps = {
+        texture.get("Map"): texture.get("File")
+        for texture in list(root.find("SubMaterials").find("Material").find("Textures"))
+        if texture.tag == "Texture"
+    }
+    assert texture_maps == {"Opacity": "./asset_roughness.dds"}
+
+
 def test_calculate_relative_path_preserves_cryengine_aliases():
     assert (
         mtl_exporter._calculate_relative_path(
