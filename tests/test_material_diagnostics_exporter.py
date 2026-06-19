@@ -213,6 +213,38 @@ def test_build_material_diagnostics_report_includes_mtl_shader_policy():
     }
 
 
+def test_build_material_diagnostics_report_includes_mtl_flags_policy():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Stone", "id": 1},
+            {"name": "Leaves", "id": 2},
+        ],
+        source_model="flags.fbx",
+    )
+
+    material_policy = report["materials"][0]["mtl_flags_policy"]
+    summary = report["mtl_flags_policy_summary"]
+
+    assert material_policy["mtl_flags"] == "524416"
+    assert material_policy["analysis"]["names"] == [
+        "MTL_FLAG_PURE_CHILD",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert material_policy["usage"] == "exported_sub_material"
+    assert summary["material_count"] == 2
+    assert summary["root_material"]["mtl_flags"] == "524544"
+    assert summary["root_material"]["analysis"]["names"] == [
+        "MTL_FLAG_MULTI_SUBMTL",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert summary["sub_material_flag_counts"] == {"524416": 2}
+    assert summary["sub_material_flag_name_counts"] == {
+        "MTL_64BIT_SHADERGENMASK": 2,
+        "MTL_FLAG_PURE_CHILD": 2,
+    }
+    assert summary["source_evidence"]["source"].endswith("IMaterial.h")
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [
@@ -572,5 +604,7 @@ def test_export_material_diagnostics_writes_json(tmp_path):
     assert output_path.endswith("asset.material_diagnostics.json")
     assert payload["source_model"] == "asset.fbx"
     assert payload["summary"]["hazard_count"] == 1
+    assert payload["materials"][0]["mtl_flags_policy"]["mtl_flags"] == "524416"
+    assert payload["mtl_flags_policy_summary"]["sub_material_flag_counts"] == {"524416": 1}
     assert payload["materials"][0]["mtl_shader_policy"]["string_gen_mask"] == "%SUBSURFACE_SCATTERING"
     assert payload["mtl_shader_policy_summary"]["token_counts"] == {"%SUBSURFACE_SCATTERING": 1}

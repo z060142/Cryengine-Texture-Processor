@@ -10,7 +10,7 @@ from model_processing.material_index_assigner import build_omitted_material_diag
 from model_processing.material_manifest import material_manifest_table_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
-from output_formats.cryengine_mtl_schema import exported_material_shader_policy
+from output_formats.cryengine_mtl_schema import exported_material_shader_policy, exported_mtl_flags_policy
 
 
 AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
@@ -53,6 +53,7 @@ def _record_to_report_item(record):
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
     physicalize_resolution = resolve_rc_physicalize(record["material"], fallback_name=record["original_name"])
     mtl_shader_policy = exported_material_shader_policy(record["material"].get("textures", {}))
+    mtl_flags_policy = exported_mtl_flags_policy()["sub_material"]
     return {
         "name": record["clean_name"],
         "original_name": record["original_name"],
@@ -76,6 +77,7 @@ def _record_to_report_item(record):
         "duplicate_sub_index_conflict": record.get("duplicate_sub_index_conflict", False),
         "duplicate_sub_index_material_names": record.get("duplicate_sub_index_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
+        "mtl_flags_policy": mtl_flags_policy,
         "mtl_shader_policy": mtl_shader_policy,
         "diagnostics": [
             *record.get("diagnostics", []),
@@ -110,6 +112,25 @@ def _mtl_shader_policy_summary(material_items):
         "string_gen_mask_source_counts": _counter_to_sorted_dict(string_gen_mask_source_counts),
         "public_params_policy_counts": _counter_to_sorted_dict(public_params_policy_counts),
         "public_param_counts": _counter_to_sorted_dict(public_param_counts),
+    }
+
+
+def _mtl_flags_policy_summary(material_items):
+    sub_material_flag_counts = Counter()
+    sub_material_flag_name_counts = Counter()
+
+    for item in material_items:
+        policy = item.get("mtl_flags_policy", {})
+        sub_material_flag_counts.update([policy.get("mtl_flags", "")])
+        sub_material_flag_name_counts.update(policy.get("analysis", {}).get("names", []))
+
+    export_policy = exported_mtl_flags_policy()
+    return {
+        "material_count": len(material_items),
+        "root_material": export_policy["root_material"],
+        "sub_material_flag_counts": _counter_to_sorted_dict(sub_material_flag_counts),
+        "sub_material_flag_name_counts": _counter_to_sorted_dict(sub_material_flag_name_counts),
+        "source_evidence": export_policy["source_evidence"],
     }
 
 
@@ -175,6 +196,7 @@ def build_material_diagnostics_report(
             "diagnostic_count": len(diagnostics),
             "hazard_count": hazard_count,
         },
+        "mtl_flags_policy_summary": _mtl_flags_policy_summary(material_items),
         "mtl_shader_policy_summary": _mtl_shader_policy_summary(material_items),
         "materials": material_items,
         "diagnostics": diagnostics,

@@ -19,6 +19,7 @@ from output_formats.cryengine_mtl_schema import (
     describe_mtl_flags,
     exported_gen_mask,
     exported_material_shader_policy,
+    exported_mtl_flags_policy,
     exported_string_gen_mask,
     mtl_flags_attr,
     parse_public_param_value,
@@ -147,6 +148,22 @@ def test_default_mtl_flags_are_named_source_backed_compositions():
 
     submaterial_flags = describe_mtl_flags(SUB_MATERIAL_DEFAULT_ATTRS["MtlFlags"])
     assert submaterial_flags["names"] == ["MTL_FLAG_PURE_CHILD", "MTL_64BIT_SHADERGENMASK"]
+
+
+def test_exported_mtl_flags_policy_exposes_root_and_submaterial_defaults():
+    policy = exported_mtl_flags_policy()
+
+    assert policy["root_material"]["mtl_flags"] == "524544"
+    assert policy["root_material"]["analysis"]["names"] == [
+        "MTL_FLAG_MULTI_SUBMTL",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert policy["sub_material"]["mtl_flags"] == "524416"
+    assert policy["sub_material"]["analysis"]["names"] == [
+        "MTL_FLAG_PURE_CHILD",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert policy["source_evidence"]["source"].endswith("IMaterial.h")
 
 
 def test_describe_mtl_flags_decodes_known_names_and_unknown_bits():

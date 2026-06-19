@@ -269,6 +269,31 @@ def describe_mtl_flags(value):
     }
 
 
+def exported_mtl_flags_policy():
+    """
+    Return the current exporter default MtlFlags as source-backed named rules.
+
+    The exporter still emits decimal XML attributes for compatibility, but this
+    policy records the CE flag composition that produces those values.
+    """
+    return {
+        "root_material": {
+            "mtl_flags": str(MTL_ROOT_DEFAULT_FLAGS),
+            "analysis": describe_mtl_flags(MTL_ROOT_DEFAULT_FLAGS),
+            "usage": "multi_sub_material_container",
+        },
+        "sub_material": {
+            "mtl_flags": str(MTL_SUB_MATERIAL_DEFAULT_FLAGS),
+            "analysis": describe_mtl_flags(MTL_SUB_MATERIAL_DEFAULT_FLAGS),
+            "usage": "exported_sub_material",
+        },
+        "source_evidence": {
+            "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+            "lines": "46-77",
+        },
+    }
+
+
 def exported_string_gen_mask(tokens):
     return "".join(sorted(set(tokens)))
 
