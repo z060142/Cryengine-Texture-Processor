@@ -196,6 +196,46 @@ def test_request_schema_diagnostics_report_invalid_node_and_joint_values():
     ]
 
 
+def test_request_schema_diagnostics_accept_source_backed_animation_fields():
+    request = build_import_request(sample_model(), "walk.fbx", output_ext="caf")
+    request["animation"] = {
+        "name": "Walk",
+        "motionNodePath": ["Root", "Hips"],
+        "startFrame": -1,
+        "endFrame": 30,
+    }
+
+    assert collect_request_schema_diagnostics(request) == []
+
+
+def test_request_schema_diagnostics_report_invalid_animation_fields():
+    request = build_import_request(sample_model(), "walk.fbx", output_ext="caf")
+    request["animation"] = {
+        "name": 123,
+        "motionNodePath": "Root/Hips",
+        "startFrame": True,
+        "endFrame": -2,
+        "debug": True,
+    }
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_invalid_animation_name",
+        "rc_request_invalid_animation_motion_node_path",
+        "rc_request_invalid_animation_frame",
+        "rc_request_invalid_animation_frame",
+        "rc_request_unknown_animation_field",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "animation.name",
+        "animation.motionNodePath",
+        "animation.startFrame",
+        "animation.endFrame",
+        "animation.debug",
+    ]
+
+
 def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
     request = build_import_request(sample_model(), "chair.fbx")
 
@@ -374,6 +414,14 @@ def test_wrap_import_request_rejects_missing_required_fields():
     del request["source_filename"]
 
     with pytest.raises(ValueError, match="source_filename"):
+        wrap_import_request(request)
+
+
+def test_wrap_import_request_rejects_invalid_animation_fields():
+    request = build_import_request(sample_model(), "walk.fbx", output_ext="caf")
+    request["animation"] = {"startFrame": 1.5}
+
+    with pytest.raises(ValueError, match=r"animation\.startFrame"):
         wrap_import_request(request)
 
 

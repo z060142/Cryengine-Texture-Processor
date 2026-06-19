@@ -26,6 +26,10 @@ RC_IMPORT_REQUEST_SOURCE = {
         "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
         "lines": "47-85",
     },
+    "animation_fields": {
+        "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
+        "lines": "88-95",
+    },
     "joint_physics_fields": {
         "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
         "lines": "98-128",
@@ -89,6 +93,7 @@ RC_IMPORT_NODE_FIELDS = {
 }
 
 RC_IMPORT_MATERIAL_FIELDS = {"name", "physicalize", "sub_index"}
+RC_IMPORT_ANIMATION_FIELDS = {"name", "motionNodePath", "startFrame", "endFrame"}
 RC_IMPORT_REQUIRED_ROOT_FIELDS = {"source_filename", "output_ext"}
 RC_IMPORT_REQUIRED_MATERIAL_FIELDS = {"name", "physicalize", "sub_index"}
 RC_IMPORT_REQUIRED_NODE_FIELDS = {"path", "name"}
@@ -181,7 +186,13 @@ def collect_unknown_request_fields(request):
     if not isinstance(request, dict):
         return {}
 
-    unknown = {"root": sorted(set(request) - RC_IMPORT_ROOT_FIELDS), "nodes": [], "materials": [], "jointPhysicsData": []}
+    unknown = {
+        "root": sorted(set(request) - RC_IMPORT_ROOT_FIELDS),
+        "nodes": [],
+        "materials": [],
+        "animation": [],
+        "jointPhysicsData": [],
+    }
 
     def visit_node(node, path):
         if not isinstance(node, dict):
@@ -201,6 +212,12 @@ def collect_unknown_request_fields(request):
         unknown_fields = sorted(set(material) - RC_IMPORT_MATERIAL_FIELDS)
         if unknown_fields:
             unknown["materials"].append({"index": index, "fields": unknown_fields})
+
+    animation = request.get("animation")
+    if isinstance(animation, dict):
+        unknown_fields = sorted(set(animation) - RC_IMPORT_ANIMATION_FIELDS)
+        if unknown_fields:
+            unknown["animation"].extend(unknown_fields)
 
     for index, physics_data in _list_items(request.get("jointPhysicsData", [])):
         if not isinstance(physics_data, dict):
@@ -438,6 +455,64 @@ def collect_request_value_diagnostics(request):
 
     visit_node_values(request.get("nodes", []), "nodes")
 
+    animation = request.get("animation")
+    if "animation" in request:
+        if not isinstance(animation, dict):
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_invalid_animation",
+                    "location": "animation",
+                    "value_type": _type_name(animation),
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["animation_fields"],
+                    "message": "RC import request animation must be a JSON object when present.",
+                }
+            )
+        else:
+            animation_name = animation.get("name")
+            if "name" in animation and not isinstance(animation_name, str):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_animation_name",
+                        "location": "animation.name",
+                        "value": animation_name,
+                        "value_type": _type_name(animation_name),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["animation_fields"],
+                        "message": "RC import request animation name must be a string when present.",
+                    }
+                )
+
+            motion_node_path = animation.get("motionNodePath")
+            if "motionNodePath" in animation and not _is_list(motion_node_path):
+                diagnostics.append(
+                    {
+                        "severity": "error",
+                        "code": "rc_request_invalid_animation_motion_node_path",
+                        "location": "animation.motionNodePath",
+                        "value_type": _type_name(motion_node_path),
+                        "schema_source": RC_IMPORT_REQUEST_SOURCE["animation_fields"],
+                        "message": "RC import request animation motionNodePath must be a JSON array when present.",
+                    }
+                )
+
+            for field in ("startFrame", "endFrame"):
+                frame = animation.get(field)
+                if field in animation and (not _is_int(frame) or frame < -1):
+                    diagnostics.append(
+                        {
+                            "severity": "error",
+                            "code": "rc_request_invalid_animation_frame",
+                            "location": f"animation.{field}",
+                            "field": field,
+                            "value": frame,
+                            "value_type": _type_name(frame),
+                            "min_value": -1,
+                            "schema_source": RC_IMPORT_REQUEST_SOURCE["animation_fields"],
+                            "message": "RC import request animation frame bounds must be integer frame numbers or -1.",
+                        }
+                    )
+
     joint_physics_data = request.get("jointPhysicsData", [])
     for index, physics_data in _list_items(joint_physics_data):
         location = f"jointPhysicsData[{index}]"
@@ -542,6 +617,18 @@ def collect_request_schema_diagnostics(request):
                     "message": "RC import request material contains a field not backed by the source-derived schema.",
                 }
             )
+
+    for field in unknown.get("animation", []):
+        diagnostics.append(
+            {
+                "severity": "error",
+                "code": "rc_request_unknown_animation_field",
+                "location": f"animation.{field}",
+                "field": field,
+                "schema_source": RC_IMPORT_REQUEST_SOURCE["animation_fields"],
+                "message": "RC import request animation contains a field not backed by the source-derived schema.",
+            }
+        )
 
     for physics_data in unknown.get("jointPhysicsData", []):
         for field in physics_data["fields"]:
