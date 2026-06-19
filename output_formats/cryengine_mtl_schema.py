@@ -70,6 +70,18 @@ CE_TEXTURE_SUFFIX_SOURCE = {
     ),
 }
 
+RC_TEXTURE_SOURCE_EXTENSIONS = {"dds", "hdr", "tif"}
+
+RC_TEXTURE_SOURCE_EXTENSION_SOURCE = {
+    "source": "Code/CryEngine/RenderDll/Common/Textures/TextureCompiler.h",
+    "lines": "165-181",
+    "rule": (
+        "CTextureCompiler::IsImageFormatSupported accepts dds, hdr, and tif "
+        "when texture compiling is enabled. TextureCompiler comments describe "
+        "source files as usually TIFF and destinations as usually DDS."
+    ),
+}
+
 CE_TEXMOD_SOURCE = {
     "save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
     "save_lines": "263-324",
@@ -426,6 +438,29 @@ def analyze_ce_texture_suffix(ce_map_type, texture_path):
     }
 
 
+def analyze_rc_texture_source_extension(texture_path):
+    filename = os.path.basename(str(texture_path or "")).replace("\\", "/")
+    _, ext = os.path.splitext(filename)
+    normalized_ext = ext[1:].lower() if ext.startswith(".") else ext.lower()
+    supported = normalized_ext in RC_TEXTURE_SOURCE_EXTENSIONS
+    if not filename:
+        status = "missing_texture_path"
+    elif not normalized_ext:
+        status = "missing_extension"
+    elif supported:
+        status = "supported_rc_texture_source_extension"
+    else:
+        status = "unsupported_rc_texture_source_extension"
+    return {
+        "filename": filename,
+        "extension": normalized_ext,
+        "supported": supported,
+        "status": status,
+        "supported_extensions": sorted(RC_TEXTURE_SOURCE_EXTENSIONS),
+        "source_evidence": RC_TEXTURE_SOURCE_EXTENSION_SOURCE,
+    }
+
+
 def resolve_ce_texture_map(texture_type, texture_path=""):
     normalized_type = str(texture_type or "").lower()
     texture_path = str(texture_path or "")
@@ -448,6 +483,7 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
         "exported": bool(texture_path and ce_map_type),
         "reason": reason,
         "suffix_analysis": analyze_ce_texture_suffix(ce_map_type, texture_path),
+        "rc_source_extension_analysis": analyze_rc_texture_source_extension(texture_path),
         "source_evidence": CE_TEXTURE_MAP_SOURCE,
     }
     if policy["exported"]:

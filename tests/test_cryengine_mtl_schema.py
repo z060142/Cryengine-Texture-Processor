@@ -17,6 +17,7 @@ from output_formats.cryengine_mtl_schema import (
     SUB_MATERIAL_DEFAULT_ATTRS,
     analyze_ce_texture_map_entry,
     analyze_ce_texture_suffix,
+    analyze_rc_texture_source_extension,
     analyze_public_params,
     compose_mtl_flags,
     describe_mtl_flags,
@@ -87,6 +88,21 @@ def test_analyze_ce_texture_map_entry_reports_known_unknown_and_suffix_status():
     assert unknown["suffix_analysis"]["suffix_status"] == "no_source_backed_suffix"
 
 
+def test_analyze_rc_texture_source_extension_follows_texture_compiler_supported_formats():
+    tif = analyze_rc_texture_source_extension("textures/wall_diff.tif")
+    assert tif["supported"] is True
+    assert tif["status"] == "supported_rc_texture_source_extension"
+    assert tif["supported_extensions"] == ["dds", "hdr", "tif"]
+    assert tif["source_evidence"]["source"].endswith("TextureCompiler.h")
+
+    dds = analyze_rc_texture_source_extension("textures/wall_diff.dds")
+    assert dds["supported"] is True
+
+    png = analyze_rc_texture_source_extension("textures/wall_diff.png")
+    assert png["supported"] is False
+    assert png["status"] == "unsupported_rc_texture_source_extension"
+
+
 def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
     diffuse = resolve_ce_texture_map("Diffuse", "wall_diff.dds")
     assert diffuse["texture_type"] == "diffuse"
@@ -95,6 +111,7 @@ def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
     assert diffuse["reason"] == "source_backed_texture_map"
     assert diffuse["suffix_analysis"]["expected_suffix"] == "_diff"
     assert diffuse["suffix_analysis"]["suffix_status"] == "matches_expected_suffix"
+    assert diffuse["rc_source_extension_analysis"]["supported"] is True
     assert diffuse["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
 
     ao = resolve_ce_texture_map("ao", "wall_ao.dds")

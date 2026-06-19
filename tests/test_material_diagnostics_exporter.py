@@ -311,6 +311,11 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
         "matches_expected_suffix",
         "mismatch_expected_suffix",
     ]
+    assert [entry["rc_source_extension_analysis"]["status"] for entry in material_policy["exported"]] == [
+        "supported_rc_texture_source_extension",
+        "supported_rc_texture_source_extension",
+        "supported_rc_texture_source_extension",
+    ]
     assert [entry["reason"] for entry in material_policy["skipped"]] == [
         "known_internal_non_mtl_channel",
         "unknown_texture_type",
@@ -352,6 +357,36 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
         "compatibility_preserved_default_texmod": 12,
     }
     assert summary["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
+
+
+def test_build_material_diagnostics_report_warns_for_non_rc_texture_source_and_suffix_mismatch():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Stone",
+                "id": 1,
+                "textures": {
+                    "diffuse": "stone_basecolor.png",
+                    "specular": "stone_s.tif",
+                },
+            }
+        ],
+        source_model="texture_sources.fbx",
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert codes == [
+        "unsupported_rc_texture_source_extension",
+        "mismatch_ce_texture_suffix",
+        "mismatch_ce_texture_suffix",
+    ]
+    extension_warning = report["diagnostics"][0]
+    assert extension_warning["texture_path"] == "stone_basecolor.png"
+    assert extension_warning["extension"] == "png"
+    assert extension_warning["supported_extensions"] == ["dds", "hdr", "tif"]
+    assert report["diagnostics"][1]["expected_suffix"] == "_diff"
+    assert report["diagnostics"][2]["expected_suffix"] == "_spec"
+    assert report["summary"]["hazard_count"] == 0
 
 
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():

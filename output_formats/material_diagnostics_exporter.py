@@ -53,6 +53,49 @@ def _texture_evidence_diagnostics(report_item):
     ]
 
 
+def _mtl_texture_source_diagnostics(report_item):
+    diagnostics = []
+    for entry in report_item.get("mtl_texture_map_policy", {}).get("exported", []):
+        extension_analysis = entry.get("rc_source_extension_analysis", {})
+        suffix_analysis = entry.get("suffix_analysis", {})
+        if extension_analysis and not extension_analysis.get("supported", False):
+            diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "unsupported_rc_texture_source_extension",
+                    "material": report_item["name"],
+                    "fbx_slot": report_item["fbx_slot"],
+                    "sub_index": report_item["sub_index"],
+                    "texture_type": entry.get("texture_type", ""),
+                    "ce_map_type": entry.get("ce_map_type", ""),
+                    "texture_path": entry.get("texture_path", ""),
+                    "extension": extension_analysis.get("extension", ""),
+                    "supported_extensions": extension_analysis.get("supported_extensions", []),
+                    "message": (
+                        "Texture path uses an extension that CryEngine TextureCompiler does not list "
+                        "as a supported source image format."
+                    ),
+                }
+            )
+        if suffix_analysis.get("suffix_status") == "mismatch_expected_suffix":
+            diagnostics.append(
+                {
+                    "severity": "warning",
+                    "code": "mismatch_ce_texture_suffix",
+                    "material": report_item["name"],
+                    "fbx_slot": report_item["fbx_slot"],
+                    "sub_index": report_item["sub_index"],
+                    "texture_type": entry.get("texture_type", ""),
+                    "ce_map_type": entry.get("ce_map_type", ""),
+                    "texture_path": entry.get("texture_path", ""),
+                    "expected_suffix": suffix_analysis.get("expected_suffix", ""),
+                    "filename": suffix_analysis.get("filename", ""),
+                    "message": "Texture filename does not contain the CryEngine suffix expected for this material map.",
+                }
+            )
+    return diagnostics
+
+
 def _record_to_report_item(record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
@@ -233,6 +276,7 @@ def build_material_diagnostics_report(
         item["diagnostics"] = [
             *item["diagnostics"],
             *_texture_evidence_diagnostics(item),
+            *_mtl_texture_source_diagnostics(item),
         ]
         for diagnostic in item["diagnostics"]:
             diagnostics.append(
