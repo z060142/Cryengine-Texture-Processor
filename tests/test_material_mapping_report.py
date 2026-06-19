@@ -681,6 +681,7 @@ def test_build_and_write_material_mapping_report(tmp_path):
     )
 
     assert report["alignment"]["ok"]
+    assert report["request_read_error"] == ""
     assert report["rc"]["output_exists"]
     assert report["rc"]["output_size"] == 3
     assert report["mtl_cryasset_details"]["subMaterialCount"] == "1"
@@ -721,3 +722,30 @@ def test_build_material_mapping_report_surfaces_malformed_mtl_and_cryasset_xml(t
     assert report["mtl_cryasset_read_error"]
     assert not report["alignment"]["ok"]
     assert report["alignment"]["checks"][0]["type"] == "missing_mtl_slot"
+
+
+def test_build_material_mapping_report_surfaces_malformed_request_json(tmp_path):
+    json_path = tmp_path / "asset.json"
+    json_path.write_text('{"request": {"materials": [', encoding="utf-8")
+
+    mtl_path = tmp_path / "asset.mtl"
+    root = ET.Element("Material")
+    ET.SubElement(root, "SubMaterials")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8", xml_declaration=True)
+
+    report = build_material_mapping_report(
+        str(json_path),
+        str(mtl_path),
+        expected_output_path="",
+        rc_exe_path="rc.exe",
+        source_fbx_path="source.fbx",
+        copied_fbx_path="asset.fbx",
+        rc_returncode=0,
+    )
+
+    assert report["request_read_error"]
+    assert report["request_materials"][0]["errors"] == ["invalid_request_json"]
+    assert report["request_materials"][0]["path"] == str(json_path)
+    assert not report["alignment"]["ok"]
+    assert report["alignment"]["checks"][0]["type"] == "invalid_request_json"
+    assert report["alignment"]["checks"][0]["read_error"]

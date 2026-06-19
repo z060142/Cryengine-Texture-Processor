@@ -101,6 +101,27 @@ def load_request_materials(json_path):
     return materials
 
 
+def _request_read_error_entry(json_path, error):
+    return {
+        "order": None,
+        "name": "",
+        "sub_index": None,
+        "physicalize": "",
+        "ok": False,
+        "errors": ["invalid_request_json"],
+        "path": json_path,
+        "read_error": error,
+    }
+
+
+def _load_request_materials_for_report(json_path):
+    try:
+        return load_request_materials(json_path), ""
+    except (json.JSONDecodeError, OSError, ValueError) as e:
+        read_error = str(e)
+        return [_request_read_error_entry(json_path, read_error)], read_error
+
+
 def load_mtl_slots(mtl_path):
     if not mtl_path or not os.path.exists(mtl_path):
         return []
@@ -197,6 +218,8 @@ def evaluate_material_slot_alignment(request_materials, mtl_slots):
                         "collection_type": material.get("collection_type"),
                         "name_type": material.get("name_type"),
                         "sub_index_type": material.get("sub_index_type"),
+                        "path": material.get("path"),
+                        "read_error": material.get("read_error"),
                     }
                 )
             continue
@@ -326,6 +349,8 @@ def _invalid_request_entries(request_materials):
                     "collection_type": material.get("collection_type"),
                     "name_type": material.get("name_type"),
                     "sub_index_type": material.get("sub_index_type"),
+                    "path": material.get("path"),
+                    "read_error": material.get("read_error"),
                 }
             )
         if material.get("errors"):
@@ -858,7 +883,7 @@ def build_material_mapping_report(
     copied_fbx_path="",
     rc_returncode=None,
 ):
-    request_materials = load_request_materials(json_path)
+    request_materials, request_read_error = _load_request_materials_for_report(json_path)
     mtl_slots, mtl_read_error = _load_mtl_slots_for_report(mtl_path)
     cryasset_path = f"{mtl_path}.cryasset" if mtl_path else ""
     cryasset_details, cryasset_read_error = _load_cryasset_details_for_report(cryasset_path)
@@ -893,6 +918,7 @@ def build_material_mapping_report(
         },
         "cgf_material_summary": cgf_material_summary,
         "cgf_read_error": cgf_read_error,
+        "request_read_error": request_read_error,
         "request_materials": request_materials,
         "mtl_slots": mtl_slots,
         "mtl_read_error": mtl_read_error,
