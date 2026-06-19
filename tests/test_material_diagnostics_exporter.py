@@ -656,7 +656,7 @@ def test_build_material_diagnostics_report_uses_existing_mtl_fallback_when_provi
 
     assert report["materials"][1]["name"] == "Moved"
     assert report["materials"][1]["sub_index"] == 1
-    assert report["diagnostics"][0]["code"] == "sub_index_differs_from_fbx_slot_usage_unknown"
+    assert report["diagnostics"] == []
 
 
 def test_build_material_diagnostics_report_flags_duplicate_sub_index():
@@ -668,7 +668,7 @@ def test_build_material_diagnostics_report_flags_duplicate_sub_index():
         source_model="duplicate.fbx",
     )
 
-    assert report["summary"]["hazard_count"] == 3
+    assert report["summary"]["hazard_count"] == 2
     assert report["materials"][0]["duplicate_sub_index_conflict"] is True
     assert report["materials"][0]["duplicate_sub_index_material_names"] == ["Wood", "Metal"]
     assert report["diagnostics"][0]["code"] == "rc_duplicate_sub_index_overwrites_material"

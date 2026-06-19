@@ -245,29 +245,6 @@ def diagnose_material_record(record):
             }
         )
 
-    if (
-        not record["deleted"]
-        and fbx_slot is not None
-        and record["sub_index"] is not None
-        and record["sub_index"] >= 0
-        and record["sub_index"] != fbx_slot
-        and polygon_usage is not False
-    ):
-        diagnostics.append(
-            {
-                "severity": "hazard",
-                "code": "sub_index_differs_from_fbx_slot_usage_unknown",
-                "material": record["clean_name"],
-                "fbx_slot": fbx_slot,
-                "sub_index": record["sub_index"],
-                "assignment_reason": record["reason"],
-                "message": (
-                    "Assigned sub_index differs from the known FBX slot. RC keeps geometry material ids "
-                    "aligned to FBX slots, so this can point polygons at the wrong material unless the slot is unused."
-                ),
-            }
-        )
-
     return diagnostics
 
 

@@ -123,7 +123,7 @@ def test_deleted_known_fbx_slot_has_no_hazard_when_usage_is_known_unused():
     assert diagnostics_by_name(records)["Removed"] == []
 
 
-def test_sub_index_different_from_fbx_slot_reports_hazard_when_usage_unknown():
+def test_explicit_sub_index_can_remap_from_fbx_slot_without_warning():
     records = assign_material_sub_indices(
         [
             {"name": "Reserved", "sub_index": 0, "auto_assigned": False},
@@ -135,9 +135,7 @@ def test_sub_index_different_from_fbx_slot_reports_hazard_when_usage_unknown():
     diagnostics = diagnostics_by_name(records)
 
     assert sub_index_by_name(records)["Moved"] == 1
-    assert diagnostics["Moved"][0]["code"] == "sub_index_differs_from_fbx_slot_usage_unknown"
-    assert diagnostics["Moved"][0]["fbx_slot"] == 0
-    assert diagnostics["Moved"][0]["sub_index"] == 1
+    assert diagnostics["Moved"] == []
 
 
 def test_duplicate_explicit_sub_index_reports_overwrite_hazard():
