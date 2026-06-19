@@ -8,6 +8,7 @@ import os
 import shutil
 
 from model_processing.material_manifest import (
+    coerce_material_name,
     coerce_material_slot,
     discover_material_manifest,
     iter_manifest_material_rows,
@@ -123,7 +124,7 @@ def source_material_specs_from_manifest(source_fbx_path):
 
     materials_by_name = {}
     for _, material in iter_manifest_material_rows(manifest):
-        name = material.get("name", "")
+        name = coerce_material_name(material.get("name", ""))
         if not name:
             continue
         slot = coerce_material_slot(material.get("slot"))
@@ -139,7 +140,7 @@ def source_material_specs_from_manifest(source_fbx_path):
         }
 
     for _, polygon in iter_manifest_polygon_rows(manifest):
-        name = polygon.get("material_name", "")
+        name = coerce_material_name(polygon.get("material_name", ""))
         if not name:
             continue
         slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot", 0)))

@@ -325,6 +325,31 @@ def test_build_material_diagnostics_report_includes_invalid_manifest_shape_diagn
     assert "material_manifest_invalid_polygon_row" in row_codes
 
 
+def test_build_material_diagnostics_report_includes_invalid_manifest_name_diagnostics():
+    report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": ""},
+                    {"slot": 1, "name": 123},
+                    {"slot": 2, "name": "Stone"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": 123, "material_table_slot": 1},
+                    {"polygon": 2, "material_name": "Stone", "material_table_slot": 2},
+                ],
+            }
+        },
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert "material_manifest_invalid_material_name" in codes
+    assert "material_manifest_invalid_polygon_material_name" in codes
+
+
 def test_build_material_diagnostics_report_includes_out_of_range_manifest_slot_diagnostics():
     report = build_material_diagnostics_report(
         [{"name": "LastValid", "id": 128}, {"name": "TooHigh", "id": 129}],

@@ -74,7 +74,7 @@ def material_manifest_table_rows(manifest):
         rows.append(
             {
                 "slot": material.get("slot"),
-                "name": material.get("name", ""),
+                "name": coerce_material_name(material.get("name", "")),
                 "source": material.get("first_object", material.get("requested_name", "")),
                 "local_slot": material.get("first_local_slot"),
             }
@@ -107,6 +107,14 @@ def coerce_material_slot(value):
     if slot < 0:
         return None
     return slot
+
+
+def coerce_material_name(value):
+    if not isinstance(value, str):
+        return ""
+    if not value.strip():
+        return ""
+    return value
 
 
 def material_manifest_table_diagnostics(material_manifest_info=None):
@@ -190,7 +198,22 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     for order, material in iter_manifest_material_rows(manifest):
         raw_slot = material.get("slot")
         slot = coerce_material_slot(raw_slot)
-        name = material.get("name", "")
+        raw_name = material.get("name", "")
+        name = coerce_material_name(raw_name)
+        if not name:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_material_name",
+                    "manifest_order": order,
+                    "material": raw_name,
+                    "name_type": type(raw_name).__name__,
+                    "message": (
+                        "The material manifest has a material row without a non-empty string name. "
+                        "RC request materials are matched to source materials by name, so this row cannot be targeted."
+                    ),
+                }
+            )
         if raw_slot is not None and slot is None:
             diagnostics.append(
                 {
@@ -267,7 +290,22 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     polygon_slots_by_name = {}
     polygon_mismatches = []
     for order, polygon in iter_manifest_polygon_rows(manifest):
-        name = polygon.get("material_name", "")
+        raw_name = polygon.get("material_name", "")
+        name = coerce_material_name(raw_name)
+        if not name:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_polygon_material_name",
+                    "polygon_order": order,
+                    "polygon_material_name": raw_name,
+                    "name_type": type(raw_name).__name__,
+                    "message": (
+                        "The material manifest has polygon evidence without a non-empty string material name. "
+                        "The converter cannot prove which source material this polygon used."
+                    ),
+                }
+            )
         raw_slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot")))
         if raw_slot is None or not name:
             continue
@@ -383,7 +421,9 @@ def material_manifest_materials(source_materials, material_manifest_info=None):
         slot = coerce_material_slot(material.get("slot"))
         if slot is None:
             continue
-        name = material.get("name", "")
+        name = coerce_material_name(material.get("name", ""))
+        if not name:
+            continue
         merged = dict(source_by_name.get(name, {}))
         merged.update(
             {

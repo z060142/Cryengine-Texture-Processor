@@ -1,6 +1,7 @@
 import json
 
 from model_processing.material_manifest import (
+    coerce_material_name,
     coerce_material_slot,
     discover_material_manifest,
     load_material_manifest,
@@ -25,6 +26,17 @@ def test_coerce_material_slot_accepts_only_non_negative_integer_evidence():
     assert coerce_material_slot("1.0") is None
     assert coerce_material_slot("-1") is None
     assert coerce_material_slot(-1) is None
+
+
+def test_coerce_material_name_accepts_only_non_empty_strings():
+    assert coerce_material_name("Stone") == "Stone"
+    assert coerce_material_name(" Stone ") == " Stone "
+
+    assert coerce_material_name("") == ""
+    assert coerce_material_name("   ") == ""
+    assert coerce_material_name(None) == ""
+    assert coerce_material_name(123) == ""
+    assert coerce_material_name(True) == ""
 
 
 def test_discover_material_manifest_prefers_fixture_manifest(tmp_path):
@@ -112,6 +124,23 @@ def test_material_manifest_helpers_skip_invalid_rows():
     assert material_manifest_summary(manifest)["polygon_count"] == 2
     assert material_manifest_table_rows(manifest) == [
         {"slot": 0, "name": "Stone", "source": "MeshA", "local_slot": 0},
+    ]
+
+
+def test_material_manifest_table_rows_blank_invalid_names():
+    manifest = {
+        "manifest_kind": "blender-fbx-material-inspection",
+        "materials": [
+            {"slot": 0, "name": 123},
+            {"slot": 1, "name": "   "},
+            {"slot": 2, "name": "Stone"},
+        ],
+    }
+
+    assert material_manifest_table_rows(manifest) == [
+        {"slot": 0, "name": "", "source": "", "local_slot": None},
+        {"slot": 1, "name": "", "source": "", "local_slot": None},
+        {"slot": 2, "name": "Stone", "source": "", "local_slot": None},
     ]
 
 
@@ -310,6 +339,34 @@ def test_material_manifest_table_diagnostics_reports_invalid_collections_and_row
     assert polygon_row["row_type"] == "bool"
 
 
+def test_material_manifest_table_diagnostics_reports_invalid_names():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": ""},
+                    {"slot": 1, "name": 123},
+                    {"slot": 2, "name": "Stone"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": 123, "material_table_slot": 1},
+                    {"polygon": 2, "material_name": "Stone", "material_table_slot": 2},
+                ],
+            }
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert codes.count("material_manifest_invalid_material_name") == 2
+    assert codes.count("material_manifest_invalid_polygon_material_name") == 2
+    material_name = next(diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_invalid_material_name")
+    polygon_name = next(diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_invalid_polygon_material_name")
+    assert material_name["manifest_order"] == 0
+    assert polygon_name["polygon_order"] == 0
+
+
 def test_material_manifest_materials_skips_invalid_manifest_slots():
     materials = material_manifest_materials(
         [{"name": "Stone"}, {"name": "Metal"}],
@@ -359,6 +416,31 @@ def test_material_manifest_materials_skips_invalid_manifest_rows():
 
     assert [material["name"] for material in materials] == ["Metal"]
     assert materials[0]["mesh_names"] == ["MeshB"]
+
+
+def test_material_manifest_materials_skips_invalid_manifest_names():
+    materials = material_manifest_materials(
+        [{"name": "Stone"}, {"name": "Metal"}],
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": ""},
+                    {"slot": 1, "name": 123},
+                    {"slot": 2, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "object": "MeshNameless", "expected_cgf_material_id": 0},
+                    {"polygon": 1, "object": "MeshNumber", "expected_cgf_material_id": 1},
+                    {"polygon": 2, "object": "MeshMetal", "expected_cgf_material_id": 2},
+                ],
+            }
+        },
+    )
+
+    assert [material["name"] for material in materials] == ["Metal"]
+    assert materials[0]["sub_index"] == 2
+    assert materials[0]["mesh_names"] == ["MeshMetal"]
 
 
 def test_material_manifest_table_diagnostics_reports_out_of_rc_range_slots():

@@ -344,6 +344,37 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_shape():
     assert row_result["polygon_checks"][0]["polygon_order"] == 0
 
 
+def test_evaluate_fixture_material_semantics_reports_invalid_manifest_names():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [
+                {"slot": 0, "name": ""},
+                {"slot": 1, "name": 123},
+                {"slot": 2, "name": "Stone"},
+            ],
+            "polygons": [
+                {"polygon": 0, "material_name": "", "expected_cgf_material_id": 0},
+                {"polygon": 1, "material_name": 123, "expected_cgf_material_id": 1},
+                {"polygon": 2, "material_name": "Stone", "expected_cgf_material_id": 2},
+            ],
+        },
+        {"material_ids": []},
+        [{"name": "Stone", "sub_index": 2}],
+        [{"slot": 2, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    assert result["material_checks"][0]["error"] == "invalid_manifest_material_name"
+    assert result["material_checks"][0]["name_type"] == "str"
+    assert result["material_checks"][1]["error"] == "invalid_manifest_material_name"
+    assert result["material_checks"][1]["name_type"] == "int"
+    assert result["polygon_checks"][0]["error"] == "invalid_manifest_polygon_material_name"
+    assert result["polygon_checks"][0]["name_type"] == "str"
+    assert result["polygon_checks"][1]["error"] == "invalid_manifest_polygon_material_name"
+    assert result["polygon_checks"][1]["name_type"] == "int"
+
+
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():
     manifest = {
         "manifest_kind": "blender-fbx-material-inspection",

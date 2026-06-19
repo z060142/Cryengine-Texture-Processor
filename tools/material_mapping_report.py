@@ -7,6 +7,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from model_processing.material_manifest import (
+    coerce_material_name,
     coerce_material_slot,
     discover_material_manifest,
     iter_manifest_material_rows,
@@ -261,7 +262,24 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
     for _, material in iter_manifest_material_rows(manifest):
         raw_slot = material.get("slot")
         slot = coerce_material_slot(raw_slot)
-        expected_name = material.get("name", "")
+        raw_expected_name = material.get("name", "")
+        expected_name = coerce_material_name(raw_expected_name)
+        if not expected_name:
+            ok = False
+            material_checks.append(
+                {
+                    "ok": False,
+                    "slot": raw_slot,
+                    "expected_name": raw_expected_name,
+                    "request_names": [],
+                    "mtl_slot_name": "",
+                    "request_ok": False,
+                    "mtl_ok": False,
+                    "error": "invalid_manifest_material_name",
+                    "name_type": type(raw_expected_name).__name__,
+                }
+            )
+            continue
         if slot is None:
             ok = False
             material_checks.append(
@@ -353,7 +371,25 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
         polygon_index = int(polygon["polygon"])
         raw_expected_cgf_id = polygon.get("expected_cgf_material_id", polygon.get("material_slot", 0))
         expected_cgf_id = coerce_material_slot(raw_expected_cgf_id)
-        expected_name = polygon.get("material_name", "")
+        raw_expected_name = polygon.get("material_name", "")
+        expected_name = coerce_material_name(raw_expected_name)
+        if not expected_name:
+            ok = False
+            polygon_checks.append(
+                {
+                    "ok": False,
+                    "polygon": polygon_index,
+                    "expected_cgf_material_id": raw_expected_cgf_id,
+                    "actual_cgf_material_id": None,
+                    "expected_name": raw_expected_name,
+                    "request_names_for_actual_id": [],
+                    "mtl_name_for_actual_id": "",
+                    "cgf_id_ok": False,
+                    "error": "invalid_manifest_polygon_material_name",
+                    "name_type": type(raw_expected_name).__name__,
+                }
+            )
+            continue
         if expected_cgf_id is None:
             ok = False
             polygon_checks.append(
