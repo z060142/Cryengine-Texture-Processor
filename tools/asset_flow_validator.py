@@ -73,6 +73,20 @@ def _summary_ok(summary):
     return bool(summary.get("rc_success")) and not bool(summary.get("action_required"))
 
 
+def _check_counts(cases):
+    counts = {}
+    for case in cases:
+        for name, value in (case.get("checks") or {}).items():
+            row = counts.setdefault(name, {"pass": 0, "fail": 0, "na": 0})
+            if value is True:
+                row["pass"] += 1
+            elif value is False:
+                row["fail"] += 1
+            else:
+                row["na"] += 1
+    return counts
+
+
 def _mtl_value_summary(mtl_path):
     if not mtl_path or not os.path.exists(mtl_path):
         return []
@@ -317,12 +331,30 @@ def format_markdown_report(report):
         f"- Cases: {summary.get('case_count', 0)}",
         f"- Passed: {summary.get('ok_count', 0)}",
         f"- Failed: {summary.get('failed_count', 0)}",
-        "",
-        "## Cases",
-        "",
-        "| Case | Type | Result | Checks | Evidence |",
-        "|---|---|---|---|---|",
     ]
+    if summary.get("check_counts"):
+        lines.extend(["", "### Check Coverage", ""])
+        lines.append("| Check | PASS | FAIL | N/A |")
+        lines.append("|---|---:|---:|---:|")
+        for name in sorted(summary.get("check_counts", {})):
+            counts = summary["check_counts"][name]
+            lines.append(
+                "| {name} | {passed} | {failed} | {na} |".format(
+                    name=_md_escape(name),
+                    passed=counts.get("pass", 0),
+                    failed=counts.get("fail", 0),
+                    na=counts.get("na", 0),
+                )
+            )
+    lines.extend(
+        [
+            "",
+            "## Cases",
+            "",
+            "| Case | Type | Result | Checks | Evidence |",
+            "|---|---|---|---|---|",
+        ]
+    )
     for case in report.get("cases", []):
         checks = ", ".join(
             f"{key}={_md_bool(value)}"
@@ -433,6 +465,7 @@ def run_validation(spec):
             "ok_count": sum(1 for case in cases if case.get("ok")),
             "failed_count": sum(1 for case in cases if not case.get("ok")),
             "ok": all(case.get("ok") for case in cases) if cases else False,
+            "check_counts": _check_counts(cases),
         },
         "cases": cases,
     }

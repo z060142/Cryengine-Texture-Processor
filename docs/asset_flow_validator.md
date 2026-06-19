@@ -218,6 +218,23 @@ ok_count: 10
 failed_count: 0
 ```
 
+The report summary includes check coverage so an all-green batch does not hide
+model-only cases:
+
+```text
+manifest_generated: PASS 8, FAIL 0, N/A 0
+model_format_ok: PASS 8, FAIL 0, N/A 0
+material_slots_ok: PASS 8, FAIL 0, N/A 0
+mtl_format_ok: PASS 8, FAIL 0, N/A 0
+texture_format_ok: PASS 4, FAIL 0, N/A 6
+material_texture_ok: PASS 2, FAIL 0, N/A 6
+raw_textures_found: PASS 2, FAIL 0, N/A 0
+texture_processing_started: PASS 2, FAIL 0, N/A 0
+```
+
+Here, `material_texture_ok` being `2 / 0 / 6` means two RC cases exercised
+texture-backed MTL export and six RC cases were intentionally model-only.
+
 That batch included two auto-generated raw texture processing cases:
 
 ```text

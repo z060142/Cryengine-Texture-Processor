@@ -55,6 +55,7 @@ def test_texture_gate_case_reports_processed_outputs(tmp_path):
 
     assert report["summary"]["ok"] is True
     assert report["cases"][0]["checks"]["texture_format_ok"] is True
+    assert report["summary"]["check_counts"]["texture_format_ok"] == {"pass": 1, "fail": 0, "na": 0}
 
 
 def test_texture_process_case_reports_raw_to_processed_flow(monkeypatch, tmp_path):
@@ -126,6 +127,10 @@ def test_format_markdown_report_summarizes_cases():
                 "case_count": 1,
                 "ok_count": 1,
                 "failed_count": 0,
+                "check_counts": {
+                    "model_format_ok": {"pass": 1, "fail": 0, "na": 0},
+                    "texture_format_ok": {"pass": 1, "fail": 0, "na": 1},
+                },
             },
             "cases": [
                 {
@@ -166,6 +171,9 @@ def test_format_markdown_report_summarizes_cases():
     assert "asset" in markdown
     assert "model_format_ok=PASS" in markdown
     assert "texture_format_ok=N/A" in markdown
+    assert "### Check Coverage" in markdown
+    assert "| model_format_ok | 1 | 0 | 0 |" in markdown
+    assert "| texture_format_ok | 1 | 0 | 1 |" in markdown
     assert "S:/out/asset.cgf" in markdown
     assert "source_texture_count=5" in markdown
     assert "texture_limit_applied=true" in markdown
