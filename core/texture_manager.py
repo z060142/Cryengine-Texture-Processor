@@ -64,6 +64,13 @@ class TextureGroup:
             "emissive": None,
             "sss": None
         }
+        self.output_policy = {
+            "entries": [],
+            "diagnostics": [],
+            "diagnostic_count": 0,
+            "ok": True,
+        }
+        self.output_diagnostics = []
     
     def add_texture(self, texture_type, texture):
         """

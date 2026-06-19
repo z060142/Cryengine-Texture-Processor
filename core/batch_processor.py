@@ -24,6 +24,7 @@ from output_formats.ddna_exporter import DDNAExporter
 from output_formats.displ_exporter import DisplExporter
 from output_formats.emissive_exporter import EmissiveExporter
 from output_formats.sss_exporter import SSSExporter
+from output_formats.texture_output_diagnostics import build_texture_output_policy
 
 class BatchProcessor:
     """
@@ -409,6 +410,9 @@ class BatchProcessor:
             output_path = self.sss_exporter.export(group, self.settings, self.output_dir)
             if output_path:
                 group.output["sss"] = output_path
+
+        group.output_policy = build_texture_output_policy(group.output)
+        group.output_diagnostics = group.output_policy["diagnostics"]
 
     # Corrected function definition to accept stage_text
     def _update_progress(self, progress, stage_text, current=None, status=None):
