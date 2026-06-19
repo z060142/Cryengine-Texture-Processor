@@ -63,6 +63,10 @@
 
 旧 Tkinter 入口在迁移期间保留为 `legacy_tk_main.py`。
 
+## 重构范围
+
+第一阶段范围已固定在 [`docs/phase1_refactor_scope.md`](docs/phase1_refactor_scope.md)。除非是修复第一阶段自身引入的 regression，否则不应再新增第一阶段工作。
+
 ## 使用方法
 
 ### 导入贴图

@@ -65,6 +65,10 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
 
 The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migration.
 
+## Refactor Scope
+
+Phase 1 is bounded in [`docs/phase1_refactor_scope.md`](docs/phase1_refactor_scope.md). New Phase 1 work should not be added unless it fixes a regression introduced by Phase 1 itself.
+
 ## Usage
 
 ### Importing Textures
