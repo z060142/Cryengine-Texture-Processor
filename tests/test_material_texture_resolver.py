@@ -420,3 +420,35 @@ def test_build_mtl_material_data_uses_external_obj_mtl_evidence_when_fbx_refs_mi
     assert result[0]["textures"]["specular"] == str(tmp_path / "KB3D_DKF_metalA_spec.tif")
     assert result[0]["textures"]["normal"] == str(tmp_path / "KB3D_DKF_metalA_ddna.tif")
     assert result[0]["texture_ref_evidence"][0]["source_mode"] == "external_obj_mtl"
+
+
+def test_build_mtl_material_data_loose_matches_external_obj_mtl_material_names(tmp_path):
+    (tmp_path / "Weed_B_diff.tif").write_text("fake diff")
+    model_data = {
+        "materials": [{"name": "Weed_B_mat"}],
+        "external_material_texture_evidence": {
+            "materials": [
+                {
+                    "name": "Weed_bSG",
+                    "textures": [
+                        {
+                            "statement": "map_Kd",
+                            "texture_type": "diffuse",
+                            "file": "Weed_B_a.tga",
+                        },
+                    ],
+                }
+            ]
+        },
+    }
+
+    records = build_material_texture_records(
+        model_data,
+        [],
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert records[0]["base_name"] == "Weed_B"
+    assert records[0]["textures"]["diffuse"] == str(tmp_path / "Weed_B_diff.tif")

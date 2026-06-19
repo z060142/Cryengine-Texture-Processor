@@ -19,6 +19,17 @@ def test_texture_manager_deduplicates_absolute_paths_and_groups_by_base(tmp_path
     assert [group.base_name for group in manager.get_all_groups()] == ["wall"]
 
 
+def test_texture_manager_treats_short_a_suffix_as_diffuse_for_asset_packs(tmp_path):
+    texture_path = tmp_path / "Weed_B_a.tga"
+    texture_path.write_text("texture", encoding="utf-8")
+    manager = TextureManager()
+
+    texture = manager.add_texture(str(texture_path))
+
+    assert texture["type"] == "diffuse"
+    assert texture["base_name"] == "Weed_B"
+
+
 def test_texture_manager_reclassifies_existing_texture_between_slots(tmp_path):
     texture_path = tmp_path / "wall_diff.png"
     texture_path.write_text("texture", encoding="utf-8")

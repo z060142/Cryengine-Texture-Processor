@@ -8,6 +8,7 @@ place so the next phase can swap them for RC-accurate material/sub-index logic.
 """
 
 import os
+import re
 
 from model_processing.material_manifest import material_manifest_materials
 from model_processing.texture_type_resolver import FILENAME_SUFFIX_TYPES, infer_texture_type_from_path
@@ -177,13 +178,33 @@ def _external_material_texture_table(model_data):
                 for texture_type, texture_path in textures.items()
                 if texture_path
             ]
-        table[str(material_name)] = [texture for texture in textures if isinstance(texture, dict)]
+        texture_rows = [texture for texture in textures if isinstance(texture, dict)]
+        material_name = str(material_name)
+        table[material_name] = texture_rows
+        normalized_name = _loose_material_key(material_name)
+        if normalized_name and normalized_name not in table:
+            table[normalized_name] = texture_rows
     return table
+
+
+def _loose_material_key(material_name):
+    key = str(material_name or "").lower()
+    key = re.sub(r"(?:_?mat|_?sg)$", "", key)
+    key = re.sub(r"[^a-z0-9]+", "", key)
+    return key
+
+
+def _external_refs_for_material(external_refs_by_material, material_name):
+    return (
+        external_refs_by_material.get(material_name)
+        or external_refs_by_material.get(_loose_material_key(material_name))
+        or []
+    )
 
 
 def external_texture_evidence(material_name, model_data):
     """Return optional OBJ-MTL/native evidence rows for a material name."""
-    rows = _external_material_texture_table(model_data).get(material_name, [])
+    rows = _external_refs_for_material(_external_material_texture_table(model_data), material_name)
     evidence = []
     for row in rows:
         ref_path = row.get("file") or row.get("path") or row.get("filename") or ""
@@ -375,7 +396,7 @@ def build_material_texture_records(
             **overrides_by_name.get(material_name, {}),
         }
         material_refs = refs_by_material.get(material_name, [])
-        external_refs = external_refs_by_material.get(material_name, [])
+        external_refs = _external_refs_for_material(external_refs_by_material, material_name)
         base_name = resolve_base_name(material_refs, texture_manager, external_refs=external_refs)
         processed_textures = find_processed_textures(
             base_name,

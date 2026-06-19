@@ -6,7 +6,8 @@
         "basecolor",
         "color",
         "col",
-        "_d"
+        "a",
+        "d"
     ],
     "normal": [
         "normal",
@@ -61,8 +62,7 @@
     "alpha": [
         "alpha",
         "opacity",
-        "transparency",
-        "_a"
+        "transparency"
     ],
     "emissive": [
         "emissive",

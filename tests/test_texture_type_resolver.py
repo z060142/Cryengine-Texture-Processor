@@ -41,6 +41,7 @@ def test_normalize_texture_type_handles_blender_socket_names_and_ce_maps():
 
 def test_infer_texture_type_from_path_uses_shared_suffix_priority():
     assert infer_texture_type_from_path("wall_diff.tif") == "diffuse"
+    assert infer_texture_type_from_path("wall_a.tif") == "diffuse"
     assert infer_texture_type_from_path("wall_ddna.tif") == "normal"
     assert infer_texture_type_from_path("wall_spec.tif") == "specular"
     assert infer_texture_type_from_path("wall_displ.tif") == "displacement"
