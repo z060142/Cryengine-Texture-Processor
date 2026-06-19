@@ -10,19 +10,10 @@ from model_processing.texture_type_resolver import (
     normalize_texture_type,
 )
 from output_formats.cryengine_mtl_schema import (
-    BASE_PUBLIC_PARAMS,
     CE_TEXTURE_MAP_TYPES,
     SUB_MATERIAL_DEFAULT_ATTRS,
-    exported_gen_mask,
-    exported_string_gen_mask,
+    exported_material_shader_policy,
 )
-
-TEXTURE_MASK_TOKENS = {
-    "normal": "%NORMAL_MAP",
-    "specular": "%SPECULAR_MAP",
-    "displacement": "%DISPLACEMENT_MAPPING",
-    "subsurface": "%SUBSURFACE_SCATTERING",
-}
 
 
 def _coerce_material_name(material):
@@ -69,22 +60,19 @@ def _texture_map_to_ce_fields(textures):
 
 
 def _shader_masks_for_textures(textures):
-    tokens = {"%SUBSURFACE_SCATTERING"}
-    for texture_type in textures:
-        token = TEXTURE_MASK_TOKENS.get(texture_type)
-        if token:
-            tokens.add(token)
-    return exported_gen_mask(tokens), exported_string_gen_mask(tokens)
+    policy = exported_material_shader_policy(textures)
+    return policy["gen_mask"], policy["string_gen_mask"]
 
 
 class MaterialConverter:
     """Convert material dictionaries to the conservative CryEngine material shape."""
 
     def __init__(self):
+        shader_policy = exported_material_shader_policy({})
         self.cryengine_template = {
             "Shader": SUB_MATERIAL_DEFAULT_ATTRS["Shader"],
-            "GenMask": str(exported_gen_mask({"%SUBSURFACE_SCATTERING"})),
-            "StringGenMask": exported_string_gen_mask({"%SUBSURFACE_SCATTERING"}),
+            "GenMask": str(shader_policy["gen_mask"]),
+            "StringGenMask": shader_policy["string_gen_mask"],
             "SubMtlCount": "0",
             "Textures": {
                 "Diffuse": "",
@@ -95,7 +83,7 @@ class MaterialConverter:
                 "Opacity": "",
                 "SubSurface": "",
             },
-            "PublicParams": dict(BASE_PUBLIC_PARAMS),
+            "PublicParams": dict(shader_policy["public_params"]),
         }
 
     def convert(self, material, texture_map):

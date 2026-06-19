@@ -148,6 +148,14 @@ EXPORT_COMPAT_SHADER_MASKS = {
     "%SUBSURFACE_SCATTERING": 0x20,
 }
 
+EXPORT_SHADER_TOKEN_BY_TEXTURE_TYPE = {
+    "normal": ["%NORMAL_MAP"],
+    "specular": ["%SPECULAR_MAP"],
+    "displacement": ["%DISPLACEMENT_MAPPING", "%PHONG_TESSELLATION"],
+}
+
+EXPORT_DEFAULT_SHADER_TOKENS = ["%SUBSURFACE_SCATTERING"]
+
 ALPHA_TEXTURE_TYPES = {"alpha", "transparency", "opacity", "mask"}
 
 SUB_MATERIAL_DEFAULT_ATTRS = {
@@ -185,6 +193,68 @@ def exported_gen_mask(tokens):
     for token in tokens:
         gen_mask |= EXPORT_COMPAT_SHADER_MASKS[token]
     return gen_mask
+
+
+def exported_material_shader_policy(textures):
+    """
+    Return the current exporter shader-mask/PublicParams policy for texture inputs.
+
+    This intentionally preserves the current compatibility GenMask values while
+    making the guessed/exporter-owned pieces visible to reports and tests.
+    """
+    texture_keys = {
+        str(texture_type).lower()
+        for texture_type, texture_path in (textures or {}).items()
+        if texture_path
+    }
+    tokens = list(EXPORT_DEFAULT_SHADER_TOKENS)
+    token_reasons = {
+        token: {
+            "source": "exporter_default_compatibility",
+            "texture_type": "",
+        }
+        for token in EXPORT_DEFAULT_SHADER_TOKENS
+    }
+    public_params = dict(BASE_PUBLIC_PARAMS)
+    public_param_reasons = {
+        name: {
+            "source": "exporter_base_compatibility",
+        }
+        for name in public_params
+    }
+
+    for texture_type in sorted(texture_keys):
+        for token in EXPORT_SHADER_TOKEN_BY_TEXTURE_TYPE.get(texture_type, []):
+            tokens.append(token)
+            token_reasons[token] = {
+                "source": "texture_presence",
+                "texture_type": texture_type,
+            }
+
+    if "displacement" in texture_keys:
+        public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
+        for name in DISPLACEMENT_PUBLIC_PARAMS:
+            public_param_reasons[name] = {
+                "source": "displacement_texture_compatibility",
+                "texture_type": "displacement",
+            }
+
+    return {
+        "tokens": sorted(set(tokens)),
+        "token_reasons": token_reasons,
+        "gen_mask": exported_gen_mask(tokens),
+        "gen_mask_source": "EXPORT_COMPAT_SHADER_MASKS",
+        "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "string_gen_mask": exported_string_gen_mask(tokens),
+        "string_gen_mask_source": "source_backed_token_names",
+        "public_params": public_params,
+        "public_param_reasons": public_param_reasons,
+        "public_params_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "source_evidence": {
+            "shader_mask_load_policy": MTL_SHADER_MASK_LOAD_POLICY,
+            "public_params_policy": MTL_PUBLIC_PARAMS_POLICY,
+        },
+    }
 
 
 def _parse_int_attr(value):

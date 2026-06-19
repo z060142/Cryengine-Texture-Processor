@@ -10,6 +10,7 @@ from output_formats.cryengine_mtl_schema import (
     MTL_SHADER_MASK_LOAD_POLICY,
     analyze_public_params,
     exported_gen_mask,
+    exported_material_shader_policy,
     exported_string_gen_mask,
     parse_public_param_value,
     shader_mask_load_policy,
@@ -59,6 +60,44 @@ def test_exported_gen_mask_preserves_current_export_compat_values():
         | EXPORT_COMPAT_SHADER_MASKS["%NORMAL_MAP"]
         | EXPORT_COMPAT_SHADER_MASKS["%SPECULAR_MAP"]
     )
+
+
+def test_exported_material_shader_policy_exposes_current_compatibility_rules():
+    policy = exported_material_shader_policy(
+        {
+            "normal": "asset_ddn.dds",
+            "specular": "asset_spec.dds",
+            "displacement": "asset_displ.dds",
+            "diffuse": "asset_diff.dds",
+        }
+    )
+
+    assert policy["tokens"] == [
+        "%DISPLACEMENT_MAPPING",
+        "%NORMAL_MAP",
+        "%PHONG_TESSELLATION",
+        "%SPECULAR_MAP",
+        "%SUBSURFACE_SCATTERING",
+    ]
+    assert policy["string_gen_mask"] == (
+        "%DISPLACEMENT_MAPPING%NORMAL_MAP%PHONG_TESSELLATION%SPECULAR_MAP%SUBSURFACE_SCATTERING"
+    )
+    assert policy["gen_mask"] == exported_gen_mask(policy["tokens"])
+    assert policy["gen_mask_policy"] == "compatibility_preserved_until_roundtrip_evidence"
+    assert policy["string_gen_mask_source"] == "source_backed_token_names"
+    assert policy["token_reasons"]["%NORMAL_MAP"] == {
+        "source": "texture_presence",
+        "texture_type": "normal",
+    }
+    assert policy["token_reasons"]["%SUBSURFACE_SCATTERING"] == {
+        "source": "exporter_default_compatibility",
+        "texture_type": "",
+    }
+    assert policy["public_params"]["TessellationFactorMax"] == "32"
+    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
+        "source": "displacement_texture_compatibility",
+        "texture_type": "displacement",
+    }
 
 
 def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():

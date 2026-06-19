@@ -17,10 +17,8 @@ from output_formats.cryengine_mtl_schema import (
     ALPHA_TEXTURE_TYPES,
     BASE_PUBLIC_PARAMS,
     CE_TEXTURE_MAP_TYPES,
-    DISPLACEMENT_PUBLIC_PARAMS,
     SUB_MATERIAL_DEFAULT_ATTRS,
-    exported_gen_mask,
-    exported_string_gen_mask,
+    exported_material_shader_policy,
 )
 from model_processing.material_index_assigner import (
     parse_mtl_submaterial_names,
@@ -187,23 +185,12 @@ def _append_texture_entries(textures_elem, textures, model_output_dir, material_
 
 
 def _shader_masks_and_public_params(textures):
-    textures = _normalize_texture_keys(textures)
-    string_gen_mask_parts = ["%SUBSURFACE_SCATTERING"]
-    public_params = dict(BASE_PUBLIC_PARAMS)
-
-    if "normal" in textures:
-        string_gen_mask_parts.append("%NORMAL_MAP")
-    if "specular" in textures:
-        string_gen_mask_parts.append("%SPECULAR_MAP")
-    if "displacement" in textures:
-        string_gen_mask_parts.append("%DISPLACEMENT_MAPPING")
-        string_gen_mask_parts.append("%PHONG_TESSELLATION")
-        public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
+    policy = exported_material_shader_policy(_normalize_texture_keys(textures))
 
     return (
-        exported_gen_mask(string_gen_mask_parts),
-        exported_string_gen_mask(string_gen_mask_parts),
-        public_params,
+        policy["gen_mask"],
+        policy["string_gen_mask"],
+        policy["public_params"],
     )
 
 
