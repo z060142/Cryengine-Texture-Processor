@@ -283,6 +283,27 @@ def test_build_material_diagnostics_report_includes_invalid_manifest_slot_diagno
     assert report["summary"]["hazard_count"] >= 2
 
 
+def test_build_material_diagnostics_report_includes_invalid_manifest_polygon_indices():
+    report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Stone"}],
+                "polygons": [
+                    {"material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": True, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": "2", "material_name": "Stone", "material_table_slot": 0},
+                ],
+            }
+        },
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert codes.count("material_manifest_invalid_polygon_index") == 2
+    assert report["summary"]["hazard_count"] >= 2
+
+
 def test_build_material_diagnostics_report_includes_invalid_manifest_shape_diagnostics():
     root_report = build_material_diagnostics_report(
         [{"name": "Stone", "id": 1}],

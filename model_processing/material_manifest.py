@@ -109,6 +109,10 @@ def coerce_material_slot(value):
     return slot
 
 
+def coerce_polygon_index(value):
+    return coerce_material_slot(value)
+
+
 def coerce_material_name(value):
     if not isinstance(value, str):
         return ""
@@ -290,6 +294,22 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     polygon_slots_by_name = {}
     polygon_mismatches = []
     for order, polygon in iter_manifest_polygon_rows(manifest):
+        raw_polygon_index = polygon.get("polygon")
+        polygon_index = coerce_polygon_index(raw_polygon_index)
+        if polygon_index is None:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_polygon_index",
+                    "polygon_order": order,
+                    "polygon": raw_polygon_index,
+                    "index_type": type(raw_polygon_index).__name__,
+                    "message": (
+                        "The material manifest has polygon evidence without a non-negative integer polygon index. "
+                        "Semantic material reports cannot tie this row to a source polygon."
+                    ),
+                }
+            )
         raw_name = polygon.get("material_name", "")
         name = coerce_material_name(raw_name)
         if not name:

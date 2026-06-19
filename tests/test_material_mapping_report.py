@@ -375,6 +375,39 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_names():
     assert result["polygon_checks"][1]["name_type"] == "int"
 
 
+def test_evaluate_fixture_material_semantics_reports_invalid_polygon_indices():
+    result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [{"slot": 0, "name": "Stone"}],
+            "polygons": [
+                {"material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 0.0},
+                {"polygon": -1, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 3.0},
+                {"polygon": True, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 6.0},
+                {"polygon": 1.5, "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": 9.0},
+                {"polygon": "4", "material_name": "Stone", "expected_cgf_material_id": 0, "center_x": "bad-center"},
+            ],
+        },
+        {
+            "meshes": [
+                {
+                    "chunk_id": 10,
+                    "subsets": [{"subset": 0, "center": [12.0, 0.0, 0.0], "material_id": 0}],
+                }
+            ]
+        },
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not result["ok"]
+    invalid_checks = [check for check in result["polygon_checks"] if check.get("error") == "invalid_manifest_polygon_index"]
+    assert [check["polygon"] for check in invalid_checks] == [None, -1, True, 1.5]
+    assert [check["polygon_order"] for check in invalid_checks] == [0, 1, 2, 3]
+    assert result["polygon_checks"][-1]["polygon"] == 4
+    assert result["polygon_checks"][-1]["ok"]
+
+
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():
     manifest = {
         "manifest_kind": "blender-fbx-material-inspection",

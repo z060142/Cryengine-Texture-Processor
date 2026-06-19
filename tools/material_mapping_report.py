@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from model_processing.material_manifest import (
     coerce_material_name,
     coerce_material_slot,
+    coerce_polygon_index,
     discover_material_manifest,
     iter_manifest_material_rows,
     iter_manifest_polygon_rows,
@@ -155,7 +156,14 @@ def _fixture_polygon_actual_ids(manifest, cgf_material_summary):
     center_lookup = {}
     for _, polygon in iter_manifest_polygon_rows(manifest):
         if "center_x" in polygon:
-            center_lookup[round(float(polygon["center_x"]), 4)] = int(polygon["polygon"])
+            polygon_index = coerce_polygon_index(polygon.get("polygon"))
+            if polygon_index is None:
+                continue
+            try:
+                center_x = round(float(polygon["center_x"]), 4)
+            except (TypeError, ValueError):
+                continue
+            center_lookup[center_x] = polygon_index
 
     actual_by_polygon = {}
     subset_entries = []
@@ -367,8 +375,27 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
                     }
                 )
 
-    for _, polygon in iter_manifest_polygon_rows(manifest):
-        polygon_index = int(polygon["polygon"])
+    for order, polygon in iter_manifest_polygon_rows(manifest):
+        raw_polygon_index = polygon.get("polygon")
+        polygon_index = coerce_polygon_index(raw_polygon_index)
+        if polygon_index is None:
+            ok = False
+            polygon_checks.append(
+                {
+                    "ok": False,
+                    "polygon": raw_polygon_index,
+                    "expected_cgf_material_id": None,
+                    "actual_cgf_material_id": None,
+                    "expected_name": "",
+                    "request_names_for_actual_id": [],
+                    "mtl_name_for_actual_id": "",
+                    "cgf_id_ok": False,
+                    "error": "invalid_manifest_polygon_index",
+                    "polygon_order": order,
+                    "index_type": type(raw_polygon_index).__name__,
+                }
+            )
+            continue
         raw_expected_cgf_id = polygon.get("expected_cgf_material_id", polygon.get("material_slot", 0))
         expected_cgf_id = coerce_material_slot(raw_expected_cgf_id)
         raw_expected_name = polygon.get("material_name", "")

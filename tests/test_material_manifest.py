@@ -3,6 +3,7 @@ import json
 from model_processing.material_manifest import (
     coerce_material_name,
     coerce_material_slot,
+    coerce_polygon_index,
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
@@ -26,6 +27,17 @@ def test_coerce_material_slot_accepts_only_non_negative_integer_evidence():
     assert coerce_material_slot("1.0") is None
     assert coerce_material_slot("-1") is None
     assert coerce_material_slot(-1) is None
+
+
+def test_coerce_polygon_index_accepts_only_non_negative_integer_evidence():
+    assert coerce_polygon_index(0) == 0
+    assert coerce_polygon_index(" 12 ") == 12
+
+    assert coerce_polygon_index(None) is None
+    assert coerce_polygon_index(True) is None
+    assert coerce_polygon_index(1.0) is None
+    assert coerce_polygon_index("-1") is None
+    assert coerce_polygon_index(-1) is None
 
 
 def test_coerce_material_name_accepts_only_non_empty_strings():
@@ -365,6 +377,31 @@ def test_material_manifest_table_diagnostics_reports_invalid_names():
     polygon_name = next(diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_invalid_polygon_material_name")
     assert material_name["manifest_order"] == 0
     assert polygon_name["polygon_order"] == 0
+
+
+def test_material_manifest_table_diagnostics_reports_invalid_polygon_indices():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Stone"}],
+                "polygons": [
+                    {"material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": -1, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": True, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": 1.5, "material_name": "Stone", "material_table_slot": 0},
+                    {"polygon": "4", "material_name": "Stone", "material_table_slot": 0},
+                ],
+            }
+        }
+    )
+
+    index_diagnostics = [
+        diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_invalid_polygon_index"
+    ]
+    assert [diagnostic["polygon"] for diagnostic in index_diagnostics] == [None, -1, True, 1.5]
+    assert [diagnostic["polygon_order"] for diagnostic in index_diagnostics] == [0, 1, 2, 3]
+    assert index_diagnostics[2]["index_type"] == "bool"
 
 
 def test_material_manifest_materials_skips_invalid_manifest_slots():

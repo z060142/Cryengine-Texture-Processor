@@ -166,6 +166,28 @@ def test_collect_model_material_diagnostics_reports_invalid_manifest_slots():
     assert "material_manifest_invalid_polygon_slot" in codes
 
 
+def test_collect_model_material_diagnostics_reports_invalid_manifest_polygon_indices():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [{"slot": 0, "name": "Stone"}],
+                    "polygons": [
+                        {"material_name": "Stone", "material_table_slot": 0},
+                        {"polygon": True, "material_name": "Stone", "material_table_slot": 0},
+                        {"polygon": "2", "material_name": "Stone", "material_table_slot": 0},
+                    ],
+                }
+            },
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert codes.count("material_manifest_invalid_polygon_index") == 2
+
+
 def test_collect_model_material_diagnostics_reports_invalid_manifest_shape():
     root_diagnostics = collect_model_material_diagnostics(
         {
