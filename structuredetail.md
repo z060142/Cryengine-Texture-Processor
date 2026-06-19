@@ -26,11 +26,11 @@
     *   **功能 (Function):** 提供批次處理 `TextureGroup` 物件的功能。
     *   **相依性 (Dependencies - 專案模組):** `core.texture_manager.TextureManager`, `core.name_parser.TextureNameParser`, `intermediate_formats.albedo_processor.AlbedoProcessor`, `intermediate_formats.normal_processor.NormalProcessor`, `intermediate_formats.reflection_processor.ReflectionProcessor`, `intermediate_formats.glossiness_processor.GlossinessProcessor`, `intermediate_formats.height_processor.HeightProcessor`, `intermediate_formats.ao_processor.AOProcessor`, `intermediate_formats.arm_processor.ARMProcessor`, `output_formats.diff_exporter.DiffExporter`, `output_formats.spec_exporter.SpecExporter`, `output_formats.ddna_exporter.DDNAExporter`, `output_formats.displ_exporter.DisplExporter`, `output_formats.emissive_exporter.EmissiveExporter`, `output_formats.sss_exporter.SSSExporter`
 *   **`core/material_manager.py`**:
-    *   **功能 (Function):** 提供管理材質的功能，包括建立、更新和轉換為 CryEngine 格式。
+    *   **功能 (Function):** Phase 1 中定位為相容用的 in-memory 材質 registry；不是目前 `.mtl` 生成主路徑。
     *   **相依性 (Dependencies):** 無
 *   **`core/model_manager.py`**:
-    *   **功能 (Function):** 提供管理模型載入、紋理提取和更新的功能。
-    *   **相依性 (Dependencies):** 無
+    *   **功能 (Function):** Phase 1 中定位為 legacy compatibility facade；目前模型載入/匯出主路徑在 `model_processing`。
+    *   **相依性 (Dependencies):** `os`
 *   **`core/name_parser.py`**:
     *   **功能 (Function):** 解析紋理文件名以提取紋理類型和基本名稱信息。
     *   **相依性 (Dependencies):** `core.texture_analyzer.TextureAnalyzer`
@@ -38,7 +38,7 @@
     *   **功能 (Function):** 分析紋理以確定其類型。
     *   **相依性 (Dependencies):** `PIL.Image`, `PIL.ImageStat`, `os`, `numpy`
 *   **`core/texture_manager.py`**:
-    *   **功能 (Function):** 管理紋理分類、分組和處理。
+    *   **功能 (Function):** 管理貼圖分類、去重、分組與 UI-facing group state；實際影像處理由 `core.batch_processor` 和各 processor/exporter 執行。
     *   **相依性 (Dependencies):** `core.name_parser.TextureNameParser`
 
 ## `examples` 目錄檔案

@@ -5,7 +5,18 @@ Model Manager
 
 This module provides functionality for managing models, including
 loading, texture extraction, and material updates.
+
+Phase 1 contract:
+This is a legacy compatibility facade. The active model pipeline is
+model_processing.model_loader, texture_extractor, model_export_context, and
+fbx_exporter. This class preserves its old minimal return shapes for any older
+scripts that still instantiate it, but it must not be treated as a complete
+model conversion backend.
 """
+
+import os
+
+LEGACY_MODEL_MANAGER_STATUS = "legacy_compatibility_facade"
 
 class ModelManager:
     """
@@ -19,6 +30,7 @@ class ModelManager:
         self.current_model = None
         self.texture_references = []
         self.processed_texture_map = {}
+        self.manager_status = LEGACY_MODEL_MANAGER_STATUS
     
     def load_model(self, file_path):
         """
@@ -30,18 +42,16 @@ class ModelManager:
         Returns:
             Loaded model object or None if loading failed
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would use PyAssimp to load the model
-        
         print(f"Loading model from {file_path}")
         self.current_model = {
             "path": file_path,
-            "filename": file_path.split("/")[-1],
+            "filename": os.path.basename(file_path),
+            "manager_status": self.manager_status,
+            "load_status": "legacy_stub",
             "materials": [],
             "meshes": []
         }
         
-        # Extract texture references (in actual implementation, would be done by PyAssimp)
         self._extract_texture_references()
         
         return self.current_model
@@ -53,14 +63,7 @@ class ModelManager:
         Returns:
             List of texture references
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would extract texture paths from the model's materials
-        
         self.texture_references = []
-        
-        # Placeholder: In actual implementation, would iterate through materials
-        # and extract texture paths for different texture types
-        
         return self.texture_references
     
     def match_textures_with_processed(self, processed_textures):
@@ -73,14 +76,8 @@ class ModelManager:
         Returns:
             Dictionary mapping original texture paths to processed texture paths
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would match based on filename similarity or user selection
-        
         self.processed_texture_map = {}
-        
-        # Placeholder: In actual implementation, would find the best match
-        # for each texture reference in the processed textures
-        
+        del processed_textures
         return self.processed_texture_map
     
     def update_materials(self):
@@ -90,15 +87,10 @@ class ModelManager:
         Returns:
             Updated model object
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would modify the model's materials to use processed textures
-        
         if not self.current_model or not self.processed_texture_map:
             return None
-        
-        # Placeholder: In actual implementation, would update material properties
-        # and texture paths in the model
-        
+
+        self.current_model["processed_texture_map"] = dict(self.processed_texture_map)
         return self.current_model
     
     def export_model(self, output_path, texture_output_dir=None):
@@ -112,15 +104,9 @@ class ModelManager:
         Returns:
             Path to the exported model or None if export failed
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would use PyAssimp to export the model
-        
         if not self.current_model:
             return None
         
         print(f"Exporting model to {output_path}")
-        
-        # Placeholder: In actual implementation, would configure export settings,
-        # update texture paths to be relative to the model, and export the model
-        
+        del texture_output_dir
         return output_path

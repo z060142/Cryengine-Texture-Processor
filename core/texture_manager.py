@@ -5,6 +5,11 @@ Texture Manager
 
 This module provides functionality for managing textures, including
 classification, grouping, and processing.
+
+Phase 1 contract:
+TextureManager and TextureGroup own classification, de-duplication, grouping,
+and UI-facing group state. Actual image processing is performed by
+core.batch_processor.BatchProcessor and the intermediate/output processors.
 """
 
 import os
@@ -97,7 +102,11 @@ class TextureGroup:
     
     def generate_intermediate_formats(self, settings=None):
         """
-        Generate intermediate texture formats from input textures.
+        Return the current intermediate texture paths.
+
+        This method is kept for compatibility with older callers. The active
+        processing path is BatchProcessor, which mutates `self.intermediate`
+        after running the concrete processors.
         
         Args:
             settings: Dictionary of processing settings
@@ -105,35 +114,15 @@ class TextureGroup:
         Returns:
             Dictionary of generated intermediate formats
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would use the appropriate processors to generate intermediates
-        
-        # Process ARM texture if available (extract AO, Roughness, Metallic)
-        if self.has_texture("arm"):
-            # Example pseudocode:
-            # arm_processor = ARMProcessor()
-            # result = arm_processor.process(self.textures["arm"])
-            # self.textures["ao"] = result["ao"]
-            # self.textures["roughness"] = result["roughness"]
-            # self.textures["metallic"] = result["metallic"]
-            pass
-        
-        # Process standard textures
-        # Example pseudocode:
-        # if self.has_texture("diffuse"):
-        #     self.intermediate["albedo"] = albedo_processor.process(self.textures["diffuse"])
-        
-        # Process metallic texture based on settings
-        if settings and "process_metallic" in settings and settings["process_metallic"] and self.has_texture("metallic"):
-            # Example pseudocode:
-            # Convert metallic + diffuse to albedo + reflection as in refl.py
-            pass
-        
+        del settings
         return self.intermediate
     
     def generate_output_formats(self, settings):
         """
-        Generate CryEngine output formats from intermediate formats.
+        Return the current CryEngine output texture paths.
+
+        This method is kept for compatibility with older callers. BatchProcessor
+        is responsible for generating actual output files.
         
         Args:
             settings: Export settings dictionary
@@ -141,12 +130,7 @@ class TextureGroup:
         Returns:
             Dictionary of generated output formats
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would use the appropriate exporters to generate outputs
-        
-        # Example pseudocode:
-        # self.output["diff"] = diff_exporter.export(self.intermediate, settings)
-        
+        del settings
         return self.output
 
 
@@ -229,7 +213,6 @@ class TextureManager:
             return None # Indicate duplicate
         # --- End Check ---
 
-        # Create texture object (simplified for placeholder)
         texture = {
             "path": file_path, # Store original path for reference if needed
             "abs_path": abs_file_path, # Store absolute path for reliable checking
@@ -333,8 +316,10 @@ class TextureManager:
                 group.add_texture(new_type, texture)
                 return True
                 
-            # If it was another type, need to handle the replacement
-            # (In a real implementation, would need to find the texture and move it)
+            if old_type in group.textures and group.textures[old_type] is texture:
+                group.textures[old_type] = None
+                group.add_texture(new_type, texture)
+                return True
         
         return False
     

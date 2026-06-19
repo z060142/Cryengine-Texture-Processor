@@ -74,6 +74,8 @@ commit and docs are added
 
 ### P1-3: Bound Core Placeholder Modules
 
+Status: done in `refactor_phase50_core_manager_contracts.md`.
+
 Problem:
 
 These modules still contain placeholder-style manager code:

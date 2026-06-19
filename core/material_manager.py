@@ -5,6 +5,10 @@ Material Manager
 
 This module provides functionality for managing materials, including
 creation, updating, and conversion to CryEngine format.
+
+Phase 1 contract:
+This module is a small in-memory material registry used for compatibility with
+older code. The active CryEngine .mtl generation path is output_formats.mtl_exporter.
 """
 
 class Material:
@@ -136,9 +140,6 @@ class MaterialManager:
         if not material:
             return None
         
-        # Update material properties for CryEngine
-        # These would be adjusted based on CryEngine material requirements
-        
         # Update texture paths with processed textures
         if texture_group.output.get("diff"):
             material.set_texture("diffuse", texture_group.output["diff"])
@@ -147,9 +148,7 @@ class MaterialManager:
             material.set_texture("specular", texture_group.output["spec"])
         
         if texture_group.output.get("ddna"):
-            # In CryEngine, normal and gloss are combined in ddna
-            # This would need special handling in the actual implementation
-            pass
+            material.set_texture("normal", texture_group.output["ddna"])
         
         if texture_group.output.get("displ"):
             material.set_texture("displacement", texture_group.output["displ"])
@@ -173,18 +172,23 @@ class MaterialManager:
         Returns:
             Updated model object
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would match model materials with texture groups
-        # and update the model's materials
-        
-        # Example pseudocode:
-        # for material_name in model.materials:
-        #     # Find matching texture group
-        #     group = self._find_matching_group(material_name, texture_groups)
-        #     if group:
-        #         # Convert material to CryEngine format
-        #         self.convert_to_cryengine(material_name, group)
-        
+        material_names = []
+        if isinstance(model, dict):
+            material_names = [
+                material.get("name", "")
+                for material in model.get("materials", [])
+                if material.get("name")
+            ]
+        else:
+            material_names = list(getattr(model, "materials", []) or [])
+
+        for material_name in material_names:
+            if material_name not in self.materials:
+                self.create_material(material_name)
+            group = self._find_matching_group(material_name, texture_groups)
+            if group:
+                self.convert_to_cryengine(material_name, group)
+
         return model
     
     def _find_matching_group(self, material_name, texture_groups):
@@ -198,12 +202,8 @@ class MaterialManager:
         Returns:
             Matching TextureGroup or None if no match found
         """
-        # This is a placeholder for the actual implementation
-        # In reality, this would use more sophisticated matching logic
-        
         for group in texture_groups:
-            # Simple string matching (would be more complex in real implementation)
-            if material_name.lower() in group.base_name.lower():
+            if material_name.lower() in group.base_name.lower() or group.base_name.lower() in material_name.lower():
                 return group
         
         return None
