@@ -254,6 +254,7 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
                 "textures": {
                     "diffuse": "stone_diff.dds",
                     "normal": "stone_ddn.dds",
+                    "specular": "stone_s.dds",
                     "ao": "stone_ao.dds",
                     "packed_orm": "stone_orm.dds",
                 },
@@ -272,7 +273,12 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
     material_policy = report["materials"][0]["mtl_texture_map_policy"]
     summary = report["mtl_texture_map_policy_summary"]
 
-    assert [entry["ce_map_type"] for entry in material_policy["exported"]] == ["Diffuse", "Bumpmap"]
+    assert [entry["ce_map_type"] for entry in material_policy["exported"]] == ["Diffuse", "Bumpmap", "Specular"]
+    assert [entry["suffix_analysis"]["suffix_status"] for entry in material_policy["exported"]] == [
+        "matches_expected_suffix",
+        "matches_expected_suffix",
+        "mismatch_expected_suffix",
+    ]
     assert [entry["reason"] for entry in material_policy["skipped"]] == [
         "known_internal_non_mtl_channel",
         "unknown_texture_type",
@@ -284,15 +290,28 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
         "normal": 1,
         "opacity": 1,
         "packed_orm": 1,
+        "specular": 1,
     }
     assert summary["exported_ce_map_counts"] == {
         "Bumpmap": 1,
         "Diffuse": 1,
         "Opacity": 1,
+        "Specular": 1,
     }
     assert summary["skipped_reason_counts"] == {
         "known_internal_non_mtl_channel": 1,
         "unknown_texture_type": 1,
+    }
+    assert summary["expected_suffix_counts"] == {
+        "_ddn": 1,
+        "_diff": 1,
+        "_spec": 1,
+    }
+    assert summary["suffix_status_counts"] == {
+        "matches_expected_suffix": 2,
+        "mismatch_expected_suffix": 1,
+        "no_source_backed_suffix": 1,
+        "not_applicable": 2,
     }
     assert summary["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
 

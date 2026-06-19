@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """CryEngine material XML schema evidence used by the MTL exporter."""
 
+import os
+
 # Source evidence:
 # CRYENGINE_Source-release/Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp
 CE_TEXTURE_MAP_TYPES = {
@@ -47,6 +49,16 @@ CE_TEXTURE_MAP_SOURCE = {
         "Only texture types with a CryEngine material Texture Map name are emitted "
         "as .mtl <Texture> entries. Known internal channels without a CE map remain "
         "available for conversion diagnostics but are not exported as Texture nodes."
+    ),
+}
+
+CE_TEXTURE_SUFFIX_SOURCE = {
+    "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "suffix_lines": "source-backed CE Texture suffix names",
+    "rule": (
+        "Known CryEngine material Texture Map names have conventional filename "
+        "suffixes. The exporter does not rename files here; diagnostics only "
+        "record whether exported texture paths already match the expected suffix."
     ),
 }
 
@@ -304,6 +316,29 @@ def exported_mtl_flags_policy():
     }
 
 
+def analyze_ce_texture_suffix(ce_map_type, texture_path):
+    expected_suffix = CE_TEXTURE_SUFFIXES.get(ce_map_type or "", "")
+    filename = os.path.basename(str(texture_path or "")).replace("\\", "/")
+    stem = os.path.splitext(filename)[0].lower()
+    expected_lower = expected_suffix.lower()
+
+    if not ce_map_type or not texture_path:
+        suffix_status = "not_applicable"
+    elif not expected_suffix:
+        suffix_status = "no_source_backed_suffix"
+    elif stem.endswith(expected_lower):
+        suffix_status = "matches_expected_suffix"
+    else:
+        suffix_status = "mismatch_expected_suffix"
+
+    return {
+        "expected_suffix": expected_suffix,
+        "suffix_status": suffix_status,
+        "filename": filename,
+        "source_evidence": CE_TEXTURE_SUFFIX_SOURCE,
+    }
+
+
 def resolve_ce_texture_map(texture_type, texture_path=""):
     normalized_type = str(texture_type or "").lower()
     texture_path = str(texture_path or "")
@@ -325,6 +360,7 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
         "ce_map_type": ce_map_type or "",
         "exported": bool(texture_path and ce_map_type),
         "reason": reason,
+        "suffix_analysis": analyze_ce_texture_suffix(ce_map_type, texture_path),
         "source_evidence": CE_TEXTURE_MAP_SOURCE,
     }
 

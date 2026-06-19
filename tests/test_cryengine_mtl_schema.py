@@ -14,6 +14,7 @@ from output_formats.cryengine_mtl_schema import (
     MTL_SHADER_MASK_LOAD_POLICY,
     MTL_SUB_MATERIAL_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
+    analyze_ce_texture_suffix,
     analyze_public_params,
     compose_mtl_flags,
     describe_mtl_flags,
@@ -47,12 +48,28 @@ def test_ce_texture_suffixes_follow_material_helpers_suffixes():
     assert CE_TEXTURE_SUFFIXES["Emittance"] == "_em"
 
 
+def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
+    match = analyze_ce_texture_suffix("Diffuse", r"textures\wall_diff.dds")
+    assert match["expected_suffix"] == "_diff"
+    assert match["suffix_status"] == "matches_expected_suffix"
+    assert match["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
+
+    mismatch = analyze_ce_texture_suffix("Bumpmap", "textures/wall_ddna.dds")
+    assert mismatch["expected_suffix"] == "_ddn"
+    assert mismatch["suffix_status"] == "mismatch_expected_suffix"
+
+    missing = analyze_ce_texture_suffix("", "")
+    assert missing["suffix_status"] == "not_applicable"
+
+
 def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
     diffuse = resolve_ce_texture_map("Diffuse", "wall_diff.dds")
     assert diffuse["texture_type"] == "diffuse"
     assert diffuse["ce_map_type"] == "Diffuse"
     assert diffuse["exported"] is True
     assert diffuse["reason"] == "source_backed_texture_map"
+    assert diffuse["suffix_analysis"]["expected_suffix"] == "_diff"
+    assert diffuse["suffix_analysis"]["suffix_status"] == "matches_expected_suffix"
     assert diffuse["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
 
     ao = resolve_ce_texture_map("ao", "wall_ao.dds")
@@ -67,6 +84,7 @@ def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
     unknown = resolve_ce_texture_map("packed_orm", "wall_orm.dds")
     assert unknown["exported"] is False
     assert unknown["reason"] == "unknown_texture_type"
+    assert unknown["suffix_analysis"]["suffix_status"] == "not_applicable"
 
 
 def test_exported_texture_map_policy_splits_exported_and_skipped_entries():
@@ -80,6 +98,10 @@ def test_exported_texture_map_policy_splits_exported_and_skipped_entries():
     )
 
     assert [entry["ce_map_type"] for entry in policy["exported"]] == ["Diffuse", "Bumpmap"]
+    assert [entry["suffix_analysis"]["suffix_status"] for entry in policy["exported"]] == [
+        "matches_expected_suffix",
+        "matches_expected_suffix",
+    ]
     assert [entry["reason"] for entry in policy["skipped"]] == [
         "known_internal_non_mtl_channel",
         "known_internal_non_mtl_channel",

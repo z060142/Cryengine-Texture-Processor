@@ -144,13 +144,20 @@ def _mtl_texture_map_policy_summary(material_items):
     input_texture_type_counts = Counter()
     exported_ce_map_counts = Counter()
     skipped_reason_counts = Counter()
+    expected_suffix_counts = Counter()
+    suffix_status_counts = Counter()
 
     for item in material_items:
         policy = item.get("mtl_texture_map_policy", {})
         for entry in policy.get("entries", []):
             input_texture_type_counts.update([entry.get("texture_type", "")])
+            suffix_analysis = entry.get("suffix_analysis", {})
+            suffix_status_counts.update([suffix_analysis.get("suffix_status", "")])
             if entry.get("exported"):
                 exported_ce_map_counts.update([entry.get("ce_map_type", "")])
+                expected_suffix = suffix_analysis.get("expected_suffix", "")
+                if expected_suffix:
+                    expected_suffix_counts.update([expected_suffix])
             else:
                 skipped_reason_counts.update([entry.get("reason", "")])
 
@@ -159,6 +166,8 @@ def _mtl_texture_map_policy_summary(material_items):
         "input_texture_type_counts": _counter_to_sorted_dict(input_texture_type_counts),
         "exported_ce_map_counts": _counter_to_sorted_dict(exported_ce_map_counts),
         "skipped_reason_counts": _counter_to_sorted_dict(skipped_reason_counts),
+        "expected_suffix_counts": _counter_to_sorted_dict(expected_suffix_counts),
+        "suffix_status_counts": _counter_to_sorted_dict(suffix_status_counts),
         "source_evidence": exported_texture_map_policy({})["source_evidence"],
     }
 
