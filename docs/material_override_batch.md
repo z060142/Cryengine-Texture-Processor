@@ -71,11 +71,9 @@ RC flow:
 $phase = 'S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides'
 $overrideJson = 'S:\Crytek\crytek\Stripped to the bone\Cryengine-Texture-Processor\docs\car_native_material_overrides.json'
 
-uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif"
+uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --reference-mtl "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --material-state-compare-output docs\car_material_state_compare.json --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif"
 
 uv run python -m tools.mtl_schema_report "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_override_mtl_schema_report.json
-
-uv run python -m tools.mtl_material_state_compare --reference "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --candidate "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_state_compare.json
 ```
 
 Native and generated MTL now match on the high-value material-state counts:
@@ -104,7 +102,9 @@ Native and generated MTL now match on the high-value material-state counts:
 
 `docs/car_material_state_compare.json` is the gate for this. Its
 `comparison.ok` value is `true`, and it checks per-material shader, MtlFlags,
-GenMask, StringGenMask, and PublicParams values.
+GenMask, StringGenMask, and PublicParams values. The same report is also embedded
+under `material_state_compare` in the RC smoke material report; a mismatch makes
+`tools.rc_smoke_test` return failure.
 
 Material report result:
 
@@ -152,7 +152,7 @@ Result:
 
 - `71 passed`
 - `58 passed`
-- `401 passed`
+- `403 passed`
 - `compileall` completed
 - converter schema snapshot is current
 - `uv lock --check` passed

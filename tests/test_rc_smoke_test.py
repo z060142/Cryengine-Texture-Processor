@@ -28,6 +28,32 @@ class TextureRef:
         self.source_mode = "test"
 
 
+def write_material_state_reference(path, *, shader="Glass"):
+    root = ET.Element("Material")
+    sub_materials = ET.SubElement(root, "SubMaterials")
+    glass = ET.SubElement(
+        sub_materials,
+        "Material",
+        Name="Glass",
+        Shader=shader,
+        MtlFlags="526466",
+        GenMask="2080000000000",
+        StringGenMask="%SPECULAR_MAP%TINT_MAP",
+    )
+    ET.SubElement(glass, "PublicParams", TintCloudiness="0.050000001")
+    unassigned = ET.SubElement(
+        sub_materials,
+        "Material",
+        Name="<unassigned>",
+        Shader="Illum",
+        MtlFlags="524416",
+        GenMask="4000000000020",
+        StringGenMask="%NORMAL_MAP%SUBSURFACE_SCATTERING",
+    )
+    ET.SubElement(unassigned, "PublicParams", EmittanceMapGamma="1", SSSIndex="0")
+    ET.ElementTree(root).write(path, encoding="utf-8")
+
+
 def test_material_names_from_arg_uses_default_when_empty():
     assert material_names_from_arg("") == ["Default"]
     assert material_names_from_arg(" Bark, Leaves ,,") == ["Bark", "Leaves"]
@@ -887,3 +913,103 @@ def test_run_rc_smoke_test_writes_preflight_material_diagnostics(tmp_path):
     assert result.success
     report = json.loads(open(result.material_report_path, encoding="utf-8").read())
     assert report["preflight_material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
+
+
+def test_run_rc_smoke_test_writes_material_state_compare_report(tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    reference_mtl = tmp_path / "reference.mtl"
+    write_material_state_reference(reference_mtl)
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    material_overrides = {
+        "Glass": {
+            "cryengine_material": {
+                "Shader": "Glass",
+                "MtlFlags": "526466",
+                "GenMask": "2080000000000",
+                "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                "PublicParams": {"TintCloudiness": "0.050000001"},
+            }
+        },
+        "<unassigned>": {
+            "cryengine_material": {
+                "Shader": "Illum",
+                "MtlFlags": "524416",
+                "GenMask": "4000000000020",
+                "StringGenMask": "%NORMAL_MAP%SUBSURFACE_SCATTERING",
+                "PublicParams": {"EmittanceMapGamma": "1", "SSSIndex": "0"},
+            }
+        },
+    }
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        material_specs=[{"name": "Glass", "id": 1, "index": 0}],
+        material_overrides=material_overrides,
+        reference_mtl_path=str(reference_mtl),
+        runner_factory=FakeRunner,
+    )
+
+    assert result.success
+    assert result.material_state_compare_path.endswith("asset.material_state_compare.json")
+    compare = json.loads(open(result.material_state_compare_path, encoding="utf-8").read())
+    assert compare["comparison"]["ok"] is True
+    report = json.loads(open(result.material_report_path, encoding="utf-8").read())
+    assert report["material_state_compare"]["comparison"]["ok"] is True
+
+
+def test_run_rc_smoke_test_fails_when_material_state_compare_fails(tmp_path):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    reference_mtl = tmp_path / "reference.mtl"
+    write_material_state_reference(reference_mtl, shader="Glass")
+
+    class FakeRunner:
+        def __init__(self, rc_exe_path):
+            self.rc_exe_path = rc_exe_path
+
+        def run(self, json_path, source_fbx_path=None):
+            return RCImportResult(
+                success=True,
+                command=[self.rc_exe_path, json_path],
+                json_path=json_path,
+                expected_output_path=os.path.splitext(json_path)[0] + ".cgf",
+                returncode=0,
+                stdout="ok",
+            )
+
+    result = run_rc_smoke_test(
+        str(rc_path),
+        str(source_fbx),
+        str(tmp_path / "work"),
+        asset_name="asset",
+        material_specs=[{"name": "Glass", "id": 1, "index": 0}],
+        reference_mtl_path=str(reference_mtl),
+        runner_factory=FakeRunner,
+    )
+
+    assert not result.success
+    assert "Material state compare failed" in result.error
+    compare = json.loads(open(result.material_state_compare_path, encoding="utf-8").read())
+    assert compare["comparison"]["ok"] is False

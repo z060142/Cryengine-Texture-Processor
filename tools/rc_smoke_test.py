@@ -32,6 +32,7 @@ from model_processing.material_texture_resolver import build_mtl_material_data
 from output_formats.json_exporter import export_json
 from output_formats.mtl_exporter import export_mtl
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
+from tools.mtl_material_state_compare import write_material_state_compare_report
 from utils.rc_import_runner import RCImportRunner, RCImportResult
 
 
@@ -57,6 +58,7 @@ class RCSmokeResult:
     json_path: str = ""
     expected_output_path: str = ""
     material_report_path: str = ""
+    material_state_compare_path: str = ""
     rc_result: RCImportResult | None = None
     error: str = ""
 
@@ -433,6 +435,8 @@ def run_rc_smoke_test(
     texture_output_dir="",
     texture_output_format="tif",
     material_overrides=None,
+    reference_mtl_path="",
+    material_state_compare_output_path="",
     runner_factory=RCImportRunner,
 ):
     rc_exe_path = rc_exe_path or ""
@@ -465,6 +469,22 @@ def run_rc_smoke_test(
     runner = runner_factory(rc_exe_path)
     rc_result = runner.run(bundle["json_path"], source_fbx_path=bundle["copied_fbx_path"])
     report_path = os.path.join(work_dir, f"{os.path.splitext(os.path.basename(bundle['json_path']))[0]}.material_report.json")
+    material_state_compare_path = ""
+    material_state_compare_report = None
+    material_state_compare_error = ""
+    if reference_mtl_path:
+        material_state_compare_path = material_state_compare_output_path or os.path.join(
+            work_dir,
+            f"{os.path.splitext(os.path.basename(bundle['json_path']))[0]}.material_state_compare.json",
+        )
+        try:
+            material_state_compare_report = write_material_state_compare_report(
+                reference_mtl_path,
+                bundle["mtl_path"],
+                material_state_compare_path,
+            )
+        except Exception as e:
+            material_state_compare_error = f"Failed to compare material state: {e}"
     try:
         report = build_material_mapping_report(
             bundle["json_path"],
@@ -477,6 +497,10 @@ def run_rc_smoke_test(
         )
         report["preflight_material_diagnostics"] = bundle.get("material_diagnostics", [])
         report["preflight_texture_diagnostics"] = bundle.get("texture_diagnostics", [])
+        if material_state_compare_report is not None:
+            report["material_state_compare"] = material_state_compare_report
+        if material_state_compare_error:
+            report["material_state_compare_error"] = material_state_compare_error
         write_material_mapping_report(report, report_path)
     except Exception as e:
         report_path = ""
@@ -492,6 +516,29 @@ def run_rc_smoke_test(
                 error=f"Failed to write material mapping report: {e}",
             )
 
+    if rc_result.success and material_state_compare_error:
+        rc_result = RCImportResult(
+            success=False,
+            command=rc_result.command,
+            json_path=rc_result.json_path,
+            expected_output_path=rc_result.expected_output_path,
+            returncode=rc_result.returncode,
+            stdout=rc_result.stdout,
+            stderr=rc_result.stderr,
+            error=material_state_compare_error,
+        )
+    if rc_result.success and material_state_compare_report is not None and not material_state_compare_report["comparison"]["ok"]:
+        rc_result = RCImportResult(
+            success=False,
+            command=rc_result.command,
+            json_path=rc_result.json_path,
+            expected_output_path=rc_result.expected_output_path,
+            returncode=rc_result.returncode,
+            stdout=rc_result.stdout,
+            stderr=rc_result.stderr,
+            error=f"Material state compare failed: {material_state_compare_path}",
+        )
+
     return RCSmokeResult(
         success=rc_result.success,
         work_dir=work_dir,
@@ -502,6 +549,7 @@ def run_rc_smoke_test(
         json_path=bundle["json_path"],
         expected_output_path=rc_result.expected_output_path,
         material_report_path=report_path,
+        material_state_compare_path=material_state_compare_path,
         rc_result=rc_result,
         error=rc_result.error,
     )
@@ -534,6 +582,16 @@ def main(argv=None):
         default="",
         help="Optional JSON file containing material_overrides keyed by material name.",
     )
+    parser.add_argument(
+        "--reference-mtl",
+        default="",
+        help="Optional reference/native .mtl to compare against the generated .mtl material state.",
+    )
+    parser.add_argument(
+        "--material-state-compare-output",
+        default="",
+        help="Optional output path for the material-state compare JSON report.",
+    )
     args = parser.parse_args(argv)
     material_specs = (
         material_specs_from_manifest(args.fbx)
@@ -551,6 +609,8 @@ def main(argv=None):
         texture_output_dir=args.texture_output_dir,
         texture_output_format=args.texture_output_format,
         material_overrides=material_overrides,
+        reference_mtl_path=args.reference_mtl,
+        material_state_compare_output_path=args.material_state_compare_output,
     )
 
     print(f"success: {result.success}")
@@ -561,6 +621,7 @@ def main(argv=None):
     print(f"json: {result.json_path}")
     print(f"expected_output: {result.expected_output_path}")
     print(f"material_report: {result.material_report_path}")
+    print(f"material_state_compare: {result.material_state_compare_path}")
     if result.error:
         print(f"error: {result.error}")
     if result.rc_result and result.rc_result.stdout:
