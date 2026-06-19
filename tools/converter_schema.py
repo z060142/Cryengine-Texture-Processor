@@ -13,7 +13,7 @@ except ModuleNotFoundError:
 
 add_repo_root()
 
-from model_processing.material_slot_mapping import SLOT_MAPPING_RULES
+from model_processing.material_slot_mapping import exported_material_slot_mapping_schema
 from output_formats.cryengine_mtl_schema import (
     CE_TEXTURE_MAP_TYPES,
     RC_TEXTURE_SOURCE_EXTENSIONS,
@@ -87,10 +87,7 @@ def _mtl_texture_map_schema():
 def build_converter_schema():
     return {
         "schema": "cryengine_converter_schema.v1",
-        "material_slot_mapping": {
-            "schema": "cryengine_material_slot_mapping.v1",
-            "rules": SLOT_MAPPING_RULES,
-        },
+        "material_slot_mapping": exported_material_slot_mapping_schema(),
         "texture_outputs": _texture_output_schema(),
         "mtl": {
             "texture_maps": _mtl_texture_map_schema(),

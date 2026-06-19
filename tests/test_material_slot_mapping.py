@@ -1,4 +1,7 @@
-from model_processing.material_slot_mapping import build_material_slot_mapping_contract
+from model_processing.material_slot_mapping import (
+    build_material_slot_mapping_contract,
+    exported_material_slot_mapping_schema,
+)
 
 
 def test_build_material_slot_mapping_contract_classifies_final_slots_and_gaps():
@@ -96,3 +99,23 @@ def test_build_material_slot_mapping_contract_counts_out_of_range_and_duplicates
     }
     assert contract["mappings"][2]["status"] == "out_of_range_deleted"
     assert contract["mappings"][2]["requested_sub_index"] == 128
+
+
+def test_exported_material_slot_mapping_schema_documents_external_tool_policy():
+    schema = exported_material_slot_mapping_schema()
+
+    assert schema["schema"] == "cryengine_material_slot_mapping.v1"
+    policy = schema["assignment_policy"]
+    assert policy["rc_request_material_fields"]["name"]["required"] is True
+    assert policy["rc_request_material_fields"]["physicalize"]["values"] == [
+        "no",
+        "default",
+        "obstruct",
+        "no_collide",
+        "proxy_only",
+    ]
+    assert policy["slot_identity"]["final_sub_index"] == "request.materials[].sub_index for non-deleted materials."
+    assert policy["placeholder_policy"]["slot_gaps"]["name"] == "unassigned"
+    assert policy["placeholder_policy"]["trailing_unassigned"]["assignment_reason"] == (
+        "trailing_unassigned_placeholder"
+    )

@@ -21,6 +21,23 @@ def test_build_converter_schema_exports_external_tool_contract():
         "raw_fbx_id_is_one_based",
         "sub_index_limit",
     ]
+    slot_policy = schema["material_slot_mapping"]["assignment_policy"]
+    assert slot_policy["rc_request_material_fields"]["sub_index"]["valid_values"] == {"min": -1, "max": 127}
+    assert [item["id"] for item in slot_policy["assignment_priority"]] == [
+        "explicit_sub_index",
+        "fbx_material_id",
+        "existing_mtl_name",
+        "first_free",
+    ]
+    assert slot_policy["placeholder_policy"]["trailing_unassigned"]["name"] == "<unassigned>"
+    hazard_codes = {hazard["code"] for hazard in slot_policy["hazards"]}
+    assert "rc_duplicate_sub_index_overwrites_material" in hazard_codes
+    assert "rc_omitted_source_material_faces_deleted" in hazard_codes
+    assert slot_policy["minimal_request_example"]["request"]["materials"][0] == {
+        "name": "Body",
+        "physicalize": "no",
+        "sub_index": 0,
+    }
 
     output_by_key = {
         output["output_key"]: output

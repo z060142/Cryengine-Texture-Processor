@@ -28,7 +28,127 @@
         "summary": "sub_index values 0..127 are supported; higher values normalize to -1.",
         "evidence": "docs/refactor_phase55_rc_sub_index_limit_policy.md"
       }
-    ]
+    ],
+    "assignment_policy": {
+      "schema": "cryengine_material_slot_assignment.v1",
+      "rc_request_material_fields": {
+        "name": {
+          "required": true,
+          "type": "string",
+          "meaning": "Source FBX scene material name. RC matches this name to the imported FBX material table.",
+          "evidence": "docs/refactor_phase99_cgf_import_settings_request_schema.md"
+        },
+        "physicalize": {
+          "required": true,
+          "type": "enum",
+          "values": [
+            "no",
+            "default",
+            "obstruct",
+            "no_collide",
+            "proxy_only"
+          ],
+          "meaning": "CryEngine physicalization policy stored with the final material slot.",
+          "evidence": "docs/refactor_phase99_cgf_import_settings_request_schema.md"
+        },
+        "sub_index": {
+          "required": true,
+          "type": "integer",
+          "valid_values": {
+            "min": -1,
+            "max": 127
+          },
+          "meaning": "Final CryEngine sub-material id. Non-negative values become MTL slots and CGF material ids.",
+          "evidence": "docs/refactor_phase55_rc_sub_index_limit_policy.md"
+        }
+      },
+      "slot_identity": {
+        "raw_fbx_slot": "fbx_material_id - 1 when a one-based FBX material id is known.",
+        "final_sub_index": "request.materials[].sub_index for non-deleted materials.",
+        "mtl_slot": "SubMaterials child order after expanding the final_sub_index table and filling gaps.",
+        "cgf_material_id": "MeshSubset material_id after RC remaps FBX material names through final_sub_index."
+      },
+      "assignment_priority": [
+        {
+          "id": "explicit_sub_index",
+          "condition": "material has sub_index >= 0 and auto_assigned/ui_autoflag is false",
+          "result": "reserve that exact final slot unless it is outside the RC range"
+        },
+        {
+          "id": "fbx_material_id",
+          "condition": "material has a known FBX id and its zero-based slot is free",
+          "result": "use fbx_material_id - 1 as final_sub_index"
+        },
+        {
+          "id": "existing_mtl_name",
+          "condition": "material name exists in an existing MTL and that child-order slot is free",
+          "result": "reuse the existing MTL slot"
+        },
+        {
+          "id": "first_free",
+          "condition": "no explicit, FBX, or existing-MTL slot was available",
+          "result": "fill the first free final slot after sorting dummy materials first, then by name"
+        }
+      ],
+      "placeholder_policy": {
+        "slot_gaps": {
+          "name": "unassigned",
+          "assignment_reason": "slot_gap",
+          "meaning": "Generated MTL placeholder for missing intermediate final slots."
+        },
+        "trailing_unassigned": {
+          "name": "<unassigned>",
+          "assignment_reason": "trailing_unassigned_placeholder",
+          "meaning": "Optional trailing request/MTL placeholder expected in CE-authored assets. It may be absent from the CGF MtlName table when no mesh subset uses it."
+        }
+      },
+      "hazards": [
+        {
+          "code": "rc_duplicate_sub_index_overwrites_material",
+          "meaning": "Multiple request materials target the same final slot; the later RC material can overwrite slot state."
+        },
+        {
+          "code": "rc_sub_index_out_of_range_deleted",
+          "meaning": "sub_index >= 128 normalizes to -1, so matching source faces can be deleted."
+        },
+        {
+          "code": "rc_case_insensitive_material_name_collision",
+          "meaning": "RC name matching is case-insensitive, so names that differ only by case cannot be targeted safely."
+        },
+        {
+          "code": "deleted_known_fbx_slot_usage_unknown",
+          "meaning": "Deleting a known FBX slot is unsafe unless polygon usage proves it is unused."
+        },
+        {
+          "code": "rc_omitted_source_material_faces_deleted",
+          "meaning": "When request materials are present, source materials omitted from the request can lose their faces."
+        }
+      ],
+      "minimal_request_example": {
+        "request": {
+          "source_filename": "asset.fbx",
+          "output_ext": "cgf",
+          "material_filename": "asset",
+          "materials": [
+            {
+              "name": "Body",
+              "physicalize": "no",
+              "sub_index": 0
+            },
+            {
+              "name": "Glass",
+              "physicalize": "no",
+              "sub_index": 1
+            },
+            {
+              "name": "<unassigned>",
+              "physicalize": "no",
+              "sub_index": 2
+            }
+          ]
+        }
+      }
+    }
   },
   "texture_outputs": {
     "schema": "cryengine_texture_output_schema.v1",
