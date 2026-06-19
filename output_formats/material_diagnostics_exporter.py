@@ -11,6 +11,7 @@ from model_processing.material_manifest import material_manifest_table_diagnosti
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 from output_formats.cryengine_mtl_schema import (
+    exported_material_attribute_policy,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
     exported_texture_map_policy,
@@ -57,6 +58,7 @@ def _record_to_report_item(record):
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
     physicalize_resolution = resolve_rc_physicalize(record["material"], fallback_name=record["original_name"])
     mtl_shader_policy = exported_material_shader_policy(record["material"].get("textures", {}))
+    mtl_attribute_policy = exported_material_attribute_policy()
     mtl_flags_policy = exported_mtl_flags_policy()["sub_material"]
     mtl_texture_map_policy = exported_texture_map_policy(record["material"].get("textures", {}))
     return {
@@ -82,6 +84,7 @@ def _record_to_report_item(record):
         "duplicate_sub_index_conflict": record.get("duplicate_sub_index_conflict", False),
         "duplicate_sub_index_material_names": record.get("duplicate_sub_index_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
+        "mtl_attribute_policy": mtl_attribute_policy,
         "mtl_flags_policy": mtl_flags_policy,
         "mtl_texture_map_policy": mtl_texture_map_policy,
         "mtl_shader_policy": mtl_shader_policy,
@@ -172,6 +175,25 @@ def _mtl_texture_map_policy_summary(material_items):
     }
 
 
+def _mtl_attribute_policy_summary(material_items):
+    attribute_value_counts = Counter()
+    attribute_status_counts = Counter()
+    policy = exported_material_attribute_policy()
+
+    for item in material_items:
+        item_policy = item.get("mtl_attribute_policy", {})
+        for name, value in item_policy.get("attributes", {}).items():
+            attribute_value_counts.update([f"{name}={value}"])
+        attribute_status_counts.update(item_policy.get("attribute_status", {}).values())
+
+    return {
+        "material_count": len(material_items),
+        "attribute_value_counts": _counter_to_sorted_dict(attribute_value_counts),
+        "attribute_status_counts": _counter_to_sorted_dict(attribute_status_counts),
+        "source_evidence": policy["source_evidence"],
+    }
+
+
 def build_material_diagnostics_report(
     materials,
     existing_submaterial_names=None,
@@ -234,6 +256,7 @@ def build_material_diagnostics_report(
             "diagnostic_count": len(diagnostics),
             "hazard_count": hazard_count,
         },
+        "mtl_attribute_policy_summary": _mtl_attribute_policy_summary(material_items),
         "mtl_flags_policy_summary": _mtl_flags_policy_summary(material_items),
         "mtl_texture_map_policy_summary": _mtl_texture_map_policy_summary(material_items),
         "mtl_shader_policy_summary": _mtl_shader_policy_summary(material_items),

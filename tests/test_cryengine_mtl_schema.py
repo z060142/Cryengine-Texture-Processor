@@ -19,6 +19,7 @@ from output_formats.cryengine_mtl_schema import (
     compose_mtl_flags,
     describe_mtl_flags,
     exported_gen_mask,
+    exported_material_attribute_policy,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
     exported_texture_map_policy,
@@ -171,6 +172,21 @@ def test_exported_material_shader_policy_exposes_current_compatibility_rules():
         "source": "displacement_texture_compatibility",
         "texture_type": "displacement",
     }
+
+
+def test_exported_material_attribute_policy_marks_source_backed_and_compat_defaults():
+    policy = exported_material_attribute_policy()
+
+    assert policy["attributes"]["Shader"] == "Illum"
+    assert policy["attributes"]["Diffuse"] == "1,1,1"
+    assert policy["attributes"]["Opacity"] == "1"
+    assert policy["attributes"]["Shininess"] == "255"
+    assert policy["attribute_status"]["Shader"] == "source_backed_editor_default"
+    assert policy["attribute_status"]["Diffuse"] == "source_backed_editor_default"
+    assert policy["attribute_status"]["Opacity"] == "source_backed_editor_default"
+    assert policy["attribute_status"]["Shininess"] == "compatibility_preserved_editor_default_differs"
+    assert policy["source_evidence"]["lighting_load_source"].endswith("MaterialHelpers.cpp")
+    assert policy["source_evidence"]["editor_default_source"].endswith("Material.cpp")
 
 
 def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():

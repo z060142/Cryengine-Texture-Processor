@@ -218,6 +218,39 @@ MTL_PUBLIC_PARAMS_POLICY = {
     ),
 }
 
+MTL_MATERIAL_ATTRIBUTE_POLICY = {
+    "lighting_load_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "lighting_load_lines": "638-652",
+    "lighting_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "lighting_save_lines": "667-680",
+    "editor_default_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+    "editor_default_lines": "58-70",
+    "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+    "editor_save_lines": "1128-1139",
+    "runtime_default_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+    "runtime_default_lines": "1012-1019",
+    "rule": (
+        "MaterialHelpers loads Diffuse, Specular, Emittance, Shininess, Opacity, "
+        "and AlphaTest from XML attributes and saves lighting attributes only "
+        "when they differ from renderer defaults. Sandbox Material initializes "
+        "Illum, Opacity=1, Diffuse=1,1,1,1, and Smoothness=10. Exporter values "
+        "that do not have confirmed default equivalence stay marked as "
+        "compatibility-preserved."
+    ),
+}
+
+EXPORT_MATERIAL_ATTRIBUTE_STATUS = {
+    "MtlFlags": "covered_by_mtl_flags_policy",
+    "Shader": "source_backed_editor_default",
+    "SurfaceType": "source_loaded_empty_export_default",
+    "MatTemplate": "source_loaded_empty_export_default",
+    "Diffuse": "source_backed_editor_default",
+    "Specular": "compatibility_preserved_until_roundtrip_evidence",
+    "Emittance": "source_loaded_compatibility_default",
+    "Opacity": "source_backed_editor_default",
+    "Shininess": "compatibility_preserved_editor_default_differs",
+}
+
 # Current exporter compatibility values. These predate the source-backed schema
 # layer and must be replaced only after a real RC/Material Editor comparison.
 EXPORT_COMPAT_SHADER_MASKS = {
@@ -313,6 +346,20 @@ def exported_mtl_flags_policy():
             "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
             "lines": "46-77",
         },
+    }
+
+
+def exported_material_attribute_policy():
+    return {
+        "attributes": dict(SUB_MATERIAL_DEFAULT_ATTRS),
+        "attribute_status": {
+            name: EXPORT_MATERIAL_ATTRIBUTE_STATUS.get(
+                name,
+                "compatibility_preserved_until_roundtrip_evidence",
+            )
+            for name in sorted(SUB_MATERIAL_DEFAULT_ATTRS)
+        },
+        "source_evidence": MTL_MATERIAL_ATTRIBUTE_POLICY,
     }
 
 

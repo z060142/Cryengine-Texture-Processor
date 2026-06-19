@@ -245,6 +245,30 @@ def test_build_material_diagnostics_report_includes_mtl_flags_policy():
     assert summary["source_evidence"]["source"].endswith("IMaterial.h")
 
 
+def test_build_material_diagnostics_report_includes_mtl_attribute_policy():
+    report = build_material_diagnostics_report(
+        [
+            {"name": "Stone", "id": 1},
+            {"name": "Leaves", "id": 2},
+        ],
+        source_model="attributes.fbx",
+    )
+
+    material_policy = report["materials"][0]["mtl_attribute_policy"]
+    summary = report["mtl_attribute_policy_summary"]
+
+    assert material_policy["attributes"]["Shader"] == "Illum"
+    assert material_policy["attributes"]["Shininess"] == "255"
+    assert material_policy["attribute_status"]["Shader"] == "source_backed_editor_default"
+    assert material_policy["attribute_status"]["Shininess"] == "compatibility_preserved_editor_default_differs"
+    assert summary["material_count"] == 2
+    assert summary["attribute_value_counts"]["Shader=Illum"] == 2
+    assert summary["attribute_value_counts"]["Shininess=255"] == 2
+    assert summary["attribute_status_counts"]["source_backed_editor_default"] == 6
+    assert summary["attribute_status_counts"]["compatibility_preserved_editor_default_differs"] == 2
+    assert summary["source_evidence"]["lighting_save_source"].endswith("MaterialHelpers.cpp")
+
+
 def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
     report = build_material_diagnostics_report(
         [
@@ -675,6 +699,8 @@ def test_export_material_diagnostics_writes_json(tmp_path):
     assert output_path.endswith("asset.material_diagnostics.json")
     assert payload["source_model"] == "asset.fbx"
     assert payload["summary"]["hazard_count"] == 1
+    assert payload["materials"][0]["mtl_attribute_policy"]["attributes"]["Shader"] == "Illum"
+    assert payload["mtl_attribute_policy_summary"]["attribute_value_counts"]["Shader=Illum"] == 1
     assert payload["materials"][0]["mtl_flags_policy"]["mtl_flags"] == "524416"
     assert payload["mtl_flags_policy_summary"]["sub_material_flag_counts"] == {"524416": 1}
     assert payload["materials"][0]["mtl_texture_map_policy"]["entries"] == []
