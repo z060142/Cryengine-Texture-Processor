@@ -193,8 +193,8 @@ def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     monkeypatch.setattr(asset_flow_validator, "inspect_fbx_materials", fake_inspect)
     monkeypatch.setattr(
         asset_flow_validator,
-        "material_specs_from_manifest",
-        lambda source_fbx: [{"name": "Mat", "sub_index": 0}],
+        "material_specs_from_manifest_path",
+        lambda manifest_path: [{"name": "Mat", "sub_index": 0}],
     )
     monkeypatch.setattr(
         asset_flow_validator,
@@ -228,3 +228,68 @@ def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     assert report["cases"][0]["checks"]["model_format_ok"] is True
     assert report["cases"][0]["checks"]["material_slots_ok"] is True
     assert report["cases"][0]["checks"]["mtl_format_ok"] is True
+
+
+def test_rc_case_defaults_manifest_to_work_dir_and_passes_it_to_rc(monkeypatch, tmp_path):
+    fbx = tmp_path / "asset.fbx"
+    fbx.write_text("fbx", encoding="utf-8")
+    cgf = tmp_path / "work" / "asset" / "asset.cgf"
+    cgf.parent.mkdir(parents=True)
+    cgf.write_text("cgf", encoding="utf-8")
+    material_report = tmp_path / "work" / "asset" / "asset.material_report.json"
+    material_report.write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "rc_success": True,
+                    "action_required": False,
+                    "slot_alignment_ok": True,
+                    "material_slot_evidence_ok": True,
+                    "mtl_schema_gate_ok": True,
+                },
+                "mtl_schema_gate": {"gate": {"ok": True}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    seen = {}
+
+    def fake_inspect(blender, source_fbx, manifest_path):
+        seen["inspect_manifest"] = manifest_path
+        with open(manifest_path, "w", encoding="utf-8") as handle:
+            handle.write("{}")
+        return {"success": True, "manifest": manifest_path}
+
+    def fake_run_rc_smoke_test(*args, **kwargs):
+        seen["rc_manifest"] = kwargs.get("material_manifest_path")
+        return SimpleNamespace(
+            success=True,
+            expected_output_path=str(cgf),
+            material_report_path=str(material_report),
+            mtl_path="",
+            mtl_schema_gate_path=str(tmp_path / "work" / "asset" / "asset.mtl_schema_gate.json"),
+            json_path=str(tmp_path / "work" / "asset" / "asset.json"),
+            error="",
+        )
+
+    monkeypatch.setattr(asset_flow_validator, "inspect_fbx_materials", fake_inspect)
+    monkeypatch.setattr(
+        asset_flow_validator,
+        "material_specs_from_manifest_path",
+        lambda manifest_path: [{"name": "Mat", "sub_index": 0}],
+    )
+    monkeypatch.setattr(asset_flow_validator, "run_rc_smoke_test", fake_run_rc_smoke_test)
+
+    report = asset_flow_validator.run_validation(
+        {
+            "work_root": str(tmp_path / "work"),
+            "cases": [{"name": "asset", "type": "rc", "fbx": str(fbx)}],
+        }
+    )
+
+    expected_manifest = str(tmp_path / "work" / "asset" / "asset.fbx_material_manifest.json")
+    assert report["summary"]["ok"] is True
+    assert seen["inspect_manifest"] == expected_manifest
+    assert seen["rc_manifest"] == expected_manifest
+    assert report["cases"][0]["manifest"] == expected_manifest

@@ -16,6 +16,10 @@ practical acceptance bar:
   `TextureManager + BatchProcessor` path before RC validation.
 - Optional OBJ MTL evidence can connect FBX material names to processed texture
   names.
+- Blender material inspection writes its FBX material manifest under the ASCII
+  case work directory by default, then passes that explicit manifest path into
+  RC smoke validation. This avoids writing sidecar JSON into external asset
+  libraries or Chinese/non-ASCII source paths.
 - Markdown reports include generated MTL values and the MTL schema gate report
   path, so Shader/MtlFlags/GenMask/StringGenMask/Texture Map choices have an
   evidence trail instead of being invisible pass/fail flags.
@@ -137,6 +141,13 @@ Textures: Diffuse -> Weed_B_diff.tif, Bumpmap -> Weed_B_ddn.tif, Specular -> Wee
 The same case lists the generated `.mtl_schema_gate.json` path as evidence for
 CryEngine-backed value policy checks.
 
+The generated FBX material manifest is also reported from the case work
+directory, for example:
+
+```text
+S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\Weed_b_texture_backed\Weed_b_texture_backed.fbx_material_manifest.json
+```
+
 The model-only case checks:
 
 ```json
@@ -158,7 +169,9 @@ validates model format, material slots, and MTL format.
 
 RC is sensitive to non-ASCII paths. The validator still reads source FBX files
 from their original locations, but `rc.exe` receives copied files under the
-ASCII `work_root`.
+ASCII `work_root`. The Blender material manifest follows the same rule: unless
+the spec explicitly sets `manifest`, it is created under the case work
+directory instead of next to the source FBX.
 
 The validator reruns Blender material inspection before RC smoke so stale
 manifest files do not silently control the result.

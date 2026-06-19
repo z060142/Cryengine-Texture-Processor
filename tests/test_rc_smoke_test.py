@@ -12,6 +12,7 @@ from tools.rc_smoke_test import (
     main,
     material_names_from_arg,
     material_specs_from_manifest,
+    material_specs_from_manifest_path,
     material_specs_from_arg,
     prepare_smoke_bundle,
     run_rc_smoke_test,
@@ -336,6 +337,46 @@ def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
     root = ET.parse(bundle["mtl_path"]).getroot()
     sub_materials = root.find("SubMaterials")
     assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001", "<unassigned>"]
+
+
+def test_prepare_smoke_bundle_copies_explicit_material_manifest(tmp_path):
+    source_fbx = tmp_path / "source" / "source.fbx"
+    source_fbx.parent.mkdir()
+    manifest_path = tmp_path / "ascii_work" / "source_manifest.json"
+    manifest_path.parent.mkdir()
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Grass"},
+                    {"slot": 1, "name": "Dirt"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Grass", "material_table_slot": 0},
+                    {"polygon": 1, "material_name": "Dirt", "material_table_slot": 1},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest_path(str(manifest_path)),
+        material_manifest_path=str(manifest_path),
+    )
+
+    copied_manifest = work_dir / "asset.fbx_material_manifest.json"
+    assert bundle["copied_manifest_path"] == str(copied_manifest)
+    assert copied_manifest.exists()
+    payload = json.loads(copied_manifest.read_text(encoding="utf-8"))
+    assert [material["name"] for material in payload["materials"]] == ["Grass", "Dirt"]
+    assert bundle["material_diagnostics"] == []
 
 
 def test_prepare_smoke_bundle_applies_material_overrides_to_generated_mtl(tmp_path):

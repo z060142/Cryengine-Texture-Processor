@@ -25,7 +25,7 @@ from tools.material_report_summary import compact_material_report_summary, load_
 from tools.rc_smoke_test import (
     discover_default_rc,
     load_external_material_texture_evidence,
-    material_specs_from_manifest,
+    material_specs_from_manifest_path,
     run_rc_smoke_test,
 )
 
@@ -114,7 +114,8 @@ def _rc_case(case, defaults):
     name = case.get("name") or Path(source_fbx).stem
     work_root = case.get("work_root") or defaults["work_root"]
     work_dir = os.path.join(work_root, _safe_name(name))
-    manifest_path = case.get("manifest") or f"{source_fbx}_material_manifest.json"
+    os.makedirs(work_dir, exist_ok=True)
+    manifest_path = case.get("manifest") or os.path.join(work_dir, f"{_safe_name(name)}.fbx_material_manifest.json")
 
     inspect_result = inspect_fbx_materials(
         case.get("blender") or defaults.get("blender", ""),
@@ -122,7 +123,7 @@ def _rc_case(case, defaults):
         manifest_path,
     )
 
-    material_specs = material_specs_from_manifest(source_fbx)
+    material_specs = material_specs_from_manifest_path(manifest_path)
     external_evidence = (
         load_external_material_texture_evidence(case.get("obj_mtl_evidence", ""))
         if case.get("obj_mtl_evidence")
@@ -137,6 +138,7 @@ def _rc_case(case, defaults):
         texture_output_dir=case.get("texture_output_dir", ""),
         texture_output_format=case.get("texture_output_format", defaults.get("texture_output_format", "tif")),
         external_material_texture_evidence=external_evidence,
+        material_manifest_path=manifest_path,
     )
 
     material_summary = {}

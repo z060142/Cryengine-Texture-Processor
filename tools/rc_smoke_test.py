@@ -129,12 +129,15 @@ def material_specs_from_arg(value):
     return specs
 
 
-def material_specs_from_manifest(source_fbx_path):
-    manifest_path = discover_material_manifest(source_fbx_path)
+def material_specs_from_manifest_path(manifest_path):
     manifest = load_material_manifest(manifest_path)
     if not manifest:
-        raise RuntimeError(f"Material manifest not found for FBX: {source_fbx_path}")
+        raise RuntimeError(f"Material manifest not found: {manifest_path}")
     return material_manifest_materials([], {"path": manifest_path, "manifest": manifest})
+
+
+def material_specs_from_manifest(source_fbx_path, manifest_path=""):
+    return material_specs_from_manifest_path(manifest_path or discover_material_manifest(source_fbx_path))
 
 
 def load_material_overrides(overrides_path):
@@ -168,8 +171,7 @@ def apply_material_overrides_to_specs(material_specs, material_overrides=None):
     return materials
 
 
-def source_material_specs_from_manifest(source_fbx_path):
-    manifest_path = discover_material_manifest(source_fbx_path)
+def source_material_specs_from_manifest_path(manifest_path):
     manifest = load_material_manifest(manifest_path)
     if not manifest:
         return []
@@ -216,6 +218,10 @@ def source_material_specs_from_manifest(source_fbx_path):
     return sorted(materials_by_name.values(), key=lambda item: int(item.get("index", 0)))
 
 
+def source_material_specs_from_manifest(source_fbx_path, manifest_path=""):
+    return source_material_specs_from_manifest_path(manifest_path or discover_material_manifest(source_fbx_path))
+
+
 def _normalize_material_specs(material_names=None, material_specs=None):
     if material_specs is not None:
         return [
@@ -246,15 +252,16 @@ def build_smoke_model_data(asset_name, material_names=None, material_specs=None,
     }
 
 
-def _copy_material_manifest(source_fbx_path, copied_fbx_path):
-    manifest_path = discover_material_manifest(source_fbx_path)
+def _copy_material_manifest(source_fbx_path, copied_fbx_path, material_manifest_path=""):
+    manifest_path = material_manifest_path or discover_material_manifest(source_fbx_path)
     if not manifest_path:
         return ""
     source_stem = os.path.splitext(os.path.abspath(source_fbx_path))[0]
     copied_stem = os.path.splitext(os.path.abspath(copied_fbx_path))[0]
-    suffix = manifest_path[len(source_stem) :]
+    manifest_abs = os.path.abspath(manifest_path)
+    suffix = manifest_abs[len(source_stem) :] if manifest_abs.startswith(source_stem) else ".fbx_material_manifest.json"
     copied_manifest_path = copied_stem + suffix
-    if os.path.abspath(manifest_path) != os.path.abspath(copied_manifest_path):
+    if manifest_abs != os.path.abspath(copied_manifest_path):
         shutil.copy2(manifest_path, copied_manifest_path)
     return copied_manifest_path
 
@@ -383,6 +390,7 @@ def prepare_smoke_bundle(
     texture_output_format="tif",
     material_overrides=None,
     external_material_texture_evidence=None,
+    material_manifest_path="",
 ):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
@@ -393,9 +401,9 @@ def prepare_smoke_bundle(
     copied_fbx_path = os.path.join(work_dir, f"{asset_name}.fbx")
     if os.path.abspath(source_fbx_path) != os.path.abspath(copied_fbx_path):
         shutil.copy2(source_fbx_path, copied_fbx_path)
-    copied_manifest_path = _copy_material_manifest(source_fbx_path, copied_fbx_path)
+    copied_manifest_path = _copy_material_manifest(source_fbx_path, copied_fbx_path, material_manifest_path)
     manifest_info = {"path": copied_manifest_path, "manifest": load_material_manifest(copied_manifest_path)} if copied_manifest_path else None
-    source_materials = source_material_specs_from_manifest(source_fbx_path)
+    source_materials = source_material_specs_from_manifest(source_fbx_path, material_manifest_path)
 
     materials_data, texture_diagnostics = build_smoke_materials_data(
         source_fbx_path,
@@ -460,6 +468,7 @@ def run_rc_smoke_test(
     texture_output_format="tif",
     material_overrides=None,
     external_material_texture_evidence=None,
+    material_manifest_path="",
     reference_mtl_path="",
     material_state_compare_output_path="",
     mtl_schema_gate_output_path="",
@@ -490,6 +499,7 @@ def run_rc_smoke_test(
             texture_output_format=texture_output_format,
             material_overrides=material_overrides,
             external_material_texture_evidence=external_material_texture_evidence,
+            material_manifest_path=material_manifest_path,
         )
     except Exception as e:
         return RCSmokeResult(False, work_dir, rc_exe_path, source_fbx_path, error=str(e))
@@ -694,6 +704,11 @@ def main(argv=None):
         help="Use the source FBX material manifest sidecar to build request and MTL materials",
     )
     parser.add_argument(
+        "--material-manifest",
+        default="",
+        help="Optional explicit FBX material manifest path. Keeps validation sidecars in the work directory.",
+    )
+    parser.add_argument(
         "--texture-output-dir",
         default="",
         help="Optional directory containing processed texture outputs to reference from the generated MTL.",
@@ -745,7 +760,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     material_specs = (
-        material_specs_from_manifest(args.fbx)
+        material_specs_from_manifest(args.fbx, args.material_manifest)
         if args.materials_from_manifest
         else material_specs_from_arg(args.materials)
     )
@@ -766,6 +781,7 @@ def main(argv=None):
         texture_output_format=args.texture_output_format,
         material_overrides=material_overrides,
         external_material_texture_evidence=external_material_texture_evidence,
+        material_manifest_path=args.material_manifest,
         reference_mtl_path=args.reference_mtl,
         material_state_compare_output_path=args.material_state_compare_output,
         mtl_schema_gate_output_path=args.mtl_schema_gate_output,
