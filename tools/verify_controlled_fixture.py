@@ -5,6 +5,13 @@
 import argparse
 import json
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from model_processing.evidence_coercion import coerce_center_x, coerce_non_negative_int, coerce_request_sub_index
 
 DEFAULT_POLYGON_SPACING = 3.0

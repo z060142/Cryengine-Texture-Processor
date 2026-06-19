@@ -9,6 +9,13 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from tools.rc_smoke_test import (
     DEFAULT_FBX_CANDIDATES,
     DEFAULT_RC_CANDIDATES,

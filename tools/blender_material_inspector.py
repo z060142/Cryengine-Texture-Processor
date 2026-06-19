@@ -8,6 +8,13 @@ import os
 import subprocess
 import tempfile
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from tools.blender_material_fixture import build_blender_command, discover_default_blender
 
 

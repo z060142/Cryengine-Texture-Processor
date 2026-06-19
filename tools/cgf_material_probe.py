@@ -5,6 +5,13 @@
 import argparse
 import json
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from utils.cgf_material_reader import read_cgf_material_summary
 
 

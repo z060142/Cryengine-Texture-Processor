@@ -8,6 +8,13 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from output_formats.cryengine_mtl_schema import (
     analyze_ce_texture_map_entry,
     analyze_public_params,

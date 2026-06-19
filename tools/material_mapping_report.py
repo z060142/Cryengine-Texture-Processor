@@ -6,6 +6,13 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from model_processing.evidence_coercion import coerce_center_x, coerce_request_sub_index
 from model_processing.material_manifest import (
     coerce_material_name,

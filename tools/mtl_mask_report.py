@@ -8,6 +8,13 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from output_formats.cryengine_mtl_schema import (
     COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,

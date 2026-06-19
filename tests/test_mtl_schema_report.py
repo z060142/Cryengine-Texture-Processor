@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
 from tools.mtl_schema_report import build_mtl_schema_report
@@ -176,3 +180,30 @@ def test_build_mtl_schema_report_can_omit_per_file_records(tmp_path):
     assert report["files"] == []
     assert report["summary"]["file_count"] == 1
     assert report["summary"]["material_count"] == 2
+
+
+def test_mtl_schema_report_script_runs_from_tools_path(tmp_path):
+    repo_root = Path(__file__).resolve().parents[1]
+    mtl_path = tmp_path / "asset.mtl"
+    output_path = tmp_path / "report.json"
+    write_schema_mtl(mtl_path)
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo_root / "tools" / "mtl_schema_report.py"),
+            str(mtl_path),
+            "--output",
+            str(output_path),
+            "--summary-only",
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["summary"]["file_count"] == 1
+    assert payload["files"] == []

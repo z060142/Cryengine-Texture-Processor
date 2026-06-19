@@ -10,6 +10,13 @@ import subprocess
 import time
 import xml.etree.ElementTree as ET
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from tools.mtl_genmask_probe import KEEP, MTLMaskVariant, apply_mask_variant_to_mtl, default_mask_variants
 from tools.mtl_schema_report import analyze_mtl_file
 

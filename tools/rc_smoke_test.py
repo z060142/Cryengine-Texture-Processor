@@ -7,6 +7,13 @@ from dataclasses import dataclass
 import os
 import shutil
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from model_processing.material_manifest import (
     coerce_material_name,
     coerce_material_slot,

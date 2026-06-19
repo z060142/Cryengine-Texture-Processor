@@ -6,6 +6,13 @@ import argparse
 import json
 import os
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
 from tools.material_mapping_report import (
     build_existing_output_material_report,
     write_material_mapping_report,
