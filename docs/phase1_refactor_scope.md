@@ -57,6 +57,8 @@ commit and docs are added
 
 ### P1-2: Make FBX Texture Fallback Visible
 
+Status: done in `refactor_phase49_fbx_texture_fallback_warning.md`.
+
 Problem:
 
 `FbxExporter` still has a compatibility fallback that guesses `<material>_diff.tif` when processed texture data is missing. That fallback is acceptable in Phase 1, but it must not be silent.

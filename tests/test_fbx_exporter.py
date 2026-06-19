@@ -3,6 +3,7 @@ import os
 from model_processing.fbx_exporter import (
     fallback_diffuse_texture_path,
     relative_blender_texture_path,
+    resolve_diffuse_texture_assignment,
     resolve_texture_output_dir,
     select_diffuse_texture_path,
 )
@@ -67,3 +68,34 @@ def test_fallback_diffuse_texture_path_preserves_legacy_name_guess(tmp_path):
     assert fallback_diffuse_texture_path("Body.001", tmp_path) == os.path.join(
         tmp_path, "Body_diff.tif"
     )
+
+
+def test_resolve_diffuse_texture_assignment_uses_processed_path_without_warning(tmp_path):
+    fbx_path = tmp_path / "models" / "chair.fbx"
+    texture_path = tmp_path / "models" / "textures" / "Body_diff.tif"
+
+    result = resolve_diffuse_texture_assignment(
+        "Body",
+        fbx_path,
+        tmp_path / "models" / "textures",
+        {"Body": {"diff": str(texture_path)}},
+    )
+
+    assert result["texture_path"] == str(texture_path)
+    assert result["relative_texture_path"] == "textures/Body_diff.tif"
+    assert result["used_fallback"] is False
+    assert result["warning"] is None
+
+
+def test_resolve_diffuse_texture_assignment_reports_fallback_warning(tmp_path):
+    fbx_path = tmp_path / "models" / "chair.fbx"
+    texture_dir = tmp_path / "models" / "textures"
+
+    result = resolve_diffuse_texture_assignment("Body.001", fbx_path, texture_dir, {})
+
+    assert result["texture_path"] == os.path.join(texture_dir, "Body_diff.tif")
+    assert result["relative_texture_path"] == "textures/Body_diff.tif"
+    assert result["used_fallback"] is True
+    assert result["warning"]["code"] == "fbx_diffuse_texture_fallback"
+    assert result["warning"]["material"] == "Body.001"
+    assert result["warning"]["relative_texture_path"] == "textures/Body_diff.tif"

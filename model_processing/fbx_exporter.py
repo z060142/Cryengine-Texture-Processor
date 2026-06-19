@@ -75,6 +75,39 @@ def fallback_diffuse_texture_path(material_name, texture_output_dir):
     return os.path.join(texture_output_dir, f"{base_name_for_texture}_diff.tif")
 
 
+def resolve_diffuse_texture_assignment(material_name, fbx_output_path, texture_output_dir, texture_data):
+    """Resolve the diffuse texture assignment and expose fallback diagnostics."""
+    selected_diffuse_path = select_diffuse_texture_path(material_name, texture_data)
+    used_fallback = not bool(selected_diffuse_path)
+    absolute_diff_texture_path = (
+        selected_diffuse_path
+        if selected_diffuse_path
+        else fallback_diffuse_texture_path(material_name, texture_output_dir)
+    )
+    relative_diff_path = relative_blender_texture_path(fbx_output_path, absolute_diff_texture_path)
+    warning = None
+    if used_fallback:
+        warning = {
+            "severity": "warning",
+            "code": "fbx_diffuse_texture_fallback",
+            "material": material_name,
+            "texture_path": absolute_diff_texture_path,
+            "relative_texture_path": relative_diff_path,
+            "message": (
+                "No processed diffuse texture path was provided for this material. "
+                "FBX export used the compatibility '<material>_diff.tif' fallback path."
+            ),
+        }
+
+    return {
+        "material": material_name,
+        "texture_path": absolute_diff_texture_path,
+        "relative_texture_path": relative_diff_path,
+        "used_fallback": used_fallback,
+        "warning": warning,
+    }
+
+
 class FbxExporter:
     """
     Class for exporting models to FBX format.
@@ -86,6 +119,7 @@ class FbxExporter:
         """
         self.bpy = None
         self.initialized = False
+        self.last_texture_warnings = []
         
         try:
             # Try to import bpy
@@ -190,7 +224,11 @@ class FbxExporter:
             absolute_texture_dir = resolve_texture_output_dir(absolute_output_path, texture_dir)
 
             # Pass texture_data to the setup function
-            self._setup_materials_for_export(absolute_output_path, absolute_texture_dir, texture_data)
+            self.last_texture_warnings = self._setup_materials_for_export(
+                absolute_output_path,
+                absolute_texture_dir,
+                texture_data,
+            )
 
             # Export FBX with relative paths for textures
             try:
@@ -248,7 +286,7 @@ class FbxExporter:
         """
         if not self.initialized:
             print("Error: bpy not initialized.")
-            return
+            return []
 
         bpy = self.bpy
         fbx_dir = os.path.dirname(fbx_output_path)
@@ -259,6 +297,7 @@ class FbxExporter:
 
         # Ensure texture output directory exists (might be needed for relative path calculation)
         os.makedirs(texture_output_dir, exist_ok=True)
+        texture_warnings = []
 
         for material in bpy.data.materials:
             # Skip default/unwanted materials if necessary
@@ -286,16 +325,22 @@ class FbxExporter:
             # Link BSDF to output
             links.new(bsdf_node.outputs['BSDF'], output_node.inputs['Surface'])
 
-            selected_diffuse_path = select_diffuse_texture_path(material.name, texture_data)
-            if selected_diffuse_path:
-                absolute_diff_texture_path = selected_diffuse_path
-                print(f"  Using processed diffuse texture: {absolute_diff_texture_path}")
+            texture_assignment = resolve_diffuse_texture_assignment(
+                material.name,
+                fbx_output_path,
+                texture_output_dir,
+                texture_data,
+            )
+            absolute_diff_texture_path = texture_assignment["texture_path"]
+            relative_diff_path = texture_assignment["relative_texture_path"]
+            if texture_assignment["used_fallback"]:
+                texture_warnings.append(texture_assignment["warning"])
+                print(f"  Warning: {texture_assignment['warning']['message']}")
+                print(f"  Fallback diffuse texture: {absolute_diff_texture_path}")
             else:
-                absolute_diff_texture_path = fallback_diffuse_texture_path(material.name, texture_output_dir)
-                print(f"  No processed diffuse texture found for {material.name}. Using fallback path.")
+                print(f"  Using processed diffuse texture: {absolute_diff_texture_path}")
 
             # Calculate the relative path from the FBX directory to the texture
-            relative_diff_path = relative_blender_texture_path(fbx_output_path, absolute_diff_texture_path)
             print(f"  Assigning relative diffuse path: {relative_diff_path}")
 
             # Create the image texture node
@@ -346,6 +391,7 @@ class FbxExporter:
             print(f"  Finished setting up material: {material.name}")
 
         print("Material rebuilding complete.")
+        return texture_warnings
 
     # Note: The old _clear_and_create_materials and _update_texture_paths are removed by this replacement.
 
