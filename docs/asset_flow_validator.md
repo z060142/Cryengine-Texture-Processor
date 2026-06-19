@@ -245,6 +245,10 @@ check_counts:
 Here, `material_texture_ok` being `2 / 0 / 6` means two RC cases exercised
 texture-backed MTL export and six RC cases were intentionally model-only.
 
+Use `tools.asset_flow_acceptance_gate` when a report must be promoted to a
+machine-checked acceptance baseline. It reads the validator JSON report and
+enforces minimum PASS counts plus zero FAIL counts for required checks.
+
 That batch included two auto-generated raw texture processing cases:
 
 ```text
