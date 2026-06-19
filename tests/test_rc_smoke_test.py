@@ -331,6 +331,41 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
     assert codes.count("material_manifest_invalid_polygon_slot") == 2
 
 
+def test_prepare_smoke_bundle_reports_out_of_range_manifest_slots(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 127, "name": "LastValid"},
+                    {"slot": 128, "name": "TooHigh"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "LastValid", "material_table_slot": 127},
+                    {"polygon": 1, "material_name": "TooHigh", "material_table_slot": 128},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
+    assert "material_manifest_material_slot_out_of_rc_range" in codes
+    assert "material_manifest_polygon_slot_out_of_rc_range" in codes
+    assert "rc_sub_index_out_of_range_deleted" in codes
+
+
 def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):
     source_fbx = tmp_path / "source.fbx"
     source_fbx.write_text("fake fbx", encoding="utf-8")

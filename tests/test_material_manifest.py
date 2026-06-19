@@ -192,3 +192,34 @@ def test_material_manifest_materials_skips_invalid_manifest_slots():
     assert [material["name"] for material in materials] == ["Metal"]
     assert materials[0]["sub_index"] == 1
     assert materials[0]["mesh_names"] == ["MeshB"]
+
+
+def test_material_manifest_table_diagnostics_reports_out_of_rc_range_slots():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 127, "name": "LastValid"},
+                    {"slot": 128, "name": "TooHigh"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "LastValid", "material_table_slot": 127},
+                    {"polygon": 1, "material_name": "TooHigh", "material_table_slot": 128},
+                ],
+            }
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert "material_manifest_material_slot_out_of_rc_range" in codes
+    assert "material_manifest_polygon_slot_out_of_rc_range" in codes
+    material_diagnostic = next(
+        diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_material_slot_out_of_rc_range"
+    )
+    polygon_diagnostic = next(
+        diagnostic for diagnostic in diagnostics if diagnostic["code"] == "material_manifest_polygon_slot_out_of_rc_range"
+    )
+    assert material_diagnostic["slot"] == 128
+    assert material_diagnostic["max_sub_materials"] == 128
+    assert polygon_diagnostic["slot"] == 128

@@ -166,6 +166,31 @@ def test_collect_model_material_diagnostics_reports_invalid_manifest_slots():
     assert "material_manifest_invalid_polygon_slot" in codes
 
 
+def test_collect_model_material_diagnostics_reports_out_of_range_manifest_slots():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "LastValid", "id": 128}, {"name": "TooHigh", "id": 129}],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [
+                        {"slot": 127, "name": "LastValid"},
+                        {"slot": 128, "name": "TooHigh"},
+                    ],
+                    "polygons": [
+                        {"polygon": 0, "material_name": "LastValid", "material_table_slot": 127},
+                        {"polygon": 1, "material_name": "TooHigh", "material_table_slot": 128},
+                    ],
+                }
+            },
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert "material_manifest_material_slot_out_of_rc_range" in codes
+    assert "material_manifest_polygon_slot_out_of_rc_range" in codes
+
+
 def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
     diagnostics = collect_model_material_diagnostics(
         {

@@ -7,6 +7,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from model_processing.material_manifest import coerce_material_slot, discover_material_manifest, load_material_manifest
+from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS
 from utils.cgf_material_reader import read_cgf_material_summary
 
 
@@ -211,6 +212,22 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
                 }
             )
             continue
+        if slot >= RC_MAX_SUB_MATERIALS:
+            ok = False
+            material_checks.append(
+                {
+                    "ok": False,
+                    "slot": slot,
+                    "expected_name": expected_name,
+                    "request_names": request_names_by_index.get(slot, []),
+                    "mtl_slot_name": mtl_slots_by_index.get(slot, {}).get("name", ""),
+                    "request_ok": False,
+                    "mtl_ok": False,
+                    "max_sub_materials": RC_MAX_SUB_MATERIALS,
+                    "error": "manifest_material_slot_out_of_rc_range",
+                }
+            )
+            continue
         request_names_for_slot = request_names_by_index.get(slot, [])
         mtl_slot_name = mtl_slots_by_index.get(slot, {}).get("name", "")
         request_ok = request_names_for_slot == [expected_name]
@@ -249,6 +266,23 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
                     "mtl_name_for_actual_id": "",
                     "cgf_id_ok": False,
                     "error": "invalid_manifest_polygon_slot",
+                }
+            )
+            continue
+        if expected_cgf_id >= RC_MAX_SUB_MATERIALS:
+            ok = False
+            polygon_checks.append(
+                {
+                    "ok": False,
+                    "polygon": polygon_index,
+                    "expected_cgf_material_id": expected_cgf_id,
+                    "actual_cgf_material_id": None,
+                    "expected_name": expected_name,
+                    "request_names_for_actual_id": [],
+                    "mtl_name_for_actual_id": "",
+                    "cgf_id_ok": False,
+                    "max_sub_materials": RC_MAX_SUB_MATERIALS,
+                    "error": "manifest_polygon_slot_out_of_rc_range",
                 }
             )
             continue

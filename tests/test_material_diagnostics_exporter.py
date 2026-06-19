@@ -283,6 +283,30 @@ def test_build_material_diagnostics_report_includes_invalid_manifest_slot_diagno
     assert report["summary"]["hazard_count"] >= 2
 
 
+def test_build_material_diagnostics_report_includes_out_of_range_manifest_slot_diagnostics():
+    report = build_material_diagnostics_report(
+        [{"name": "LastValid", "id": 128}, {"name": "TooHigh", "id": 129}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 127, "name": "LastValid"},
+                    {"slot": 128, "name": "TooHigh"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "LastValid", "material_table_slot": 127},
+                    {"polygon": 1, "material_name": "TooHigh", "material_table_slot": 128},
+                ],
+            }
+        },
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert "material_manifest_material_slot_out_of_rc_range" in codes
+    assert "material_manifest_polygon_slot_out_of_rc_range" in codes
+    assert "rc_sub_index_out_of_range_deleted" in codes
+
+
 def test_build_material_diagnostics_report_checks_source_materials_separately_from_output_materials():
     report = build_material_diagnostics_report(
         [{"name": "Visible", "id": 1}],

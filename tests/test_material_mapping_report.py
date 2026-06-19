@@ -275,6 +275,44 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
     assert result["polygon_checks"][1]["expected_cgf_material_id"] == -1
 
 
+def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():
+    manifest = {
+        "manifest_kind": "blender-fbx-material-inspection",
+        "materials": [
+            {"slot": 127, "name": "LastValid"},
+            {"slot": 128, "name": "TooHigh"},
+        ],
+        "polygons": [
+            {
+                "polygon": 0,
+                "material_slot": 127,
+                "material_name": "LastValid",
+                "expected_cgf_material_id": 127,
+            },
+            {
+                "polygon": 1,
+                "material_slot": 128,
+                "material_name": "TooHigh",
+                "expected_cgf_material_id": 128,
+            },
+        ],
+    }
+
+    result = evaluate_fixture_material_semantics(
+        manifest,
+        {"material_ids": []},
+        [{"name": "LastValid", "sub_index": 127}, {"name": "TooHigh", "sub_index": -1}],
+        [{"slot": 127, "name": "LastValid"}],
+    )
+
+    assert not result["ok"]
+    assert result["material_checks"][1]["error"] == "manifest_material_slot_out_of_rc_range"
+    assert result["material_checks"][1]["slot"] == 128
+    assert result["material_checks"][1]["max_sub_materials"] == 128
+    assert result["polygon_checks"][1]["error"] == "manifest_polygon_slot_out_of_rc_range"
+    assert result["polygon_checks"][1]["expected_cgf_material_id"] == 128
+
+
 def test_build_and_write_material_mapping_report(tmp_path):
     json_path = tmp_path / "asset.json"
     json_path.write_text(

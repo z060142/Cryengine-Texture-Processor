@@ -5,6 +5,8 @@
 import json
 import os
 
+from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS
+
 
 MATERIAL_MANIFEST_SUFFIXES = (".fixture_manifest.json", ".fbx_material_manifest.json")
 
@@ -104,6 +106,21 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
                     ),
                 }
             )
+        if slot is not None and slot >= RC_MAX_SUB_MATERIALS:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_material_slot_out_of_rc_range",
+                    "manifest_order": order,
+                    "material": name,
+                    "slot": slot,
+                    "max_sub_materials": RC_MAX_SUB_MATERIALS,
+                    "message": (
+                        "The material manifest has a material row whose slot is outside RC's supported "
+                        "sub-material range. RC normalizes request sub_index values at or above this limit to -1."
+                    ),
+                }
+            )
         if slot is not None:
             by_slot.setdefault(slot, []).append({"order": order, "name": name})
         if name:
@@ -171,6 +188,21 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
                 }
             )
             continue
+        if slot >= RC_MAX_SUB_MATERIALS:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_polygon_slot_out_of_rc_range",
+                    "polygon_order": order,
+                    "polygon_material_name": name,
+                    "slot": slot,
+                    "max_sub_materials": RC_MAX_SUB_MATERIALS,
+                    "message": (
+                        "The material manifest has polygon evidence for a material slot outside RC's supported "
+                        "sub-material range. The converter cannot target that polygon with a stable request sub_index."
+                    ),
+                }
+            )
         polygon_slots_by_name.setdefault(name, set()).add(slot)
         table_name = table_name_by_slot.get(slot)
         if table_name and table_name != name:
