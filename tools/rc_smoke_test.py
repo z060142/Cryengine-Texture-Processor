@@ -35,6 +35,7 @@ from output_formats.texture_output_diagnostics import (
     build_texture_output_report_from_paths,
     write_texture_output_report,
 )
+from tools.material_report_summary import compact_material_report_summary, format_summary, load_report
 from tools.material_mapping_report import build_material_mapping_report, write_material_mapping_report
 from tools.mtl_material_state_compare import write_material_state_compare_report
 from tools.mtl_schema_report import build_mtl_schema_report, write_mtl_schema_report
@@ -709,6 +710,16 @@ def main(argv=None):
         default="",
         help="Optional output path for the texture output gate JSON report.",
     )
+    parser.add_argument(
+        "--no-rc-log",
+        action="store_true",
+        help="Do not print RC stdout/stderr after the compact smoke result.",
+    )
+    parser.add_argument(
+        "--report-summary",
+        action="store_true",
+        help="Print a compact material report summary after the smoke result.",
+    )
     args = parser.parse_args(argv)
     material_specs = (
         material_specs_from_manifest(args.fbx)
@@ -745,9 +756,12 @@ def main(argv=None):
     print(f"texture_output_gate: {result.texture_output_gate_path}")
     if result.error:
         print(f"error: {result.error}")
-    if result.rc_result and result.rc_result.stdout:
+    if args.report_summary and result.material_report_path:
+        print("material_report_summary:")
+        print(format_summary(compact_material_report_summary(load_report(result.material_report_path))))
+    if not args.no_rc_log and result.rc_result and result.rc_result.stdout:
         print(result.rc_result.stdout)
-    if result.rc_result and result.rc_result.stderr:
+    if not args.no_rc_log and result.rc_result and result.rc_result.stderr:
         print(result.rc_result.stderr)
 
     return 0 if result.success else 1

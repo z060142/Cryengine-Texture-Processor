@@ -1,6 +1,7 @@
 import json
 import os
 
+from tools import rc_smoke_test as rc_smoke_test_module
 from tools.rc_smoke_test import (
     apply_material_overrides_to_specs,
     build_smoke_materials_data,
@@ -8,6 +9,7 @@ from tools.rc_smoke_test import (
     collect_material_slot_diagnostics,
     discover_default_fbx,
     load_material_overrides,
+    main,
     material_names_from_arg,
     material_specs_from_manifest,
     material_specs_from_arg,
@@ -876,6 +878,68 @@ def test_run_rc_smoke_test_uses_runner_factory(tmp_path):
     assert result.copied_fbx_path.endswith("asset.fbx")
     assert result.material_report_path.endswith("asset.material_report.json")
     assert os.path.exists(result.material_report_path)
+
+
+def test_rc_smoke_test_cli_can_suppress_rc_log_and_print_report_summary(monkeypatch, tmp_path, capsys):
+    rc_path = tmp_path / "rc.exe"
+    rc_path.write_text("fake rc", encoding="utf-8")
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    report_path = tmp_path / "asset.material_report.json"
+    report_path.write_text(
+        json.dumps(
+            {
+                "summary": {
+                    "rc_success": True,
+                    "action_required": False,
+                    "slot_alignment_ok": True,
+                    "cgf_material_id_alignment_ok": True,
+                    "material_slot_evidence_ok": True,
+                    "material_slot_evidence_status_counts": {"matched_used_slot": 1},
+                },
+                "material_slot_evidence": {"summary": {"row_count": 1}},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_run_rc_smoke_test(*args, **kwargs):
+        del args, kwargs
+        return rc_smoke_test_module.RCSmokeResult(
+            success=True,
+            work_dir=str(tmp_path / "work"),
+            rc_exe_path=str(rc_path),
+            source_fbx_path=str(source_fbx),
+            material_report_path=str(report_path),
+            rc_result=RCImportResult(
+                success=True,
+                command=[],
+                json_path="asset.json",
+                expected_output_path="asset.cgf",
+                returncode=0,
+                stdout="very noisy rc log",
+            ),
+        )
+
+    monkeypatch.setattr(rc_smoke_test_module, "run_rc_smoke_test", fake_run_rc_smoke_test)
+
+    assert main(
+        [
+            "--rc",
+            str(rc_path),
+            "--fbx",
+            str(source_fbx),
+            "--work-dir",
+            str(tmp_path / "work"),
+            "--no-rc-log",
+            "--report-summary",
+        ]
+    ) == 0
+
+    output = capsys.readouterr().out
+    assert "material_report_summary:" in output
+    assert "material_slot_evidence_ok: True" in output
+    assert "very noisy rc log" not in output
 
 
 def test_run_rc_smoke_test_writes_preflight_material_diagnostics(tmp_path):
