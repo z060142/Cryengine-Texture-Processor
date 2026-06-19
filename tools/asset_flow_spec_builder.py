@@ -9,6 +9,15 @@ import os
 import re
 from pathlib import Path
 
+try:
+    from _repo_path import add_repo_root
+except ModuleNotFoundError:
+    from tools._repo_path import add_repo_root
+
+add_repo_root()
+
+from tools.obj_mtl_report import parse_obj_mtl
+
 
 FBX_EXTENSIONS = {".fbx"}
 MTL_EXTENSIONS = {".mtl"}
@@ -17,6 +26,18 @@ MTL_EXTENSIONS = {".mtl"}
 def _safe_name(value):
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(value or "asset")).strip("._")
     return safe or "asset"
+
+
+def _match_key(value):
+    return re.sub(r"[^a-z0-9]+", "", str(value or "").lower())
+
+
+def _matches_hint(value, hint):
+    hint_key = _match_key(hint)
+    if not hint_key:
+        return True
+    value_key = _match_key(value)
+    return bool(value_key) and (value_key.startswith(hint_key) or hint_key.startswith(value_key))
 
 
 def _hash_path(path):
@@ -93,6 +114,78 @@ def find_obj_mtl_evidence(fbx_path, mtl_index=None):
     return ""
 
 
+def resolve_texture_path_from_obj_mtl(texture_file, mtl_path):
+    if not texture_file:
+        return ""
+    if os.path.isabs(texture_file) and os.path.exists(texture_file):
+        return os.path.abspath(texture_file)
+
+    base_dir = os.path.dirname(os.path.abspath(mtl_path))
+    direct = os.path.abspath(os.path.join(base_dir, texture_file))
+    if os.path.exists(direct):
+        return direct
+
+    filename = os.path.basename(texture_file)
+    current = Path(base_dir)
+    for directory in [current, *current.parents]:
+        candidate = directory / "Textures" / filename
+        if candidate.exists():
+            return str(candidate.resolve())
+    return ""
+
+
+def _related_texture_filenames(texture_path):
+    path = Path(texture_path)
+    stem = path.stem
+    suffix = path.suffix
+    lower_stem = stem.lower()
+    replacements = []
+    for source_suffix in ("_a", "_d", "_diff", "_diffuse", "_albedo"):
+        if lower_stem.endswith(source_suffix):
+            base = stem[: -len(source_suffix)]
+            replacements.extend([f"{base}_n{suffix}", f"{base}_normal{suffix}", f"{base}_s{suffix}", f"{base}_spec{suffix}"])
+            break
+    return replacements
+
+
+def expand_related_texture_paths(paths, mtl_path):
+    expanded = []
+    seen = set()
+    for path in paths:
+        for candidate in [path, *(_related_texture_filenames(path))]:
+            resolved = candidate if os.path.isabs(candidate) and os.path.exists(candidate) else resolve_texture_path_from_obj_mtl(candidate, mtl_path)
+            if not resolved:
+                continue
+            normalized = os.path.normcase(os.path.abspath(resolved))
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            expanded.append(os.path.abspath(resolved))
+    return expanded
+
+
+def texture_paths_from_obj_mtl(mtl_path, name_hint=""):
+    if not mtl_path or not os.path.exists(mtl_path):
+        return []
+    report = parse_obj_mtl(mtl_path)
+    paths = []
+    seen = set()
+    for material in report.get("materials", []):
+        material_matches = _matches_hint(material.get("name", ""), name_hint)
+        for texture in material.get("textures", []):
+            if name_hint and not material_matches and not _matches_hint(texture.get("file", ""), name_hint):
+                continue
+            candidate = resolve_texture_path_from_obj_mtl(texture.get("file", ""), mtl_path)
+            if not candidate:
+                continue
+            normalized = os.path.normcase(os.path.abspath(candidate))
+            if normalized in seen or not os.path.exists(candidate):
+                continue
+            seen.add(normalized)
+            paths.append(os.path.abspath(candidate))
+    return expand_related_texture_paths(paths, mtl_path)
+
+
 def collect_fbx_candidates(roots, max_bytes=None):
     candidates = []
     seen = set()
@@ -120,6 +213,7 @@ def build_spec(
     texture_output_dir="",
     obj_mtl_roots=None,
     include_obj_mtl_evidence=True,
+    include_texture_process=False,
 ):
     selected = collect_fbx_candidates(roots, max_bytes=max_bytes)
     if limit and limit > 0:
@@ -136,6 +230,8 @@ def build_spec(
         while name in used_names:
             name = f"{name}_{len(used_names)}"
         used_names.add(name)
+        case_texture_output_dir = texture_output_dir
+        texture_paths = []
         case = {
             "name": name,
             "type": "rc",
@@ -145,8 +241,21 @@ def build_spec(
         obj_mtl_evidence = find_obj_mtl_evidence(path, mtl_index) if include_obj_mtl_evidence else ""
         if obj_mtl_evidence:
             case["obj_mtl_evidence"] = obj_mtl_evidence
-        if texture_output_dir:
-            case["texture_output_dir"] = texture_output_dir
+            if include_texture_process:
+                texture_paths = texture_paths_from_obj_mtl(obj_mtl_evidence, name_hint=Path(path).stem)
+        if include_texture_process and texture_paths and not case_texture_output_dir:
+            case_texture_output_dir = os.path.join(work_root, f"{name}_textures")
+            cases.append(
+                {
+                    "name": f"{name}_raw_textures",
+                    "type": "texture_process",
+                    "textures": texture_paths,
+                    "output_dir": case_texture_output_dir,
+                    "source_obj_mtl_evidence": obj_mtl_evidence,
+                }
+            )
+        if case_texture_output_dir:
+            case["texture_output_dir"] = case_texture_output_dir
         cases.append(case)
 
     return {
@@ -160,6 +269,7 @@ def build_spec(
             "obj_mtl_roots": [os.path.abspath(root) for root in mtl_roots],
             "include_obj_mtl_evidence": include_obj_mtl_evidence,
             "texture_output_dir": texture_output_dir,
+            "include_texture_process": include_texture_process,
             "case_count": len(cases),
         },
         "cases": cases,
@@ -206,6 +316,11 @@ def main(argv=None):
         action="store_true",
         help="Do not try to attach OBJ .mtl evidence to generated rc cases.",
     )
+    parser.add_argument(
+        "--include-texture-process",
+        action="store_true",
+        help="Add texture_process cases from OBJ .mtl texture references when possible.",
+    )
     args = parser.parse_args(argv)
 
     max_bytes = _parse_size_mb(args.max_mb)
@@ -218,13 +333,17 @@ def main(argv=None):
         texture_output_dir=args.texture_output_dir,
         obj_mtl_roots=args.obj_mtl_root or args.roots,
         include_obj_mtl_evidence=not args.no_obj_mtl_evidence,
+        include_texture_process=args.include_texture_process,
     )
     write_spec(args.output, spec)
     print(args.output)
     print(f"case_count: {len(spec['cases'])}")
     for case in spec["cases"]:
         evidence = f" obj_mtl={case['obj_mtl_evidence']}" if case.get("obj_mtl_evidence") else ""
-        print(f"{case['name']}: {case['source_size_bytes']} bytes{evidence}")
+        if case.get("type") == "rc":
+            print(f"{case['name']}: {case['source_size_bytes']} bytes{evidence}")
+        else:
+            print(f"{case['name']}: {case['type']} textures={len(case.get('textures', []))}")
 
 
 if __name__ == "__main__":

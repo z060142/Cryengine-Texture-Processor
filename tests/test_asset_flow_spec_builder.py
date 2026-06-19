@@ -105,3 +105,131 @@ def test_build_spec_attaches_texture_output_dir(tmp_path):
 
     assert spec["cases"][0]["texture_output_dir"] == str(tmp_path / "textures")
     assert spec["metadata"]["texture_output_dir"] == str(tmp_path / "textures")
+
+
+def test_texture_paths_from_obj_mtl_finds_ancestor_textures_folder(tmp_path):
+    obj_dir = tmp_path / "Pack" / "Models" / "OBJ"
+    texture_dir = tmp_path / "Pack" / "Textures"
+    obj_dir.mkdir(parents=True)
+    texture_dir.mkdir()
+    mtl = obj_dir / "Weed_b.mtl"
+    diff = texture_dir / "Weed_B_a.tga"
+    normal = texture_dir / "Weed_B_n.tga"
+    diff.write_bytes(b"diff")
+    normal.write_bytes(b"normal")
+    mtl.write_text(
+        "newmtl Weed_B_mat\nmap_Kd Weed_B_a.tga\nbump Weed_B_n.tga -bm 1\n",
+        encoding="utf-8",
+    )
+
+    assert asset_flow_spec_builder.texture_paths_from_obj_mtl(str(mtl)) == [
+        str(diff.resolve()),
+        str(normal.resolve()),
+    ]
+
+
+def test_texture_paths_from_obj_mtl_can_filter_by_name_hint(tmp_path):
+    obj_dir = tmp_path / "Pack" / "Models" / "OBJ"
+    texture_dir = tmp_path / "Pack" / "Textures"
+    obj_dir.mkdir(parents=True)
+    texture_dir.mkdir()
+    mtl = obj_dir / "Weed_b.mtl"
+    weed = texture_dir / "Weed_B_a.tga"
+    bark = texture_dir / "Bark_a.tga"
+    weed.write_bytes(b"weed")
+    bark.write_bytes(b"bark")
+    mtl.write_text(
+        "\n".join(
+            [
+                "newmtl BarkSG",
+                "map_Kd Bark_a.tga",
+                "newmtl Weed_bSG",
+                "map_Kd Weed_B_a.tga",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert asset_flow_spec_builder.texture_paths_from_obj_mtl(str(mtl), name_hint="Weed_b") == [
+        str(weed.resolve())
+    ]
+
+
+def test_texture_paths_from_obj_mtl_expands_related_normal(tmp_path):
+    obj_dir = tmp_path / "Pack" / "Models" / "OBJ"
+    texture_dir = tmp_path / "Pack" / "Textures"
+    obj_dir.mkdir(parents=True)
+    texture_dir.mkdir()
+    mtl = obj_dir / "Weed_b.mtl"
+    diff = texture_dir / "Weed_B_a.tga"
+    normal = texture_dir / "Weed_B_n.tga"
+    diff.write_bytes(b"diff")
+    normal.write_bytes(b"normal")
+    mtl.write_text("newmtl Weed_bSG\nmap_Kd Weed_B_a.tga\n", encoding="utf-8")
+
+    assert asset_flow_spec_builder.texture_paths_from_obj_mtl(str(mtl), name_hint="Weed_b") == [
+        str(diff.resolve()),
+        str(normal.resolve()),
+    ]
+
+
+def test_build_spec_can_add_texture_process_case_from_obj_mtl(tmp_path):
+    pack = tmp_path / "Pack"
+    fbx_dir = pack / "Models" / "FBX"
+    obj_dir = pack / "Models" / "OBJ"
+    texture_dir = pack / "Textures"
+    fbx_dir.mkdir(parents=True)
+    obj_dir.mkdir()
+    texture_dir.mkdir()
+    fbx = fbx_dir / "Weed_b.fbx"
+    mtl = obj_dir / "Weed_b.mtl"
+    diff = texture_dir / "Weed_B_a.tga"
+    fbx.write_bytes(b"fbx")
+    diff.write_bytes(b"diff")
+    mtl.write_text("newmtl Weed_B_mat\nmap_Kd Weed_B_a.tga\n", encoding="utf-8")
+
+    spec = asset_flow_spec_builder.build_spec(
+        [str(fbx)],
+        str(tmp_path / "work"),
+        obj_mtl_roots=[str(obj_dir)],
+        include_texture_process=True,
+    )
+
+    assert [case["type"] for case in spec["cases"]] == ["texture_process", "rc"]
+    assert spec["cases"][0]["textures"] == [str(diff.resolve())]
+    assert spec["cases"][1]["texture_output_dir"] == spec["cases"][0]["output_dir"]
+    assert spec["cases"][1]["obj_mtl_evidence"] == str(mtl.resolve())
+
+
+def test_main_prints_texture_process_cases(tmp_path, capsys):
+    pack = tmp_path / "Pack"
+    fbx_dir = pack / "Models" / "FBX"
+    obj_dir = pack / "Models" / "OBJ"
+    texture_dir = pack / "Textures"
+    fbx_dir.mkdir(parents=True)
+    obj_dir.mkdir()
+    texture_dir.mkdir()
+    fbx = fbx_dir / "Weed_b.fbx"
+    mtl = obj_dir / "Weed_b.mtl"
+    texture = texture_dir / "Weed_B_a.tga"
+    fbx.write_bytes(b"fbx")
+    texture.write_bytes(b"diff")
+    mtl.write_text("newmtl Weed_B_mat\nmap_Kd Weed_B_a.tga\n", encoding="utf-8")
+    output = tmp_path / "spec.json"
+
+    asset_flow_spec_builder.main(
+        [
+            str(fbx),
+            "--obj-mtl-root",
+            str(obj_dir),
+            "--include-texture-process",
+            "--output",
+            str(output),
+            "--work-root",
+            str(tmp_path / "work"),
+            "--max-mb",
+            "0",
+        ]
+    )
+
+    assert "texture_process textures=1" in capsys.readouterr().out

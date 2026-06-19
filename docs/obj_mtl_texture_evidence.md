@@ -42,7 +42,8 @@ The practical rule is:
 - `map_Ke`
 
 The parser intentionally stays rough and practical. It also handles unquoted
-filenames with spaces such as `Map__19_Normal Bump.tga`.
+filenames with spaces such as `Map__19_Normal Bump.tga`, and trailing texture
+options such as `bump Bark_Birch_n.tga -bm 1`.
 
 `model_processing.material_texture_resolver` now accepts
 `external_material_texture_evidence` or `obj_mtl_report` in `model_data`. When

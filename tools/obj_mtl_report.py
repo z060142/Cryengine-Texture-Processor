@@ -48,6 +48,11 @@ def _texture_filename(tokens):
         for _ in range(arg_count):
             payload.pop(0)
 
+    for index, token in enumerate(payload):
+        if index > 0 and token.startswith("-"):
+            payload = payload[:index]
+            break
+
     return " ".join(payload).strip().strip('"')
 
 

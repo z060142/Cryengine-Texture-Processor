@@ -40,3 +40,12 @@ def test_parse_obj_mtl_texture_refs_with_simple_option(tmp_path):
     report = parse_obj_mtl(str(mtl))
 
     assert report["materials"][0]["textures"][0]["file"] == "KB3D_DKF_planksA_Diffuse.jpg"
+
+
+def test_parse_obj_mtl_texture_refs_with_trailing_option(tmp_path):
+    mtl = tmp_path / "sample.mtl"
+    mtl.write_text("newmtl bark\nbump Bark_Birch_n.tga -bm 1\n", encoding="utf-8")
+
+    report = parse_obj_mtl(str(mtl))
+
+    assert report["materials"][0]["textures"][0]["file"] == "Bark_Birch_n.tga"

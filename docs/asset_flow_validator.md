@@ -137,6 +137,56 @@ Bumpmap: ../../Weed_b_textures/Weed_B_ddn.tif
 Specular: ../../Weed_b_textures/Weed_B_spec.tif
 ```
 
+To let the builder create the raw texture-processing case too, use
+`--include-texture-process` and omit `--texture-output-dir`:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX\Weed_b.fbx" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --include-texture-process `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_auto_texture_process_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_auto_texture_process" `
+  --limit 1 `
+  --max-mb 2
+```
+
+The builder reads the OBJ `.mtl`, filters texture references by the FBX stem
+so shared pack-level `.mtl` files do not pull in the whole texture library, and
+adds a `texture_process` case before the `rc` case. It also does a narrow
+same-base expansion from names such as `_a`/`_diff` to `_n`/`_normal` and
+`_s`/`_spec` when those files exist nearby.
+
+Observed auto texture-process result:
+
+```text
+ok: True
+case_count: 2
+ok_count: 2
+failed_count: 0
+Weed_b_27b3df7b_raw_textures: True
+Weed_b_27b3df7b: True
+```
+
+Observed processed outputs:
+
+```text
+Weed_B_diff.tif
+Weed_B_ddn.tif
+Weed_B_spec.tif
+```
+
+The generated MTL values from that run:
+
+```text
+Material: Weed_B_mat
+Shader: Illum
+MtlFlags: 524416
+GenMask: 1125899907366944
+StringGenMask: %NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING
+Textures: Diffuse -> Weed_B_diff.tif, Bumpmap -> Weed_B_ddn.tif, Specular -> Weed_B_spec.tif
+```
+
 ## Spec Format
 
 Example:
