@@ -527,6 +527,12 @@ def exported_material_state_contract():
         "fallback_policy": {
             "allowed": True,
             "status": "degraded_without_reference_mtl",
+            "report_counters": [
+                "compatibility_preserved_default_count",
+                "material_attribute_compatibility_defaults",
+                "public_param_compatibility_defaults",
+                "texmod_compatibility_statuses",
+            ],
             "rule": (
                 "Fallback MTL generation is allowed for rough conversion, but its compatibility-preserved "
                 "shader masks, PublicParams, TexMod defaults, Specular, and Shininess must remain visible "

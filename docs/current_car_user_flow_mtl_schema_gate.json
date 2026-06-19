@@ -8298,7 +8298,8 @@
     "file_count": 1,
     "material_count": 18,
     "multi_material_file_count": 1,
-    "tokenized_material_count": 16
+    "tokenized_material_count": 16,
+    "compatibility_preserved_default_count": 146
   },
   "schema": {
     "material_tags": [
@@ -8395,6 +8396,46 @@
       {
         "name": "missing_export_attribute",
         "count": 8
+      }
+    ],
+    "material_attribute_policy_sources": [
+      {
+        "name": "source_backed_editor_default",
+        "count": 54
+      },
+      {
+        "name": "source_loaded_empty_export_default",
+        "count": 36
+      },
+      {
+        "name": "compatibility_preserved_editor_default_differs",
+        "count": 18
+      },
+      {
+        "name": "compatibility_preserved_until_roundtrip_evidence",
+        "count": 18
+      },
+      {
+        "name": "covered_by_mtl_flags_policy",
+        "count": 18
+      },
+      {
+        "name": "source_loaded_compatibility_default",
+        "count": 18
+      }
+    ],
+    "material_attribute_compatibility_defaults": [
+      {
+        "name": "Emittance=0,0,0,0",
+        "count": 17
+      },
+      {
+        "name": "Shininess=255",
+        "count": 17
+      },
+      {
+        "name": "Specular=1,1,1",
+        "count": 14
       }
     ],
     "material_attribute_policy_missing": [
@@ -8575,6 +8616,16 @@
       {
         "name": "Layer2ReflectivityScale=1.5",
         "count": 1
+      }
+    ],
+    "public_param_compatibility_defaults": [
+      {
+        "name": "EmittanceMapGamma=1",
+        "count": 17
+      },
+      {
+        "name": "SSSIndex=0",
+        "count": 16
       }
     ],
     "public_param_component_counts": [
@@ -8861,6 +8912,12 @@
     ],
     "texture_path_reuse_diagnostics": [],
     "texmod_statuses": [
+      {
+        "name": "matches_export_minimal_texmod",
+        "count": 65
+      }
+    ],
+    "texmod_compatibility_statuses": [
       {
         "name": "matches_export_minimal_texmod",
         "count": 65

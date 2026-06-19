@@ -352,6 +352,12 @@ def test_exported_material_state_contract_separates_reference_overrides_from_fal
         "PublicParams",
     ]
     assert contract["fallback_policy"]["status"] == "degraded_without_reference_mtl"
+    assert contract["fallback_policy"]["report_counters"] == [
+        "compatibility_preserved_default_count",
+        "material_attribute_compatibility_defaults",
+        "public_param_compatibility_defaults",
+        "texmod_compatibility_statuses",
+    ]
 
 
 def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():

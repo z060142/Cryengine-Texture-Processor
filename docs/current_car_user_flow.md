@@ -34,6 +34,7 @@ Result:
 - material report: `S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_current\rc_work\kb3d_citycarsessentialssedan-native.material_report.json`
 - material state compare: `ok: True`
 - MTL schema gate: `ok: True`, `material_count: 18`, `diagnostic_count: 0`
+- MTL fallback provenance: `compatibility_preserved_default_count: 146`
 - texture output gate: `ok: True`, `group_count: 17`, `output_count: 73`, `diagnostic_count: 0`
 - slot alignment: `slot_alignment_ok: True`
 - CGF material id alignment: `cgf_material_id_alignment_ok: True`
@@ -114,13 +115,26 @@ This current run compares equal for high-value state by material name:
 Shader, MtlFlags, GenMask, StringGenMask, PublicParams
 ```
 
+The MTL schema report also exposes fallback provenance counters. These counters
+do not make the gate fail, but they keep exporter compatibility defaults visible
+instead of letting them masquerade as fully proven CryEngine material state. In
+the current car run:
+
+```text
+compatibility_preserved_default_count = 146
+material_attribute_compatibility_defaults = Emittance=0,0,0,0 x17, Shininess=255 x17, Specular=1,1,1 x14
+public_param_compatibility_defaults = EmittanceMapGamma=1 x17, SSSIndex=0 x16
+texmod_compatibility_statuses = matches_export_minimal_texmod x65
+```
+
 ## Missing Pieces After This Slice
 
 The remaining material work should stay bounded to these items:
 
 - define the fallback material state when no CE-authored MTL exists
-- document which `PublicParams` and shader masks are evidence-backed versus
-  compatibility-preserved
+- replace compatibility-preserved `PublicParams`, shader masks, TexMod defaults,
+  `Specular`, and `Shininess` with stronger RC/Material Editor evidence where
+  possible
 - decide how a Blender plugin supplies or edits `sub_index` and material names
 - keep `<unassigned>` visible as a normal placeholder, while blocking the case
   where a real mesh subset uses it

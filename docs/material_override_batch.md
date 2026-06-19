@@ -175,6 +175,29 @@ MTL schema gate result:
 }
 ```
 
+The same MTL schema report now also records fallback provenance counters. These
+are not gate failures; they quantify compatibility-preserved defaults that still
+need stronger RC or Material Editor evidence before they can be treated as fully
+proven material state. In the current car flow the generated MTL records:
+
+```json
+{
+  "compatibility_preserved_default_count": 146,
+  "material_attribute_compatibility_defaults": {
+    "Emittance=0,0,0,0": 17,
+    "Shininess=255": 17,
+    "Specular=1,1,1": 14
+  },
+  "public_param_compatibility_defaults": {
+    "EmittanceMapGamma=1": 17,
+    "SSSIndex=0": 16
+  },
+  "texmod_compatibility_statuses": {
+    "matches_export_minimal_texmod": 65
+  }
+}
+```
+
 Direct RC export gate result:
 
 ```json

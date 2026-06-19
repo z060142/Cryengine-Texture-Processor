@@ -16,6 +16,7 @@ except ModuleNotFoundError:
 add_repo_root()
 
 from output_formats.cryengine_mtl_schema import (
+    BASE_PUBLIC_PARAMS,
     analyze_ce_texture_map_entry,
     analyze_ce_texture_path_reuse,
     analyze_public_params,
@@ -46,6 +47,15 @@ MTL_SCHEMA_WARNING_STATUS_COUNTERS = {
         "no_source_backed_suffix": "no_source_backed_texture_suffix",
     },
 }
+
+TEXMOD_COMPATIBILITY_STATUSES = {
+    "matches_export_minimal_texmod",
+    "partial_export_minimal_texmod",
+}
+
+
+def _is_compatibility_policy_status(policy_status):
+    return "compatibility" in str(policy_status or "")
 
 
 def iter_mtl_files(paths):
@@ -297,6 +307,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     public_param_counts = Counter()
     public_param_value_counts = Counter()
     attribute_policy_status_counts = Counter()
+    attribute_policy_source_counts = Counter()
+    attribute_policy_compatibility_default_counts = Counter()
     attribute_policy_diff_counts = Counter()
     attribute_policy_missing_counts = Counter()
     texture_map_counts = Counter()
@@ -306,12 +318,14 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     texture_expected_suffix_counts = Counter()
     texture_path_reuse_diagnostic_counts = Counter()
     texmod_status_counts = Counter()
+    texmod_compatibility_status_counts = Counter()
     texmod_attribute_counts = Counter()
     texmod_extra_attribute_counts = Counter()
     string_gen_mask_counts = Counter()
     gen_mask_literal_counts = Counter()
     token_counts = Counter()
     public_param_component_counts = Counter()
+    public_param_compatibility_default_counts = Counter()
     mtl_flag_name_counts = Counter()
     mtl_flag_unknown_mask_counts = Counter()
     attributes_by_shader = defaultdict(Counter)
@@ -342,17 +356,23 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 attributes_by_shader[shader][attr_name] += 1
             for attr_name, analysis in material["attribute_policy_analysis"]["entries"].items():
                 status = analysis["status"]
+                policy_status = analysis.get("policy_status", "")
                 attribute_policy_status_counts.update([status])
+                attribute_policy_source_counts.update([policy_status or "unknown_policy_status"])
                 if status == "missing_export_attribute":
                     attribute_policy_missing_counts.update([attr_name])
                 elif status == "differs_from_export_attribute":
                     attribute_policy_diff_counts.update([f"{attr_name}={analysis['actual']}"])
+                elif status == "matches_export_attribute" and _is_compatibility_policy_status(policy_status):
+                    attribute_policy_compatibility_default_counts.update([f"{attr_name}={analysis['actual']}"])
             for param_name in material["public_params"]:
                 public_param_counts[param_name] += 1
                 public_params_by_shader[shader][param_name] += 1
                 param_value = material["public_params"][param_name]
                 public_param_value_counts[f"{param_name}={param_value}"] += 1
                 public_param_values_by_name[param_name][param_value] += 1
+                if BASE_PUBLIC_PARAMS.get(param_name) == param_value:
+                    public_param_compatibility_default_counts[f"{param_name}={param_value}"] += 1
             for param_info in material["public_param_analysis"].values():
                 public_param_component_counts[str(param_info["parsed_component_count"])] += 1
             for param_name, param_info in material["public_param_analysis"].items():
@@ -378,6 +398,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                     texture_expected_suffix_counts[expected_suffix] += 1
                 texmod_analysis = texture["texmod_analysis"]
                 texmod_status_counts[texmod_analysis["status"]] += 1
+                if texmod_analysis["status"] in TEXMOD_COMPATIBILITY_STATUSES:
+                    texmod_compatibility_status_counts[texmod_analysis["status"]] += 1
                 for attr_name in texture["texmod"]:
                     texmod_attribute_counts[attr_name] += 1
                 for attr_name in texmod_analysis["extra_attrs"]:
@@ -398,6 +420,11 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
         "material_count": material_count,
         "multi_material_file_count": multi_material_file_count,
         "tokenized_material_count": tokenized_material_count,
+        "compatibility_preserved_default_count": (
+            sum(attribute_policy_compatibility_default_counts.values())
+            + sum(public_param_compatibility_default_counts.values())
+            + sum(texmod_compatibility_status_counts.values())
+        ),
     }
     report = {
         "files": files,
@@ -407,10 +434,17 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "child_tags": _counter_to_sorted_pairs(child_tag_counts),
             "material_attributes": _counter_to_sorted_pairs(attribute_counts),
             "material_attribute_policy_statuses": _counter_to_sorted_pairs(attribute_policy_status_counts),
+            "material_attribute_policy_sources": _counter_to_sorted_pairs(attribute_policy_source_counts),
+            "material_attribute_compatibility_defaults": _counter_to_sorted_pairs(
+                attribute_policy_compatibility_default_counts
+            ),
             "material_attribute_policy_missing": _counter_to_sorted_pairs(attribute_policy_missing_counts),
             "material_attribute_policy_differences": _counter_to_sorted_pairs(attribute_policy_diff_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
             "public_param_values": _counter_to_sorted_pairs(public_param_value_counts)[:value_limit],
+            "public_param_compatibility_defaults": _counter_to_sorted_pairs(
+                public_param_compatibility_default_counts
+            ),
             "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
             "public_param_values_by_name": _top_values(public_param_values_by_name, value_limit),
             "public_param_component_counts_by_name": _top_values(public_param_component_counts_by_name, value_limit),
@@ -423,6 +457,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "texture_expected_suffixes": _counter_to_sorted_pairs(texture_expected_suffix_counts),
             "texture_path_reuse_diagnostics": _counter_to_sorted_pairs(texture_path_reuse_diagnostic_counts),
             "texmod_statuses": _counter_to_sorted_pairs(texmod_status_counts),
+            "texmod_compatibility_statuses": _counter_to_sorted_pairs(texmod_compatibility_status_counts),
             "texmod_attributes": _counter_to_sorted_pairs(texmod_attribute_counts),
             "texmod_extra_attributes": _counter_to_sorted_pairs(texmod_extra_attribute_counts),
             "shaders": _counter_to_sorted_pairs(shader_counts),

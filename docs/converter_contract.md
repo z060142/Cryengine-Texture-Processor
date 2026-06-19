@@ -113,6 +113,11 @@ until stronger round-trip evidence exists. In particular, fallback shader masks,
 as compatibility evidence and must not be treated as fully proven CryEngine
 material state.
 
+`tools.mtl_schema_report` exposes this through fallback provenance counters such
+as `compatibility_preserved_default_count`,
+`material_attribute_compatibility_defaults`,
+`public_param_compatibility_defaults`, and `texmod_compatibility_statuses`.
+
 Machine-readable entry:
 
 ```text

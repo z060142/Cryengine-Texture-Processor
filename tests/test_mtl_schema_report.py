@@ -64,6 +64,7 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
         "material_count": 2,
         "multi_material_file_count": 1,
         "tokenized_material_count": 2,
+        "compatibility_preserved_default_count": 3,
     }
     assert report["gate"]["summary"] == {
         "ok": False,
@@ -81,6 +82,14 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "matches_export_attribute", "count": 5} in schema["material_attribute_policy_statuses"]
     assert {"name": "missing_export_attribute", "count": 10} in schema["material_attribute_policy_statuses"]
     assert {"name": "differs_from_export_attribute", "count": 3} in schema["material_attribute_policy_statuses"]
+    assert {"name": "source_backed_editor_default", "count": 6} in schema["material_attribute_policy_sources"]
+    assert {"name": "compatibility_preserved_until_roundtrip_evidence", "count": 2} in schema[
+        "material_attribute_policy_sources"
+    ]
+    assert {"name": "compatibility_preserved_editor_default_differs", "count": 2} in schema[
+        "material_attribute_policy_sources"
+    ]
+    assert schema["material_attribute_compatibility_defaults"] == []
     assert {"name": "MtlFlags=524544", "count": 1} in schema["material_attribute_policy_differences"]
     assert {"name": "SurfaceType=mat_concrete", "count": 1} in schema["material_attribute_policy_differences"]
     assert {"name": "Shininess=10", "count": 1} in schema["material_attribute_policy_differences"]
@@ -88,6 +97,8 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "SSSIndex", "count": 1} in schema["public_params"]
     assert {"name": "IndirectColor=0.25,0.25,0.25", "count": 1} in schema["public_param_values"]
     assert {"name": "EmittanceMapGamma=1", "count": 1} in schema["public_param_values"]
+    assert {"name": "EmittanceMapGamma=1", "count": 1} in schema["public_param_compatibility_defaults"]
+    assert {"name": "SSSIndex=0", "count": 1} in schema["public_param_compatibility_defaults"]
     assert schema["public_param_values_by_name"]["SSSIndex"] == [{"name": "0", "count": 1}]
     assert schema["public_param_values_by_name"]["IndirectColor"] == [
         {"name": "0.25,0.25,0.25", "count": 1}
@@ -116,6 +127,7 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "partial_export_minimal_texmod", "count": 1} in schema["texmod_statuses"]
     assert {"name": "missing_texmod", "count": 2} in schema["texmod_statuses"]
     assert {"name": "custom_texmod", "count": 1} in schema["texmod_statuses"]
+    assert schema["texmod_compatibility_statuses"] == [{"name": "partial_export_minimal_texmod", "count": 1}]
     assert {"name": "TexMod_RotateType", "count": 2} in schema["texmod_attributes"]
     assert {"name": "TileU", "count": 1} in schema["texmod_extra_attributes"]
     assert {"name": "%SUBSURFACE_SCATTERING", "count": 2} in schema["tokens"]
