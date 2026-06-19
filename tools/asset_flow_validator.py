@@ -46,6 +46,28 @@ def _write_json(path, payload):
         handle.write("\n")
 
 
+def _write_text(path, text):
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+        if not text.endswith("\n"):
+            handle.write("\n")
+
+
+def _md_bool(value):
+    if value is True:
+        return "PASS"
+    if value is False:
+        return "FAIL"
+    if value is None:
+        return "N/A"
+    return str(value)
+
+
+def _md_escape(value):
+    return str(value if value is not None else "").replace("|", "\\|").replace("\n", " ")
+
+
 def _summary_ok(summary):
     return bool(summary.get("rc_success")) and not bool(summary.get("action_required"))
 
@@ -241,6 +263,55 @@ def _texture_process_case(case):
     }
 
 
+def format_markdown_report(report):
+    summary = report.get("summary", {})
+    lines = [
+        "# CryEngine Asset Flow Validation",
+        "",
+        "## Summary",
+        "",
+        f"- Overall: {_md_bool(summary.get('ok'))}",
+        f"- Cases: {summary.get('case_count', 0)}",
+        f"- Passed: {summary.get('ok_count', 0)}",
+        f"- Failed: {summary.get('failed_count', 0)}",
+        "",
+        "## Cases",
+        "",
+        "| Case | Type | Result | Checks | Evidence |",
+        "|---|---|---|---|---|",
+    ]
+    for case in report.get("cases", []):
+        checks = ", ".join(
+            f"{key}={_md_bool(value)}"
+            for key, value in (case.get("checks") or {}).items()
+        )
+        evidence_values = [
+            case.get("texture_output_report"),
+            case.get("material_report"),
+            case.get("mtl"),
+            case.get("json"),
+            case.get("cgf"),
+        ]
+        evidence = "<br>".join(_md_escape(value) for value in evidence_values if value)
+        lines.append(
+            "| {name} | {type} | {result} | {checks} | {evidence} |".format(
+                name=_md_escape(case.get("name", "")),
+                type=_md_escape(case.get("type", "")),
+                result=_md_bool(case.get("ok")),
+                checks=_md_escape(checks),
+                evidence=evidence,
+            )
+        )
+
+    failed = [case for case in report.get("cases", []) if not case.get("ok")]
+    if failed:
+        lines.extend(["", "## Failures", ""])
+        for case in failed:
+            lines.append(f"- `{_md_escape(case.get('name', ''))}`: {_md_escape(case.get('error', 'failed checks'))}")
+
+    return "\n".join(lines) + "\n"
+
+
 def run_validation(spec):
     defaults = {
         "work_root": spec.get("work_root", os.path.abspath("asset_flow_validation")),
@@ -293,11 +364,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Run practical CryEngine asset-flow validation cases.")
     parser.add_argument("--spec", required=True, help="Validation spec JSON")
     parser.add_argument("--output", required=True, help="Output JSON report")
+    parser.add_argument("--markdown-output", default="", help="Optional human-readable Markdown report")
     args = parser.parse_args(argv)
 
     report = run_validation(_load_json(args.spec))
     _write_json(args.output, report)
+    if args.markdown_output:
+        _write_text(args.markdown_output, format_markdown_report(report))
     print(args.output)
+    if args.markdown_output:
+        print(args.markdown_output)
     print(f"ok: {report['summary']['ok']}")
     print(f"case_count: {report['summary']['case_count']}")
     print(f"ok_count: {report['summary']['ok_count']}")

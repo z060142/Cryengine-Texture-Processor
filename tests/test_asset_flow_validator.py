@@ -79,6 +79,37 @@ def test_texture_process_case_reports_raw_to_processed_flow(monkeypatch, tmp_pat
     assert case["groups"][0]["outputs"]["diff"].endswith("wall_diff.tif")
 
 
+def test_format_markdown_report_summarizes_cases():
+    markdown = asset_flow_validator.format_markdown_report(
+        {
+            "summary": {
+                "ok": True,
+                "case_count": 1,
+                "ok_count": 1,
+                "failed_count": 0,
+            },
+            "cases": [
+                {
+                    "name": "asset",
+                    "type": "rc",
+                    "ok": True,
+                    "checks": {
+                        "model_format_ok": True,
+                        "texture_format_ok": None,
+                    },
+                    "cgf": "S:/out/asset.cgf",
+                }
+            ],
+        }
+    )
+
+    assert "# CryEngine Asset Flow Validation" in markdown
+    assert "asset" in markdown
+    assert "model_format_ok=PASS" in markdown
+    assert "texture_format_ok=N/A" in markdown
+    assert "S:/out/asset.cgf" in markdown
+
+
 def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     fbx = tmp_path / "asset.fbx"
     fbx.write_text("fake")

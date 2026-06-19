@@ -53,7 +53,7 @@ Example:
       "name": "Weed_b_texture_outputs",
       "type": "texture_gate",
       "paths": [
-        "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_more_assets_batch\\Weed_b_textures"
+        "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_asset_flow_validator\\Weed_b_textures"
       ]
     }
   ]
@@ -65,7 +65,8 @@ Run:
 ```powershell
 uv run python -m tools.asset_flow_validator `
   --spec examples\asset_flow_validation_more_assets.json `
-  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\asset_flow_validation_report.json"
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\asset_flow_validation_report.json" `
+  --markdown-output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\asset_flow_validation_report.md"
 ```
 
 ## Current Real-Flow Result
@@ -82,6 +83,10 @@ Weed_b_texture_backed: True
 Trash_Paper_D_model_only: True
 Weed_b_texture_outputs: True
 ```
+
+Markdown report:
+
+`S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\asset_flow_validation_report.md`
 
 The raw texture process case checks:
 
