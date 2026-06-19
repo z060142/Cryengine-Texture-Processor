@@ -32,6 +32,8 @@ from model_processing.material_manifest import (
 )
 from model_processing.model_loader import ModelLoader
 from model_processing.texture_extractor import TextureExtractor
+from output_formats.cryengine_mtl_schema import exported_texture_map_policy
+from output_formats.material_diagnostics_exporter import collect_mtl_texture_map_diagnostics
 from tools.blender_material_inspector import inspect_fbx_materials
 from tools.rc_smoke_test import material_specs_from_manifest, run_rc_smoke_test
 from ui_pyside.progress_dialog import ProgressDialog
@@ -138,6 +140,22 @@ def _rc_unassigned_material_diagnostics(smoke_info):
     return diagnostics
 
 
+def _mtl_texture_map_diagnostics(material_name, record):
+    fbx_id = record.get("fbx_material_id")
+    fbx_slot = (
+        fbx_id - 1
+        if isinstance(fbx_id, int) and not isinstance(fbx_id, bool) and fbx_id >= 1
+        else record["material"].get("index")
+    )
+    report_item = {
+        "name": material_name,
+        "fbx_slot": fbx_slot,
+        "sub_index": record["sub_index"],
+        "mtl_texture_map_policy": exported_texture_map_policy(record["material"].get("textures", {})),
+    }
+    return collect_mtl_texture_map_diagnostics(report_item)
+
+
 def collect_model_material_diagnostics(model_data):
     diagnostics = _degraded_model_load_diagnostics(model_data or {})
     diagnostics.extend(_rc_unassigned_material_diagnostics((model_data or {}).get("rc_material_smoke", {})))
@@ -150,6 +168,7 @@ def collect_model_material_diagnostics(model_data):
     diagnostics.extend(build_omitted_material_diagnostics(materials, records))
     for record in records:
         diagnostics.extend(_degraded_texture_reference_diagnostics(record["clean_name"], record["material"]))
+        diagnostics.extend(_mtl_texture_map_diagnostics(record["clean_name"], record))
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(
                 {

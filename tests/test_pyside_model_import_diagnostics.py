@@ -310,6 +310,59 @@ def test_collect_model_material_diagnostics_reports_degraded_texture_source():
     assert diagnostics[0]["texture_ref_evidence"][0]["filename"] == "wall_diff.png"
 
 
+def test_collect_model_material_diagnostics_reports_mtl_texture_source_warnings():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [
+                {
+                    "name": "Bush",
+                    "id": 1,
+                    "index": 0,
+                    "textures": {
+                        "diffuse": "rock_face_01_diff.tif",
+                        "specular": "rock_face_01_diff.tif",
+                        "displacement": "rock_face_01_diff.tif",
+                        "opacity": "rock_face_01_diff.tif",
+                    },
+                }
+            ]
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert codes == [
+        "mismatch_ce_texture_suffix",
+        "mismatch_ce_texture_suffix",
+        "shared_texture_path_across_ce_maps",
+    ]
+    reuse = diagnostics[2]
+    assert reuse["severity"] == "warning"
+    assert reuse["material"] == "Bush"
+    assert reuse["fbx_slot"] == 0
+    assert reuse["sub_index"] == 0
+    assert reuse["ce_map_types"] == ["Diffuse", "Heightmap", "Opacity", "Specular"]
+    assert reuse["expected_suffixes"] == ["_diff", "_displ", "_spec"]
+
+
+def test_collect_model_material_diagnostics_allows_diffuse_opacity_texture_sharing():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [
+                {
+                    "name": "Leaves",
+                    "id": 1,
+                    "textures": {
+                        "diffuse": "leaves_diff.tif",
+                        "opacity": "leaves_diff.tif",
+                    },
+                }
+            ]
+        }
+    )
+
+    assert diagnostics == []
+
+
 def test_collect_model_material_diagnostics_reports_rc_unassigned_placeholders():
     diagnostics = collect_model_material_diagnostics(
         {

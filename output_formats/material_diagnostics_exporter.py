@@ -54,7 +54,7 @@ def _texture_evidence_diagnostics(report_item):
     ]
 
 
-def _mtl_texture_source_diagnostics(report_item):
+def collect_mtl_texture_map_diagnostics(report_item):
     diagnostics = []
     exported_entries = report_item.get("mtl_texture_map_policy", {}).get("exported", [])
     for entry in exported_entries:
@@ -105,6 +105,9 @@ def _mtl_texture_source_diagnostics(report_item):
             }
         )
     return diagnostics
+
+
+_mtl_texture_source_diagnostics = collect_mtl_texture_map_diagnostics
 
 
 def _record_to_report_item(record):
