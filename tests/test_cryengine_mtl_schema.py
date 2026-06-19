@@ -4,8 +4,12 @@ from output_formats.cryengine_mtl_schema import (
     COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,
     ILLUM_EXT_SHADER_MASKS,
+    MTL_64BIT_SHADERGENMASK,
+    MTL_FLAG_MULTI_SUBMTL,
+    MTL_SHADER_MASK_LOAD_POLICY,
     exported_gen_mask,
     exported_string_gen_mask,
+    shader_mask_load_policy,
 )
 
 
@@ -52,3 +56,28 @@ def test_exported_gen_mask_preserves_current_export_compat_values():
         | EXPORT_COMPAT_SHADER_MASKS["%NORMAL_MAP"]
         | EXPORT_COMPAT_SHADER_MASKS["%SPECULAR_MAP"]
     )
+
+
+def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():
+    assert MTL_FLAG_MULTI_SUBMTL == 0x0100
+    assert MTL_64BIT_SHADERGENMASK == 0x80000
+    assert MTL_SHADER_MASK_LOAD_POLICY["runtime_source"].endswith("MatMan.cpp")
+
+    policy = shader_mask_load_policy(
+        {
+            "MtlFlags": str(MTL_64BIT_SHADERGENMASK),
+            "GenMask": "32",
+            "StringGenMask": "%SUBSURFACE_SCATTERING",
+        }
+    )
+    assert policy["effective_source"] == "StringGenMask"
+    assert policy["operation"] == "EF_GetShaderGlobalMaskGenFromString"
+    assert policy["has_64bit_shadergenmask_flag"] is True
+
+    policy = shader_mask_load_policy({"MtlFlags": "0", "GenMask": "32"})
+    assert policy["effective_source"] == "GenMask"
+    assert policy["operation"] == "EF_GetRemapedShaderMaskGen"
+
+    policy = shader_mask_load_policy({"MtlFlags": str(MTL_FLAG_MULTI_SUBMTL)})
+    assert policy["effective_source"] == "sub_materials"
+    assert policy["operation"] == "skip_multi_submaterial_container_shader_mask"

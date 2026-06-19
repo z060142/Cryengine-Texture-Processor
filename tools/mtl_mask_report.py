@@ -12,6 +12,7 @@ from output_formats.cryengine_mtl_schema import (
     COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,
     ILLUM_EXT_SHADER_MASKS,
+    shader_mask_load_policy,
 )
 from tools.cryengine_shader_flags import (
     build_common_global_flag_table_from_dir,
@@ -121,6 +122,7 @@ def analyze_material_element(element, location, common_global_flags=None):
         "common_global_legacy_fix_mask": common_legacy_fix,
         "common_global_generated_mask": common_generated,
         "export_compat_mask": export_compat,
+        "source_load_policy": shader_mask_load_policy(element.attrib),
         "matches_illum_ext_mask": bool(tokens) and gen_mask["value"] == illum_ext["value"],
         "matches_common_global_legacy_fix_mask": bool(tokens) and gen_mask["value"] == common_legacy_fix["value"],
         "matches_common_global_generated_mask": bool(tokens) and gen_mask["value"] == common_generated["value"],
@@ -188,6 +190,7 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
     unknown_common_legacy_token_count = 0
     unknown_common_generated_token_count = 0
     generated_match_count = 0
+    effective_source_counts = {}
     for file_info in files:
         for material in file_info["materials"]:
             if material["tokens"] and not (
@@ -205,6 +208,8 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
             )
             if material["matches_common_global_generated_mask"]:
                 generated_match_count += 1
+            effective_source = material["source_load_policy"]["effective_source"]
+            effective_source_counts[effective_source] = effective_source_counts.get(effective_source, 0) + 1
 
     return {
         "files": files,
@@ -220,6 +225,7 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
             "unknown_common_global_legacy_fix_token_count": unknown_common_legacy_token_count,
             "unknown_common_global_generated_token_count": unknown_common_generated_token_count,
             "common_global_generated_match_count": generated_match_count,
+            "source_load_effective_source_counts": dict(sorted(effective_source_counts.items())),
         },
     }
 

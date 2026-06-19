@@ -9,7 +9,7 @@ from tools.mtl_mask_report import (
 
 
 def write_mtl(path, materials):
-    root = ET.Element("Material", Name="Root", Shader="Illum", GenMask="0", StringGenMask="")
+    root = ET.Element("Material", Name="Root", MtlFlags="524544", Shader="Illum", GenMask="0", StringGenMask="")
     sub_materials = ET.SubElement(root, "SubMaterials")
     for material in materials:
         ET.SubElement(sub_materials, "Material", **material)
@@ -74,8 +74,36 @@ def test_build_mtl_mask_report_summarizes_tokenized_mismatches(tmp_path):
     assert report["summary"]["material_count"] == 3
     assert report["summary"]["tokenized_material_mismatch_count"] == 1
     assert report["summary"]["unknown_common_global_legacy_fix_token_count"] == 2
+    assert report["summary"]["source_load_effective_source_counts"] == {
+        "StringGenMask": 2,
+        "sub_materials": 1,
+    }
     assert report["files"][0]["materials"][1]["gen_mask"]["value"] == 0x80000000
     assert report["files"][0]["materials"][2]["matches_export_compat_mask"] is True
+    assert report["files"][0]["materials"][1]["source_load_policy"]["effective_source"] == "StringGenMask"
+    assert report["files"][0]["materials"][1]["source_load_policy"]["operation"] == (
+        "EF_GetShaderGlobalMaskGenFromString"
+    )
+
+
+def test_build_mtl_mask_report_marks_genmask_only_as_remap_fallback(tmp_path):
+    mtl_path = tmp_path / "sample.mtl"
+    write_mtl(
+        mtl_path,
+        [
+            {
+                "Name": "LegacyStyle",
+                "Shader": "Illum",
+                "GenMask": "32",
+            },
+        ],
+    )
+
+    report = build_mtl_mask_report([str(mtl_path)])
+    material = report["files"][0]["materials"][1]
+
+    assert material["source_load_policy"]["effective_source"] == "GenMask"
+    assert material["source_load_policy"]["operation"] == "EF_GetRemapedShaderMaskGen"
 
 
 def test_build_mtl_mask_report_matches_common_global_legacy_fix_tokens(tmp_path):

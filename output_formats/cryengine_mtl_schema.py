@@ -101,6 +101,28 @@ COMMON_GLOBAL_LEGACY_FIX_MASKS = {
     "%WRINKLE_BLENDING": 0x8000000000,
 }
 
+# Source evidence:
+# CRYENGINE_Source-release/Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h
+MTL_FLAG_MULTI_SUBMTL = 0x0100
+MTL_64BIT_SHADERGENMASK = 0x80000
+
+MTL_SHADER_MASK_LOAD_POLICY = {
+    "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+    "runtime_lines": "451-475",
+    "editor_load_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+    "editor_load_lines": "887-915",
+    "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+    "editor_save_lines": "1132-1137",
+    "public_params_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+    "public_params_lines": "813-830",
+    "rule": (
+        "GenMask is read first, but a present StringGenMask is converted through "
+        "EF_GetShaderGlobalMaskGenFromString and becomes the effective shader mask. "
+        "If StringGenMask is absent, GenMask is remapped through EF_GetRemapedShaderMaskGen. "
+        "The Material Editor saves both GenMask and StringGenMask."
+    ),
+}
+
 # Current exporter compatibility values. These predate the source-backed schema
 # layer and must be replaced only after a real RC/Material Editor comparison.
 EXPORT_COMPAT_SHADER_MASKS = {
@@ -148,3 +170,48 @@ def exported_gen_mask(tokens):
     for token in tokens:
         gen_mask |= EXPORT_COMPAT_SHADER_MASKS[token]
     return gen_mask
+
+
+def _parse_int_attr(value):
+    value = str(value or "").strip()
+    if not value:
+        return 0
+    return int(value, 16 if value.lower().startswith("0x") else 10)
+
+
+def shader_mask_load_policy(material_attrs):
+    """
+    Return the source-backed shader-mask load policy for one .mtl Material node.
+
+    This does not calculate renderer-specific masks. It records which XML field
+    CryEngine runtime/editor load logic treats as authoritative.
+    """
+    attrs = dict(material_attrs or {})
+    mtl_flags = _parse_int_attr(attrs.get("MtlFlags", ""))
+    is_multi_submaterial = bool(mtl_flags & MTL_FLAG_MULTI_SUBMTL)
+    has_string_gen_mask = "StringGenMask" in attrs
+    has_gen_mask = "GenMask" in attrs
+    has_64bit_flag = bool(mtl_flags & MTL_64BIT_SHADERGENMASK)
+
+    if is_multi_submaterial:
+        effective_source = "sub_materials"
+        operation = "skip_multi_submaterial_container_shader_mask"
+    elif has_string_gen_mask:
+        effective_source = "StringGenMask"
+        operation = "EF_GetShaderGlobalMaskGenFromString"
+    elif has_gen_mask:
+        effective_source = "GenMask"
+        operation = "EF_GetRemapedShaderMaskGen"
+    else:
+        effective_source = "shader_default"
+        operation = "load_shader_defaults"
+
+    return {
+        "effective_source": effective_source,
+        "operation": operation,
+        "has_gen_mask": has_gen_mask,
+        "has_string_gen_mask": has_string_gen_mask,
+        "has_64bit_shadergenmask_flag": has_64bit_flag,
+        "is_multi_submaterial_container": is_multi_submaterial,
+        "source_evidence": MTL_SHADER_MASK_LOAD_POLICY,
+    }
