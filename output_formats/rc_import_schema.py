@@ -153,3 +153,86 @@ def collect_unknown_request_fields(request):
             )
 
     return {key: value for key, value in unknown.items() if value}
+
+
+def collect_request_schema_diagnostics(request):
+    unknown = collect_unknown_request_fields(request)
+    diagnostics = []
+
+    for field in unknown.get("root", []):
+        diagnostics.append(
+            {
+                "severity": "error",
+                "code": "rc_request_unknown_root_field",
+                "location": field,
+                "field": field,
+                "schema_source": RC_IMPORT_REQUEST_SOURCE["root_fields"],
+                "message": "RC import request root contains a field not backed by the source-derived schema.",
+            }
+        )
+
+    for node in unknown.get("nodes", []):
+        for field in node["fields"]:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_unknown_node_field",
+                    "location": f"{node['path']}.{field}",
+                    "field": field,
+                    "node_path": node["path"],
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["node_fields"],
+                    "message": "RC import request node contains a field not backed by the source-derived schema.",
+                }
+            )
+
+    for material in unknown.get("materials", []):
+        for field in material["fields"]:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_unknown_material_field",
+                    "location": f"materials[{material['index']}].{field}",
+                    "field": field,
+                    "material_index": material["index"],
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["material_fields"],
+                    "message": "RC import request material contains a field not backed by the source-derived schema.",
+                }
+            )
+
+    for physics_data in unknown.get("jointPhysicsData", []):
+        for field in physics_data["fields"]:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_unknown_joint_physics_field",
+                    "location": f"jointPhysicsData[{physics_data['index']}].{field}",
+                    "field": field,
+                    "joint_physics_index": physics_data["index"],
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
+                    "message": "RC import request joint physics data contains a field not backed by the source-derived schema.",
+                }
+            )
+        for field in physics_data["jointLimitFields"]:
+            diagnostics.append(
+                {
+                    "severity": "error",
+                    "code": "rc_request_unknown_joint_limit_field",
+                    "location": f"jointPhysicsData[{physics_data['index']}].jointLimits.{field}",
+                    "field": field,
+                    "joint_physics_index": physics_data["index"],
+                    "schema_source": RC_IMPORT_REQUEST_SOURCE["joint_physics_fields"],
+                    "message": "RC import request joint limit data contains a field not backed by the source-derived schema.",
+                }
+            )
+
+    return diagnostics
+
+
+def assert_rc_import_request_schema(request):
+    diagnostics = collect_request_schema_diagnostics(request)
+    if diagnostics:
+        locations = ", ".join(diagnostic["location"] for diagnostic in diagnostics[:5])
+        if len(diagnostics) > 5:
+            locations = f"{locations}, ..."
+        raise ValueError(f"RC import request contains source-unsupported fields: {locations}")
+    return request

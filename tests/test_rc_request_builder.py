@@ -1,9 +1,12 @@
 import json
 import xml.etree.ElementTree as ET
 
+import pytest
+
 from output_formats.rc_import_schema import (
     RC_IMPORT_OUTPUT_EXTENSIONS,
     RC_IMPORT_PHYSICALIZE_VALUES,
+    collect_request_schema_diagnostics,
     collect_unknown_request_fields,
     normalize_rc_sub_index,
 )
@@ -48,6 +51,7 @@ def test_build_import_request_uses_source_backed_schema_fields_only():
     request = build_import_request(sample_model(), "chair.fbx")
 
     assert collect_unknown_request_fields(request) == {}
+    assert collect_request_schema_diagnostics(request) == []
     assert "proxy_only" in RC_IMPORT_PHYSICALIZE_VALUES
     assert request["nodes"][0] == {
         "name": "Root",
@@ -57,6 +61,32 @@ def test_build_import_request_uses_source_backed_schema_fields_only():
             {"name": "Chair_proxy", "path": ["Root", "Chair_proxy"]},
         ],
     }
+
+
+def test_request_schema_diagnostics_report_internal_field_contamination():
+    request = build_import_request(sample_model(), "chair.fbx")
+    request["diagnostics"] = []
+    request["materials"][0]["diagnostics"] = []
+    request["nodes"][0]["_is_proxy"] = False
+    request["jointPhysicsData"][0]["debug"] = True
+    request["jointPhysicsData"][0]["jointLimits"] = {"min_x": 0, "debug_min": -1}
+
+    diagnostics = collect_request_schema_diagnostics(request)
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "rc_request_unknown_root_field",
+        "rc_request_unknown_node_field",
+        "rc_request_unknown_material_field",
+        "rc_request_unknown_joint_physics_field",
+        "rc_request_unknown_joint_limit_field",
+    ]
+    assert [diagnostic["location"] for diagnostic in diagnostics] == [
+        "diagnostics",
+        "nodes[0]._is_proxy",
+        "materials[0].diagnostics",
+        "jointPhysicsData[0].debug",
+        "jointPhysicsData[0].jointLimits.debug_min",
+    ]
 
 
 def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
@@ -215,6 +245,14 @@ def test_wrap_import_request_defaults_to_rc_request_name():
 
     assert set(wrap_import_request(request).keys()) == {"request"}
     assert set(wrap_import_request(request, "metadata").keys()) == {"metadata"}
+
+
+def test_wrap_import_request_rejects_unknown_rc_fields():
+    request = build_import_request(sample_model(), "chair.fbx")
+    request["materials"][0]["diagnostics"] = [{"code": "internal"}]
+
+    with pytest.raises(ValueError, match=r"materials\[0\]\.diagnostics"):
+        wrap_import_request(request)
 
 
 def test_export_json_writes_request_wrapper_by_default(tmp_path):

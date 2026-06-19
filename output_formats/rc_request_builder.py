@@ -13,6 +13,7 @@ from model_processing.rc_material_policy import (
     rc_physicalize_diagnostics,
     resolve_rc_physicalize,
 )
+from output_formats.rc_import_schema import assert_rc_import_request_schema
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
 
@@ -245,4 +246,6 @@ def build_import_request(
 def wrap_import_request(request, wrapper_name="request"):
     if wrapper_name not in VALID_WRAPPER_NAMES:
         raise ValueError(f"Invalid RC request wrapper: {wrapper_name}")
+    if wrapper_name == "request":
+        assert_rc_import_request_schema(request)
     return {wrapper_name: request}
