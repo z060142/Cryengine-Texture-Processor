@@ -4,6 +4,7 @@
 
 import json
 import os
+from collections import Counter
 
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_manifest import material_manifest_table_diagnostics
@@ -83,6 +84,35 @@ def _record_to_report_item(record):
     }
 
 
+def _counter_to_sorted_dict(counter):
+    return {key: counter[key] for key in sorted(counter)}
+
+
+def _mtl_shader_policy_summary(material_items):
+    token_counts = Counter()
+    gen_mask_policy_counts = Counter()
+    string_gen_mask_source_counts = Counter()
+    public_params_policy_counts = Counter()
+    public_param_counts = Counter()
+
+    for item in material_items:
+        policy = item.get("mtl_shader_policy", {})
+        token_counts.update(policy.get("tokens", []))
+        gen_mask_policy_counts.update([policy.get("gen_mask_policy", "")])
+        string_gen_mask_source_counts.update([policy.get("string_gen_mask_source", "")])
+        public_params_policy_counts.update([policy.get("public_params_policy", "")])
+        public_param_counts.update(policy.get("public_params", {}).keys())
+
+    return {
+        "material_count": len(material_items),
+        "token_counts": _counter_to_sorted_dict(token_counts),
+        "gen_mask_policy_counts": _counter_to_sorted_dict(gen_mask_policy_counts),
+        "string_gen_mask_source_counts": _counter_to_sorted_dict(string_gen_mask_source_counts),
+        "public_params_policy_counts": _counter_to_sorted_dict(public_params_policy_counts),
+        "public_param_counts": _counter_to_sorted_dict(public_param_counts),
+    }
+
+
 def build_material_diagnostics_report(
     materials,
     existing_submaterial_names=None,
@@ -145,6 +175,7 @@ def build_material_diagnostics_report(
             "diagnostic_count": len(diagnostics),
             "hazard_count": hazard_count,
         },
+        "mtl_shader_policy_summary": _mtl_shader_policy_summary(material_items),
         "materials": material_items,
         "diagnostics": diagnostics,
     }

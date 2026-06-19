@@ -213,6 +213,52 @@ def test_build_material_diagnostics_report_includes_mtl_shader_policy():
     }
 
 
+def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Stone",
+                "id": 1,
+                "textures": {
+                    "normal": "stone_ddn.dds",
+                    "specular": "stone_spec.dds",
+                    "displacement": "stone_displ.dds",
+                },
+            },
+            {
+                "name": "Leaves",
+                "id": 2,
+                "textures": {
+                    "normal": "leaves_ddn.dds",
+                },
+            },
+        ],
+        source_model="foliage.fbx",
+    )
+
+    summary = report["mtl_shader_policy_summary"]
+
+    assert summary["material_count"] == 2
+    assert summary["token_counts"] == {
+        "%DISPLACEMENT_MAPPING": 1,
+        "%NORMAL_MAP": 2,
+        "%PHONG_TESSELLATION": 1,
+        "%SPECULAR_MAP": 1,
+        "%SUBSURFACE_SCATTERING": 2,
+    }
+    assert summary["gen_mask_policy_counts"] == {
+        "compatibility_preserved_until_roundtrip_evidence": 2,
+    }
+    assert summary["string_gen_mask_source_counts"] == {
+        "source_backed_token_names": 2,
+    }
+    assert summary["public_params_policy_counts"] == {
+        "compatibility_preserved_until_roundtrip_evidence": 2,
+    }
+    assert summary["public_param_counts"]["EmittanceMapGamma"] == 2
+    assert summary["public_param_counts"]["TessellationFactorMax"] == 1
+
+
 def test_build_material_diagnostics_report_flags_used_ignored_source_material():
     report = build_material_diagnostics_report(
         [
@@ -527,3 +573,4 @@ def test_export_material_diagnostics_writes_json(tmp_path):
     assert payload["source_model"] == "asset.fbx"
     assert payload["summary"]["hazard_count"] == 1
     assert payload["materials"][0]["mtl_shader_policy"]["string_gen_mask"] == "%SUBSURFACE_SCATTERING"
+    assert payload["mtl_shader_policy_summary"]["token_counts"] == {"%SUBSURFACE_SCATTERING": 1}
