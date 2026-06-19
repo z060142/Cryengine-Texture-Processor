@@ -5,6 +5,7 @@
 import os
 import xml.etree.ElementTree as ET
 
+from model_processing.evidence_coercion import coerce_int
 from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS, normalize_rc_sub_index
 from model_processing.material_texture_resolver import IGNORED_MATERIAL_NAMES, clean_material_name, iter_model_materials
 
@@ -34,10 +35,7 @@ def parse_mtl_submaterial_names(mtl_file_path):
 
 
 def _coerce_int(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+    return coerce_int(value)
 
 
 def get_fbx_material_id(material, fallback_order=None):

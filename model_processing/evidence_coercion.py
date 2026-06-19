@@ -5,19 +5,35 @@
 import math
 
 
-def coerce_non_negative_int(value):
+def coerce_int(value):
     if value is None:
         return None
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
-        return value if value >= 0 else None
+        return value
     if isinstance(value, str):
         text = value.strip()
-        if not text or not all("0" <= char <= "9" for char in text):
+        if not text:
+            return None
+        if text.startswith("-"):
+            digits = text[1:]
+            if not digits:
+                return None
+            if not all("0" <= char <= "9" for char in digits):
+                return None
+            return -int(digits)
+        if not all("0" <= char <= "9" for char in text):
             return None
         return int(text)
     return None
+
+
+def coerce_non_negative_int(value):
+    value = coerce_int(value)
+    if value is None or value < 0:
+        return None
+    return value
 
 
 def coerce_request_sub_index(value):

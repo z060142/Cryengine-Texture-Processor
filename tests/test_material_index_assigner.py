@@ -158,6 +158,24 @@ def test_duplicate_explicit_sub_index_reports_overwrite_hazard():
     assert diagnostics["Metal"][0]["conflicting_material_names"] == ["Wood", "Metal"]
 
 
+def test_malformed_explicit_sub_index_falls_back_to_fbx_material_id():
+    records = assign_material_sub_indices(
+        [
+            {"name": "BoolExplicit", "id": 3, "sub_index": True, "auto_assigned": False},
+            {"name": "FloatExplicit", "id": 4, "sub_index": 1.5, "auto_assigned": False},
+        ],
+        existing_submaterial_names=[],
+    )
+
+    assert sub_index_by_name(records) == {"BoolExplicit": 2, "FloatExplicit": 3}
+    assert reason_by_name(records) == {
+        "BoolExplicit": "fbx_material_id",
+        "FloatExplicit": "fbx_material_id",
+    }
+    assert records[0]["requested_sub_index"] is None
+    assert records[1]["requested_sub_index"] is None
+
+
 def test_slot_name_conflict_reports_warning():
     records = assign_material_sub_indices(
         [
