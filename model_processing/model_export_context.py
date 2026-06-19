@@ -35,6 +35,27 @@ class ModelExportContext:
     fbx_texture_data: dict[str, dict[str, str]]
 
 
+def fbx_texture_export_diagnostics(export_context):
+    """Return non-blocking diagnostics for FBX texture data availability."""
+    if export_context.fbx_texture_data:
+        return []
+
+    material_count = len(export_context.mtl_materials)
+    return [
+        {
+            "severity": "warning",
+            "code": "fbx_export_no_processed_textures",
+            "source_model": export_context.model_filename,
+            "material_count": material_count,
+            "message": (
+                "No processed textures were resolved for FBX material nodes. "
+                "FBX/JSON/RC export should still run so material slot mapping can be verified; "
+                "FbxExporter will use diffuse fallback paths for material texture nodes."
+            ),
+        }
+    ]
+
+
 def attach_material_manifest(model_data, model_info):
     """Copy the loaded sidecar material manifest onto a model dict when present."""
     material_manifest = (model_info or {}).get("material_manifest")

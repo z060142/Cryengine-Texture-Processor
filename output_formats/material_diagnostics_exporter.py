@@ -298,6 +298,7 @@ def build_material_diagnostics_report(
     artifact_kind="model",
     material_manifest_info=None,
     source_materials=None,
+    extra_diagnostics=None,
 ):
     records = build_material_slot_records(
         materials,
@@ -319,6 +320,7 @@ def build_material_diagnostics_report(
         for diagnostic in build_omitted_material_diagnostics(source_materials, records)
     ]
     diagnostics.extend(material_manifest_table_diagnostics(material_manifest_info))
+    diagnostics.extend(extra_diagnostics or [])
     for item in material_items:
         item["diagnostics"] = [
             *item["diagnostics"],
@@ -383,6 +385,7 @@ def export_material_diagnostics(
     artifact_kind="model",
     material_manifest_info=None,
     source_materials=None,
+    extra_diagnostics=None,
 ):
     report = build_material_diagnostics_report(
         materials,
@@ -391,6 +394,7 @@ def export_material_diagnostics(
         artifact_kind=artifact_kind,
         material_manifest_info=material_manifest_info,
         source_materials=source_materials,
+        extra_diagnostics=extra_diagnostics,
     )
     output_path = os.path.join(output_dir, output_filename)
     return write_material_diagnostics_report(report, output_path)

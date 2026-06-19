@@ -21,6 +21,7 @@ from language.language_manager import get_text
 from model_processing.model_export_context import (
     attach_material_manifest,
     build_model_export_context,
+    fbx_texture_export_diagnostics,
 )
 from model_processing.texture_extractor import TextureExtractor
 from output_formats.json_exporter import export_json
@@ -397,9 +398,9 @@ def main():
                     settings.get("output_format", "tif"),
                     texture_rel_dir=texture_rel_dir,
                 )
-                if not export_context.fbx_texture_data:
-                    print(f"No processed textures found for model {model_filename}. Skipping FBX export.")
-                    continue
+                fbx_texture_diagnostics = fbx_texture_export_diagnostics(export_context)
+                for diagnostic in fbx_texture_diagnostics:
+                    print(f"Warning: {diagnostic['message']}")
 
                 os.makedirs(export_context.model_texture_dir, exist_ok=True)
                 result = fbx_exporter.export(
@@ -425,6 +426,7 @@ def main():
                         artifact_kind="fbx_json",
                         material_manifest_info=reloaded_model.get("material_manifest"),
                         source_materials=reloaded_model.get("materials", []),
+                        extra_diagnostics=fbx_texture_diagnostics,
                     )
                     print(f"Successfully exported material diagnostics: {diagnostics_path}")
                 except Exception as diagnostics_error:

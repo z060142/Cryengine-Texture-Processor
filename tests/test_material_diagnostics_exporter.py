@@ -499,6 +499,26 @@ def test_build_material_diagnostics_report_includes_slot_mapping_contract():
     ]
 
 
+def test_build_material_diagnostics_report_includes_extra_flow_diagnostics():
+    report = build_material_diagnostics_report(
+        [{"name": "SlotA", "id": 1}],
+        source_model="slots_only.fbx",
+        extra_diagnostics=[
+            {
+                "severity": "warning",
+                "code": "fbx_export_no_processed_textures",
+                "source_model": "slots_only.fbx",
+                "material_count": 1,
+                "message": "No processed textures were resolved for FBX material nodes.",
+            }
+        ],
+    )
+
+    assert report["summary"]["diagnostic_count"] == 1
+    assert report["diagnostic_summary"]["warning_count"] == 1
+    assert report["diagnostics"][0]["code"] == "fbx_export_no_processed_textures"
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [

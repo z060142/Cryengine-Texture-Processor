@@ -3,6 +3,7 @@ import os
 from model_processing.model_export_context import (
     attach_material_manifest,
     build_model_export_context,
+    fbx_texture_export_diagnostics,
 )
 
 
@@ -83,3 +84,34 @@ def test_build_model_export_context_keeps_manifest_order_for_mtl_materials(tmp_p
 
     assert [material["name"] for material in context.mtl_materials] == ["Stone", "Stone.001"]
     assert [material["sub_index"] for material in context.mtl_materials] == [0, 1]
+    assert context.fbx_texture_data == {}
+
+
+def test_fbx_texture_export_diagnostics_warns_without_blocking_material_export(tmp_path):
+    model_data = {"materials": [{"name": "SlotA"}, {"name": "SlotB"}]}
+    context = build_model_export_context(
+        model_data,
+        "slots_only.fbx",
+        str(tmp_path),
+        str(tmp_path / "textures"),
+        [],
+        TextureManagerStub(),
+    )
+
+    diagnostics = fbx_texture_export_diagnostics(context)
+
+    assert context.mtl_materials
+    assert context.fbx_texture_data == {}
+    assert diagnostics == [
+        {
+            "severity": "warning",
+            "code": "fbx_export_no_processed_textures",
+            "source_model": "slots_only.fbx",
+            "material_count": 2,
+            "message": (
+                "No processed textures were resolved for FBX material nodes. "
+                "FBX/JSON/RC export should still run so material slot mapping can be verified; "
+                "FbxExporter will use diffuse fallback paths for material texture nodes."
+            ),
+        }
+    ]
