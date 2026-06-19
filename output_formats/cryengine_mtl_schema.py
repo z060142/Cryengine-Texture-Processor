@@ -123,6 +123,21 @@ MTL_SHADER_MASK_LOAD_POLICY = {
     ),
 }
 
+MTL_PUBLIC_PARAMS_POLICY = {
+    "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+    "runtime_lines": "800-830",
+    "editor_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "editor_save_lines": "774-803",
+    "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+    "editor_cache_lines": "523-533",
+    "rule": (
+        "PublicParams XML attributes are parsed into SShaderParam color/vector storage "
+        "with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned "
+        "before parsing. MaterialHelpers saves byte/short/int/float params as scalar "
+        "attributes and color/vector params as Vec3 attributes."
+    ),
+}
+
 # Current exporter compatibility values. These predate the source-backed schema
 # layer and must be replaced only after a real RC/Material Editor comparison.
 EXPORT_COMPAT_SHADER_MASKS = {
@@ -214,4 +229,40 @@ def shader_mask_load_policy(material_attrs):
         "has_64bit_shadergenmask_flag": has_64bit_flag,
         "is_multi_submaterial_container": is_multi_submaterial,
         "source_evidence": MTL_SHADER_MASK_LOAD_POLICY,
+    }
+
+
+def parse_public_param_value(value):
+    """
+    Parse a PublicParams XML attribute the way MatMan accepts it.
+
+    CryEngine initializes all four components to zero, then parses up to four
+    comma-separated floats. Scalar attrs therefore become [value, 0, 0, 0].
+    """
+    components = [0.0, 0.0, 0.0, 0.0]
+    parsed_count = 0
+    raw_parts = str(value or "").split(",")
+
+    for index, raw_part in enumerate(raw_parts[:4]):
+        raw_part = raw_part.strip()
+        if not raw_part:
+            break
+        try:
+            components[index] = float(raw_part)
+        except ValueError:
+            break
+        parsed_count += 1
+
+    return {
+        "raw": str(value or ""),
+        "components": components,
+        "parsed_component_count": parsed_count,
+        "source_evidence": MTL_PUBLIC_PARAMS_POLICY,
+    }
+
+
+def analyze_public_params(public_params):
+    return {
+        name: parse_public_param_value(value)
+        for name, value in sorted((public_params or {}).items())
     }

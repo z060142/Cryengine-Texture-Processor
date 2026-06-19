@@ -6,9 +6,12 @@ from output_formats.cryengine_mtl_schema import (
     ILLUM_EXT_SHADER_MASKS,
     MTL_64BIT_SHADERGENMASK,
     MTL_FLAG_MULTI_SUBMTL,
+    MTL_PUBLIC_PARAMS_POLICY,
     MTL_SHADER_MASK_LOAD_POLICY,
+    analyze_public_params,
     exported_gen_mask,
     exported_string_gen_mask,
+    parse_public_param_value,
     shader_mask_load_policy,
 )
 
@@ -81,3 +84,28 @@ def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():
     policy = shader_mask_load_policy({"MtlFlags": str(MTL_FLAG_MULTI_SUBMTL)})
     assert policy["effective_source"] == "sub_materials"
     assert policy["operation"] == "skip_multi_submaterial_container_shader_mask"
+
+
+def test_public_param_parser_follows_matman_vector4_parsing():
+    assert MTL_PUBLIC_PARAMS_POLICY["runtime_source"].endswith("MatMan.cpp")
+
+    scalar = parse_public_param_value("1")
+    assert scalar["components"] == [1.0, 0.0, 0.0, 0.0]
+    assert scalar["parsed_component_count"] == 1
+
+    vec3 = parse_public_param_value("0.25,0.5,0.75")
+    assert vec3["components"] == [0.25, 0.5, 0.75, 0.0]
+    assert vec3["parsed_component_count"] == 3
+
+    invalid = parse_public_param_value("not-a-number")
+    assert invalid["components"] == [0.0, 0.0, 0.0, 0.0]
+    assert invalid["parsed_component_count"] == 0
+
+
+def test_analyze_public_params_preserves_raw_values_and_sorted_names():
+    analysis = analyze_public_params({"ZParam": "2", "AParam": "1,2,3,4"})
+
+    assert list(analysis) == ["AParam", "ZParam"]
+    assert analysis["AParam"]["raw"] == "1,2,3,4"
+    assert analysis["AParam"]["parsed_component_count"] == 4
+    assert analysis["ZParam"]["components"] == [2.0, 0.0, 0.0, 0.0]

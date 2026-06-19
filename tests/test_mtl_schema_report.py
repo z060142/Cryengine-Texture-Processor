@@ -43,9 +43,24 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     schema = report["schema"]
     assert {"name": "Shader", "count": 2} in schema["material_attributes"]
     assert {"name": "SSSIndex", "count": 1} in schema["public_params"]
+    assert {"name": "1", "count": 1} in schema["public_param_component_counts"]
+    assert {"name": "3", "count": 1} in schema["public_param_component_counts"]
     assert {"name": "Diffuse", "count": 1} in schema["texture_maps"]
     assert {"name": "%SUBSURFACE_SCATTERING", "count": 2} in schema["tokens"]
     assert report["files"][0]["materials"][0]["textures"][0]["texmod"]["TexMod_RotateType"] == "0"
+    assert report["files"][0]["materials"][0]["public_param_analysis"]["SSSIndex"]["components"] == [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+    ]
+    assert report["files"][0]["materials"][0]["public_param_analysis"]["SSSIndex"]["parsed_component_count"] == 1
+    assert report["files"][0]["materials"][0]["public_param_analysis"]["IndirectColor"]["components"] == [
+        0.25,
+        0.25,
+        0.25,
+        0.0,
+    ]
 
 
 def test_build_mtl_schema_report_can_omit_per_file_records(tmp_path):

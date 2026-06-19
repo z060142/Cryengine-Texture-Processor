@@ -8,6 +8,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
+from output_formats.cryengine_mtl_schema import analyze_public_params
 from tools.mtl_mask_report import parse_gen_mask_literal, string_gen_mask_tokens
 
 
@@ -68,6 +69,7 @@ def analyze_material_element(element, location):
         prefer_hex_for_string_mask=bool(element.get("StringGenMask", "")),
     )
     tokens = string_gen_mask_tokens(element.get("StringGenMask", ""))
+    public_params = _child_attributes(element, "PublicParams")
     return {
         "location": location,
         "tag": element.tag,
@@ -78,7 +80,8 @@ def analyze_material_element(element, location):
         "string_gen_mask": element.get("StringGenMask", ""),
         "tokens": tokens,
         "attributes": _attributes(element),
-        "public_params": _child_attributes(element, "PublicParams"),
+        "public_params": public_params,
+        "public_param_analysis": analyze_public_params(public_params),
         "textures": _texture_entries(element),
         "child_tags": [child.tag for child in list(element)],
     }
@@ -125,6 +128,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     string_gen_mask_counts = Counter()
     gen_mask_literal_counts = Counter()
     token_counts = Counter()
+    public_param_component_counts = Counter()
     attributes_by_shader = defaultdict(Counter)
     public_params_by_shader = defaultdict(Counter)
     texture_maps_by_shader = defaultdict(Counter)
@@ -152,6 +156,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             for param_name in material["public_params"]:
                 public_param_counts[param_name] += 1
                 public_params_by_shader[shader][param_name] += 1
+            for param_info in material["public_param_analysis"].values():
+                public_param_component_counts[str(param_info["parsed_component_count"])] += 1
             for texture in material["textures"]:
                 texture_map = texture["map"] or "<empty>"
                 texture_map_counts[texture_map] += 1
@@ -179,6 +185,7 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "child_tags": _counter_to_sorted_pairs(child_tag_counts),
             "material_attributes": _counter_to_sorted_pairs(attribute_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
+            "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
             "texture_maps": _counter_to_sorted_pairs(texture_map_counts),
             "shaders": _counter_to_sorted_pairs(shader_counts),
             "string_gen_masks": _counter_to_sorted_pairs(string_gen_mask_counts)[:value_limit],
