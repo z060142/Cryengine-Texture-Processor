@@ -1,0 +1,147 @@
+# Material Override Batch
+
+## Why
+
+The converter needed a batch path for material state that is already known from
+CryEngine `.mtl` evidence. Guessing shader families and shader-specific params
+inside the exporter does not scale, especially for `Glass`,
+`Multilayeredmaterials`, and the permanent trailing `<unassigned>` slot.
+
+This batch adds an explicit override channel:
+
+- extract per-material CryEngine state from a reference `.mtl`
+- feed that override JSON into model/MTL export
+- preserve shader, GenMask, StringGenMask, material attrs, and PublicParams
+- keep texture resolution and RC material slot assignment separate
+
+## Files
+
+- `tools/mtl_override_extractor.py`
+- `tools/rc_smoke_test.py`
+- `output_formats/mtl_exporter.py`
+- `model_processing/material_texture_resolver.py`
+- `docs/car_native_material_overrides.json`
+- `docs/car_material_override_mtl_schema_report.json`
+
+## Override Shape
+
+`tools.mtl_override_extractor` emits:
+
+```json
+{
+  "schema": "cryengine_material_overrides.v1",
+  "source_mtl": "absolute reference mtl path",
+  "material_overrides": {
+    "MaterialName": {
+      "cryengine_material": {
+        "Shader": "Illum",
+        "GenMask": "...",
+        "StringGenMask": "...",
+        "MtlFlags": "...",
+        "PublicParams": {}
+      }
+    }
+  }
+}
+```
+
+The exporter also accepts the same material state directly on a material dict via
+`cryengine_material`, `ce_material`, or `mtl_overrides`.
+
+Important behavior:
+
+- explicit empty `StringGenMask=""` is preserved
+- explicit `PublicParams` replace the exporter defaults
+- the generated trailing `<unassigned>` placeholder can receive overrides by name
+- RC request materials are not polluted by the placeholder override
+
+## Car Batch
+
+Reference extraction:
+
+```powershell
+uv run python -m tools.mtl_override_extractor "S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_native_material_overrides.json
+```
+
+RC flow:
+
+```powershell
+$phase = 'S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides'
+$overrideJson = 'S:\Crytek\crytek\Stripped to the bone\Cryengine-Texture-Processor\docs\car_native_material_overrides.json'
+
+uv run python -m tools.rc_smoke_test --rc "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe" --fbx (Join-Path $phase 'kb3d_citycarsessentialssedan-native.fbx') --work-dir (Join-Path $phase 'rc_work') --asset-name kb3d_citycarsessentialssedan-native --materials-from-manifest --material-overrides $overrideJson --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\example\car" --texture-output-format "dds,tif"
+
+uv run python -m tools.mtl_schema_report "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\kb3d_citycarsessentialssedan-native.mtl" --output docs\car_material_override_mtl_schema_report.json
+```
+
+Native and generated MTL now match on the high-value material-state counts:
+
+```json
+{
+  "shader_counts": {
+    "Illum": 15,
+    "Multilayeredmaterials": 1,
+    "Glass": 1
+  },
+  "string_gen_masks": {
+    "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING": 14,
+    "": 1,
+    "%SPECULAR_MAP%TINT_MAP": 1,
+    "%NORMAL_MAP%SUBSURFACE_SCATTERING": 1
+  },
+  "mtl_flags": {
+    "524416": 15,
+    "526464": 1,
+    "526466": 1
+  }
+}
+```
+
+Material report result:
+
+```json
+{
+  "rc_success": true,
+  "output_exists": true,
+  "slot_alignment_ok": true,
+  "cgf_material_id_alignment_ok": true,
+  "cgf_import_settings_alignment_ok": true,
+  "fixture_material_semantic_alignment_ok": true,
+  "request_material_count": 17,
+  "mtl_slot_count": 17,
+  "cgf_material_id_count": 16,
+  "failed_material_id_check_count": 0,
+  "unassigned_placeholder_count": 1,
+  "unassigned_slots_ok": true,
+  "action_required": false
+}
+```
+
+## Batch Policy
+
+Going forward, avoid adding one document and one RC run per tiny rule. Use this
+larger batch rhythm instead:
+
+1. mine a sample or source-backed schema into a machine-readable rule set
+2. apply a batch of low-risk rules through shared data channels
+3. run one focused suite for changed modules
+4. run one full suite and one RC smoke flow
+5. commit the whole batch with one durable doc/report pair
+
+## Verification
+
+```powershell
+uv run python -m pytest tests/test_mtl_exporter.py tests/test_material_texture_resolver.py tests/test_mtl_override_extractor.py tests/test_rc_smoke_test.py
+uv run python -m pytest
+uv run python -m compileall model_processing output_formats tools tests
+uv run python tools/converter_schema.py --check docs/converter_schema.json
+uv lock --check
+```
+
+Result:
+
+- `71 passed`
+- `398 passed`
+- `compileall` completed
+- converter schema snapshot is current
+- `uv lock --check` passed

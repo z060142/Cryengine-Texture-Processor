@@ -139,6 +139,85 @@ def _normalize_texture_keys(textures):
     return {str(texture_type).lower(): texture_path for texture_type, texture_path in (textures or {}).items()}
 
 
+def _first_present(mapping, *keys):
+    for key in keys:
+        if key in mapping:
+            return mapping[key], True
+    return None, False
+
+
+def _coerce_xml_attrs(values):
+    return {
+        str(name): str(value)
+        for name, value in (values or {}).items()
+        if name and value is not None
+    }
+
+
+def _material_override_sources(mat_info):
+    sources = []
+    cryengine_material = mat_info.get("cryengine_material")
+    if isinstance(cryengine_material, dict):
+        sources.append(cryengine_material)
+    ce_material = mat_info.get("ce_material")
+    if isinstance(ce_material, dict):
+        sources.append(ce_material)
+    mtl_overrides = mat_info.get("mtl_overrides")
+    if isinstance(mtl_overrides, dict):
+        sources.append(mtl_overrides)
+    sources.append(mat_info)
+    return sources
+
+
+def _material_attr_overrides(mat_info):
+    attrs = {}
+    attr_keys = {
+        *SUB_MATERIAL_DEFAULT_ATTRS,
+        "AlphaTest",
+        "CloakAmount",
+        "LayerAct",
+        "vertModifType",
+    }
+    for source in _material_override_sources(mat_info):
+        nested_attrs, found = _first_present(source, "material_attrs", "mtl_attrs", "attributes")
+        if found and isinstance(nested_attrs, dict):
+            attrs.update(_coerce_xml_attrs(nested_attrs))
+        for key in sorted(attr_keys):
+            value, found = _first_present(source, key)
+            if found and value is not None:
+                attrs[key] = str(value)
+        shader, found = _first_present(source, "shader")
+        if found and shader is not None:
+            attrs["Shader"] = str(shader)
+    attrs.pop("Name", None)
+    attrs.pop("GenMask", None)
+    attrs.pop("StringGenMask", None)
+    return attrs
+
+
+def _material_mask_overrides(mat_info):
+    overrides = {}
+    for source in _material_override_sources(mat_info):
+        gen_mask, found = _first_present(source, "GenMask", "gen_mask")
+        if found and gen_mask is not None:
+            overrides["gen_mask"] = gen_mask
+        string_gen_mask, found = _first_present(source, "StringGenMask", "string_gen_mask")
+        if found and string_gen_mask is not None:
+            overrides["string_gen_mask"] = str(string_gen_mask)
+    return overrides
+
+
+def _material_public_param_overrides(mat_info):
+    public_params = {}
+    found_any = False
+    for source in _material_override_sources(mat_info):
+        value, found = _first_present(source, "PublicParams", "public_params")
+        if found and isinstance(value, dict):
+            found_any = True
+            public_params.update(_coerce_xml_attrs(value))
+    return public_params, found_any
+
+
 def _material_has_alpha(textures):
     normalized_textures = _normalize_texture_keys(textures)
     for texture_type in normalized_textures:
@@ -154,13 +233,14 @@ def _material_has_alpha(textures):
     return False
 
 
-def _sub_material_attrs(material_name, textures):
+def _sub_material_attrs(material_name, textures, mat_info=None):
     attrs = {"Name": material_name, **SUB_MATERIAL_DEFAULT_ATTRS}
     normalized_textures = _normalize_texture_keys(textures)
     if "emissive" in normalized_textures:
         attrs["Emittance"] = "1,1,1,10"
     if _material_has_alpha(normalized_textures):
         attrs["AlphaTest"] = "0.5"
+    attrs.update(_material_attr_overrides(mat_info or {}))
     return attrs
 
 
@@ -186,13 +266,16 @@ def _append_texture_entries(textures_elem, textures, model_output_dir, material_
         )
 
 
-def _shader_masks_and_public_params(textures):
+def _shader_masks_and_public_params(textures, mat_info=None):
     policy = exported_material_shader_policy(_normalize_texture_keys(textures))
+    mask_overrides = _material_mask_overrides(mat_info or {})
+    public_param_overrides, has_public_param_overrides = _material_public_param_overrides(mat_info or {})
+    public_params = public_param_overrides if has_public_param_overrides else dict(policy["public_params"])
 
     return (
-        policy["gen_mask"],
-        policy["string_gen_mask"],
-        policy["public_params"],
+        mask_overrides.get("gen_mask", policy["gen_mask"]),
+        mask_overrides.get("string_gen_mask", policy["string_gen_mask"]),
+        public_params,
     )
 
 
@@ -207,11 +290,11 @@ def build_mtl_material_slots(materials_data, existing_submaterial_names=None, in
 def _append_sub_material(sub_materials_elem, mat_info, model_output_dir):
     material_name = mat_info.get("name", "UnnamedMaterial")
     textures = mat_info.get("textures", {})
-    sub_mat = ET.SubElement(sub_materials_elem, "Material", **_sub_material_attrs(material_name, textures))
+    sub_mat = ET.SubElement(sub_materials_elem, "Material", **_sub_material_attrs(material_name, textures, mat_info))
     textures_elem = ET.SubElement(sub_mat, "Textures")
     _append_texture_entries(textures_elem, textures, model_output_dir, material_name)
 
-    gen_mask_value, string_gen_mask, public_params = _shader_masks_and_public_params(textures)
+    gen_mask_value, string_gen_mask, public_params = _shader_masks_and_public_params(textures, mat_info)
     sub_mat.set("GenMask", str(gen_mask_value))
     sub_mat.set("StringGenMask", string_gen_mask)
     ET.SubElement(sub_mat, "PublicParams", **public_params)
@@ -222,6 +305,7 @@ def build_mtl_document(
     model_output_dir,
     existing_submaterial_names=None,
     include_trailing_unassigned=False,
+    material_overrides=None,
 ):
     root_material = ET.Element("Material", MtlFlags=str(MTL_ROOT_DEFAULT_FLAGS), vertModifType="0")
     sub_materials = ET.SubElement(root_material, "SubMaterials")
@@ -230,6 +314,16 @@ def build_mtl_document(
         existing_submaterial_names,
         include_trailing_unassigned=include_trailing_unassigned,
     )
+    material_overrides = material_overrides or {}
+    material_slots = [
+        {
+            **slot,
+            **material_overrides.get(slot.get("name", ""), {}),
+        }
+        if isinstance(material_overrides.get(slot.get("name", "")), dict)
+        else slot
+        for slot in material_slots
+    ]
 
     for mat_info in material_slots:
         _append_sub_material(sub_materials, mat_info, model_output_dir)
@@ -244,6 +338,7 @@ def export_mtl(
     texture_output_dir,
     output_filename,
     include_trailing_unassigned=False,
+    material_overrides=None,
 ):
     """
     Exports a .mtl file based on the provided material data.
@@ -280,6 +375,7 @@ def export_mtl(
             model_output_dir,
             existing_submaterial_names,
             include_trailing_unassigned=include_trailing_unassigned,
+            material_overrides=material_overrides,
         )
         xml_string = _pretty_print_xml(root_material)
 

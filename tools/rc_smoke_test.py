@@ -4,6 +4,7 @@
 
 import argparse
 from dataclasses import dataclass
+import json
 import os
 import shutil
 
@@ -123,6 +124,28 @@ def material_specs_from_manifest(source_fbx_path):
     if not manifest:
         raise RuntimeError(f"Material manifest not found for FBX: {source_fbx_path}")
     return material_manifest_materials([], {"path": manifest_path, "manifest": manifest})
+
+
+def load_material_overrides(overrides_path):
+    if not overrides_path:
+        return {}
+    with open(overrides_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
+    if isinstance(payload, dict) and isinstance(payload.get("material_overrides"), dict):
+        return payload["material_overrides"]
+    if isinstance(payload, dict):
+        return payload
+    raise ValueError(f"Material overrides JSON must be an object: {overrides_path}")
+
+
+def apply_material_overrides_to_specs(material_specs, material_overrides=None):
+    material_overrides = material_overrides or {}
+    materials = []
+    for spec in material_specs or []:
+        name = spec.get("name", "")
+        override = material_overrides.get(name, {})
+        materials.append({**spec, **override} if isinstance(override, dict) else dict(spec))
+    return materials
 
 
 def source_material_specs_from_manifest(source_fbx_path):
@@ -255,10 +278,14 @@ def build_smoke_materials_data(
     manifest_info=None,
     texture_output_dir="",
     texture_output_format="tif",
+    material_overrides=None,
     model_loader_factory=None,
     texture_extractor_factory=None,
 ):
-    fallback_materials = [{**spec, "textures": {}} for spec in material_specs]
+    fallback_materials = [
+        {**spec, "textures": {}}
+        for spec in apply_material_overrides_to_specs(material_specs, material_overrides)
+    ]
     texture_diagnostics = []
     if not texture_output_dir:
         return fallback_materials, texture_diagnostics
@@ -286,6 +313,8 @@ def build_smoke_materials_data(
             model_data["materials"] = material_specs
         if manifest_info:
             model_data["material_manifest"] = manifest_info
+        if material_overrides:
+            model_data["material_overrides"] = material_overrides
 
         texture_refs = texture_extractor_factory().extract(model_data)
         materials_data = build_mtl_material_data(
@@ -328,6 +357,7 @@ def prepare_smoke_bundle(
     material_specs=None,
     texture_output_dir="",
     texture_output_format="tif",
+    material_overrides=None,
 ):
     source_fbx_path = os.path.abspath(source_fbx_path)
     work_dir = os.path.abspath(work_dir)
@@ -348,6 +378,7 @@ def prepare_smoke_bundle(
         manifest_info=manifest_info,
         texture_output_dir=texture_output_dir,
         texture_output_format=texture_output_format,
+        material_overrides=material_overrides,
     )
     mtl_filename = f"{asset_name}.mtl"
     mtl_success, mtl_result = export_mtl(
@@ -356,6 +387,7 @@ def prepare_smoke_bundle(
         work_dir,
         mtl_filename,
         include_trailing_unassigned=True,
+        material_overrides=material_overrides,
     )
     if not mtl_success:
         raise RuntimeError(mtl_result)
@@ -400,6 +432,7 @@ def run_rc_smoke_test(
     material_specs=None,
     texture_output_dir="",
     texture_output_format="tif",
+    material_overrides=None,
     runner_factory=RCImportRunner,
 ):
     rc_exe_path = rc_exe_path or ""
@@ -424,6 +457,7 @@ def run_rc_smoke_test(
             material_specs=material_specs,
             texture_output_dir=texture_output_dir,
             texture_output_format=texture_output_format,
+            material_overrides=material_overrides,
         )
     except Exception as e:
         return RCSmokeResult(False, work_dir, rc_exe_path, source_fbx_path, error=str(e))
@@ -495,12 +529,18 @@ def main(argv=None):
         default="tif",
         help="Processed texture extension(s) to probe, for example 'tif', 'dds', 'dds,tif', or 'auto'.",
     )
+    parser.add_argument(
+        "--material-overrides",
+        default="",
+        help="Optional JSON file containing material_overrides keyed by material name.",
+    )
     args = parser.parse_args(argv)
     material_specs = (
         material_specs_from_manifest(args.fbx)
         if args.materials_from_manifest
         else material_specs_from_arg(args.materials)
     )
+    material_overrides = load_material_overrides(args.material_overrides) if args.material_overrides else {}
 
     result = run_rc_smoke_test(
         args.rc,
@@ -510,6 +550,7 @@ def main(argv=None):
         material_specs=material_specs,
         texture_output_dir=args.texture_output_dir,
         texture_output_format=args.texture_output_format,
+        material_overrides=material_overrides,
     )
 
     print(f"success: {result.success}")

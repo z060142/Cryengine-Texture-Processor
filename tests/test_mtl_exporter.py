@@ -184,6 +184,90 @@ def test_build_mtl_document_exports_roughness_as_observed_opacity_map(tmp_path):
     assert material.get("AlphaTest") is None
 
 
+def test_build_mtl_document_applies_explicit_cryengine_material_overrides(tmp_path):
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "Glass",
+                "textures": {"Specular": str(tmp_path / "glass_spec.dds")},
+                "cryengine_material": {
+                    "Shader": "Glass",
+                    "GenMask": "524288",
+                    "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                    "material_attrs": {
+                        "MtlFlags": "526466",
+                        "LayerAct": "1",
+                    },
+                    "PublicParams": {
+                        "TintCloudiness": "0.050000001",
+                        "TintColor": "0.16078432,0.16078432,0.16078432",
+                    },
+                },
+            }
+        ],
+        str(tmp_path),
+    )
+
+    material = root.find("SubMaterials").find("Material")
+    assert material.get("Shader") == "Glass"
+    assert material.get("MtlFlags") == "526466"
+    assert material.get("LayerAct") == "1"
+    assert material.get("GenMask") == "524288"
+    assert material.get("StringGenMask") == "%SPECULAR_MAP%TINT_MAP"
+    public_params = material.find("PublicParams")
+    assert public_params.get("EmittanceMapGamma") is None
+    assert public_params.get("TintCloudiness") == "0.050000001"
+    assert public_params.get("TintColor") == "0.16078432,0.16078432,0.16078432"
+
+
+def test_build_mtl_document_preserves_explicit_empty_string_gen_mask(tmp_path):
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "CarPaint",
+                "textures": {"Specular": str(tmp_path / "paint_spec.dds")},
+                "mtl_overrides": {
+                    "shader": "Multilayeredmaterials",
+                    "gen_mask": "0",
+                    "string_gen_mask": "",
+                    "public_params": {
+                        "Layer0ReflectivityScale": "1.5",
+                    },
+                },
+            }
+        ],
+        str(tmp_path),
+    )
+
+    material = root.find("SubMaterials").find("Material")
+    assert material.get("Shader") == "Multilayeredmaterials"
+    assert material.get("GenMask") == "0"
+    assert material.get("StringGenMask") == ""
+    assert material.find("PublicParams").get("Layer0ReflectivityScale") == "1.5"
+
+
+def test_build_mtl_document_applies_global_override_to_trailing_unassigned(tmp_path):
+    root, slots = build_mtl_document(
+        [{"name": "Stone", "id": 1, "textures": {}}],
+        str(tmp_path),
+        include_trailing_unassigned=True,
+        material_overrides={
+            "<unassigned>": {
+                "cryengine_material": {
+                    "StringGenMask": "%NORMAL_MAP%SUBSURFACE_SCATTERING",
+                    "PublicParams": {"SSSIndex": "0"},
+                }
+            }
+        },
+    )
+
+    materials = list(root.find("SubMaterials"))
+    assert [slot["name"] for slot in slots] == ["Stone", "<unassigned>"]
+    assert materials[-1].get("Name") == "<unassigned>"
+    assert materials[-1].get("StringGenMask") == "%NORMAL_MAP%SUBSURFACE_SCATTERING"
+    assert materials[-1].find("PublicParams").get("SSSIndex") == "0"
+
+
 def test_build_mtl_document_does_not_probe_dds_diffuse_alpha_with_pillow(tmp_path, capsys):
     diffuse_path = tmp_path / "asset_diff.dds"
     diffuse_path.write_text("dds", encoding="utf-8")

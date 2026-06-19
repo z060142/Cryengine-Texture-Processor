@@ -16,6 +16,21 @@ from output_formats.texture_output_paths import texture_output_suffix
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 
 COMMON_TEXTURE_BASE_SUFFIXES = tuple(suffix for suffix, _ in FILENAME_SUFFIX_TYPES)
+MTL_MATERIAL_OVERRIDE_KEYS = (
+    "cryengine_material",
+    "ce_material",
+    "mtl_overrides",
+    "material_attrs",
+    "mtl_attrs",
+    "public_params",
+    "PublicParams",
+    "shader",
+    "Shader",
+    "GenMask",
+    "StringGenMask",
+    "gen_mask",
+    "string_gen_mask",
+)
 
 
 def _suffix_template(output_key, normal_alpha=False):
@@ -123,6 +138,38 @@ def texture_ref_evidence(material_refs):
     return evidence
 
 
+def material_mtl_overrides(material):
+    return {
+        key: material[key]
+        for key in MTL_MATERIAL_OVERRIDE_KEYS
+        if key in material
+    }
+
+
+def _material_override_table(model_data):
+    raw_overrides = (
+        model_data.get("mtl_material_overrides")
+        or model_data.get("material_overrides")
+        or {}
+    )
+    if isinstance(raw_overrides, dict):
+        return {
+            str(name): override
+            for name, override in raw_overrides.items()
+            if name and isinstance(override, dict)
+        }
+    if isinstance(raw_overrides, list):
+        overrides = {}
+        for item in raw_overrides:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("Name")
+            if name:
+                overrides[str(name)] = item
+        return overrides
+    return {}
+
+
 def resolve_base_name(material_refs, texture_manager, suffixes=COMMON_TEXTURE_BASE_SUFFIXES):
     """
     Resolve the processed texture base name for a material.
@@ -227,7 +274,12 @@ def build_material_texture_records(
         model_data.get("materials", []),
         model_data.get("material_manifest"),
     )
+    overrides_by_name = _material_override_table(model_data)
     for material_name, material in iter_model_materials(source_materials):
+        material = {
+            **material,
+            **overrides_by_name.get(material_name, {}),
+        }
         material_refs = refs_by_material.get(material_name, [])
         base_name = resolve_base_name(material_refs, texture_manager)
         processed_textures = find_processed_textures(
@@ -259,6 +311,7 @@ def build_material_texture_records(
                     "textures": processed_textures,
                     "texture_ref_evidence": texture_ref_evidence(material_refs),
                     "source_texture_count": len(material_refs),
+                    "mtl_overrides": material_mtl_overrides(material),
                 }
             )
         elif not base_name:
@@ -299,6 +352,7 @@ def build_mtl_material_data(*args, **kwargs):
             "slot_name_conflict": record["slot_name_conflict"],
             "textures": record["textures"],
             "texture_ref_evidence": record["texture_ref_evidence"],
+            **record.get("mtl_overrides", {}),
         }
         for record in records
     ]

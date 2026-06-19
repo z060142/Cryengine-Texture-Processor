@@ -1,0 +1,376 @@
+{
+  "schema": "cryengine_material_overrides.v1",
+  "source_mtl": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.mtl",
+  "material_overrides": {
+    "KB3D_CEV_UndercarriageTrim": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_SeatsDriverATrim": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_TiresSedans": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_WheelRimsA": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "0.98225087,0.98225087,0.98225087",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_RubberTrim": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_PlasticTileableA": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_PlasticTrimA": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_SedanExteriorBody": {
+      "cryengine_material": {
+        "MtlFlags": "526464",
+        "Shader": "Multilayeredmaterials",
+        "GenMask": "0",
+        "StringGenMask": "",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "BackLightScale": "0.5",
+          "BumpMapTile": "1",
+          "BumpScale": "0.1",
+          "EmittanceMapGamma": "1",
+          "Layer0ReflectivityScale": "1.5",
+          "Layer1ReflectivityScale": "1.5",
+          "Layer1Smoothness": "0.1",
+          "Layer1Thickness": "0.1",
+          "Layer2ReflectivityScale": "1.5",
+          "Layer2Smoothness": "0.1",
+          "Layer2Thickness": "0.1"
+        }
+      }
+    },
+    "KB3D_CEV_CarAtlas": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "0.77582246,0.77582246,0.77582246",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_CarsLicensePlates": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_TapesTrimA": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_WindowFritsTrim": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_FeltA": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_FeltB": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_GlassMirror": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "6000000000020",
+        "StringGenMask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    },
+    "KB3D_CEV_TranslElemSedans": {
+      "cryengine_material": {
+        "MtlFlags": "526466",
+        "Shader": "Glass",
+        "GenMask": "2080000000000",
+        "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "BackLightScale": "0.050000001",
+          "BumpMapTile": "1",
+          "BumpScale": "0.1",
+          "CloudinessReducesGloss": "0.1",
+          "TintCloudiness": "0.050000001",
+          "TintColor": "0.16078432,0.16078432,0.16078432"
+        }
+      }
+    },
+    "<unassigned>": {
+      "cryengine_material": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "GenMask": "4000000000020",
+        "StringGenMask": "%NORMAL_MAP%SUBSURFACE_SCATTERING",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "0.046964195,0.046964195,0.046964195",
+        "Opacity": "1",
+        "Shininess": "255",
+        "CloakAmount": "0",
+        "vertModifType": "0",
+        "LayerAct": "1",
+        "PublicParams": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        }
+      }
+    }
+  }
+}

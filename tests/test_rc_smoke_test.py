@@ -2,10 +2,12 @@ import json
 import os
 
 from tools.rc_smoke_test import (
+    apply_material_overrides_to_specs,
     build_smoke_materials_data,
     build_smoke_model_data,
     collect_material_slot_diagnostics,
     discover_default_fbx,
+    load_material_overrides,
     material_names_from_arg,
     material_specs_from_manifest,
     material_specs_from_arg,
@@ -204,6 +206,36 @@ def test_build_smoke_model_data_accepts_manifest_scene_hierarchy():
     assert model_data["scene_hierarchy"] == hierarchy
 
 
+def test_load_material_overrides_accepts_schema_wrapper(tmp_path):
+    overrides_path = tmp_path / "overrides.json"
+    overrides_path.write_text(
+        json.dumps(
+            {
+                "schema": "cryengine_material_overrides.v1",
+                "material_overrides": {
+                    "Glass": {"cryengine_material": {"Shader": "Glass"}},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert load_material_overrides(str(overrides_path)) == {
+        "Glass": {"cryengine_material": {"Shader": "Glass"}},
+    }
+
+
+def test_apply_material_overrides_to_specs_merges_by_material_name():
+    result = apply_material_overrides_to_specs(
+        [{"name": "Stone", "id": 1}, {"name": "Glass", "id": 2}],
+        {"Glass": {"cryengine_material": {"Shader": "Glass"}}},
+    )
+
+    assert result[0] == {"name": "Stone", "id": 1}
+    assert result[1]["name"] == "Glass"
+    assert result[1]["cryengine_material"]["Shader"] == "Glass"
+
+
 def test_collect_material_slot_diagnostics_reports_deleted_known_slot():
     diagnostics = collect_material_slot_diagnostics(
         [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}]
@@ -276,6 +308,33 @@ def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
     root = ET.parse(bundle["mtl_path"]).getroot()
     sub_materials = root.find("SubMaterials")
     assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001", "<unassigned>"]
+
+
+def test_prepare_smoke_bundle_applies_material_overrides_to_generated_mtl(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=[{"name": "Glass", "id": 1, "index": 0}],
+        material_overrides={
+            "Glass": {
+                "cryengine_material": {
+                    "Shader": "Glass",
+                    "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                    "PublicParams": {"TintCloudiness": "0.050000001"},
+                }
+            }
+        },
+    )
+
+    material = ET.parse(bundle["mtl_path"]).getroot().find("SubMaterials").find("Material")
+    assert material.get("Shader") == "Glass"
+    assert material.get("StringGenMask") == "%SPECULAR_MAP%TINT_MAP"
+    assert material.find("PublicParams").get("TintCloudiness") == "0.050000001"
 
 
 def test_prepare_smoke_bundle_uses_material_manifest_scene_hierarchy(tmp_path):
@@ -696,6 +755,45 @@ def test_build_smoke_materials_data_uses_texture_outputs_and_manifest_order(tmp_
     assert materials_data[1]["textures"]["roughness"] == str(tmp_path / "Glass_roughness.tif")
     assert diagnostics[0]["code"] == "texture_backed_mtl_material_summary"
     assert diagnostics[0]["texture_material_count"] == 2
+
+
+def test_build_smoke_materials_data_applies_overrides_with_texture_outputs(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    source_texture = tmp_path / "Glass_spec.png"
+    source_texture.write_text("fake source", encoding="utf-8")
+    (tmp_path / "Glass_spec.tif").write_text("fake spec", encoding="utf-8")
+
+    class FakeLoader:
+        def load(self, path):
+            return {
+                "path": path,
+                "materials": [{"name": "Glass"}],
+            }
+
+    class FakeExtractor:
+        def extract(self, model_data):
+            return [TextureRef(str(source_texture), "Glass", "specular")]
+
+    materials_data, _ = build_smoke_materials_data(
+        str(source_fbx),
+        [{"name": "Glass", "id": 1, "index": 0}],
+        texture_output_dir=str(tmp_path),
+        texture_output_format="tif",
+        material_overrides={
+            "Glass": {
+                "cryengine_material": {
+                    "Shader": "Glass",
+                    "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                }
+            }
+        },
+        model_loader_factory=FakeLoader,
+        texture_extractor_factory=FakeExtractor,
+    )
+
+    assert materials_data[0]["textures"]["specular"] == str(tmp_path / "Glass_spec.tif")
+    assert materials_data[0]["cryengine_material"]["Shader"] == "Glass"
 
 
 def test_run_rc_smoke_test_reports_missing_rc(tmp_path):

@@ -228,6 +228,81 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
     assert result[0]["texture_ref_evidence"] == []
 
 
+def test_build_mtl_material_data_preserves_explicit_mtl_overrides(tmp_path):
+    model_data = {
+        "materials": [
+            {
+                "name": "Glass",
+                "cryengine_material": {
+                    "Shader": "Glass",
+                    "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                    "PublicParams": {"TintCloudiness": "0.050000001"},
+                },
+            },
+            {
+                "name": "Paint",
+                "mtl_overrides": {
+                    "shader": "Multilayeredmaterials",
+                    "string_gen_mask": "",
+                    "public_params": {"Layer0ReflectivityScale": "1.5"},
+                },
+            },
+        ]
+    }
+
+    result = build_mtl_material_data(
+        model_data,
+        [],
+        TextureManagerStub(),
+        str(tmp_path),
+        "tif",
+    )
+
+    assert result[0]["cryengine_material"]["Shader"] == "Glass"
+    assert result[0]["cryengine_material"]["PublicParams"]["TintCloudiness"] == "0.050000001"
+    assert result[1]["mtl_overrides"]["shader"] == "Multilayeredmaterials"
+    assert result[1]["mtl_overrides"]["string_gen_mask"] == ""
+    assert result[1]["mtl_overrides"]["public_params"]["Layer0ReflectivityScale"] == "1.5"
+
+
+def test_build_mtl_material_data_applies_bulk_material_overrides_by_name(tmp_path):
+    model_data = {
+        "materials": [
+            {"name": "Paint"},
+            {"name": "Glass"},
+        ],
+        "material_overrides": {
+            "Paint": {
+                "mtl_overrides": {
+                    "shader": "Multilayeredmaterials",
+                    "string_gen_mask": "",
+                    "public_params": {"Layer0ReflectivityScale": "1.5"},
+                },
+            },
+            "Glass": {
+                "cryengine_material": {
+                    "Shader": "Glass",
+                    "StringGenMask": "%SPECULAR_MAP%TINT_MAP",
+                    "PublicParams": {"TintCloudiness": "0.050000001"},
+                },
+            },
+        },
+    }
+
+    result = build_mtl_material_data(
+        model_data,
+        [],
+        TextureManagerStub(),
+        str(tmp_path),
+        "tif",
+    )
+
+    assert result[0]["mtl_overrides"]["shader"] == "Multilayeredmaterials"
+    assert result[0]["mtl_overrides"]["string_gen_mask"] == ""
+    assert result[1]["cryengine_material"]["Shader"] == "Glass"
+    assert result[1]["cryengine_material"]["PublicParams"]["TintCloudiness"] == "0.050000001"
+
+
 def test_build_mtl_material_data_follows_material_manifest_order(tmp_path):
     model_data = {
         "materials": [{"name": "Stone.001"}, {"name": "Stone"}],
