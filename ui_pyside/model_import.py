@@ -37,6 +37,20 @@ from utils.config_manager import ConfigManager
 
 
 AUTHORITATIVE_MODEL_LOAD_STATUS = {"", "loaded"}
+LOAD_STATUS_LABELS = {
+    "": "loaded",
+    "loaded": "loaded",
+    "import_only": "import_only (filesystem texture scan)",
+    "dummy": "dummy (model load failed)",
+    "error": "error",
+}
+SOURCE_MODE_LABELS = {
+    "": "unknown",
+    "blender": "blender material data",
+    "filesystem_import_only": "filesystem scan (import_only)",
+    "filesystem_no_bpy": "filesystem scan (no bpy)",
+    "filesystem_legacy": "filesystem scan (legacy)",
+}
 
 
 def _degraded_model_load_diagnostics(model_data):
@@ -221,14 +235,41 @@ def rc_material_smoke_summary_text(smoke_info):
     return " / ".join([status, *checks])
 
 
+def model_load_state_text(model_info):
+    status = (model_info or {}).get("load_status", "")
+    return LOAD_STATUS_LABELS.get(status, status or "loaded")
+
+
+def texture_source_mode_text(source_mode):
+    label = SOURCE_MODE_LABELS.get(source_mode, source_mode or "unknown")
+    if not source_mode or label == source_mode:
+        return label
+    return f"{label} [{source_mode}]"
+
+
+def texture_source_summary_text(textures):
+    counts = {}
+    for texture in textures or []:
+        source_mode = texture.get("source_mode", "")
+        counts[source_mode] = counts.get(source_mode, 0) + 1
+    if not counts:
+        return "none"
+    return ", ".join(
+        f"{texture_source_mode_text(source_mode)} x{count}"
+        for source_mode, count in sorted(counts.items(), key=lambda item: item[0])
+    )
+
+
 def model_display_name(model_info):
     filename = model_info.get("filename", "Unknown Model")
     diagnostics = model_info.get("material_diagnostics", [])
+    load_status = model_info.get("load_status", "")
+    state_suffix = "" if load_status in AUTHORITATIVE_MODEL_LOAD_STATUS else f" [{load_status}]"
     if any(item.get("severity") == "hazard" for item in diagnostics):
-        return f"{filename} [hazard]"
+        return f"{filename}{state_suffix} [hazard]"
     if diagnostics:
-        return f"{filename} [diagnostics]"
-    return filename
+        return f"{filename}{state_suffix} [diagnostics]"
+    return f"{filename}{state_suffix}"
 
 
 class ModelImportPanel(QWidget):
@@ -262,18 +303,23 @@ class ModelImportPanel(QWidget):
         info_layout = QFormLayout(info_box)
         self.path_label = QLabel("")
         self.path_label.setWordWrap(True)
+        self.load_state_label = QLabel("loaded")
         self.materials_label = QLabel("0")
         self.material_manifest_label = QLabel("not found")
         self.material_manifest_label.setWordWrap(True)
         self.rc_smoke_label = QLabel("not run")
         self.rc_smoke_label.setWordWrap(True)
         self.textures_label = QLabel("0")
+        self.texture_sources_label = QLabel("none")
+        self.texture_sources_label.setWordWrap(True)
         self.diagnostics_label = QLabel("0")
         info_layout.addRow(get_text("model_import.path_label", "Path:"), self.path_label)
+        info_layout.addRow(get_text("model_import.load_state_label", "Load State:"), self.load_state_label)
         info_layout.addRow(get_text("model_import.materials_label", "Materials:"), self.materials_label)
         info_layout.addRow(get_text("model_import.material_manifest_label", "Material Table:"), self.material_manifest_label)
         info_layout.addRow(get_text("model_import.rc_smoke_label", "RC Material Smoke:"), self.rc_smoke_label)
         info_layout.addRow(get_text("model_import.textures_label", "Textures:"), self.textures_label)
+        info_layout.addRow(get_text("model_import.texture_sources_label", "Texture Sources:"), self.texture_sources_label)
         info_layout.addRow(get_text("model_import.diagnostics_label", "Diagnostics:"), self.diagnostics_label)
         layout.addWidget(info_box)
 
@@ -401,6 +447,9 @@ class ModelImportPanel(QWidget):
             model_info = {
                 "path": file_path,
                 "filename": filename,
+                "load_status": "error",
+                "load_warning": "",
+                "load_error": "",
                 "materials": 0,
                 "model_obj": None,
                 "extracted_textures": [],
@@ -411,10 +460,14 @@ class ModelImportPanel(QWidget):
 
             try:
                 model = self.model_loader.load(file_path)
+                if model:
+                    model_info["load_status"] = model.get("load_status", "")
+                    model_info["load_warning"] = model.get("load_warning", "")
+                    model_info["load_error"] = model.get("load_error", "")
+                    model_info["material_diagnostics"] = collect_model_material_diagnostics(model)
                 if model and not model.get("is_dummy", False):
                     model_info["model_obj"] = model
                     model_info["materials"] = len(model.get("materials", []))
-                    model_info["material_diagnostics"] = collect_model_material_diagnostics(model)
                     model_info["material_manifest"] = load_model_material_manifest(file_path)
                     model["material_manifest"] = model_info["material_manifest"]
                     refs = self.texture_extractor.extract(model)
@@ -431,6 +484,8 @@ class ModelImportPanel(QWidget):
                     error_count += 1
             except Exception as e:
                 print(f"Error importing model {file_path}: {e}")
+                model_info["load_status"] = "error"
+                model_info["load_error"] = str(e)
                 model_info["filename"] += get_text("model_import.load_error_suffix", " (Error)")
                 error_count += 1
 
@@ -507,10 +562,12 @@ class ModelImportPanel(QWidget):
         row = self.models_list.currentRow()
         if row < 0 or row >= len(self.imported_models_info):
             self.path_label.setText("")
+            self.load_state_label.setText("loaded")
             self.materials_label.setText("0")
             self.material_manifest_label.setText("not found")
             self.rc_smoke_label.setText("not run")
             self.textures_label.setText("0")
+            self.texture_sources_label.setText("none")
             self.diagnostics_label.setText("0")
             self._populate_diagnostics_table([])
             self._populate_material_table([])
@@ -527,10 +584,12 @@ class ModelImportPanel(QWidget):
         material_manifest = model_info.get("material_manifest", {})
         rc_smoke = model_info.get("rc_material_smoke", {})
         self.path_label.setText(model_info.get("path", ""))
+        self.load_state_label.setText(model_load_state_text(model_info))
         self.materials_label.setText(str(model_info.get("materials", 0)))
         self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
         self.rc_smoke_label.setText(rc_material_smoke_summary_text(rc_smoke))
         self.textures_label.setText(str(len(textures)))
+        self.texture_sources_label.setText(texture_source_summary_text(textures))
         self.diagnostics_label.setText(str(len(diagnostics)))
         self.currently_selected_model_textures = textures
         self._populate_diagnostics_table(diagnostics)
@@ -553,7 +612,11 @@ class ModelImportPanel(QWidget):
             self.texture_table.insertRow(row)
             self.texture_table.setItem(row, 0, QTableWidgetItem(texture.get("material", "Unknown")))
             self.texture_table.setItem(row, 1, QTableWidgetItem(texture.get("type", "Unknown")))
-            self.texture_table.setItem(row, 2, QTableWidgetItem(texture.get("source_mode", "")))
+            self.texture_table.setItem(
+                row,
+                2,
+                QTableWidgetItem(texture_source_mode_text(texture.get("source_mode", ""))),
+            )
             self.texture_table.setItem(row, 3, QTableWidgetItem(texture.get("path") or texture.get("filename", "N/A")))
 
     def _populate_material_table(self, materials):

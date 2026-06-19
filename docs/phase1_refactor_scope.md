@@ -100,6 +100,8 @@ commit and docs are added
 
 ### P1-4: Model Import UI Shows Degraded State
 
+Status: done in `refactor_phase51_model_import_degraded_state_ui.md`.
+
 Problem:
 
 The UI stores `load_status` and `source_mode`, but users can still mistake fallback filesystem scans for authoritative Blender/FBX material data.

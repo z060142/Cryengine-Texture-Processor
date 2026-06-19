@@ -6,9 +6,12 @@ from ui_pyside.model_import import (
     generate_model_material_manifest,
     load_model_material_manifest,
     material_manifest_summary_text,
+    model_load_state_text,
     model_display_name,
     rc_material_smoke_summary_text,
     run_model_material_rc_smoke,
+    texture_source_mode_text,
+    texture_source_summary_text,
 )
 from tools.rc_smoke_test import RCSmokeResult
 
@@ -130,6 +133,42 @@ def test_model_display_name_marks_hazards():
             }
         )
         == "tree.fbx [hazard]"
+    )
+
+
+def test_model_display_name_includes_degraded_load_state():
+    assert (
+        model_display_name(
+            {
+                "filename": "tree.fbx",
+                "load_status": "import_only",
+                "material_diagnostics": [{"severity": "warning"}],
+            }
+        )
+        == "tree.fbx [import_only] [diagnostics]"
+    )
+    assert model_display_name({"filename": "tree.fbx", "load_status": "dummy"}) == "tree.fbx [dummy]"
+
+
+def test_model_load_state_text_explains_degraded_state():
+    assert model_load_state_text({"load_status": "loaded"}) == "loaded"
+    assert model_load_state_text({"load_status": "import_only"}) == "import_only (filesystem texture scan)"
+    assert model_load_state_text({"load_status": "dummy"}) == "dummy (model load failed)"
+
+
+def test_texture_source_summary_text_explains_fallback_modes():
+    assert texture_source_mode_text("filesystem_import_only") == (
+        "filesystem scan (import_only) [filesystem_import_only]"
+    )
+    assert (
+        texture_source_summary_text(
+            [
+                {"source_mode": "blender"},
+                {"source_mode": "filesystem_no_bpy"},
+                {"source_mode": "filesystem_no_bpy"},
+            ]
+        )
+        == "blender material data [blender] x1, filesystem scan (no bpy) [filesystem_no_bpy] x2"
     )
 
 
