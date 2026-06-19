@@ -1,0 +1,376 @@
+{
+  "source_material_report": "S:\\Crytek\\crytek\\Stripped to the bone\\e2e_car_user_flow_current\\rc_work\\kb3d_citycarsessentialssedan-native.material_report.json",
+  "material_slot_evidence": {
+    "schema": "cryengine_material_slot_evidence.v1",
+    "summary": {
+      "ok": true,
+      "row_count": 17,
+      "used_cgf_material_slot_count": 16,
+      "max_used_material_id": 15,
+      "cgf_mtl_name_sub_material_count": 16,
+      "cgf_evidence_present": true,
+      "status_counts": {
+        "matched_used_slot": 16,
+        "trailing_unassigned_placeholder": 1
+      },
+      "action_required": false
+    },
+    "rows": [
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 0,
+        "manifest_names": [
+          "KB3D_CEV_UndercarriageTrim"
+        ],
+        "request_names": [
+          "KB3D_CEV_UndercarriageTrim"
+        ],
+        "request_orders": [
+          0
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_UndercarriageTrim",
+        "cgf_mtl_name": "KB3D_CEV_UndercarriageTrim",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 1,
+        "manifest_names": [
+          "KB3D_CEV_SeatsDriverATrim"
+        ],
+        "request_names": [
+          "KB3D_CEV_SeatsDriverATrim"
+        ],
+        "request_orders": [
+          1
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_SeatsDriverATrim",
+        "cgf_mtl_name": "KB3D_CEV_SeatsDriverATrim",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 2,
+        "manifest_names": [
+          "KB3D_CEV_TiresSedans"
+        ],
+        "request_names": [
+          "KB3D_CEV_TiresSedans"
+        ],
+        "request_orders": [
+          2
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_TiresSedans",
+        "cgf_mtl_name": "KB3D_CEV_TiresSedans",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 3,
+        "manifest_names": [
+          "KB3D_CEV_WheelRimsA"
+        ],
+        "request_names": [
+          "KB3D_CEV_WheelRimsA"
+        ],
+        "request_orders": [
+          3
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_WheelRimsA",
+        "cgf_mtl_name": "KB3D_CEV_WheelRimsA",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 4,
+        "manifest_names": [
+          "KB3D_CEV_RubberTrim"
+        ],
+        "request_names": [
+          "KB3D_CEV_RubberTrim"
+        ],
+        "request_orders": [
+          4
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_RubberTrim",
+        "cgf_mtl_name": "KB3D_CEV_RubberTrim",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 5,
+        "manifest_names": [
+          "KB3D_CEV_PlasticTileableA"
+        ],
+        "request_names": [
+          "KB3D_CEV_PlasticTileableA"
+        ],
+        "request_orders": [
+          5
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_PlasticTileableA",
+        "cgf_mtl_name": "KB3D_CEV_PlasticTileableA",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 6,
+        "manifest_names": [
+          "KB3D_CEV_PlasticTrimA"
+        ],
+        "request_names": [
+          "KB3D_CEV_PlasticTrimA"
+        ],
+        "request_orders": [
+          6
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_PlasticTrimA",
+        "cgf_mtl_name": "KB3D_CEV_PlasticTrimA",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 7,
+        "manifest_names": [
+          "KB3D_CEV_SedanExteriorBody"
+        ],
+        "request_names": [
+          "KB3D_CEV_SedanExteriorBody"
+        ],
+        "request_orders": [
+          7
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_SedanExteriorBody",
+        "cgf_mtl_name": "KB3D_CEV_SedanExteriorBody",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 8,
+        "manifest_names": [
+          "KB3D_CEV_CarAtlas"
+        ],
+        "request_names": [
+          "KB3D_CEV_CarAtlas"
+        ],
+        "request_orders": [
+          8
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_CarAtlas",
+        "cgf_mtl_name": "KB3D_CEV_CarAtlas",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 9,
+        "manifest_names": [
+          "KB3D_CEV_CarsLicensePlates"
+        ],
+        "request_names": [
+          "KB3D_CEV_CarsLicensePlates"
+        ],
+        "request_orders": [
+          9
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_CarsLicensePlates",
+        "cgf_mtl_name": "KB3D_CEV_CarsLicensePlates",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 10,
+        "manifest_names": [
+          "KB3D_CEV_TapesTrimA"
+        ],
+        "request_names": [
+          "KB3D_CEV_TapesTrimA"
+        ],
+        "request_orders": [
+          10
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_TapesTrimA",
+        "cgf_mtl_name": "KB3D_CEV_TapesTrimA",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 11,
+        "manifest_names": [
+          "KB3D_CEV_WindowFritsTrim"
+        ],
+        "request_names": [
+          "KB3D_CEV_WindowFritsTrim"
+        ],
+        "request_orders": [
+          11
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_WindowFritsTrim",
+        "cgf_mtl_name": "KB3D_CEV_WindowFritsTrim",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 12,
+        "manifest_names": [
+          "KB3D_CEV_FeltA"
+        ],
+        "request_names": [
+          "KB3D_CEV_FeltA"
+        ],
+        "request_orders": [
+          12
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_FeltA",
+        "cgf_mtl_name": "KB3D_CEV_FeltA",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 13,
+        "manifest_names": [
+          "KB3D_CEV_FeltB"
+        ],
+        "request_names": [
+          "KB3D_CEV_FeltB"
+        ],
+        "request_orders": [
+          13
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_FeltB",
+        "cgf_mtl_name": "KB3D_CEV_FeltB",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 14,
+        "manifest_names": [
+          "KB3D_CEV_GlassMirror"
+        ],
+        "request_names": [
+          "KB3D_CEV_GlassMirror"
+        ],
+        "request_orders": [
+          14
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_GlassMirror",
+        "cgf_mtl_name": "KB3D_CEV_GlassMirror",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "matched_used_slot",
+        "slot": 15,
+        "manifest_names": [
+          "KB3D_CEV_TranslElemSedans"
+        ],
+        "request_names": [
+          "KB3D_CEV_TranslElemSedans"
+        ],
+        "request_orders": [
+          15
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "KB3D_CEV_TranslElemSedans",
+        "cgf_mtl_name": "KB3D_CEV_TranslElemSedans",
+        "used_by_cgf": true,
+        "is_unassigned_placeholder": false
+      },
+      {
+        "ok": true,
+        "status": "trailing_unassigned_placeholder",
+        "slot": 16,
+        "manifest_names": [],
+        "request_names": [
+          "<unassigned>"
+        ],
+        "request_orders": [
+          16
+        ],
+        "request_physicalize": [
+          "no"
+        ],
+        "mtl_name": "<unassigned>",
+        "cgf_mtl_name": "",
+        "used_by_cgf": false,
+        "is_unassigned_placeholder": true
+      }
+    ]
+  }
+}

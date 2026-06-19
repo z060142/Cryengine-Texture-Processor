@@ -137,6 +137,13 @@ tools.mtl_schema_report
 output_formats.texture_output_diagnostics
 ```
 
+The RC material report also carries a `material_slot_evidence` table. Each row
+uses the final CE slot id as the key and records the manifest material name,
+request name/sub_index, generated MTL slot name, CGF `MtlName` slot name, and
+whether any CGF mesh subset actually uses that material id. A trailing
+`<unassigned>` row is acceptable when unused; a used unassigned material is an
+action-required failure.
+
 ## Texture Output Contract
 
 For material texture references in this converter path, `.tif` and `.dds` are

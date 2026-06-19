@@ -42,6 +42,8 @@ def summarize_material_mapping_report(report):
     semantic_alignment = report.get("fixture_material_semantic_alignment", {}) if isinstance(report, dict) else {}
     import_settings_alignment = report.get("cgf_import_settings_alignment", {}) if isinstance(report, dict) else {}
     slot_alignment = report.get("alignment", {}) if isinstance(report, dict) else {}
+    slot_evidence = report.get("material_slot_evidence", {}) if isinstance(report, dict) else {}
+    slot_evidence_summary = slot_evidence.get("summary", {}) if isinstance(slot_evidence, dict) else {}
     rc_info = report.get("rc", {}) if isinstance(report, dict) else {}
     unassigned_diagnostics = cgf_id_alignment.get("unassigned_slot_diagnostics", []) or []
     unassigned_counts = Counter(
@@ -73,7 +75,14 @@ def summarize_material_mapping_report(report):
         "unassigned_placeholder_count": placeholder_count,
         "used_unassigned_material_count": used_unassigned_count,
         "unassigned_slots_ok": cgf_id_alignment.get("unassigned_slot_diagnostics_ok"),
-        "action_required": bool(used_unassigned_count or failed_material_id_checks),
+        "material_slot_evidence_ok": slot_evidence_summary.get("ok"),
+        "material_slot_evidence_row_count": slot_evidence_summary.get("row_count", 0),
+        "material_slot_evidence_status_counts": slot_evidence_summary.get("status_counts", {}),
+        "action_required": bool(
+            used_unassigned_count
+            or failed_material_id_checks
+            or slot_evidence_summary.get("action_required", False)
+        ),
     }
 
 
@@ -1163,6 +1172,159 @@ def _valid_cgf_mtl_name_sub_materials(cgf_material_summary):
     return sub_materials
 
 
+def _manifest_names_by_slot(manifest):
+    names_by_slot = {}
+    if not isinstance(manifest, dict):
+        return names_by_slot
+    for _, material in iter_manifest_material_rows(manifest):
+        slot = coerce_material_slot(material.get("slot"))
+        name = coerce_material_name(material.get("name", ""))
+        if slot is None or not name:
+            continue
+        names_by_slot.setdefault(slot, []).append(name)
+    return names_by_slot
+
+
+def _request_materials_by_slot(request_materials):
+    materials_by_slot = {}
+    for material in _valid_request_materials(request_materials):
+        slot = _coerce_request_sub_index(material.get("sub_index"))
+        if slot is None or slot < 0:
+            continue
+        name = coerce_material_name(material.get("name", ""))
+        if not name:
+            continue
+        materials_by_slot.setdefault(slot, []).append(material)
+    return materials_by_slot
+
+
+def _slot_names_match(expected_names, *actual_names):
+    present_names = [name for name in actual_names if name]
+    if expected_names:
+        return all(name in expected_names for name in present_names)
+    return len(set(present_names)) <= 1
+
+
+def _classify_material_slot_evidence_row(
+    slot,
+    manifest_names,
+    request_names,
+    mtl_name,
+    cgf_mtl_name,
+    used_by_cgf,
+    max_used_material_id,
+    cgf_mtl_name_sub_material_count,
+):
+    unassigned = any(
+        _is_unassigned_slot_name(name)
+        for name in [*manifest_names, *request_names, mtl_name, cgf_mtl_name]
+        if name
+    )
+    expected_names = manifest_names or request_names or ([mtl_name] if mtl_name else []) or (
+        [cgf_mtl_name] if cgf_mtl_name else []
+    )
+
+    if used_by_cgf and unassigned:
+        return False, "used_unassigned_material"
+    if used_by_cgf and not request_names:
+        return False, "missing_request_slot"
+    if used_by_cgf and not mtl_name:
+        return False, "missing_mtl_slot"
+    if used_by_cgf and not cgf_mtl_name:
+        return False, "missing_cgf_mtl_name_slot"
+    if request_names and mtl_name and not _slot_names_match(expected_names, mtl_name):
+        return False, "mtl_name_mismatch"
+    if request_names and cgf_mtl_name and not _slot_names_match(expected_names, cgf_mtl_name):
+        return False, "cgf_mtl_name_mismatch"
+    if manifest_names and request_names and not all(name in manifest_names for name in request_names):
+        return False, "request_name_mismatch"
+    if len(set(request_names)) > 1:
+        return False, "duplicate_request_slot"
+    if not used_by_cgf and unassigned:
+        if slot > max_used_material_id:
+            return True, "trailing_unassigned_placeholder"
+        return True, "gap_unassigned_placeholder"
+    if cgf_mtl_name_sub_material_count and slot >= cgf_mtl_name_sub_material_count:
+        return False, "missing_cgf_mtl_name_slot"
+    if used_by_cgf:
+        return True, "matched_used_slot"
+    return True, "matched_unused_slot"
+
+
+def build_material_slot_evidence_table(manifest, cgf_material_summary, request_materials, mtl_slots):
+    manifest_by_slot = _manifest_names_by_slot(manifest)
+    request_by_slot = _request_materials_by_slot(request_materials)
+    mtl_by_slot = {slot["slot"]: slot for slot in _valid_mtl_slots(mtl_slots)}
+    cgf_by_slot = {entry["slot"]: entry for entry in _valid_cgf_mtl_name_sub_materials(cgf_material_summary)}
+    material_ids = set(cgf_material_summary.get("material_ids", []) if isinstance(cgf_material_summary, dict) else [])
+    cgf_evidence_present = bool(cgf_by_slot or material_ids)
+    max_used_material_id = max(material_ids) if material_ids else -1
+    candidate_slots = sorted(
+        set(manifest_by_slot)
+        | set(request_by_slot)
+        | set(mtl_by_slot)
+        | set(cgf_by_slot)
+        | material_ids
+    )
+
+    rows = []
+    status_counts = Counter()
+    action_required = False
+    for slot in candidate_slots:
+        request_materials_for_slot = request_by_slot.get(slot, [])
+        request_names = [coerce_material_name(material.get("name", "")) for material in request_materials_for_slot]
+        manifest_names = manifest_by_slot.get(slot, [])
+        mtl_name = mtl_by_slot.get(slot, {}).get("name", "")
+        cgf_mtl_name = cgf_by_slot.get(slot, {}).get("name", "")
+        used_by_cgf = slot in material_ids
+        ok, status = _classify_material_slot_evidence_row(
+            slot,
+            manifest_names,
+            request_names,
+            mtl_name,
+            cgf_mtl_name,
+            used_by_cgf,
+            max_used_material_id,
+            len(cgf_by_slot),
+        )
+        status_counts.update([status])
+        action_required = action_required or not ok
+        rows.append(
+            {
+                "ok": ok,
+                "status": status,
+                "slot": slot,
+                "manifest_names": manifest_names,
+                "request_names": request_names,
+                "request_orders": [material.get("order") for material in request_materials_for_slot],
+                "request_physicalize": [material.get("physicalize", "") for material in request_materials_for_slot],
+                "mtl_name": mtl_name,
+                "cgf_mtl_name": cgf_mtl_name,
+                "used_by_cgf": used_by_cgf,
+                "is_unassigned_placeholder": any(
+                    _is_unassigned_slot_name(name)
+                    for name in [*manifest_names, *request_names, mtl_name, cgf_mtl_name]
+                    if name
+                ),
+            }
+        )
+
+    return {
+        "schema": "cryengine_material_slot_evidence.v1",
+        "summary": {
+            "ok": not action_required,
+            "row_count": len(rows),
+            "used_cgf_material_slot_count": len(material_ids),
+            "max_used_material_id": max_used_material_id,
+            "cgf_mtl_name_sub_material_count": len(cgf_by_slot),
+            "cgf_evidence_present": cgf_evidence_present,
+            "status_counts": _counter_to_sorted_dict(status_counts),
+            "action_required": action_required and cgf_evidence_present,
+        },
+        "rows": rows,
+    }
+
+
 def _request_materials_equal(left, right):
     left_valid = _valid_request_materials(left)
     right_valid = _valid_request_materials(right)
@@ -1385,6 +1547,12 @@ def build_material_mapping_report(
             request_materials,
             mtl_slots,
         ),
+        "material_slot_evidence": build_material_slot_evidence_table(
+            fixture_manifest,
+            cgf_material_summary,
+            request_materials,
+            mtl_slots,
+        ),
     }
     report["summary"] = summarize_material_mapping_report(report)
     return report
@@ -1469,6 +1637,12 @@ def build_existing_output_material_report(
         ),
         "source_fixture_manifest": fixture_manifest_path,
         "fixture_material_semantic_alignment": evaluate_fixture_material_semantics(
+            fixture_manifest,
+            cgf_material_summary,
+            request_materials,
+            mtl_slots,
+        ),
+        "material_slot_evidence": build_material_slot_evidence_table(
             fixture_manifest,
             cgf_material_summary,
             request_materials,

@@ -40,6 +40,8 @@ Result:
 - CGF material id alignment: `cgf_material_id_alignment_ok: True`
 - CGF import settings alignment: `cgf_import_settings_alignment_ok: True`
 - fixture semantic alignment: `fixture_material_semantic_alignment_ok: True`
+- material slot evidence: `ok: True`, `row_count: 17`, `matched_used_slot: 16`,
+  `trailing_unassigned_placeholder: 1`
 - `<unassigned>` state: one trailing placeholder, `used_unassigned_material_count: 0`
 
 ## Rules Fixed By This Run
@@ -93,6 +95,35 @@ For this car sample, RC generated 16 used material ids from request slots
 `0..15`; slot `16` is the trailing `<unassigned>` placeholder and is not used by
 any CGF mesh subset.
 
+The material report now includes `material_slot_evidence`, a row-per-slot table
+that ties together:
+
+```text
+manifest material name
+-> request material name / sub_index
+-> generated MTL slot name
+-> CGF MtlName slot name
+-> whether any CGF mesh subset uses that material_id
+```
+
+Current car evidence:
+
+```json
+{
+  "ok": true,
+  "row_count": 17,
+  "used_cgf_material_slot_count": 16,
+  "cgf_mtl_name_sub_material_count": 16,
+  "status_counts": {
+    "matched_used_slot": 16,
+    "trailing_unassigned_placeholder": 1
+  },
+  "action_required": false
+}
+```
+
+Durable artifact: `docs/current_car_user_flow_material_slot_evidence.json`.
+
 PySide's model import panel now carries the RC material smoke report back into
 the visible Material Slot Diagnostics table. Failed
 `cgf_material_id_alignment.checks[]` entries are shown as hazards, so a CGF
@@ -142,6 +173,8 @@ The remaining material work should stay bounded to these items:
 - decide how a Blender plugin supplies or edits `sub_index` and material names
 - keep `<unassigned>` visible as a normal placeholder, while blocking the case
   where a real mesh subset uses it
+- use `material_slot_evidence` as the default debug artifact when Blender or RC
+  material numbering looks wrong
 
 Anything outside that list should require a new explicit decision before it is
 added to this first working slice.
@@ -149,6 +182,7 @@ added to this first working slice.
 ## Verification Files
 
 - `docs/current_car_user_flow_material_state_compare.json`
+- `docs/current_car_user_flow_material_slot_evidence.json`
 - `docs/current_car_user_flow_mtl_schema_gate.json`
 - `docs/current_car_user_flow_texture_output_gate.json`
 - `docs/converter_contract.md`

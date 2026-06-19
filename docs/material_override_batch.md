@@ -147,11 +147,23 @@ Material report result:
   "mtl_slot_count": 17,
   "cgf_material_id_count": 16,
   "failed_material_id_check_count": 0,
+  "material_slot_evidence_ok": true,
+  "material_slot_evidence_row_count": 17,
+  "material_slot_evidence_status_counts": {
+    "matched_used_slot": 16,
+    "trailing_unassigned_placeholder": 1
+  },
   "unassigned_placeholder_count": 1,
   "unassigned_slots_ok": true,
   "action_required": false
 }
 ```
+
+The durable slot table artifact is
+`docs/current_car_user_flow_material_slot_evidence.json`. It is the shortest
+debug path for material numbering: each row ties together the manifest material
+slot, request `sub_index`, generated MTL slot, CGF `MtlName` slot, and whether a
+CGF mesh subset actually used that material id.
 
 Texture output gate result:
 

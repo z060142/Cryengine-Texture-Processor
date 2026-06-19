@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 from tools.material_mapping_report import (
     build_existing_output_material_report,
+    build_material_slot_evidence_table,
     build_material_mapping_report,
     discover_fixture_manifest,
     evaluate_cgf_import_settings_roundtrip,
@@ -340,6 +341,110 @@ def test_evaluate_cgf_material_ids_rejects_used_unassigned_material():
             "max_used_material_id": 1,
         }
     ]
+
+
+def test_build_material_slot_evidence_table_aligns_manifest_request_mtl_and_cgf():
+    result = build_material_slot_evidence_table(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": [
+                {"slot": 0, "name": "Body"},
+                {"slot": 1, "name": "Glass"},
+            ],
+        },
+        {
+            "materials": [
+                {
+                    "sub_materials": [
+                        {"slot": 0, "name": "Body"},
+                        {"slot": 1, "name": "Glass"},
+                    ]
+                }
+            ],
+            "material_ids": [0, 1],
+        },
+        [
+            {"order": 0, "name": "Body", "sub_index": 0, "physicalize": "no"},
+            {"order": 1, "name": "Glass", "sub_index": 1, "physicalize": "no"},
+            {"order": 2, "name": "<unassigned>", "sub_index": 2, "physicalize": "no"},
+        ],
+        [
+            {"slot": 0, "name": "Body"},
+            {"slot": 1, "name": "Glass"},
+            {"slot": 2, "name": "<unassigned>"},
+        ],
+    )
+
+    assert result["summary"]["ok"] is True
+    assert result["summary"]["status_counts"] == {
+        "matched_used_slot": 2,
+        "trailing_unassigned_placeholder": 1,
+    }
+    assert result["rows"] == [
+        {
+            "ok": True,
+            "status": "matched_used_slot",
+            "slot": 0,
+            "manifest_names": ["Body"],
+            "request_names": ["Body"],
+            "request_orders": [0],
+            "request_physicalize": ["no"],
+            "mtl_name": "Body",
+            "cgf_mtl_name": "Body",
+            "used_by_cgf": True,
+            "is_unassigned_placeholder": False,
+        },
+        {
+            "ok": True,
+            "status": "matched_used_slot",
+            "slot": 1,
+            "manifest_names": ["Glass"],
+            "request_names": ["Glass"],
+            "request_orders": [1],
+            "request_physicalize": ["no"],
+            "mtl_name": "Glass",
+            "cgf_mtl_name": "Glass",
+            "used_by_cgf": True,
+            "is_unassigned_placeholder": False,
+        },
+        {
+            "ok": True,
+            "status": "trailing_unassigned_placeholder",
+            "slot": 2,
+            "manifest_names": [],
+            "request_names": ["<unassigned>"],
+            "request_orders": [2],
+            "request_physicalize": ["no"],
+            "mtl_name": "<unassigned>",
+            "cgf_mtl_name": "",
+            "used_by_cgf": False,
+            "is_unassigned_placeholder": True,
+        },
+    ]
+
+
+def test_build_material_slot_evidence_table_rejects_used_unassigned_material():
+    result = build_material_slot_evidence_table(
+        {},
+        {
+            "materials": [{"sub_materials": [{"slot": 0, "name": "Body"}, {"slot": 1, "name": "unassigned"}]}],
+            "material_ids": [0, 1],
+        },
+        [
+            {"order": 0, "name": "Body", "sub_index": 0, "physicalize": "no"},
+            {"order": 1, "name": "unassigned", "sub_index": 1, "physicalize": "no"},
+        ],
+        [{"slot": 0, "name": "Body"}, {"slot": 1, "name": "unassigned"}],
+    )
+
+    assert result["summary"]["ok"] is False
+    assert result["summary"]["action_required"] is True
+    assert result["summary"]["status_counts"] == {
+        "matched_used_slot": 1,
+        "used_unassigned_material": 1,
+    }
+    assert result["rows"][1]["status"] == "used_unassigned_material"
+    assert result["rows"][1]["ok"] is False
 
 
 def test_summarize_material_mapping_report_counts_unassigned_placeholders_and_hazards():
@@ -1197,10 +1302,16 @@ def test_build_and_write_material_mapping_report(tmp_path):
     assert report["mtl_cryasset_read_error"] == ""
     assert report["cgf_material_id_alignment"]["material_ids"] == []
     assert report["cgf_import_settings_alignment"]["import_settings_error"] == "missing_cgf_import_settings"
+    assert report["material_slot_evidence"]["summary"]["status_counts"] == {
+        "matched_unused_slot": 1
+    }
+    assert report["summary"]["material_slot_evidence_ok"] is True
 
     report_path = tmp_path / "asset.material_report.json"
     write_material_mapping_report(report, str(report_path))
-    assert json.loads(report_path.read_text(encoding="utf-8"))["alignment"]["ok"]
+    written = json.loads(report_path.read_text(encoding="utf-8"))
+    assert written["alignment"]["ok"]
+    assert written["material_slot_evidence"]["rows"][0]["request_names"] == ["Bark"]
 
 
 def test_build_existing_output_material_report_uses_cgf_import_settings_when_json_missing(monkeypatch, tmp_path):
