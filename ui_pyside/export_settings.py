@@ -235,7 +235,16 @@ class ExportSettingsPanel(QWidget):
         existing_texture_files = self._snapshot_files(settings["texture_output_directory"], (".tif",))
         existing_model_files = self._snapshot_files(settings["model_output_directory"], (".fbx", ".json"))
 
-        main_window.start_batch_processing(export_settings=settings)
+        texture_export_ok = main_window.start_batch_processing(export_settings=settings)
+        if not texture_export_ok:
+            self._new_generated_files = {
+                "texture": self._new_files(settings["texture_output_directory"], (".tif",), existing_texture_files),
+                "model": set(),
+            }
+            self._process_post_export_cleanup(settings)
+            self._show_export_summary(0, 0, 1, ["Texture export failed; model export was skipped."])
+            return
+
         progress = ProgressDialog(self, title=get_text("export.model_export_title", "Exporting Models..."))
         mtl_exported, mtl_errors, mtl_msgs = main_window.run_model_mtl_export(settings, progress)
         if not progress.is_cancelled():
@@ -288,7 +297,15 @@ class ExportSettingsPanel(QWidget):
         if not main_window or not self._ensure_dirs(texture=True):
             return
         existing_files = self._snapshot_files(settings["texture_output_directory"], (".tif",))
-        main_window.start_batch_processing(texture_groups=texture_groups, export_settings=settings)
+        texture_export_ok = main_window.start_batch_processing(texture_groups=texture_groups, export_settings=settings)
+        if not texture_export_ok:
+            self._new_generated_files = {
+                "texture": self._new_files(settings["texture_output_directory"], (".tif",), existing_files),
+                "model": set(),
+            }
+            self._process_post_export_cleanup(settings)
+            return
+
         self._new_generated_files = {
             "texture": self._new_files(settings["texture_output_directory"], (".tif",), existing_files),
             "model": set(),

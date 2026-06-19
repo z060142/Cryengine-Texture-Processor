@@ -67,6 +67,9 @@ texture_output_gate_ok
 
 The PySide entry point treats `texture_output_gate_ok = false` as a failed
 texture batch instead of showing a successful export with hidden diagnostics.
+The full Batch Process button also stops at this point and skips MTL/FBX model
+export, so RC model conversion cannot continue on top of invalid processed
+texture outputs.
 
 Tiny raw texture batch result:
 
