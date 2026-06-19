@@ -684,8 +684,40 @@ def test_build_and_write_material_mapping_report(tmp_path):
     assert report["rc"]["output_exists"]
     assert report["rc"]["output_size"] == 3
     assert report["mtl_cryasset_details"]["subMaterialCount"] == "1"
+    assert report["mtl_read_error"] == ""
+    assert report["mtl_cryasset_read_error"] == ""
     assert report["cgf_material_id_alignment"]["material_ids"] == []
 
     report_path = tmp_path / "asset.material_report.json"
     write_material_mapping_report(report, str(report_path))
     assert json.loads(report_path.read_text(encoding="utf-8"))["alignment"]["ok"]
+
+
+def test_build_material_mapping_report_surfaces_malformed_mtl_and_cryasset_xml(tmp_path):
+    json_path = tmp_path / "asset.json"
+    json_path.write_text(
+        json.dumps({"request": {"materials": [{"name": "Bark", "sub_index": 0, "physicalize": "no_collide"}]}}),
+        encoding="utf-8",
+    )
+
+    mtl_path = tmp_path / "asset.mtl"
+    mtl_path.write_text("<Material><SubMaterials>", encoding="utf-8")
+    cryasset_path = tmp_path / "asset.mtl.cryasset"
+    cryasset_path.write_text("<AssetMetadata><Details>", encoding="utf-8")
+
+    report = build_material_mapping_report(
+        str(json_path),
+        str(mtl_path),
+        expected_output_path="",
+        rc_exe_path="rc.exe",
+        source_fbx_path="source.fbx",
+        copied_fbx_path="asset.fbx",
+        rc_returncode=0,
+    )
+
+    assert report["mtl_slots"] == []
+    assert report["mtl_read_error"]
+    assert report["mtl_cryasset_details"] == {}
+    assert report["mtl_cryasset_read_error"]
+    assert not report["alignment"]["ok"]
+    assert report["alignment"]["checks"][0]["type"] == "missing_mtl_slot"

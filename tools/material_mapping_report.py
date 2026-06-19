@@ -142,6 +142,20 @@ def load_cryasset_details(cryasset_path):
     return details
 
 
+def _load_mtl_slots_for_report(mtl_path):
+    try:
+        return load_mtl_slots(mtl_path), ""
+    except (ET.ParseError, OSError, ValueError) as e:
+        return [], str(e)
+
+
+def _load_cryasset_details_for_report(cryasset_path):
+    try:
+        return load_cryasset_details(cryasset_path), ""
+    except (ET.ParseError, OSError, ValueError) as e:
+        return {}, str(e)
+
+
 def discover_fixture_manifest(source_fbx_path="", copied_fbx_path=""):
     return discover_material_manifest(source_fbx_path, copied_fbx_path)
 
@@ -845,8 +859,9 @@ def build_material_mapping_report(
     rc_returncode=None,
 ):
     request_materials = load_request_materials(json_path)
-    mtl_slots = load_mtl_slots(mtl_path)
+    mtl_slots, mtl_read_error = _load_mtl_slots_for_report(mtl_path)
     cryasset_path = f"{mtl_path}.cryasset" if mtl_path else ""
+    cryasset_details, cryasset_read_error = _load_cryasset_details_for_report(cryasset_path)
     alignment = evaluate_material_slot_alignment(request_materials, mtl_slots)
     fixture_manifest_path = discover_fixture_manifest(source_fbx_path, copied_fbx_path)
     fixture_manifest = load_fixture_manifest(fixture_manifest_path)
@@ -880,7 +895,9 @@ def build_material_mapping_report(
         "cgf_read_error": cgf_read_error,
         "request_materials": request_materials,
         "mtl_slots": mtl_slots,
-        "mtl_cryasset_details": load_cryasset_details(cryasset_path),
+        "mtl_read_error": mtl_read_error,
+        "mtl_cryasset_details": cryasset_details,
+        "mtl_cryasset_read_error": cryasset_read_error,
         "alignment": alignment,
         "cgf_material_id_alignment": evaluate_cgf_material_ids(cgf_material_summary, request_materials, mtl_slots),
         "source_fixture_manifest": fixture_manifest_path,
