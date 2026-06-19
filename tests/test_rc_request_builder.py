@@ -1,6 +1,12 @@
 import json
 import xml.etree.ElementTree as ET
 
+from output_formats.rc_import_schema import (
+    RC_IMPORT_OUTPUT_EXTENSIONS,
+    RC_IMPORT_PHYSICALIZE_VALUES,
+    collect_unknown_request_fields,
+    normalize_rc_sub_index,
+)
 from output_formats.json_exporter import export_json
 from output_formats.rc_request_builder import build_import_request, build_material_requests, wrap_import_request
 
@@ -35,6 +41,22 @@ def test_build_import_request_matches_rc_root_payload_shape():
     assert request["unit_size"] == "cm"
     assert request["forward_up_axes"] == "-Y+Z"
     assert "use_32_bit_positions" not in request
+    assert "cgf" in RC_IMPORT_OUTPUT_EXTENSIONS
+
+
+def test_build_import_request_uses_source_backed_schema_fields_only():
+    request = build_import_request(sample_model(), "chair.fbx")
+
+    assert collect_unknown_request_fields(request) == {}
+    assert "proxy_only" in RC_IMPORT_PHYSICALIZE_VALUES
+    assert request["nodes"][0] == {
+        "name": "Root",
+        "path": ["Root"],
+        "nodes": [
+            {"name": "ChairMesh", "path": ["Root", "ChairMesh"]},
+            {"name": "Chair_proxy", "path": ["Root", "Chair_proxy"]},
+        ],
+    }
 
 
 def test_material_requests_use_rc_fields_only_and_preserve_blender_suffixes():
@@ -90,6 +112,9 @@ def test_nodes_and_joint_physics_use_path_arrays():
 
     assert root["path"] == ["Root"]
     assert root["nodes"][1]["path"] == ["Root", "Chair_proxy"]
+    assert "bIsProxy" not in root["nodes"][1]
+    assert "helper" not in root["nodes"][1]
+    assert "lod" not in root["nodes"][1]
     assert request["jointPhysicsData"] == [
         {
             "jointNodePath": ["Root"],
@@ -97,6 +122,13 @@ def test_nodes_and_joint_physics_use_path_arrays():
             "snapToJoint": True,
         }
     ]
+
+
+def test_normalize_rc_sub_index_matches_import_request_bounds():
+    assert normalize_rc_sub_index(0) == 0
+    assert normalize_rc_sub_index(127) == 127
+    assert normalize_rc_sub_index(128) == -1
+    assert normalize_rc_sub_index(-1) == -1
 
 
 def test_wrap_import_request_defaults_to_rc_request_name():

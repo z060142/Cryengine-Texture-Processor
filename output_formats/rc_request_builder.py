@@ -121,14 +121,8 @@ def process_node_hierarchy(nodes, parent_path=None):
             "name": node_name,
             "path": node_path,
             "nodes": [],
+            "_is_proxy": node_type["is_proxy"],
         }
-
-        if node_type["is_lod"] and node_type["lod_level"] is not None:
-            json_node["lod"] = node_type["lod_level"]
-        if node_type["is_proxy"]:
-            json_node["bIsProxy"] = True
-        if node_type["is_helper"]:
-            json_node["helper"] = True
 
         children = node.get("children", [])
         if children:
@@ -138,13 +132,27 @@ def process_node_hierarchy(nodes, parent_path=None):
     return result
 
 
+def strip_internal_node_fields(nodes):
+    stripped = []
+    for node in nodes or []:
+        clean_node = {
+            key: value
+            for key, value in node.items()
+            if not key.startswith("_") and not (key == "nodes" and not value)
+        }
+        if node.get("nodes"):
+            clean_node["nodes"] = strip_internal_node_fields(node["nodes"])
+        stripped.append(clean_node)
+    return stripped
+
+
 def find_joint_physics_relations(processed_nodes):
     joint_physics_data = []
 
     def find_proxy_relations(nodes):
         for node in nodes or []:
             node_path = node.get("path", [])
-            if node.get("bIsProxy", False) and len(node_path) > 1:
+            if node.get("_is_proxy", False) and len(node_path) > 1:
                 joint_physics_data.append(
                     {
                         "jointNodePath": node_path[:-1],
@@ -199,6 +207,8 @@ def build_import_request(
     base_name = os.path.splitext(os.path.basename(source_filename))[0]
     node_hierarchy = extract_scene_hierarchy_from_model(model_data)
     processed_nodes = process_node_hierarchy(node_hierarchy)
+    joint_physics_data = find_joint_physics_relations(processed_nodes)
+    request_nodes = strip_internal_node_fields(processed_nodes)
 
     request = {
         "source_filename": source_filename,
@@ -216,8 +226,8 @@ def build_import_request(
             existing_submaterial_names,
             material_manifest_info=model_data.get("material_manifest"),
         ),
-        "nodes": processed_nodes,
-        "jointPhysicsData": find_joint_physics_relations(processed_nodes),
+        "nodes": request_nodes,
+        "jointPhysicsData": joint_physics_data,
         "autolodsettings": autolodsettings or {"GenerateAutomaticLODs": False},
     }
     return request
