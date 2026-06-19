@@ -124,6 +124,24 @@ Current car evidence:
 
 Durable artifact: `docs/current_car_user_flow_material_slot_evidence.json`.
 
+For quick checks without opening the full material report JSON:
+
+```powershell
+uv run python -m tools.material_report_summary "S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_current\rc_work\kb3d_citycarsessentialssedan-native.material_report.json"
+```
+
+Expected short result:
+
+```text
+action_required: False
+material_slot_evidence_ok: True
+slot_rows: 17
+slot_status_counts: {'matched_used_slot': 16, 'trailing_unassigned_placeholder': 1}
+used_unassigned: 0
+texture_output_gate_ok: True
+mtl_schema_gate_ok: True
+```
+
 PySide's model import panel now carries the RC material smoke report back into
 the visible Material Slot Diagnostics table. Failed
 `cgf_material_id_alignment.checks[]` entries are shown as hazards, so a CGF
