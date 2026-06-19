@@ -26,6 +26,53 @@ practical acceptance bar:
 
 It is intentionally a small JSON-driven tool, not a polished UI.
 
+## Batch Spec Builder
+
+Use `tools.asset_flow_spec_builder` when the next step is to run real user
+flows across a folder instead of hand-writing every case. It scans FBX files or
+folders, keeps the smallest files first, and writes `rc` cases that
+`tools.asset_flow_validator` can run directly.
+
+Example:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "Z:\Dark Fantasy\models" `
+  "D:\DATA\00_DATA2\Art Assets\Models" `
+  "D:\DATA\3D模型" `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\small_fbx_batch_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\small_fbx_batch" `
+  --limit 5 `
+  --max-mb 1
+```
+
+Then run the generated spec through the same validator:
+
+```powershell
+uv run python -m tools.asset_flow_validator `
+  --spec "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\small_fbx_batch_spec.json" `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\small_fbx_batch_report.json" `
+  --markdown-output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\small_fbx_batch_report.md"
+```
+
+Observed small-batch result:
+
+```text
+ok: True
+case_count: 5
+ok_count: 5
+failed_count: 0
+Trash_Paper_C_3a7b4004: True
+Trash_Paper_D_75807579: True
+RoadDecal_BusLane_e2c00bfb: True
+Scaffolding_Tarp_7ec8bfd8: True
+GardenDecorationTrim_67576cbd: True
+```
+
+This batch is model-only: it proves FBX copy/import, generated JSON, generated
+MTL, material slot evidence, schema gate, and CGF output. It does not prove
+material-texture matching because these cases do not provide texture evidence.
+
 ## Spec Format
 
 Example:
