@@ -30,6 +30,15 @@ def test_build_mtl_material_slots_returns_expanded_slot_table():
     assert slots[2]["sub_index"] == 2
 
 
+def test_build_mtl_material_slots_can_append_trailing_unassigned_placeholder():
+    slots = build_mtl_material_slots(
+        [{"name": "Stone", "id": 1, "textures": {}}],
+        include_trailing_unassigned=True,
+    )
+
+    assert [slot["name"] for slot in slots] == ["Stone", "<unassigned>"]
+
+
 def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     texture_paths = {
         "Diffuse": tmp_path / "asset_diff.dds",
@@ -214,6 +223,19 @@ def test_export_mtl_preserves_sub_index_slots_and_fills_gaps(tmp_path):
 
     assert success
     assert submaterial_names(result) == ["First", "unassigned", "Third"]
+
+
+def test_export_mtl_can_write_ce_trailing_unassigned_placeholder(tmp_path):
+    success, result = export_mtl(
+        [{"name": "Stone", "id": 1, "textures": {}}],
+        str(tmp_path),
+        str(tmp_path),
+        "asset.mtl",
+        include_trailing_unassigned=True,
+    )
+
+    assert success
+    assert submaterial_names(result) == ["Stone", "<unassigned>"]
 
 
 def test_export_mtl_preserves_fbx_slots_over_existing_submaterial_name_order(tmp_path):

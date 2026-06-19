@@ -264,7 +264,13 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
 
     materials_data = [{**spec, "textures": {}} for spec in material_specs]
     mtl_filename = f"{asset_name}.mtl"
-    mtl_success, mtl_result = export_mtl(materials_data, work_dir, work_dir, mtl_filename)
+    mtl_success, mtl_result = export_mtl(
+        materials_data,
+        work_dir,
+        work_dir,
+        mtl_filename,
+        include_trailing_unassigned=True,
+    )
     if not mtl_success:
         raise RuntimeError(mtl_result)
 
@@ -280,6 +286,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
         f"{asset_name}.fbx",
         work_dir,
         material_filename=asset_name,
+        include_trailing_unassigned=True,
     )
     if not json_success:
         raise RuntimeError(json_result)

@@ -4,6 +4,9 @@
 
 from model_processing.material_index_assigner import assign_material_sub_indices
 from model_processing.material_manifest import material_manifest_materials
+from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS
+
+TRAILING_UNASSIGNED_MATERIAL_NAME = "<unassigned>"
 
 
 def build_material_slot_records(
@@ -31,6 +34,38 @@ def _placeholder_slot(slot_index):
     }
 
 
+def _is_unassigned_slot_name(name):
+    normalized = str(name or "").strip().casefold()
+    return normalized in {"unassigned", "<unassigned>"}
+
+
+def trailing_unassigned_slot(slot_index):
+    return {
+        "name": TRAILING_UNASSIGNED_MATERIAL_NAME,
+        "original_name": TRAILING_UNASSIGNED_MATERIAL_NAME,
+        "sub_index": slot_index,
+        "textures": {},
+        "physicalize": "no",
+        "is_dummy": True,
+        "is_unassigned_placeholder": True,
+        "assignment_reason": "trailing_unassigned_placeholder",
+    }
+
+
+def append_trailing_unassigned_slot(material_slots):
+    material_slots = list(material_slots or [])
+    if not material_slots:
+        return material_slots
+    if _is_unassigned_slot_name(material_slots[-1].get("name")):
+        return material_slots
+
+    max_slot = max(int(slot.get("sub_index", order)) for order, slot in enumerate(material_slots))
+    if max_slot + 1 >= RC_MAX_SUB_MATERIALS:
+        return material_slots
+    material_slots.append(trailing_unassigned_slot(max_slot + 1))
+    return material_slots
+
+
 def material_slot_from_record(record):
     """Return the exporter-facing material dict for one assigned record."""
     material = record["material"].copy()
@@ -52,6 +87,7 @@ def build_expanded_material_slot_table(
     material_manifest_info=None,
     include_default=True,
     fill_gaps=True,
+    include_trailing_unassigned=False,
 ):
     """
     Build a zero-based RC material slot table for MTL/export consumers.
@@ -82,5 +118,8 @@ def build_expanded_material_slot_table(
                 material_slots[slot_index] = _placeholder_slot(slot_index)
     else:
         material_slots = [slot for slot in material_slots if slot is not None]
+
+    if include_trailing_unassigned:
+        material_slots = append_trailing_unassigned_slot(material_slots)
 
     return material_slots

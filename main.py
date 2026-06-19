@@ -283,6 +283,7 @@ def main():
                     model_output_dir,
                     texture_output_dir,
                     export_context.mtl_filename,
+                    include_trailing_unassigned=True,
                 )
                 if success:
                     exported_count += 1
@@ -415,6 +416,7 @@ def main():
                     export_context.fbx_filename,
                     model_output_dir,
                     texture_output_dir,
+                    include_trailing_unassigned=True,
                 )
                 try:
                     diagnostics_path = export_material_diagnostics(

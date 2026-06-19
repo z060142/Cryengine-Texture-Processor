@@ -273,6 +273,32 @@ def test_material_requests_follow_material_manifest_table_order():
     ]
 
 
+def test_material_requests_can_append_trailing_unassigned_placeholder():
+    request = build_import_request(
+        {"path": "stone.fbx", "materials": [{"name": "Stone"}]},
+        "stone.fbx",
+        include_trailing_unassigned=True,
+    )
+
+    assert request["materials"] == [
+        {"name": "Stone", "physicalize": "no_collide", "sub_index": 0},
+        {"name": "<unassigned>", "physicalize": "no", "sub_index": 1},
+    ]
+
+
+def test_material_requests_do_not_append_out_of_range_trailing_placeholder():
+    request = build_import_request(
+        {
+            "path": "stone.fbx",
+            "materials": [{"name": "LastValid", "sub_index": 127, "auto_assigned": False}],
+        },
+        "stone.fbx",
+        include_trailing_unassigned=True,
+    )
+
+    assert request["materials"] == [{"name": "LastValid", "physicalize": "no_collide", "sub_index": 127}]
+
+
 def test_material_requests_preserve_explicit_physicalize_metadata():
     request = build_import_request(
         {

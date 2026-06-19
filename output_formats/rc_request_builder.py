@@ -7,8 +7,9 @@ import os
 import re
 import traceback
 
-from model_processing.material_slot_table import build_material_slot_records
+from model_processing.material_slot_table import TRAILING_UNASSIGNED_MATERIAL_NAME, build_material_slot_records
 from model_processing.rc_material_policy import (
+    RC_MAX_SUB_MATERIALS,
     infer_rc_physicalize_from_name,
     rc_physicalize_diagnostics,
     resolve_rc_physicalize,
@@ -177,6 +178,7 @@ def build_material_requests(
     existing_submaterial_names=None,
     include_diagnostics=False,
     material_manifest_info=None,
+    include_trailing_unassigned=False,
 ):
     material_requests = []
     for material in build_material_slot_records(
@@ -200,6 +202,22 @@ def build_material_requests(
         if include_diagnostics and diagnostics:
             request_material["diagnostics"] = diagnostics
         material_requests.append(request_material)
+    if include_trailing_unassigned and material_requests:
+        used_sub_indices = [
+            material["sub_index"]
+            for material in material_requests
+            if isinstance(material.get("sub_index"), int) and material["sub_index"] >= 0
+        ]
+        last_name = str(material_requests[-1].get("name", "")).strip().casefold()
+        next_sub_index = max(used_sub_indices) + 1 if used_sub_indices else RC_MAX_SUB_MATERIALS
+        if used_sub_indices and next_sub_index < RC_MAX_SUB_MATERIALS and last_name not in {"unassigned", "<unassigned>"}:
+            material_requests.append(
+                {
+                    "name": TRAILING_UNASSIGNED_MATERIAL_NAME,
+                    "physicalize": "no",
+                    "sub_index": next_sub_index,
+                }
+            )
     return material_requests
 
 
@@ -217,6 +235,7 @@ def build_import_request(
     ignore_uv=False,
     autolodsettings=None,
     existing_submaterial_names=None,
+    include_trailing_unassigned=False,
 ):
     base_name = os.path.splitext(os.path.basename(source_filename))[0]
     node_hierarchy = extract_scene_hierarchy_from_model(model_data)
@@ -239,6 +258,7 @@ def build_import_request(
             model_data.get("materials", []),
             existing_submaterial_names,
             material_manifest_info=model_data.get("material_manifest"),
+            include_trailing_unassigned=include_trailing_unassigned,
         ),
         "nodes": request_nodes,
         "jointPhysicsData": joint_physics_data,

@@ -42,6 +42,27 @@ def test_expanded_material_slot_table_fills_gaps_and_keeps_metadata():
     assert slots[2]["textures"] == {"diffuse": "third.dds"}
 
 
+def test_expanded_material_slot_table_can_append_trailing_unassigned_placeholder():
+    slots = build_expanded_material_slot_table(
+        [{"name": "Stone", "id": 1}],
+        include_trailing_unassigned=True,
+    )
+
+    assert [slot["name"] for slot in slots] == ["Stone", "<unassigned>"]
+    assert slots[1]["sub_index"] == 1
+    assert slots[1]["assignment_reason"] == "trailing_unassigned_placeholder"
+
+
+def test_expanded_material_slot_table_does_not_append_out_of_range_trailing_placeholder():
+    slots = build_expanded_material_slot_table(
+        [{"name": "LastValid", "sub_index": 127, "auto_assigned": False}],
+        fill_gaps=False,
+        include_trailing_unassigned=True,
+    )
+
+    assert [slot["name"] for slot in slots] == ["LastValid"]
+
+
 def test_expanded_material_slot_table_omits_deleted_materials_but_keeps_default_for_empty_input():
     assert build_expanded_material_slot_table([]) == [
         {"name": "Default", "textures": {}, "is_default": True, "sub_index": 0}

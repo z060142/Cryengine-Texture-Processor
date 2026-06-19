@@ -19,6 +19,7 @@ def export_json(
     wrapper_name="direct",
     output_ext="cgf",
     material_filename=None,
+    include_trailing_unassigned=False,
 ):
     """
     Export a CryEngine Resource Compiler FBX import request.
@@ -62,6 +63,7 @@ def export_json(
             material_filename=resolved_material_filename,
             output_ext=output_ext,
             existing_submaterial_names=existing_submaterial_names,
+            include_trailing_unassigned=include_trailing_unassigned,
         )
         if wrapper_name in (None, "", "direct"):
             assert_rc_import_request_schema(request)

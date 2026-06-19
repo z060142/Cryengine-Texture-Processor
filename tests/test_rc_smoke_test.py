@@ -225,6 +225,7 @@ def test_prepare_smoke_bundle_copies_fbx_and_writes_mtl_and_request(tmp_path):
     assert payload["materials"] == [
         {"name": "Bark", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Leaves", "physicalize": "no_collide", "sub_index": 1},
+        {"name": "<unassigned>", "physicalize": "no", "sub_index": 2},
     ]
 
 
@@ -260,10 +261,11 @@ def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
     assert payload["materials"] == [
         {"name": "Stone", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Stone.001", "physicalize": "no_collide", "sub_index": 1},
+        {"name": "<unassigned>", "physicalize": "no", "sub_index": 2},
     ]
     root = ET.parse(bundle["mtl_path"]).getroot()
     sub_materials = root.find("SubMaterials")
-    assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001"]
+    assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001", "<unassigned>"]
 
 
 def test_prepare_smoke_bundle_uses_material_manifest_scene_hierarchy(tmp_path):
@@ -590,6 +592,11 @@ def test_prepare_smoke_bundle_reports_out_of_range_manifest_slots(tmp_path):
         material_specs=material_specs_from_manifest(str(source_fbx)),
     )
 
+    payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
+    assert payload["materials"] == [
+        {"name": "LastValid", "physicalize": "no_collide", "sub_index": 127},
+        {"name": "TooHigh", "physicalize": "no_collide", "sub_index": -1},
+    ]
     codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
     assert "material_manifest_material_slot_out_of_rc_range" in codes
     assert "material_manifest_polygon_slot_out_of_rc_range" in codes
@@ -617,6 +624,7 @@ def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_pa
         {"name": "Slot_0_Red", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Slot_1_Green", "physicalize": "no_collide", "sub_index": -1},
         {"name": "Slot_2_Blue", "physicalize": "no_collide", "sub_index": 2},
+        {"name": "<unassigned>", "physicalize": "no", "sub_index": 3},
     ]
 
     root = ET.parse(bundle["mtl_path"]).getroot()
@@ -625,6 +633,7 @@ def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_pa
         "Slot_0_Red",
         "unassigned",
         "Slot_2_Blue",
+        "<unassigned>",
     ]
     assert bundle["material_diagnostics"][0]["code"] == "deleted_known_fbx_slot_usage_unknown"
 

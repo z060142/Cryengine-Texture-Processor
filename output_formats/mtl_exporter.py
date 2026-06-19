@@ -194,10 +194,11 @@ def _shader_masks_and_public_params(textures):
     )
 
 
-def build_mtl_material_slots(materials_data, existing_submaterial_names=None):
+def build_mtl_material_slots(materials_data, existing_submaterial_names=None, include_trailing_unassigned=False):
     return build_expanded_material_slot_table(
         materials_data,
         existing_submaterial_names=existing_submaterial_names or [],
+        include_trailing_unassigned=include_trailing_unassigned,
     )
 
 
@@ -214,10 +215,19 @@ def _append_sub_material(sub_materials_elem, mat_info, model_output_dir):
     ET.SubElement(sub_mat, "PublicParams", **public_params)
 
 
-def build_mtl_document(materials_data, model_output_dir, existing_submaterial_names=None):
+def build_mtl_document(
+    materials_data,
+    model_output_dir,
+    existing_submaterial_names=None,
+    include_trailing_unassigned=False,
+):
     root_material = ET.Element("Material", MtlFlags=str(MTL_ROOT_DEFAULT_FLAGS), vertModifType="0")
     sub_materials = ET.SubElement(root_material, "SubMaterials")
-    material_slots = build_mtl_material_slots(materials_data, existing_submaterial_names)
+    material_slots = build_mtl_material_slots(
+        materials_data,
+        existing_submaterial_names,
+        include_trailing_unassigned=include_trailing_unassigned,
+    )
 
     for mat_info in material_slots:
         _append_sub_material(sub_materials, mat_info, model_output_dir)
@@ -226,7 +236,13 @@ def build_mtl_document(materials_data, model_output_dir, existing_submaterial_na
     return root_material, material_slots
 
 
-def export_mtl(materials_data, model_output_dir, texture_output_dir, output_filename):
+def export_mtl(
+    materials_data,
+    model_output_dir,
+    texture_output_dir,
+    output_filename,
+    include_trailing_unassigned=False,
+):
     """
     Exports a .mtl file based on the provided material data.
 
@@ -261,6 +277,7 @@ def export_mtl(materials_data, model_output_dir, texture_output_dir, output_file
             materials_data,
             model_output_dir,
             existing_submaterial_names,
+            include_trailing_unassigned=include_trailing_unassigned,
         )
         xml_string = _pretty_print_xml(root_material)
 
