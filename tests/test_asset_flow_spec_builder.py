@@ -234,6 +234,38 @@ def test_build_spec_limits_texture_process_case_size(tmp_path):
     assert spec["metadata"]["max_textures_per_case"] == 2
 
 
+def test_build_spec_texture_backed_only_skips_model_only_candidates(tmp_path):
+    pack = tmp_path / "Pack"
+    fbx_dir = pack / "Models" / "FBX"
+    obj_dir = pack / "Models" / "OBJ"
+    texture_dir = pack / "Textures"
+    fbx_dir.mkdir(parents=True)
+    obj_dir.mkdir()
+    texture_dir.mkdir()
+    model_only = fbx_dir / "Collision.fbx"
+    textured = fbx_dir / "Ivy_Climb.fbx"
+    mtl = obj_dir / "Ivy_Climb.mtl"
+    texture = texture_dir / "Ivy_Small_a.tga"
+    model_only.write_bytes(b"1")
+    textured.write_bytes(b"1" * 10)
+    texture.write_bytes(b"diff")
+    mtl.write_text("newmtl Ivy_ClimbSG\nmap_Kd Ivy_Small_a.tga\n", encoding="utf-8")
+
+    spec = asset_flow_spec_builder.build_spec(
+        [str(fbx_dir)],
+        str(tmp_path / "work"),
+        obj_mtl_roots=[str(obj_dir)],
+        include_texture_process=True,
+        texture_backed_only=True,
+        limit=1,
+    )
+
+    assert [case["type"] for case in spec["cases"]] == ["texture_process", "rc"]
+    assert spec["cases"][1]["fbx"] == str(textured.resolve())
+    assert spec["metadata"]["rc_case_count"] == 1
+    assert spec["metadata"]["texture_backed_only"] is True
+
+
 def test_main_prints_texture_process_cases(tmp_path, capsys):
     pack = tmp_path / "Pack"
     fbx_dir = pack / "Models" / "FBX"

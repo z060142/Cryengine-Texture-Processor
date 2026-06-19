@@ -260,6 +260,42 @@ Ivy_small_mat -> Ivy_Small_diff.tif, Ivy_Small_ddn.tif, Ivy_Small_spec.tif
 Ivy_medium_mat -> Ivy_Medium_diff.tif, Ivy_Medium_ddn.tif, Ivy_Medium_spec.tif
 ```
 
+When the goal is to stress the texture-backed path instead of mixing in
+model-only samples, add `--texture-backed-only`. This makes the builder skip
+FBX files whose OBJ `.mtl` evidence does not resolve to raw texture inputs:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --include-texture-process `
+  --texture-backed-only `
+  --max-textures-per-case 2 `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_batch_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_batch" `
+  --limit 3 `
+  --max-mb 2
+```
+
+Observed texture-backed-only batch:
+
+```text
+ok: True
+case_count: 6
+ok_count: 6
+failed_count: 0
+material_texture_ok: pass=3 fail=0 na=0
+texture_format_ok: pass=6 fail=0 na=0
+```
+
+Selected FBX cases:
+
+```text
+Ivy_Climb_d128b427
+Ivy_Medium_94ee8462
+Ivy_Large_524ced31
+```
+
 ## Spec Format
 
 Example:
