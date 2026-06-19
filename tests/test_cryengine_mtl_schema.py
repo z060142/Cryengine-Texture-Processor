@@ -58,6 +58,7 @@ def test_ce_texture_suffixes_follow_material_helpers_suffixes():
     assert CE_TEXTURE_SUFFIXES["Heightmap"] == "_displ"
     assert CE_TEXTURE_SUFFIXES["Emittance"] == "_em"
     assert CE_TEXTURE_ACCEPTED_SUFFIXES["Bumpmap"] == ("_ddn", "_ddna")
+    assert CE_TEXTURE_ACCEPTED_SUFFIXES["Emittance"] == ("_em", "_emissive")
 
 
 def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
@@ -74,6 +75,12 @@ def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
     assert alias["matched_suffix"] == "_ddna"
     assert alias["suffix_status"] == "matches_accepted_alias_suffix"
     assert alias["source_evidence"]["alias_source"].endswith("TextureCompiler.cpp")
+
+    emissive_alias = analyze_ce_texture_suffix("Emittance", "textures/wall_emissive.dds")
+    assert emissive_alias["expected_suffix"] == "_em"
+    assert emissive_alias["accepted_suffixes"] == ["_em", "_emissive"]
+    assert emissive_alias["matched_suffix"] == "_emissive"
+    assert emissive_alias["suffix_status"] == "matches_accepted_alias_suffix"
 
     mismatch = analyze_ce_texture_suffix("Bumpmap", "textures/wall_normal.dds")
     assert mismatch["expected_suffix"] == "_ddn"

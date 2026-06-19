@@ -13,6 +13,8 @@ OUTPUT_TEXTURE_TYPE_BY_KEY = {
     "ddna": "normal",
     "displ": "displacement",
     "emissive": "emissive",
+    "opacity": "opacity",
+    "roughness": "roughness",
     "sss": "subsurface",
 }
 

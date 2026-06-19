@@ -97,8 +97,43 @@
         "ce_map_type": "Emittance",
         "expected_suffix": "_em",
         "accepted_suffixes": [
-          "_em"
+          "_em",
+          "_emissive"
         ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "opacity",
+        "texture_type": "opacity",
+        "ce_map_type": "Opacity",
+        "expected_suffix": "",
+        "accepted_suffixes": [],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "roughness",
+        "texture_type": "roughness",
+        "ce_map_type": "Opacity",
+        "expected_suffix": "",
+        "accepted_suffixes": [],
         "supported_source_extensions": [
           "dds",
           "hdr",
@@ -244,7 +279,8 @@
           "reason": "source_backed_texture_map",
           "expected_suffix": "_em",
           "accepted_suffixes": [
-            "_em"
+            "_em",
+            "_emissive"
           ]
         },
         {
@@ -254,7 +290,8 @@
           "reason": "source_backed_texture_map",
           "expected_suffix": "_em",
           "accepted_suffixes": [
-            "_em"
+            "_em",
+            "_emissive"
           ]
         },
         {

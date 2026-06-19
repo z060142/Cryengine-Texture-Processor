@@ -13,6 +13,8 @@ def test_texture_output_suffixes_follow_ce_policy():
         "ddna": "normal",
         "displ": "displacement",
         "emissive": "emissive",
+        "opacity": "opacity",
+        "roughness": "roughness",
         "sss": "subsurface",
     }
     assert texture_output_suffix("diff") == "_diff"
@@ -21,6 +23,7 @@ def test_texture_output_suffixes_follow_ce_policy():
     assert texture_output_suffix("ddna", normal_alpha=True) == "_ddna"
     assert texture_output_suffix("displ") == "_displ"
     assert texture_output_suffix("emissive") == "_em"
+    assert texture_output_suffix("roughness") == "_roughness"
     assert texture_output_suffix("sss") == "_sss"
 
 

@@ -1,11 +1,16 @@
 import json
+import subprocess
+import sys
 
 from core.batch_processor import BatchProcessor
 from core.texture_manager import TextureGroup
 from output_formats.texture_output_diagnostics import (
     build_texture_output_policy,
     build_texture_output_report,
+    build_texture_output_report_from_paths,
     export_texture_output_report,
+    infer_output_key_from_filename,
+    is_texture_output_sidecar,
 )
 
 
@@ -26,6 +31,7 @@ def test_build_texture_output_policy_accepts_ce_suffixes_and_rc_source_extension
             "ddna": "wall_ddna.tif",
             "displ": "wall_displ.tif",
             "emissive": "wall_em.tif",
+            "roughness": "wall_roughness.tif",
             "sss": "wall_sss.tif",
         }
     )
@@ -38,6 +44,7 @@ def test_build_texture_output_policy_accepts_ce_suffixes_and_rc_source_extension
         "diff": "Diffuse",
         "displ": "Heightmap",
         "emissive": "Emittance",
+        "roughness": "Opacity",
         "spec": "Specular",
         "sss": "SubSurface",
     }
@@ -62,6 +69,76 @@ def test_build_texture_output_policy_warns_for_non_rc_extension_and_suffix_misma
     assert policy["diagnostics"][0]["supported_extensions"] == ["dds", "hdr", "tif"]
     assert policy["diagnostics"][1]["expected_suffix"] == "_diff"
     assert policy["diagnostics"][2]["expected_suffix"] == "_spec"
+
+
+def test_build_texture_output_policy_can_check_missing_output_files(tmp_path):
+    existing = tmp_path / "wall_diff.tif"
+    existing.write_text("fake texture", encoding="utf-8")
+
+    policy = build_texture_output_policy(
+        {
+            "diff": str(existing),
+            "spec": str(tmp_path / "wall_spec.tif"),
+        },
+        check_exists=True,
+    )
+
+    assert policy["ok"] is False
+    assert [entry["exists"] for entry in policy["entries"]] == [True, False]
+    assert [diagnostic["code"] for diagnostic in policy["diagnostics"]] == ["missing_texture_output_file"]
+
+
+def test_texture_output_report_from_paths_groups_known_suffixes(tmp_path):
+    (tmp_path / "wall_diff.tif").write_text("diff", encoding="utf-8")
+    (tmp_path / "wall_ddna.tif").write_text("ddna", encoding="utf-8")
+    (tmp_path / "carpaint_roughness.dds").write_text("roughness", encoding="utf-8")
+    (tmp_path / "wall_diff.dds.thmb.png").write_text("thumbnail", encoding="utf-8")
+    (tmp_path / "ignored.txt").write_text("ignored", encoding="utf-8")
+
+    report = build_texture_output_report_from_paths([str(tmp_path)])
+
+    assert report["summary"] == {
+        "group_count": 2,
+        "output_count": 3,
+        "diagnostic_count": 0,
+        "ok": True,
+    }
+    outputs_by_group = {group["base_name"]: group["outputs"] for group in report["groups"]}
+    assert sorted(outputs_by_group["wall"]) == ["ddna", "diff"]
+    assert sorted(outputs_by_group["carpaint"]) == ["roughness"]
+    assert infer_output_key_from_filename("wall_ddna.tif") == ("ddna", "wall")
+    assert is_texture_output_sidecar("wall_diff.dds.thmb.png") is True
+
+
+def test_texture_output_gate_script_returns_nonzero_for_bad_outputs(tmp_path):
+    output_report = tmp_path / "texture_gate.json"
+    (tmp_path / "wall_diff.png").write_text("bad", encoding="utf-8")
+    (tmp_path / "wall_s.tif").write_text("bad", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "tools.texture_output_gate",
+            str(tmp_path),
+            "--output",
+            str(output_report),
+        ],
+        cwd=__import__("pathlib").Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    report = json.loads(output_report.read_text(encoding="utf-8"))
+    assert report["summary"]["ok"] is False
+    assert report["summary"]["output_count"] == 2
+    codes = [diagnostic["code"] for group in report["groups"] for diagnostic in group["diagnostics"]]
+    assert codes == [
+        "unsupported_rc_texture_output_extension",
+        "unknown_texture_output_key",
+    ]
 
 
 def test_batch_processor_records_texture_output_policy(tmp_path):

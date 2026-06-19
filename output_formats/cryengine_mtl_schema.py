@@ -64,6 +64,7 @@ CE_TEXTURE_OBSERVED_SUFFIXES = {
 CE_TEXTURE_ACCEPTED_SUFFIXES = {
     **{ce_map_type: (suffix,) for ce_map_type, suffix in CE_TEXTURE_SUFFIXES.items()},
     "Bumpmap": ("_ddn", "_ddna"),
+    "Emittance": ("_em", "_emissive"),
 }
 
 CE_TEXTURE_MAP_NAMES = {
@@ -90,7 +91,9 @@ CE_TEXTURE_SUFFIX_SOURCE = {
         "MaterialHelpers names Bumpmap as _ddn, while TextureCompiler also "
         "handles _ddna normal-alpha placeholder textures. Diagnostics accept "
         "_ddna as a Bumpmap alias instead of treating CE normal-alpha exports "
-        "as suffix mismatches."
+        "as suffix mismatches. The car sample also uses _emissive for "
+        "Emittance textures, so diagnostics accept it as an observed export "
+        "alias for the source-backed _em suffix."
     ),
     "rule": (
         "Known CryEngine material Texture Map names have conventional filename "
