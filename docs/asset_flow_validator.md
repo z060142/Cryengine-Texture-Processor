@@ -195,6 +195,44 @@ StringGenMask: %NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING
 Textures: Diffuse -> Weed_B_diff.tif, Bumpmap -> Weed_B_ddn.tif, Specular -> Weed_B_spec.tif
 ```
 
+The same builder path has also been run as a small controlled batch:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --include-texture-process `
+  --max-textures-per-case 2 `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\auto_texture_batch_limited_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\auto_texture_batch_limited" `
+  --limit 8 `
+  --max-mb 2
+```
+
+Observed controlled batch result:
+
+```text
+ok: True
+case_count: 10
+ok_count: 10
+failed_count: 0
+```
+
+That batch included two auto-generated raw texture processing cases:
+
+```text
+Ivy_Climb_d128b427_raw_textures: source_texture_count=2, texture_limit_applied=false
+Ivy_Medium_94ee8462_raw_textures: source_texture_count=2, texture_limit_applied=false
+```
+
+Both texture-backed RC cases passed `material_texture_ok` and produced
+Diffuse/Bumpmap/Specular MTL links:
+
+```text
+Ivy_small_mat -> Ivy_Small_diff.tif, Ivy_Small_ddn.tif, Ivy_Small_spec.tif
+Ivy_medium_mat -> Ivy_Medium_diff.tif, Ivy_Medium_ddn.tif, Ivy_Medium_spec.tif
+```
+
 ## Spec Format
 
 Example:
