@@ -13,15 +13,17 @@ import struct
 
 
 CHUNK_TYPE_MESH = 0x1000
+CHUNK_TYPE_MTL_NAME = 0x1014
 CHUNK_TYPE_MESH_SUBSETS = 0x1017
 MESH_CHUNK_VERSION_0801 = 0x0801
+MTL_NAME_CHUNK_VERSION_0802 = 0x0802
 MESH_SUBSETS_CHUNK_VERSION_0800 = 0x0800
 
 CHUNK_TYPE_NAMES = {
     CHUNK_TYPE_MESH: "Mesh",
     0x100B: "Node",
     0x1013: "SourceInfo",
-    0x1014: "MtlName",
+    CHUNK_TYPE_MTL_NAME: "MtlName",
     0x1015: "ExportFlags",
     0x1016: "DataStream",
     CHUNK_TYPE_MESH_SUBSETS: "MeshSubsets",
@@ -180,10 +182,68 @@ def read_mesh_subsets(cgf_path, chunk):
     }
 
 
+def _read_c_string(raw):
+    return raw.split(b"\0", 1)[0].decode("utf-8", errors="replace").replace("\\", "/")
+
+
+def _read_next_ascii_z(data, offset, end):
+    start = offset
+    while offset < end and data[offset] >= 32:
+        offset += 1
+    if offset >= end or data[offset] != 0:
+        return "", end
+    return data[start:offset].decode("utf-8", errors="replace").replace("\\", "/"), offset + 1
+
+
+def read_mtl_name_chunk(cgf_path, chunk):
+    if chunk.chunk_type != CHUNK_TYPE_MTL_NAME:
+        raise ValueError(f"Chunk {chunk.chunk_id} is not a MtlName chunk")
+    if chunk.version != MTL_NAME_CHUNK_VERSION_0802:
+        raise ValueError(f"Unsupported MtlName chunk version 0x{chunk.version:x}")
+    if chunk.big_endian:
+        raise ValueError("Big-endian CGF chunks are not supported by this reader")
+
+    data = _read_chunk_data(cgf_path, chunk)
+    header_size = struct.calcsize("<128si")
+    if len(data) < header_size:
+        raise ValueError(f"MtlName chunk {chunk.chunk_id} is too small")
+
+    raw_name, n_sub_materials = struct.unpack_from("<128si", data, 0)
+    slot_count = 1 if n_sub_materials <= 0 else n_sub_materials
+    physicalize_offset = header_size
+    physicalize_size = slot_count * struct.calcsize("<i")
+    if physicalize_offset + physicalize_size > len(data):
+        raise ValueError(f"MtlName chunk {chunk.chunk_id} is truncated")
+
+    physicalize_types = list(struct.unpack_from(f"<{slot_count}i", data, physicalize_offset))
+    names_offset = physicalize_offset + physicalize_size
+    sub_materials = []
+    if n_sub_materials > 0:
+        offset = names_offset
+        for slot in range(n_sub_materials):
+            name, offset = _read_next_ascii_z(data, offset, len(data))
+            sub_materials.append(
+                {
+                    "slot": slot,
+                    "name": name,
+                    "physicalize_type": physicalize_types[slot],
+                }
+            )
+
+    return {
+        "chunk_id": chunk.chunk_id,
+        "name": _read_c_string(raw_name),
+        "sub_material_count": n_sub_materials,
+        "physicalize_types": physicalize_types,
+        "sub_materials": sub_materials,
+    }
+
+
 def read_cgf_material_summary(cgf_path):
     chunks = read_chunk_table(cgf_path)
     chunks_by_id = _chunk_map(chunks)
     mesh_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MESH]
+    mtl_name_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MTL_NAME]
     subset_chunks = [chunk for chunk in chunks if chunk.chunk_type == CHUNK_TYPE_MESH_SUBSETS]
 
     meshes = []
@@ -210,12 +270,14 @@ def read_cgf_material_summary(cgf_path):
             if subset.get("material_id") is not None
         }
     )
+    materials = [read_mtl_name_chunk(cgf_path, chunk) for chunk in mtl_name_chunks if chunk.version == MTL_NAME_CHUNK_VERSION_0802]
 
     return {
         "path": cgf_path,
         "file_version": "0x746",
         "chunk_count": len(chunks),
         "chunks": [chunk.to_dict() for chunk in chunks],
+        "materials": materials,
         "meshes": meshes,
         "standalone_mesh_subsets": standalone_subset_chunks,
         "material_ids": material_ids,

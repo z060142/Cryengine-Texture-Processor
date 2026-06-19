@@ -1,0 +1,1278 @@
+{
+  "sample": {
+    "root": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car",
+    "fbx": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.fbx",
+    "cgf": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.cgf",
+    "mtl": "S:\\Crytek\\crytek\\Stripped to the bone\\example\\car\\kb3d_citycarsessentialssedan-native.mtl"
+  },
+  "counts": {
+    "fbx_material_count": 16,
+    "cgf_mtl_name_sub_material_count": 16,
+    "cgf_used_material_id_count": 16,
+    "mtl_sub_material_count": 17,
+    "mtl_schema_material_count_including_root": 18,
+    "cgf_mesh_count": 21,
+    "cgf_subset_count": 68,
+    "fbx_polygon_row_count": 111972
+  },
+  "source_observations": {
+    "cgf_mtl_name_matches_mtl_prefix": true,
+    "cgf_mtl_name_matches_fbx_first_seen_order": false,
+    "mtl_extra_slots_not_in_cgf_mtl_name": [
+      {
+        "slot": 16,
+        "name": "<unassigned>"
+      }
+    ],
+    "cgf_material_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ]
+  },
+  "alignment": [
+    {
+      "cgf_slot": 0,
+      "cgf_name": "KB3D_CEV_UndercarriageTrim",
+      "mtl_slot": 0,
+      "fbx_first_seen_slot": 0,
+      "subset_count": 9,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 1,
+      "cgf_name": "KB3D_CEV_SeatsDriverATrim",
+      "mtl_slot": 1,
+      "fbx_first_seen_slot": 1,
+      "subset_count": 7,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 2,
+      "cgf_name": "KB3D_CEV_TiresSedans",
+      "mtl_slot": 2,
+      "fbx_first_seen_slot": 14,
+      "subset_count": 4,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 3,
+      "cgf_name": "KB3D_CEV_WheelRimsA",
+      "mtl_slot": 3,
+      "fbx_first_seen_slot": 15,
+      "subset_count": 6,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 4,
+      "cgf_name": "KB3D_CEV_RubberTrim",
+      "mtl_slot": 4,
+      "fbx_first_seen_slot": 2,
+      "subset_count": 11,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 5,
+      "cgf_name": "KB3D_CEV_PlasticTileableA",
+      "mtl_slot": 5,
+      "fbx_first_seen_slot": 3,
+      "subset_count": 5,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 6,
+      "cgf_name": "KB3D_CEV_PlasticTrimA",
+      "mtl_slot": 6,
+      "fbx_first_seen_slot": 4,
+      "subset_count": 7,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 7,
+      "cgf_name": "KB3D_CEV_SedanExteriorBody",
+      "mtl_slot": 7,
+      "fbx_first_seen_slot": 5,
+      "subset_count": 7,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 8,
+      "cgf_name": "KB3D_CEV_CarAtlas",
+      "mtl_slot": 8,
+      "fbx_first_seen_slot": 6,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 9,
+      "cgf_name": "KB3D_CEV_CarsLicensePlates",
+      "mtl_slot": 9,
+      "fbx_first_seen_slot": 7,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 10,
+      "cgf_name": "KB3D_CEV_TapesTrimA",
+      "mtl_slot": 10,
+      "fbx_first_seen_slot": 8,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 11,
+      "cgf_name": "KB3D_CEV_WindowFritsTrim",
+      "mtl_slot": 11,
+      "fbx_first_seen_slot": 9,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 12,
+      "cgf_name": "KB3D_CEV_FeltA",
+      "mtl_slot": 12,
+      "fbx_first_seen_slot": 10,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 13,
+      "cgf_name": "KB3D_CEV_FeltB",
+      "mtl_slot": 13,
+      "fbx_first_seen_slot": 11,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 14,
+      "cgf_name": "KB3D_CEV_GlassMirror",
+      "mtl_slot": 14,
+      "fbx_first_seen_slot": 12,
+      "subset_count": 1,
+      "physicalize_type": -1
+    },
+    {
+      "cgf_slot": 15,
+      "cgf_name": "KB3D_CEV_TranslElemSedans",
+      "mtl_slot": 15,
+      "fbx_first_seen_slot": 13,
+      "subset_count": 5,
+      "physicalize_type": -1
+    }
+  ],
+  "fbx_first_seen_materials": [
+    {
+      "slot": 0,
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 0
+    },
+    {
+      "slot": 1,
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 1
+    },
+    {
+      "slot": 2,
+      "name": "KB3D_CEV_RubberTrim",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 2
+    },
+    {
+      "slot": 3,
+      "name": "KB3D_CEV_PlasticTileableA",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 3
+    },
+    {
+      "slot": 4,
+      "name": "KB3D_CEV_PlasticTrimA",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 4
+    },
+    {
+      "slot": 5,
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 5
+    },
+    {
+      "slot": 6,
+      "name": "KB3D_CEV_CarAtlas",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 6
+    },
+    {
+      "slot": 7,
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 7
+    },
+    {
+      "slot": 8,
+      "name": "KB3D_CEV_TapesTrimA",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 8
+    },
+    {
+      "slot": 9,
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 9
+    },
+    {
+      "slot": 10,
+      "name": "KB3D_CEV_FeltA",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 10
+    },
+    {
+      "slot": 11,
+      "name": "KB3D_CEV_FeltB",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 11
+    },
+    {
+      "slot": 12,
+      "name": "KB3D_CEV_GlassMirror",
+      "first_object": "KB3D_CEV_VehicSedan_A_Body",
+      "first_local_slot": 12
+    },
+    {
+      "slot": 13,
+      "name": "KB3D_CEV_TranslElemSedans",
+      "first_object": "KB3D_CEV_VehicSedan_A_BodyTranslElem",
+      "first_local_slot": 0
+    },
+    {
+      "slot": 14,
+      "name": "KB3D_CEV_TiresSedans",
+      "first_object": "KB3D_CEV_VehicSedan_A_FrontWheelL",
+      "first_local_slot": 1
+    },
+    {
+      "slot": 15,
+      "name": "KB3D_CEV_WheelRimsA",
+      "first_object": "KB3D_CEV_VehicSedan_A_FrontWheelL",
+      "first_local_slot": 2
+    }
+  ],
+  "mtl_slots": [
+    {
+      "slot": 0,
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_UndercarriageTrim_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_UndercarriageTrim_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_UndercarriageTrim_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_UndercarriageTrim_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 1,
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_SeatsDriverATrim_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_SedanExteriorBody_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_SeatsDriverATrim_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_SeatsDriverATrim_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 2,
+      "name": "KB3D_CEV_TiresSedans",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_TiresSedans_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_TiresSedans_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_TiresSedans_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_TiresSedans_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 3,
+      "name": "KB3D_CEV_WheelRimsA",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_WheelRimsA_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_WheelRimsA_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_WheelRimsA_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_WheelRimsA_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 4,
+      "name": "KB3D_CEV_RubberTrim",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_RubberTrim_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_RubberTrim_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_RubberTrim_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_RubberTrim_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 5,
+      "name": "KB3D_CEV_PlasticTileableA",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_PlasticTileableA_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_PlasticTileableA_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_PlasticTileableA_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_PlasticTileableA_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 6,
+      "name": "KB3D_CEV_PlasticTrimA",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_PlasticTrimA_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_PlasticTrimA_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_PlasticTrimA_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_PlasticTrimA_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 7,
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "shader": "Multilayeredmaterials",
+      "mtl_flags": "526464",
+      "gen_mask": "0",
+      "string_gen_mask": "",
+      "texture_count": 6,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_SedanExteriorBody_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_SedanExteriorBody_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_SedanExteriorBody_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_SedanExteriorBody_displ.dds"
+        },
+        {
+          "map": "Opacity",
+          "file": "./KB3D_CEV_SedanExteriorBody_roughness.dds"
+        },
+        {
+          "map": "Emittance",
+          "file": "./KB3D_CEV_SedanExteriorBody_emissive.dds"
+        }
+      ]
+    },
+    {
+      "slot": 8,
+      "name": "KB3D_CEV_CarAtlas",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 5,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_CarAtlas_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_CarAtlas_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_CarAtlas_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_CarAtlas_displ.dds"
+        },
+        {
+          "map": "Emittance",
+          "file": "./KB3D_CEV_CarAtlas_emissive.dds"
+        }
+      ]
+    },
+    {
+      "slot": 9,
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_CarsLicensePlates_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_CarsLicensePlates_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_CarsLicensePlates_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_CarsLicensePlates_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 10,
+      "name": "KB3D_CEV_TapesTrimA",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_TapesTrimA_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_TapesTrimA_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_TapesTrimA_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_TapesTrimA_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 11,
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_WindowFritsTrim_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_WindowFritsTrim_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_WindowFritsTrim_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_WindowFritsTrim_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 12,
+      "name": "KB3D_CEV_FeltA",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_FeltA_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_FeltA_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_FeltA_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_FeltA_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 13,
+      "name": "KB3D_CEV_FeltB",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_FeltB_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_FeltB_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_FeltB_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_FeltB_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 14,
+      "name": "KB3D_CEV_GlassMirror",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "6000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_GlassMirror_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_GlassMirror_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_GlassMirror_spec.dds"
+        },
+        {
+          "map": "Heightmap",
+          "file": "./KB3D_CEV_GlassMirror_displ.dds"
+        }
+      ]
+    },
+    {
+      "slot": 15,
+      "name": "KB3D_CEV_TranslElemSedans",
+      "shader": "Glass",
+      "mtl_flags": "526466",
+      "gen_mask": "2080000000000",
+      "string_gen_mask": "%SPECULAR_MAP%TINT_MAP",
+      "texture_count": 4,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "./KB3D_CEV_TranslElemSedans_diff.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "./KB3D_CEV_TranslElemSedans_ddna.dds"
+        },
+        {
+          "map": "Specular",
+          "file": "./KB3D_CEV_TranslElemSedans_spec.dds"
+        },
+        {
+          "map": "Emittance",
+          "file": "./KB3D_CEV_TranslElemSedans_emissive.dds"
+        }
+      ]
+    },
+    {
+      "slot": 16,
+      "name": "<unassigned>",
+      "shader": "Illum",
+      "mtl_flags": "524416",
+      "gen_mask": "4000000000020",
+      "string_gen_mask": "%NORMAL_MAP%SUBSURFACE_SCATTERING",
+      "texture_count": 2,
+      "textures": [
+        {
+          "map": "Diffuse",
+          "file": "%ENGINE%/EngineAssets/Textures/white.dds"
+        },
+        {
+          "map": "Bumpmap",
+          "file": "%ENGINE%/EngineAssets/Textures/white_ddn.dds"
+        }
+      ]
+    }
+  ],
+  "cgf_material_chunk": {
+    "chunk_id": 2,
+    "name": "kb3d_citycarsessentialssedan-native",
+    "sub_material_count": 16,
+    "physicalize_types": [
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1,
+      -1
+    ],
+    "sub_materials": [
+      {
+        "slot": 0,
+        "name": "KB3D_CEV_UndercarriageTrim",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 1,
+        "name": "KB3D_CEV_SeatsDriverATrim",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 2,
+        "name": "KB3D_CEV_TiresSedans",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 3,
+        "name": "KB3D_CEV_WheelRimsA",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 4,
+        "name": "KB3D_CEV_RubberTrim",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 5,
+        "name": "KB3D_CEV_PlasticTileableA",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 6,
+        "name": "KB3D_CEV_PlasticTrimA",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 7,
+        "name": "KB3D_CEV_SedanExteriorBody",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 8,
+        "name": "KB3D_CEV_CarAtlas",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 9,
+        "name": "KB3D_CEV_CarsLicensePlates",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 10,
+        "name": "KB3D_CEV_TapesTrimA",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 11,
+        "name": "KB3D_CEV_WindowFritsTrim",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 12,
+        "name": "KB3D_CEV_FeltA",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 13,
+        "name": "KB3D_CEV_FeltB",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 14,
+        "name": "KB3D_CEV_GlassMirror",
+        "physicalize_type": -1
+      },
+      {
+        "slot": 15,
+        "name": "KB3D_CEV_TranslElemSedans",
+        "physicalize_type": -1
+      }
+    ]
+  },
+  "cryasset": {
+    "mesh": {
+      "type": "Mesh",
+      "source": "kb3d_citycarsessentialssedan-native.fbx",
+      "details": {
+        "materialCount": "17",
+        "triangleCount": "215790",
+        "vertexCount": "184712",
+        "16BitPrecision": "false"
+      },
+      "dependencies": [
+        {
+          "path": "./kb3d_citycarsessentialssedan-native.mtl",
+          "usage_count": 1
+        }
+      ]
+    },
+    "material": {
+      "type": "Material",
+      "source": "",
+      "details": {
+        "subMaterialCount": "17",
+        "textureCount": "68"
+      },
+      "dependencies": [
+        {
+          "path": "./KB3D_CEV_UndercarriageTrim_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_UndercarriageTrim_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_UndercarriageTrim_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_UndercarriageTrim_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SeatsDriverATrim_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_ddna.dds",
+          "usage_count": 2
+        },
+        {
+          "path": "./KB3D_CEV_SeatsDriverATrim_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SeatsDriverATrim_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TiresSedans_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TiresSedans_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TiresSedans_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TiresSedans_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WheelRimsA_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WheelRimsA_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WheelRimsA_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WheelRimsA_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_RubberTrim_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_RubberTrim_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_RubberTrim_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_RubberTrim_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTileableA_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTileableA_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTileableA_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTileableA_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTrimA_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTrimA_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTrimA_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_PlasticTrimA_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_roughness.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_SedanExteriorBody_emissive.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarAtlas_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarAtlas_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarAtlas_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarAtlas_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarAtlas_emissive.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarsLicensePlates_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarsLicensePlates_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarsLicensePlates_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_CarsLicensePlates_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TapesTrimA_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TapesTrimA_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TapesTrimA_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TapesTrimA_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WindowFritsTrim_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WindowFritsTrim_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WindowFritsTrim_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_WindowFritsTrim_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltA_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltA_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltA_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltA_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltB_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltB_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltB_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_FeltB_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_GlassMirror_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_GlassMirror_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_GlassMirror_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_GlassMirror_displ.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TranslElemSedans_diff.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TranslElemSedans_ddna.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TranslElemSedans_spec.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "./KB3D_CEV_TranslElemSedans_emissive.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "%ENGINE%/EngineAssets/Textures/white.dds",
+          "usage_count": 1
+        },
+        {
+          "path": "%ENGINE%/EngineAssets/Textures/white_ddn.dds",
+          "usage_count": 1
+        }
+      ]
+    }
+  },
+  "mtl_schema_report": {
+    "summary": {
+      "file_count": 1,
+      "material_count": 18,
+      "multi_material_file_count": 1,
+      "tokenized_material_count": 16
+    },
+    "texture_maps": [
+      {
+        "name": "Bumpmap",
+        "count": 17
+      },
+      {
+        "name": "Diffuse",
+        "count": 17
+      },
+      {
+        "name": "Specular",
+        "count": 16
+      },
+      {
+        "name": "Heightmap",
+        "count": 15
+      },
+      {
+        "name": "Emittance",
+        "count": 3
+      },
+      {
+        "name": "Opacity",
+        "count": 1
+      }
+    ],
+    "texture_suffix_statuses": [
+      {
+        "name": "matches_expected_suffix",
+        "count": 48
+      },
+      {
+        "name": "mismatch_expected_suffix",
+        "count": 20
+      },
+      {
+        "name": "no_source_backed_suffix",
+        "count": 1
+      }
+    ],
+    "texmod_statuses": [
+      {
+        "name": "matches_export_minimal_texmod",
+        "count": 69
+      }
+    ],
+    "public_params": [
+      {
+        "name": "EmittanceMapGamma",
+        "count": 17
+      },
+      {
+        "name": "SSSIndex",
+        "count": 16
+      },
+      {
+        "name": "BackLightScale",
+        "count": 2
+      },
+      {
+        "name": "BumpMapTile",
+        "count": 2
+      },
+      {
+        "name": "BumpScale",
+        "count": 2
+      },
+      {
+        "name": "CloudinessReducesGloss",
+        "count": 1
+      },
+      {
+        "name": "Layer0ReflectivityScale",
+        "count": 1
+      },
+      {
+        "name": "Layer1ReflectivityScale",
+        "count": 1
+      },
+      {
+        "name": "Layer1Smoothness",
+        "count": 1
+      },
+      {
+        "name": "Layer1Thickness",
+        "count": 1
+      },
+      {
+        "name": "Layer2ReflectivityScale",
+        "count": 1
+      },
+      {
+        "name": "Layer2Smoothness",
+        "count": 1
+      },
+      {
+        "name": "Layer2Thickness",
+        "count": 1
+      },
+      {
+        "name": "TintCloudiness",
+        "count": 1
+      },
+      {
+        "name": "TintColor",
+        "count": 1
+      }
+    ],
+    "tokens": [
+      {
+        "name": "%NORMAL_MAP",
+        "count": 15
+      },
+      {
+        "name": "%SPECULAR_MAP",
+        "count": 15
+      },
+      {
+        "name": "%SUBSURFACE_SCATTERING",
+        "count": 15
+      },
+      {
+        "name": "%TINT_MAP",
+        "count": 1
+      }
+    ]
+  }
+}

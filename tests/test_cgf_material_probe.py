@@ -26,6 +26,27 @@ def _write_synthetic_cgf(path):
     )
 
 
+def _write_synthetic_cgf_with_mtl_name(path):
+    mtl_chunk_id = 2
+    name = b"car_body"
+    header = name + (b"\0" * (128 - len(name))) + struct.pack("<i", 2)
+    physicalize_types = struct.pack("<2i", 0, 1)
+    sub_names = b"Paint\0Glass\0"
+    mtl_chunk = header + physicalize_types + sub_names
+
+    header_size = 16
+    table_entry_size = 16
+    chunk_count = 1
+    table_offset = header_size
+    mtl_offset = header_size + table_entry_size * chunk_count
+
+    path.write_bytes(
+        struct.pack("<4sIII", b"CrCh", 0x746, chunk_count, table_offset)
+        + struct.pack("<HHIII", 0x1014, 0x0802, mtl_chunk_id, len(mtl_chunk), mtl_offset)
+        + mtl_chunk
+    )
+
+
 def test_cgf_material_probe_prints_summary(tmp_path, capsys):
     cgf_path = tmp_path / "asset.cgf"
     _write_synthetic_cgf(cgf_path)
@@ -34,3 +55,24 @@ def test_cgf_material_probe_prints_summary(tmp_path, capsys):
 
     output = json.loads(capsys.readouterr().out)
     assert output["material_ids"] == [5]
+
+
+def test_cgf_material_probe_reads_mtl_name_chunk_0802(tmp_path, capsys):
+    cgf_path = tmp_path / "asset.cgf"
+    _write_synthetic_cgf_with_mtl_name(cgf_path)
+
+    assert main([str(cgf_path)]) == 0
+
+    output = json.loads(capsys.readouterr().out)
+    assert output["materials"] == [
+        {
+            "chunk_id": 2,
+            "name": "car_body",
+            "sub_material_count": 2,
+            "physicalize_types": [0, 1],
+            "sub_materials": [
+                {"slot": 0, "name": "Paint", "physicalize_type": 0},
+                {"slot": 1, "name": "Glass", "physicalize_type": 1},
+            ],
+        }
+    ]
