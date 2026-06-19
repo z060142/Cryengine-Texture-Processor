@@ -50,7 +50,9 @@ CE treats `.tif` and `.dds` texture outputs as the same practical asset identity
 for this converter path. The gate accepts both as RC source formats and groups
 files by base name plus CE suffix, not by extension. If both
 `wall_diff.dds` and `wall_diff.tif` exist, they represent the same `diff`
-texture output for gate purposes.
+texture output for gate purposes. The material resolver uses the same rule when
+probing processed outputs, so `tif` probing also accepts the matching `dds` file
+for the same CE texture slot, and vice versa.
 
 The output keys currently used by the gate are:
 

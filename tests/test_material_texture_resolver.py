@@ -171,11 +171,31 @@ def test_build_mtl_material_data_probes_multiple_output_extensions(tmp_path):
     assert result[0]["textures"]["roughness"] == str(tmp_path / "carpaint_roughness.tif")
 
 
+def test_build_mtl_material_data_treats_tif_and_dds_as_same_ce_texture_identity(tmp_path):
+    source = tmp_path / "wall_albedo.png"
+    source.write_text("fake source")
+    (tmp_path / "wall_diff.dds").write_text("fake compiled diff")
+    model_data = {"materials": [{"name": "Wall"}]}
+    refs = [TextureRef(str(source), "Wall", texture_type="diffuse")]
+
+    result = build_mtl_material_data(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert result[0]["textures"]["diffuse"] == str(tmp_path / "wall_diff.dds")
+
+
 def test_texture_output_extensions_normalizes_lists_auto_and_csv():
     assert texture_output_extensions("dds,tif;png") == ["dds", "tif"]
     assert texture_output_extensions([".dds", "dds", "TIF"]) == ["dds", "tif"]
     assert texture_output_extensions("auto") == ["dds", "hdr", "tif"]
-    assert texture_output_extensions("png") == ["tif"]
+    assert texture_output_extensions("png") == ["tif", "dds"]
+    assert texture_output_extensions("tif") == ["tif", "dds"]
+    assert texture_output_extensions("dds") == ["dds", "tif"]
 
 
 def test_build_mtl_material_data_finds_ce_emissive_output_suffix(tmp_path):

@@ -17,6 +17,10 @@ from output_formats.texture_output_paths import texture_output_suffix
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 DEFAULT_TEXTURE_OUTPUT_EXTENSION = "tif"
 AUTO_TEXTURE_OUTPUT_EXTENSIONS = ("dds", "hdr", "tif")
+CE_TEXTURE_OUTPUT_EQUIVALENT_EXTENSIONS = {
+    "dds": ("tif",),
+    "tif": ("dds",),
+}
 
 COMMON_TEXTURE_BASE_SUFFIXES = tuple(suffix for suffix, _ in FILENAME_SUFFIX_TYPES)
 MTL_MATERIAL_OVERRIDE_KEYS = (
@@ -234,7 +238,7 @@ def texture_output_extensions(output_format):
         else:
             raw_extensions = raw_value.replace(";", ",").split(",")
 
-    extensions = []
+    requested_extensions = []
     seen = set()
     supported_extensions = set(RC_TEXTURE_SOURCE_EXTENSIONS)
     for ext in raw_extensions:
@@ -242,8 +246,24 @@ def texture_output_extensions(output_format):
         if not normalized or normalized in seen or normalized not in supported_extensions:
             continue
         seen.add(normalized)
-        extensions.append(normalized)
-    return extensions or [DEFAULT_TEXTURE_OUTPUT_EXTENSION]
+        requested_extensions.append(normalized)
+
+    if not requested_extensions:
+        requested_extensions = [DEFAULT_TEXTURE_OUTPUT_EXTENSION]
+
+    extensions = []
+    requested_set = set(requested_extensions)
+    seen.clear()
+    for ext in requested_extensions:
+        if ext not in seen:
+            extensions.append(ext)
+            seen.add(ext)
+        for equivalent_ext in CE_TEXTURE_OUTPUT_EQUIVALENT_EXTENSIONS.get(ext, ()):
+            if equivalent_ext in requested_set or equivalent_ext in seen:
+                continue
+            extensions.append(equivalent_ext)
+            seen.add(equivalent_ext)
+    return extensions
 
 
 def build_material_texture_records(

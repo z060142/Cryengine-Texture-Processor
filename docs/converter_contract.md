@@ -143,6 +143,10 @@ For material texture references in this converter path, `.tif` and `.dds` are
 treated as the same practical CryEngine texture asset identity. RC accepts both
 as source texture formats, and the texture gate groups outputs by base name plus
 CE suffix rather than by extension.
+The model material resolver follows the same rule: if a caller asks to probe
+`tif`, it also probes `dds` for the same CE suffix, and vice versa. The requested
+extension remains the first choice; the paired extension is the fallback for the
+same practical CE texture.
 
 Current exported texture output keys:
 
