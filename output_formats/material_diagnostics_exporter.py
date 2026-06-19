@@ -20,6 +20,11 @@ from output_formats.cryengine_mtl_schema import (
 
 
 AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
+MTL_TEXTURE_MAP_DIAGNOSTIC_CODES = {
+    "mismatch_ce_texture_suffix",
+    "shared_texture_path_across_ce_maps",
+    "unsupported_rc_texture_source_extension",
+}
 
 
 def _texture_source_modes(texture_ref_evidence):
@@ -154,6 +159,33 @@ def _record_to_report_item(record):
 
 def _counter_to_sorted_dict(counter):
     return {key: counter[key] for key in sorted(counter)}
+
+
+def _diagnostic_summary(diagnostics):
+    severity_counts = Counter()
+    code_counts = Counter()
+    mtl_texture_map_warning_count = 0
+
+    for diagnostic in diagnostics:
+        severity = diagnostic.get("severity", "")
+        code = diagnostic.get("code", "")
+        if severity:
+            severity_counts.update([severity])
+        if code:
+            code_counts.update([code])
+        if code in MTL_TEXTURE_MAP_DIAGNOSTIC_CODES:
+            mtl_texture_map_warning_count += 1
+
+    hazard_count = severity_counts.get("hazard", 0)
+    warning_count = severity_counts.get("warning", 0)
+    return {
+        "severity_counts": _counter_to_sorted_dict(severity_counts),
+        "code_counts": _counter_to_sorted_dict(code_counts),
+        "hazard_count": hazard_count,
+        "warning_count": warning_count,
+        "mtl_texture_map_warning_count": mtl_texture_map_warning_count,
+        "action_required": hazard_count > 0,
+    }
 
 
 def _mtl_shader_policy_summary(material_items):
@@ -321,6 +353,7 @@ def build_material_diagnostics_report(
             "diagnostic_count": len(diagnostics),
             "hazard_count": hazard_count,
         },
+        "diagnostic_summary": _diagnostic_summary(diagnostics),
         "mtl_attribute_policy_summary": _mtl_attribute_policy_summary(material_items),
         "mtl_flags_policy_summary": _mtl_flags_policy_summary(material_items),
         "mtl_texture_map_policy_summary": _mtl_texture_map_policy_summary(material_items),

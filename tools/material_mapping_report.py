@@ -5,6 +5,7 @@
 import json
 import os
 import xml.etree.ElementTree as ET
+from collections import Counter
 
 try:
     from _repo_path import add_repo_root
@@ -30,6 +31,50 @@ from utils.cgf_material_reader import read_cgf_material_summary
 def _read_json(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _counter_to_sorted_dict(counter):
+    return {key: counter[key] for key in sorted(counter)}
+
+
+def summarize_material_mapping_report(report):
+    cgf_id_alignment = report.get("cgf_material_id_alignment", {}) if isinstance(report, dict) else {}
+    semantic_alignment = report.get("fixture_material_semantic_alignment", {}) if isinstance(report, dict) else {}
+    import_settings_alignment = report.get("cgf_import_settings_alignment", {}) if isinstance(report, dict) else {}
+    slot_alignment = report.get("alignment", {}) if isinstance(report, dict) else {}
+    rc_info = report.get("rc", {}) if isinstance(report, dict) else {}
+    unassigned_diagnostics = cgf_id_alignment.get("unassigned_slot_diagnostics", []) or []
+    unassigned_counts = Counter(
+        diagnostic.get("type", "")
+        for diagnostic in unassigned_diagnostics
+        if diagnostic.get("type", "")
+    )
+    material_id_checks = cgf_id_alignment.get("checks", []) or []
+    failed_material_id_checks = [check for check in material_id_checks if not check.get("ok", False)]
+    used_unassigned_count = unassigned_counts.get("used_unassigned_material", 0)
+    placeholder_count = sum(
+        count
+        for diagnostic_type, count in unassigned_counts.items()
+        if diagnostic_type in {"gap_unassigned_placeholder", "trailing_unassigned_placeholder"}
+    )
+
+    return {
+        "rc_success": rc_info.get("returncode") == 0 if rc_info.get("returncode") is not None else None,
+        "output_exists": bool(rc_info.get("output_exists", False)),
+        "slot_alignment_ok": slot_alignment.get("ok"),
+        "cgf_material_id_alignment_ok": cgf_id_alignment.get("ok"),
+        "cgf_import_settings_alignment_ok": import_settings_alignment.get("ok"),
+        "fixture_material_semantic_alignment_ok": semantic_alignment.get("ok"),
+        "request_material_count": len(report.get("request_materials", []) or []),
+        "mtl_slot_count": len(report.get("mtl_slots", []) or []),
+        "cgf_material_id_count": len(cgf_id_alignment.get("material_ids", []) or []),
+        "failed_material_id_check_count": len(failed_material_id_checks),
+        "unassigned_slot_counts": _counter_to_sorted_dict(unassigned_counts),
+        "unassigned_placeholder_count": placeholder_count,
+        "used_unassigned_material_count": used_unassigned_count,
+        "unassigned_slots_ok": cgf_id_alignment.get("unassigned_slot_diagnostics_ok"),
+        "action_required": bool(used_unassigned_count or failed_material_id_checks),
+    }
 
 
 def _coerce_request_sub_index(value):
@@ -1302,7 +1347,7 @@ def build_material_mapping_report(
         except Exception as e:
             cgf_read_error = str(e)
 
-    return {
+    report = {
         "paths": {
             "json": json_path,
             "mtl": mtl_path,
@@ -1340,6 +1385,8 @@ def build_material_mapping_report(
             mtl_slots,
         ),
     }
+    report["summary"] = summarize_material_mapping_report(report)
+    return report
 
 
 def build_existing_output_material_report(
@@ -1388,7 +1435,7 @@ def build_existing_output_material_report(
     fixture_manifest_path = discover_fixture_manifest(source_fbx_path, "")
     fixture_manifest = load_fixture_manifest(fixture_manifest_path)
 
-    return {
+    report = {
         "paths": {
             "json": json_path,
             "mtl": mtl_path,
@@ -1427,6 +1474,8 @@ def build_existing_output_material_report(
             mtl_slots,
         ),
     }
+    report["summary"] = summarize_material_mapping_report(report)
+    return report
 
 
 def write_material_mapping_report(report, report_path):

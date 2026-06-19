@@ -445,6 +445,35 @@ def test_build_material_diagnostics_report_warns_for_shared_texture_path_across_
     assert reuse["normalized_texture_path"] == "rock_face_01_diff.tif"
 
 
+def test_build_material_diagnostics_report_adds_actionable_diagnostic_summary():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Removed",
+                "id": 1,
+                "deleted": True,
+                "polygon_count": 4,
+                "textures": {
+                    "diffuse": "wall_basecolor.png",
+                },
+            }
+        ],
+        source_model="diagnostic_summary.fbx",
+    )
+
+    summary = report["diagnostic_summary"]
+    assert summary["severity_counts"] == {"hazard": 1, "warning": 2}
+    assert summary["hazard_count"] == 1
+    assert summary["warning_count"] == 2
+    assert summary["mtl_texture_map_warning_count"] == 2
+    assert summary["action_required"] is True
+    assert summary["code_counts"] == {
+        "deleted_known_fbx_slot_usage_unknown": 1,
+        "mismatch_ce_texture_suffix": 1,
+        "unsupported_rc_texture_source_extension": 1,
+    }
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [

@@ -512,9 +512,28 @@ def test_rc_material_smoke_summary_text_handles_states():
                 "semantic_alignment_ok": True,
                 "cgf_material_id_alignment_ok": True,
                 "unassigned_slot_diagnostics_ok": True,
+                "material_report_summary": {
+                    "unassigned_placeholder_count": 2,
+                    "used_unassigned_material_count": 0,
+                },
             }
         )
-        == "passed / semantic ok / CGF ids ok / unassigned ok"
+        == "passed / semantic ok / CGF ids ok / unassigned placeholders x2"
+    )
+    assert (
+        rc_material_smoke_summary_text(
+            {
+                "success": False,
+                "semantic_alignment_ok": True,
+                "cgf_material_id_alignment_ok": False,
+                "unassigned_slot_diagnostics_ok": False,
+                "material_report_summary": {
+                    "unassigned_placeholder_count": 0,
+                    "used_unassigned_material_count": 1,
+                },
+            }
+        )
+        == "failed / semantic ok / CGF ids mismatch / used unassigned x1"
     )
     assert rc_material_smoke_summary_text({"error": "missing rc"}) == "failed: missing rc"
 
@@ -579,6 +598,10 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
         report_path.write_text(
             json.dumps(
                 {
+                    "summary": {
+                        "unassigned_placeholder_count": 1,
+                        "used_unassigned_material_count": 0,
+                    },
                     "fixture_material_semantic_alignment": {"ok": True},
                     "cgf_material_id_alignment": {
                         "ok": True,
@@ -614,6 +637,10 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
     assert smoke_info["semantic_alignment_ok"] is True
     assert smoke_info["cgf_material_id_alignment_ok"] is True
     assert smoke_info["unassigned_slot_diagnostics_ok"] is True
+    assert smoke_info["material_report_summary"] == {
+        "unassigned_placeholder_count": 1,
+        "used_unassigned_material_count": 0,
+    }
     assert smoke_info["unassigned_slot_diagnostics"] == [
         {
             "ok": True,

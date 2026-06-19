@@ -13,6 +13,7 @@ from tools.material_mapping_report import (
     load_fixture_manifest,
     load_mtl_slots,
     load_request_materials,
+    summarize_material_mapping_report,
     write_material_mapping_report,
 )
 
@@ -335,6 +336,51 @@ def test_evaluate_cgf_material_ids_rejects_used_unassigned_material():
             "max_used_material_id": 1,
         }
     ]
+
+
+def test_summarize_material_mapping_report_counts_unassigned_placeholders_and_hazards():
+    placeholder_report = {
+        "rc": {"returncode": 0, "output_exists": True},
+        "request_materials": [{"name": "Stone", "sub_index": 0}, {"name": "<unassigned>", "sub_index": 1}],
+        "mtl_slots": [{"slot": 0, "name": "Stone"}, {"slot": 1, "name": "<unassigned>"}],
+        "alignment": {"ok": True},
+        "cgf_import_settings_alignment": {"ok": True},
+        "fixture_material_semantic_alignment": {"ok": True},
+        "cgf_material_id_alignment": {
+            "ok": True,
+            "material_ids": [0],
+            "checks": [{"ok": True, "material_id": 0}],
+            "unassigned_slot_diagnostics_ok": True,
+            "unassigned_slot_diagnostics": [
+                {"ok": True, "type": "trailing_unassigned_placeholder", "slot": 1}
+            ],
+        },
+    }
+    used_report = {
+        **placeholder_report,
+        "cgf_material_id_alignment": {
+            "ok": False,
+            "material_ids": [0, 1],
+            "checks": [{"ok": True, "material_id": 0}, {"ok": False, "material_id": 1}],
+            "unassigned_slot_diagnostics_ok": False,
+            "unassigned_slot_diagnostics": [
+                {"ok": False, "type": "used_unassigned_material", "slot": 1}
+            ],
+        },
+    }
+
+    placeholder_summary = summarize_material_mapping_report(placeholder_report)
+    used_summary = summarize_material_mapping_report(used_report)
+
+    assert placeholder_summary["unassigned_slot_counts"] == {"trailing_unassigned_placeholder": 1}
+    assert placeholder_summary["unassigned_placeholder_count"] == 1
+    assert placeholder_summary["used_unassigned_material_count"] == 0
+    assert placeholder_summary["failed_material_id_check_count"] == 0
+    assert placeholder_summary["action_required"] is False
+    assert used_summary["unassigned_slot_counts"] == {"used_unassigned_material": 1}
+    assert used_summary["used_unassigned_material_count"] == 1
+    assert used_summary["failed_material_id_check_count"] == 1
+    assert used_summary["action_required"] is True
 
 
 def test_evaluate_cgf_import_settings_roundtrip_matches_request_mtl_and_cgf_mtl_name():
@@ -1134,6 +1180,10 @@ def test_build_and_write_material_mapping_report(tmp_path):
     )
 
     assert report["alignment"]["ok"]
+    assert report["summary"]["slot_alignment_ok"] is True
+    assert report["summary"]["request_material_count"] == 1
+    assert report["summary"]["mtl_slot_count"] == 1
+    assert report["summary"]["unassigned_placeholder_count"] == 0
     assert report["request_read_error"] == ""
     assert report["rc"]["output_exists"]
     assert report["rc"]["output_size"] == 3

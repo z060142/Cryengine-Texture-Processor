@@ -235,6 +235,10 @@ def _material_id_alignment(report):
     return (report or {}).get("cgf_material_id_alignment", {}) or {}
 
 
+def _material_report_summary(report):
+    return (report or {}).get("summary", {}) or {}
+
+
 def run_model_material_rc_smoke(
     model_path,
     rc_exe_path,
@@ -254,6 +258,7 @@ def run_model_material_rc_smoke(
         "cgf_material_id_alignment_ok": None,
         "unassigned_slot_diagnostics": [],
         "unassigned_slot_diagnostics_ok": None,
+        "material_report_summary": {},
         "error": "",
     }
 
@@ -273,6 +278,7 @@ def run_model_material_rc_smoke(
     report_path = getattr(result, "material_report_path", "") or ""
     report = _load_rc_material_report(report_path)
     material_id_alignment = _material_id_alignment(report)
+    material_report_summary = _material_report_summary(report)
     result_info.update(
         {
             "success": bool(getattr(result, "success", False)),
@@ -285,6 +291,7 @@ def run_model_material_rc_smoke(
             "cgf_material_id_alignment_ok": material_id_alignment.get("ok"),
             "unassigned_slot_diagnostics": material_id_alignment.get("unassigned_slot_diagnostics", []),
             "unassigned_slot_diagnostics_ok": material_id_alignment.get("unassigned_slot_diagnostics_ok"),
+            "material_report_summary": material_report_summary,
             "error": getattr(result, "error", "") or "",
         }
     )
@@ -307,7 +314,15 @@ def rc_material_smoke_summary_text(smoke_info):
     if cgf_ok is not None:
         checks.append("CGF ids ok" if cgf_ok else "CGF ids mismatch")
     if unassigned_ok is not None:
-        checks.append("unassigned ok" if unassigned_ok else "used unassigned")
+        summary = smoke_info.get("material_report_summary", {}) or {}
+        used_unassigned_count = summary.get("used_unassigned_material_count", 0)
+        placeholder_count = summary.get("unassigned_placeholder_count", 0)
+        if used_unassigned_count:
+            checks.append(f"used unassigned x{used_unassigned_count}")
+        elif placeholder_count:
+            checks.append(f"unassigned placeholders x{placeholder_count}")
+        else:
+            checks.append("unassigned ok" if unassigned_ok else "used unassigned")
     return " / ".join([status, *checks])
 
 
