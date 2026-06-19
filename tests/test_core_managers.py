@@ -1,5 +1,6 @@
 from core.material_manager import MaterialManager
 from core.model_manager import LEGACY_MODEL_MANAGER_STATUS, ModelManager
+from core.name_parser import TextureNameParser
 from core.texture_manager import TextureGroup, TextureManager
 
 
@@ -40,6 +41,13 @@ def test_texture_group_generation_methods_are_state_accessors():
 
     assert group.generate_intermediate_formats({"process_metallic": True}) == group.intermediate
     assert group.generate_output_formats({"output_format": "tif"}) == group.output
+
+
+def test_texture_name_parser_accepts_ce_em_and_legacy_emissive_suffixes():
+    parser = TextureNameParser()
+
+    assert parser.parse("wall_em.tif") == ("emissive", "wall")
+    assert parser.parse("wall_emissive.tif") == ("emissive", "wall")
 
 
 def test_legacy_model_manager_marks_stub_status(tmp_path):

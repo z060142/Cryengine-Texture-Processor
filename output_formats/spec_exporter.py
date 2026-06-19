@@ -11,6 +11,7 @@ import os
 import subprocess
 import shutil
 # from utils.image_processing import ImageProcessor # No longer needed for saving
+from output_formats.texture_output_paths import texture_output_path
 
 class SpecExporter:
     """
@@ -39,7 +40,7 @@ class SpecExporter:
         base_name = texture_group.base_name
         
         # Create output path
-        output_path = os.path.join(output_dir, f"{base_name}_spec.tif")
+        output_path = texture_output_path("spec", base_name, output_dir)
         
         # Find ImageMagick executable
         magick_path = shutil.which('magick')

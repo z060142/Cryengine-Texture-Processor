@@ -13,6 +13,7 @@ import shutil
 # Keep ImageProcessor import for fallback/helper methods if needed later
 import numpy as np # Needed for _darker_color_blend fallback
 from PIL import Image, ImageChops # Needed for _darker_color_blend fallback
+from output_formats.texture_output_paths import texture_output_path
 
 class DiffExporter:
     """
@@ -45,7 +46,7 @@ class DiffExporter:
         base_name = texture_group.base_name
         
         # Create output path
-        output_path = os.path.join(output_dir, f"{base_name}_diff.tif")
+        output_path = texture_output_path("diff", base_name, output_dir)
 
         # Find ImageMagick executable
         magick_path = shutil.which('magick')

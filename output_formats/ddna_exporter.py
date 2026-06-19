@@ -13,6 +13,7 @@ import subprocess
 import shutil
 # from utils.image_processing import ImageProcessor # No longer needed for saving/combining
 # from PIL import Image # No longer needed
+from output_formats.texture_output_paths import texture_output_filename, texture_output_path
 
 class DDNAExporter:
     """
@@ -93,8 +94,8 @@ class DDNAExporter:
             print(f"  >>> Will export _ddn.tif") 
 
         # Create output path (_ddna if alpha source exists, _ddn otherwise for now)
-        output_filename = f"{base_name}_ddna.tif" if alpha_source_path else f"{base_name}_ddn.tif"
-        output_path = os.path.join(output_dir, output_filename)
+        output_filename = texture_output_filename("ddna", base_name, normal_alpha=bool(alpha_source_path))
+        output_path = texture_output_path("ddna", base_name, output_dir, normal_alpha=bool(alpha_source_path))
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
         # --- ImageMagick Command Construction ---

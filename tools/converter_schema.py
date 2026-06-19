@@ -25,7 +25,7 @@ from output_formats.cryengine_mtl_schema import (
     exported_texture_modifier_policy,
     resolve_ce_texture_map,
 )
-from output_formats.texture_output_diagnostics import OUTPUT_TEXTURE_TYPE_BY_KEY
+from output_formats.texture_output_paths import OUTPUT_TEXTURE_TYPE_BY_KEY
 
 
 def _sample_texture_path(texture_type, ce_map_type):

@@ -6,16 +6,7 @@ import json
 import os
 
 from output_formats.cryengine_mtl_schema import resolve_ce_texture_map
-
-
-OUTPUT_TEXTURE_TYPE_BY_KEY = {
-    "diff": "diffuse",
-    "spec": "specular",
-    "ddna": "normal",
-    "displ": "displacement",
-    "emissive": "emissive",
-    "sss": "subsurface",
-}
+from output_formats.texture_output_paths import OUTPUT_TEXTURE_TYPE_BY_KEY
 
 
 def analyze_texture_output(output_key, texture_path):

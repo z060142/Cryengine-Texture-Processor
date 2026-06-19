@@ -11,6 +11,7 @@ import subprocess
 import shutil
 # Keep ImageProcessor import for generation fallback
 from utils.image_processing import ImageProcessor 
+from output_formats.texture_output_paths import texture_output_path
 
 class SSSExporter:
     """
@@ -39,7 +40,7 @@ class SSSExporter:
         base_name = texture_group.base_name
         
         # Create output path
-        output_path = os.path.join(output_dir, f"{base_name}_sss.tif")
+        output_path = texture_output_path("sss", base_name, output_dir)
 
         # Find ImageMagick executable
         magick_path = shutil.which('magick')

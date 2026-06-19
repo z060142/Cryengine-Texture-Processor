@@ -223,7 +223,7 @@ class TextureNameParser:
             "normal": [r"_ddna$"],
             "displacement": [r"_displ$"],
             "specular": [r"_spec$"],
-            "emissive": [r"_emissive$"],
+            "emissive": [r"_em$", r"_emissive$"],
             "sss": [r"_sss$"]
         }
         
