@@ -125,3 +125,21 @@ tools.rc_export_gate
 tools.mtl_schema_report
 output_formats.texture_output_diagnostics
 ```
+
+## Texture Output Contract
+
+For material texture references in this converter path, `.tif` and `.dds` are
+treated as the same practical CryEngine texture asset identity. RC accepts both
+as source texture formats, and the texture gate groups outputs by base name plus
+CE suffix rather than by extension.
+
+Current exported texture output keys:
+
+- `diff` -> `Diffuse`
+- `spec` -> `Specular`
+- `ddna` / `ddn` -> `Bumpmap`
+- `displ` -> `Heightmap`
+- `emissive` -> `Emittance`
+- `sss` -> `SubSurface`
+- `roughness` -> `Opacity`, observed compatibility alias
+- `opacity` -> `Opacity`

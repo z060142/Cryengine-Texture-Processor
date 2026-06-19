@@ -90,6 +90,7 @@ def test_build_texture_output_policy_can_check_missing_output_files(tmp_path):
 
 def test_texture_output_report_from_paths_groups_known_suffixes(tmp_path):
     (tmp_path / "wall_diff.tif").write_text("diff", encoding="utf-8")
+    (tmp_path / "wall_diff.dds").write_text("compiled diff", encoding="utf-8")
     (tmp_path / "wall_ddna.tif").write_text("ddna", encoding="utf-8")
     (tmp_path / "carpaint_roughness.dds").write_text("roughness", encoding="utf-8")
     (tmp_path / "wall_diff.dds.thmb.png").write_text("thumbnail", encoding="utf-8")
@@ -105,6 +106,7 @@ def test_texture_output_report_from_paths_groups_known_suffixes(tmp_path):
     }
     outputs_by_group = {group["base_name"]: group["outputs"] for group in report["groups"]}
     assert sorted(outputs_by_group["wall"]) == ["ddna", "diff"]
+    assert outputs_by_group["wall"]["diff"].endswith("wall_diff.tif")
     assert sorted(outputs_by_group["carpaint"]) == ["roughness"]
     assert infer_output_key_from_filename("wall_ddna.tif") == ("ddna", "wall")
     assert is_texture_output_sidecar("wall_diff.dds.thmb.png") is True
