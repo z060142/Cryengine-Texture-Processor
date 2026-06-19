@@ -14,7 +14,7 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
   - _spec (Specular)
   - _ddna (Normal & Gloss combined)
   - _displ (Displacement)
-  - _emissive (Emissive)
+  - _em (Emissive)
   - _sss (Subsurface Scattering)
 - **Advanced Processing Options**:
   - Convert Metallic/Roughness PBR textures to CryEngine spec/gloss workflow

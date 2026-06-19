@@ -128,7 +128,7 @@
     *   **功能 (Function):** 導出 CryEngine 的 _displ 紋理。
     *   **相依性 (Dependencies):** `os`, `subprocess`, `shutil`
 *   **`output_formats/emissive_exporter.py`**:
-    *   **功能 (Function):** 導出 CryEngine 的 _emissive 紋理。
+    *   **功能 (Function):** 導出 CryEngine 的 _em 紋理。
     *   **相依性 (Dependencies):** `os`, `subprocess`, `shutil`, `utils.image_processing.ImageProcessor`, `PIL.Image`, `numpy`
 *   **`output_formats/json_exporter.py`**:
     *   **功能 (Function):** 導出 CryEngine 兼容的 JSON 配置文件。

@@ -67,7 +67,7 @@ def test_material_manager_applies_matching_texture_group_to_dict_model():
             "spec": "Wall_spec.tif",
             "ddna": "Wall_ddna.tif",
             "displ": "Wall_displ.tif",
-            "emissive": "Wall_emissive.tif",
+            "emissive": "Wall_em.tif",
             "sss": "Wall_sss.tif",
         }
     )
@@ -79,5 +79,5 @@ def test_material_manager_applies_matching_texture_group_to_dict_model():
     assert material.textures["specular"] == "Wall_spec.tif"
     assert material.textures["normal"] == "Wall_ddna.tif"
     assert material.textures["displacement"] == "Wall_displ.tif"
-    assert material.textures["emissive"] == "Wall_emissive.tif"
+    assert material.textures["emissive"] == "Wall_em.tif"
     assert material.textures["sss"] == "Wall_sss.tif"

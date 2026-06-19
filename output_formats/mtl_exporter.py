@@ -400,7 +400,7 @@ if __name__ == '__main__':
                 'normal': r'z:\mcp\dandan\processed_textures\cliff_side_ddna.dds', # Our internal 'normal' maps to CE 'Bumpmap'
                 'specular': r'z:\mcp\dandan\processed_textures\cliff_side_spec.dds',
                 'displacement': r'z:\mcp\dandan\processed_textures\cliff_side_displ.dds',
-                'emissive': r'z:\mcp\dandan\processed_textures\cliff_side_emissive.dds'
+                'emissive': r'z:\mcp\dandan\processed_textures\cliff_side_em.dds'
             }
         },
         {

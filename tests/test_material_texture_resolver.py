@@ -47,6 +47,7 @@ def test_iter_unique_clean_materials_skips_defaults_and_preserves_suffixes():
 def test_strip_known_texture_suffix_handles_cryengine_outputs():
     assert strip_known_texture_suffix("wall_diff") == "wall"
     assert strip_known_texture_suffix("wall_ddna") == "wall"
+    assert strip_known_texture_suffix("wall_em") == "wall"
     assert strip_known_texture_suffix("wall_basecolor") == "wall"
     assert strip_known_texture_suffix("wall_opacity") == "wall"
     assert strip_known_texture_suffix("wall") == "wall"
@@ -95,6 +96,24 @@ def test_material_texture_records_capture_texture_ref_evidence(tmp_path):
             "source_mode": "filesystem_no_bpy",
         }
     ]
+
+
+def test_build_mtl_material_data_finds_ce_emissive_output_suffix(tmp_path):
+    source = tmp_path / "wall_emissive.png"
+    source.write_text("fake source")
+    (tmp_path / "wall_em.tif").write_text("fake emissive")
+    model_data = {"materials": [{"name": "Wall"}]}
+    refs = [TextureRef(str(source), "Wall", texture_type="emissive")]
+
+    result = build_mtl_material_data(
+        model_data,
+        refs,
+        None,
+        str(tmp_path),
+        "tif",
+    )
+
+    assert result[0]["textures"]["emissive"] == str(tmp_path / "wall_em.tif")
 
 
 def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_path):

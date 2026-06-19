@@ -67,9 +67,9 @@ For each model material, the resolver:
 1. skips known default materials
 2. asks `TextureManager.classify_texture()` for the texture base name when the source texture exists
 3. falls back to stripping common suffixes such as `_diff`, `_albedo`, `_normal`, `_ddna`, `_spec`, `_height`, `_emissive`
-4. searches the processed texture output directory for current legacy outputs:
+4. searches the processed texture output directory for current outputs:
    - FBX shader rewrite: `_diff`, `_ddna`
-   - MTL export: `_diff`, `_ddna`, `_spec`, `_displ`, `_emissive`, `_opacity`, `_sss`
+   - MTL export: `_diff`, `_ddna`, `_spec`, `_displ`, `_em`, `_opacity`, `_sss`
 
 This is still legacy behavior. It is not yet the CryEngine Editor's exact material auto-assignment algorithm.
 

@@ -96,7 +96,7 @@ LANGUAGE_DICT = {
         "spec": "Specular (_spec)",
         "ddna": "Normal & Gloss (_ddna)",
         "displ": "Displacement (_displ)",
-        "emissive": "Emissive (_emissive)",
+        "emissive": "Emissive (_em)",
         "sss": "Subsurface Scattering (_sss)",
         "export_textures": "Export Textures", # Key changed slightly for clarity
         "export_model": "Export Model", # Added

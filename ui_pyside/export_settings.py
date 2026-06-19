@@ -113,7 +113,7 @@ class ExportSettingsPanel(QWidget):
             ("spec", get_text("export.type_spec", "Specular (_spec)")),
             ("ddna", get_text("export.type_ddna", "Normal & Gloss (_ddna)")),
             ("displ", get_text("export.type_displ", "Displacement (_displ)")),
-            ("emissive", get_text("export.type_emissive", "Emissive (_emissive)")),
+            ("emissive", get_text("export.type_emissive", "Emissive (_em)")),
             ("sss", get_text("export.type_sss", "Subsurface Scattering (_sss)")),
         ]:
             check = QCheckBox(label)

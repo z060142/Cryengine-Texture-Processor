@@ -73,7 +73,8 @@ For Blender plugin work, the diagnostics should treat:
 - `_ddna` Bumpmap as valid normal-alpha output
 - `_diff` reused as Specular/Heightmap as suspicious unless intentionally
   documented by a CE sample
-- `_emissive` vs `_em` as an unresolved naming-policy question
+- `_emissive` vs `_em` was an unresolved naming-policy question in this phase;
+  Phase 111 resolves current converter output to CE-backed `_em`
 
 ## Verification
 

@@ -26,7 +26,7 @@ MTL_OUTPUT_TEXTURE_SUFFIXES = {
     "normal": "_ddna.{ext}",
     "specular": "_spec.{ext}",
     "displacement": "_displ.{ext}",
-    "emissive": "_emissive.{ext}",
+    "emissive": "_em.{ext}",
     "opacity": "_opacity.{ext}",
     "sss": "_sss.{ext}",
 }

@@ -95,7 +95,7 @@ LANGUAGE_DICT = {
         "spec": "高光 (_spec)",
         "ddna": "法線和光澤度 (_ddna)",
         "displ": "位移 (_displ)",
-        "emissive": "自發光 (_emissive)",
+        "emissive": "自發光 (_em)",
         "sss": "次表面散射 (_sss)",
         "export_textures": "匯出貼圖", # 鍵名稍微更改以更清晰
         "export_model": "匯出模型", # 新增

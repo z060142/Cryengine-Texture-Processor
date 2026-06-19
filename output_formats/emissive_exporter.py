@@ -3,7 +3,7 @@
 """
 Emissive Exporter
 
-This module provides functionality for exporting _emissive textures for CryEngine.
+This module provides functionality for exporting _em textures for CryEngine.
 """
 
 import os
@@ -14,7 +14,7 @@ from utils.image_processing import ImageProcessor
 
 class EmissiveExporter:
     """
-    Class for exporting _emissive textures.
+    Class for exporting _em textures.
     """
     
     def __init__(self):
@@ -25,7 +25,7 @@ class EmissiveExporter:
     
     def export(self, texture_group, settings, output_dir):
         """
-        Export an _emissive texture for CryEngine.
+        Export an _em texture for CryEngine.
         
         Args:
             texture_group: TextureGroup object containing intermediate formats
@@ -39,7 +39,7 @@ class EmissiveExporter:
         base_name = texture_group.base_name
         
         # Create output path
-        output_path = os.path.join(output_dir, f"{base_name}_emissive.tif")
+        output_path = os.path.join(output_dir, f"{base_name}_em.tif")
 
         # Find ImageMagick executable
         magick_path = shutil.which('magick')
@@ -104,17 +104,17 @@ class EmissiveExporter:
                 result = subprocess.run(command, check=True, capture_output=True, text=True)
                 print(f"ImageMagick STDOUT: {result.stdout}")
                 print(f"ImageMagick STDERR: {result.stderr}")
-                print(f"Successfully exported _emissive to {output_path}")
+                print(f"Successfully exported _em to {output_path}")
                 return output_path
             except subprocess.CalledProcessError as e:
-                print(f"Error executing ImageMagick for _emissive:")
+                print(f"Error executing ImageMagick for _em:")
                 print(f"Command: {' '.join(e.cmd)}")
                 print(f"Return Code: {e.returncode}")
                 print(f"STDOUT: {e.stdout}")
                 print(f"STDERR: {e.stderr}")
                 # Fall through to generation if enabled
             except Exception as e:
-                print(f"An unexpected error occurred during _emissive export via ImageMagick: {e}")
+                print(f"An unexpected error occurred during _em export via ImageMagick: {e}")
                 # Fall through to generation if enabled
                 
             print("ImageMagick processing failed or not available. Checking generation options.")

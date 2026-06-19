@@ -36,7 +36,7 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
         "Normal": tmp_path / "asset_ddna.dds",
         "Specular": tmp_path / "asset_spec.dds",
         "Displacement": tmp_path / "asset_displ.dds",
-        "Emissive": tmp_path / "asset_emissive.dds",
+        "Emissive": tmp_path / "asset_em.dds",
         "Opacity": tmp_path / "asset_opacity.dds",
     }
     for texture_path in texture_paths.values():
@@ -74,7 +74,7 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
         "Bumpmap": "./asset_ddna.dds",
         "Specular": "./asset_spec.dds",
         "Heightmap": "./asset_displ.dds",
-        "Emittance": "./asset_emissive.dds",
+        "Emittance": "./asset_em.dds",
         "Opacity": "./asset_opacity.dds",
     }
     public_params = material.find("PublicParams")

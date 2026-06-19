@@ -737,7 +737,7 @@ def main():
                     output_suffixes = {
                         "diffuse": f"_diff.{output_format}", "normal": f"_ddna.{output_format}",
                         "specular": f"_spec.{output_format}", "displacement": f"_displ.{output_format}",
-                        "emissive": f"_emissive.{output_format}", "opacity": f"_opacity.{output_format}",
+                        "emissive": f"_em.{output_format}", "opacity": f"_opacity.{output_format}",
                         "sss": f"_sss.{output_format}"
                     }
                     base_name = None

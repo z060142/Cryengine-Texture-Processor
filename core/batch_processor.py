@@ -398,7 +398,7 @@ class BatchProcessor:
             if output_path:
                 group.output["displ"] = output_path
         
-        # Export _emissive
+        # Export _em
         if texture_types.get("emissive", True):
             output_path = self.emissive_exporter.export(group, self.settings, self.output_dir)
             if output_path:
