@@ -6,7 +6,9 @@ from output_formats.cryengine_mtl_schema import (
     ILLUM_EXT_SHADER_MASKS,
     MTL_64BIT_SHADERGENMASK,
     MTL_FLAG_MULTI_SUBMTL,
+    MTL_FLAG_NODRAW,
     MTL_FLAG_PURE_CHILD,
+    MTL_FLAG_REFRACTIVE,
     MTL_ROOT_DEFAULT_FLAGS,
     MTL_PUBLIC_PARAMS_POLICY,
     MTL_SHADER_MASK_LOAD_POLICY,
@@ -145,6 +147,15 @@ def test_default_mtl_flags_are_named_source_backed_compositions():
 
     submaterial_flags = describe_mtl_flags(SUB_MATERIAL_DEFAULT_ATTRS["MtlFlags"])
     assert submaterial_flags["names"] == ["MTL_FLAG_PURE_CHILD", "MTL_64BIT_SHADERGENMASK"]
+
+
+def test_describe_mtl_flags_decodes_known_names_and_unknown_bits():
+    unknown_bit = 0x8000000
+    flags = describe_mtl_flags(MTL_FLAG_NODRAW | MTL_FLAG_REFRACTIVE | unknown_bit)
+
+    assert flags["names"] == ["MTL_FLAG_NODRAW", "MTL_FLAG_REFRACTIVE"]
+    assert flags["unknown_mask"] == unknown_bit
+    assert flags["lines"] == "46-77"
 
 
 def test_public_param_parser_follows_matman_vector4_parsing():

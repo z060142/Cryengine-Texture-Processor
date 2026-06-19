@@ -21,6 +21,7 @@ def write_schema_mtl(path):
         sub_materials,
         "Material",
         Name="Slot_0",
+        MtlFlags="524416",
         Shader="Illum",
         GenMask="2020000000",
         StringGenMask="%SUBSURFACE_SCATTERING%VERTCOLORS",
@@ -45,8 +46,20 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     assert {"name": "SSSIndex", "count": 1} in schema["public_params"]
     assert {"name": "1", "count": 1} in schema["public_param_component_counts"]
     assert {"name": "3", "count": 1} in schema["public_param_component_counts"]
+    assert {"name": "MTL_64BIT_SHADERGENMASK", "count": 2} in schema["mtl_flag_names"]
+    assert {"name": "MTL_FLAG_MULTI_SUBMTL", "count": 1} in schema["mtl_flag_names"]
+    assert {"name": "MTL_FLAG_PURE_CHILD", "count": 1} in schema["mtl_flag_names"]
+    assert schema["mtl_flag_unknown_masks"] == []
     assert {"name": "Diffuse", "count": 1} in schema["texture_maps"]
     assert {"name": "%SUBSURFACE_SCATTERING", "count": 2} in schema["tokens"]
+    assert report["files"][0]["materials"][0]["mtl_flags_analysis"]["names"] == [
+        "MTL_FLAG_MULTI_SUBMTL",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert report["files"][0]["materials"][1]["mtl_flags_analysis"]["names"] == [
+        "MTL_FLAG_PURE_CHILD",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
     assert report["files"][0]["materials"][0]["textures"][0]["texmod"]["TexMod_RotateType"] == "0"
     assert report["files"][0]["materials"][0]["public_param_analysis"]["SSSIndex"]["components"] == [
         0.0,

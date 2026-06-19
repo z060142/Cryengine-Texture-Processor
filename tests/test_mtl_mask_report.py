@@ -55,6 +55,7 @@ def test_build_mtl_mask_report_summarizes_tokenized_mismatches(tmp_path):
         [
             {
                 "Name": "DefaultStyle",
+                "MtlFlags": "524416",
                 "Shader": "Illum",
                 "GenMask": "80000000",
                 "StringGenMask": "%SUBSURFACE_SCATTERING",
@@ -78,6 +79,20 @@ def test_build_mtl_mask_report_summarizes_tokenized_mismatches(tmp_path):
         "StringGenMask": 2,
         "sub_materials": 1,
     }
+    assert report["summary"]["mtl_flag_name_counts"] == {
+        "MTL_64BIT_SHADERGENMASK": 2,
+        "MTL_FLAG_MULTI_SUBMTL": 1,
+        "MTL_FLAG_PURE_CHILD": 1,
+    }
+    assert report["summary"]["mtl_flag_unknown_mask_counts"] == {}
+    assert report["files"][0]["materials"][0]["mtl_flags_analysis"]["names"] == [
+        "MTL_FLAG_MULTI_SUBMTL",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
+    assert report["files"][0]["materials"][1]["mtl_flags_analysis"]["names"] == [
+        "MTL_FLAG_PURE_CHILD",
+        "MTL_64BIT_SHADERGENMASK",
+    ]
     assert report["files"][0]["materials"][1]["gen_mask"]["value"] == 0x80000000
     assert report["files"][0]["materials"][2]["matches_export_compat_mask"] is True
     assert report["files"][0]["materials"][1]["source_load_policy"]["effective_source"] == "StringGenMask"

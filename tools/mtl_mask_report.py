@@ -12,6 +12,7 @@ from output_formats.cryengine_mtl_schema import (
     COMMON_GLOBAL_LEGACY_FIX_MASKS,
     EXPORT_COMPAT_SHADER_MASKS,
     ILLUM_EXT_SHADER_MASKS,
+    describe_mtl_flags,
     shader_mask_load_policy,
 )
 from tools.cryengine_shader_flags import (
@@ -115,6 +116,7 @@ def analyze_material_element(element, location, common_global_flags=None):
         "name": element.get("Name", ""),
         "shader": element.get("Shader", ""),
         "mtl_flags": element.get("MtlFlags", ""),
+        "mtl_flags_analysis": describe_mtl_flags(element.get("MtlFlags", "")),
         "gen_mask": gen_mask,
         "string_gen_mask": string_gen_mask,
         "tokens": tokens,
@@ -191,6 +193,8 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
     unknown_common_generated_token_count = 0
     generated_match_count = 0
     effective_source_counts = {}
+    mtl_flag_name_counts = {}
+    mtl_flag_unknown_mask_counts = {}
     for file_info in files:
         for material in file_info["materials"]:
             if material["tokens"] and not (
@@ -210,6 +214,12 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
                 generated_match_count += 1
             effective_source = material["source_load_policy"]["effective_source"]
             effective_source_counts[effective_source] = effective_source_counts.get(effective_source, 0) + 1
+            for flag_name in material["mtl_flags_analysis"]["names"]:
+                mtl_flag_name_counts[flag_name] = mtl_flag_name_counts.get(flag_name, 0) + 1
+            unknown_mask = material["mtl_flags_analysis"]["unknown_mask"]
+            if unknown_mask:
+                key = str(unknown_mask)
+                mtl_flag_unknown_mask_counts[key] = mtl_flag_unknown_mask_counts.get(key, 0) + 1
 
     return {
         "files": files,
@@ -226,6 +236,8 @@ def build_mtl_mask_report(paths, limit=None, shader_ext_dir=None, globals_file=N
             "unknown_common_global_generated_token_count": unknown_common_generated_token_count,
             "common_global_generated_match_count": generated_match_count,
             "source_load_effective_source_counts": dict(sorted(effective_source_counts.items())),
+            "mtl_flag_name_counts": dict(sorted(mtl_flag_name_counts.items())),
+            "mtl_flag_unknown_mask_counts": dict(sorted(mtl_flag_unknown_mask_counts.items())),
         },
     }
 

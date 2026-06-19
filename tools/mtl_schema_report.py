@@ -8,7 +8,7 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-from output_formats.cryengine_mtl_schema import analyze_public_params
+from output_formats.cryengine_mtl_schema import analyze_public_params, describe_mtl_flags
 from tools.mtl_mask_report import parse_gen_mask_literal, string_gen_mask_tokens
 
 
@@ -70,12 +70,14 @@ def analyze_material_element(element, location):
     )
     tokens = string_gen_mask_tokens(element.get("StringGenMask", ""))
     public_params = _child_attributes(element, "PublicParams")
+    mtl_flags_analysis = describe_mtl_flags(element.get("MtlFlags", ""))
     return {
         "location": location,
         "tag": element.tag,
         "name": element.get("Name", ""),
         "shader": element.get("Shader", ""),
         "mtl_flags": element.get("MtlFlags", ""),
+        "mtl_flags_analysis": mtl_flags_analysis,
         "gen_mask": gen_mask,
         "string_gen_mask": element.get("StringGenMask", ""),
         "tokens": tokens,
@@ -129,6 +131,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
     gen_mask_literal_counts = Counter()
     token_counts = Counter()
     public_param_component_counts = Counter()
+    mtl_flag_name_counts = Counter()
+    mtl_flag_unknown_mask_counts = Counter()
     attributes_by_shader = defaultdict(Counter)
     public_params_by_shader = defaultdict(Counter)
     texture_maps_by_shader = defaultdict(Counter)
@@ -158,6 +162,11 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
                 public_params_by_shader[shader][param_name] += 1
             for param_info in material["public_param_analysis"].values():
                 public_param_component_counts[str(param_info["parsed_component_count"])] += 1
+            for flag_name in material["mtl_flags_analysis"]["names"]:
+                mtl_flag_name_counts[flag_name] += 1
+            unknown_mask = material["mtl_flags_analysis"]["unknown_mask"]
+            if unknown_mask:
+                mtl_flag_unknown_mask_counts[str(unknown_mask)] += 1
             for texture in material["textures"]:
                 texture_map = texture["map"] or "<empty>"
                 texture_map_counts[texture_map] += 1
@@ -186,6 +195,8 @@ def build_mtl_schema_report(paths, limit=None, value_limit=12, include_files=Tru
             "material_attributes": _counter_to_sorted_pairs(attribute_counts),
             "public_params": _counter_to_sorted_pairs(public_param_counts),
             "public_param_component_counts": _counter_to_sorted_pairs(public_param_component_counts),
+            "mtl_flag_names": _counter_to_sorted_pairs(mtl_flag_name_counts),
+            "mtl_flag_unknown_masks": _counter_to_sorted_pairs(mtl_flag_unknown_mask_counts),
             "texture_maps": _counter_to_sorted_pairs(texture_map_counts),
             "shaders": _counter_to_sorted_pairs(shader_counts),
             "string_gen_masks": _counter_to_sorted_pairs(string_gen_mask_counts)[:value_limit],
