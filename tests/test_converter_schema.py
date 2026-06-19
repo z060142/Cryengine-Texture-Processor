@@ -1,6 +1,13 @@
 import json
+import subprocess
+import sys
 
-from tools.converter_schema import build_converter_schema, write_converter_schema
+from tools.converter_schema import (
+    build_converter_schema,
+    check_converter_schema_snapshot,
+    converter_schema_json,
+    write_converter_schema,
+)
 
 
 def test_build_converter_schema_exports_external_tool_contract():
@@ -48,3 +55,41 @@ def test_write_converter_schema_writes_json(tmp_path):
     written = json.loads((tmp_path / "converter_schema.json").read_text(encoding="utf-8"))
     assert output_path == str(tmp_path / "converter_schema.json")
     assert written["schema"] == "cryengine_converter_schema.v1"
+    assert (tmp_path / "converter_schema.json").read_text(encoding="utf-8") == converter_schema_json(
+        build_converter_schema()
+    )
+
+
+def test_check_converter_schema_snapshot_reports_current_and_stale(tmp_path):
+    schema = build_converter_schema()
+    snapshot = tmp_path / "converter_schema.json"
+    snapshot.write_text(converter_schema_json(schema), encoding="utf-8")
+
+    assert check_converter_schema_snapshot(schema, str(snapshot)) == {
+        "ok": True,
+        "path": str(snapshot),
+        "error": "",
+        "message": "Converter schema snapshot is current.",
+    }
+
+    snapshot.write_text(json.dumps({"schema": "stale"}, indent=2) + "\n", encoding="utf-8")
+    result = check_converter_schema_snapshot(schema, str(snapshot))
+    assert result["ok"] is False
+    assert result["path"] == str(snapshot)
+    assert result["error"] == ""
+    assert "stale" in result["message"]
+
+
+def test_converter_schema_cli_check_accepts_current_snapshot(tmp_path):
+    snapshot = tmp_path / "converter_schema.json"
+    write_converter_schema(build_converter_schema(), str(snapshot))
+
+    result = subprocess.run(
+        [sys.executable, "tools/converter_schema.py", "--check", str(snapshot)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True

@@ -1,0 +1,619 @@
+{
+  "schema": "cryengine_converter_schema.v1",
+  "material_slot_mapping": {
+    "schema": "cryengine_material_slot_mapping.v1",
+    "rules": [
+      {
+        "id": "request_sub_index_is_final_slot",
+        "summary": "materials[].sub_index is the final CryEngine sub-material id written by RC.",
+        "evidence": "docs/refactor_phase99_cgf_import_settings_request_schema.md"
+      },
+      {
+        "id": "mtl_child_order_matches_final_slots",
+        "summary": "MTL SubMaterials child order follows the final sub_index table; gaps are placeholders.",
+        "evidence": "docs/refactor_phase99_cgf_import_settings_request_schema.md"
+      },
+      {
+        "id": "cgf_subset_material_id_indexes_final_slots",
+        "summary": "CGF MeshSubset material_id indexes the final CGF material table, not subset order.",
+        "evidence": "docs/refactor_phase9_controlled_blender_material_fixture.md"
+      },
+      {
+        "id": "raw_fbx_id_is_one_based",
+        "summary": "Known FBX material ids are one-based; raw FBX slot is fbx_material_id - 1.",
+        "evidence": "model_processing/material_index_assigner.py"
+      },
+      {
+        "id": "sub_index_limit",
+        "summary": "sub_index values 0..127 are supported; higher values normalize to -1.",
+        "evidence": "docs/refactor_phase55_rc_sub_index_limit_policy.md"
+      }
+    ]
+  },
+  "texture_outputs": {
+    "schema": "cryengine_texture_output_schema.v1",
+    "outputs": [
+      {
+        "output_key": "ddna",
+        "texture_type": "normal",
+        "ce_map_type": "Bumpmap",
+        "expected_suffix": "_ddn",
+        "accepted_suffixes": [
+          "_ddn",
+          "_ddna"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "diff",
+        "texture_type": "diffuse",
+        "ce_map_type": "Diffuse",
+        "expected_suffix": "_diff",
+        "accepted_suffixes": [
+          "_diff"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "displ",
+        "texture_type": "displacement",
+        "ce_map_type": "Heightmap",
+        "expected_suffix": "_displ",
+        "accepted_suffixes": [
+          "_displ"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "emissive",
+        "texture_type": "emissive",
+        "ce_map_type": "Emittance",
+        "expected_suffix": "_em",
+        "accepted_suffixes": [
+          "_em"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "spec",
+        "texture_type": "specular",
+        "ce_map_type": "Specular",
+        "expected_suffix": "_spec",
+        "accepted_suffixes": [
+          "_spec"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      },
+      {
+        "output_key": "sss",
+        "texture_type": "subsurface",
+        "ce_map_type": "SubSurface",
+        "expected_suffix": "_sss",
+        "accepted_suffixes": [
+          "_sss"
+        ],
+        "supported_source_extensions": [
+          "dds",
+          "hdr",
+          "tif"
+        ],
+        "source_evidence": {
+          "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+          "map_type_lines": "source-backed CE Texture Map names",
+          "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+        }
+      }
+    ],
+    "supported_source_extensions": [
+      "dds",
+      "hdr",
+      "tif"
+    ],
+    "source_evidence": {
+      "source": "Code/CryEngine/RenderDll/Common/Textures/TextureCompiler.h",
+      "lines": "165-181",
+      "rule": "CTextureCompiler::IsImageFormatSupported accepts dds, hdr, and tif when texture compiling is enabled. TextureCompiler comments describe source files as usually TIFF and destinations as usually DDS."
+    }
+  },
+  "mtl": {
+    "texture_maps": {
+      "schema": "cryengine_mtl_texture_map_schema.v1",
+      "entries": [
+        {
+          "texture_type": "alpha",
+          "ce_map_type": "Opacity",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "ao",
+          "ce_map_type": "",
+          "exported": false,
+          "reason": "known_internal_non_mtl_channel",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "bumpmap",
+          "ce_map_type": "Bumpmap",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_ddn",
+          "accepted_suffixes": [
+            "_ddn",
+            "_ddna"
+          ]
+        },
+        {
+          "texture_type": "custom",
+          "ce_map_type": "Custom",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "decal",
+          "ce_map_type": "Decal",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "detail",
+          "ce_map_type": "Detail",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_detail",
+          "accepted_suffixes": [
+            "_detail"
+          ]
+        },
+        {
+          "texture_type": "diffuse",
+          "ce_map_type": "Diffuse",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_diff",
+          "accepted_suffixes": [
+            "_diff"
+          ]
+        },
+        {
+          "texture_type": "displacement",
+          "ce_map_type": "Heightmap",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_displ",
+          "accepted_suffixes": [
+            "_displ"
+          ]
+        },
+        {
+          "texture_type": "emissive",
+          "ce_map_type": "Emittance",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_em",
+          "accepted_suffixes": [
+            "_em"
+          ]
+        },
+        {
+          "texture_type": "emittance",
+          "ce_map_type": "Emittance",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_em",
+          "accepted_suffixes": [
+            "_em"
+          ]
+        },
+        {
+          "texture_type": "environment",
+          "ce_map_type": "Environment",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_cm",
+          "accepted_suffixes": [
+            "_cm"
+          ]
+        },
+        {
+          "texture_type": "glossiness",
+          "ce_map_type": "",
+          "exported": false,
+          "reason": "known_internal_non_mtl_channel",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "height",
+          "ce_map_type": "Heightmap",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_displ",
+          "accepted_suffixes": [
+            "_displ"
+          ]
+        },
+        {
+          "texture_type": "heightmap",
+          "ce_map_type": "Heightmap",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_displ",
+          "accepted_suffixes": [
+            "_displ"
+          ]
+        },
+        {
+          "texture_type": "mask",
+          "ce_map_type": "Opacity",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "normal",
+          "ce_map_type": "Bumpmap",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_ddn",
+          "accepted_suffixes": [
+            "_ddn",
+            "_ddna"
+          ]
+        },
+        {
+          "texture_type": "opacity",
+          "ce_map_type": "Opacity",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        },
+        {
+          "texture_type": "smoothness",
+          "ce_map_type": "Smoothness",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_ddna",
+          "accepted_suffixes": [
+            "_ddna"
+          ]
+        },
+        {
+          "texture_type": "specular",
+          "ce_map_type": "Specular",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_spec",
+          "accepted_suffixes": [
+            "_spec"
+          ]
+        },
+        {
+          "texture_type": "subsurface",
+          "ce_map_type": "SubSurface",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_sss",
+          "accepted_suffixes": [
+            "_sss"
+          ]
+        },
+        {
+          "texture_type": "translucency",
+          "ce_map_type": "Translucency",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "_trans",
+          "accepted_suffixes": [
+            "_trans"
+          ]
+        },
+        {
+          "texture_type": "transparency",
+          "ce_map_type": "Opacity",
+          "exported": true,
+          "reason": "source_backed_texture_map",
+          "expected_suffix": "",
+          "accepted_suffixes": []
+        }
+      ],
+      "source_evidence": {
+        "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+        "map_type_lines": "source-backed CE Texture Map names",
+        "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+      }
+    },
+    "texture_modifier": {
+      "attributes": {
+        "TexMod_RotateType": "0",
+        "TexMod_TexGenType": "0",
+        "TexMod_bTexGenProjected": "0"
+      },
+      "attribute_status": {
+        "TexMod_RotateType": "compatibility_preserved_default_texmod",
+        "TexMod_TexGenType": "compatibility_preserved_default_texmod",
+        "TexMod_bTexGenProjected": "compatibility_preserved_default_texmod"
+      },
+      "emission_policy": "compatibility_preserved_emits_minimal_texmod",
+      "source_evidence": {
+        "save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+        "save_lines": "263-324",
+        "rule": "MaterialHelpers saves a TexMod child only when the texture modifier differs from CryEngine's default modifier. The current exporter still emits a minimal TexMod child for compatibility, so these attributes are tracked as compatibility-preserved until round-trip evidence confirms whether they should be omitted for default modifiers."
+      }
+    },
+    "material_attributes": {
+      "attributes": {
+        "MtlFlags": "524416",
+        "Shader": "Illum",
+        "SurfaceType": "",
+        "MatTemplate": "",
+        "Diffuse": "1,1,1",
+        "Specular": "1,1,1",
+        "Emittance": "0,0,0,0",
+        "Opacity": "1",
+        "Shininess": "255"
+      },
+      "attribute_status": {
+        "Diffuse": "source_backed_editor_default",
+        "Emittance": "source_loaded_compatibility_default",
+        "MatTemplate": "source_loaded_empty_export_default",
+        "MtlFlags": "covered_by_mtl_flags_policy",
+        "Opacity": "source_backed_editor_default",
+        "Shader": "source_backed_editor_default",
+        "Shininess": "compatibility_preserved_editor_default_differs",
+        "Specular": "compatibility_preserved_until_roundtrip_evidence",
+        "SurfaceType": "source_loaded_empty_export_default"
+      },
+      "source_evidence": {
+        "lighting_load_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+        "lighting_load_lines": "638-652",
+        "lighting_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+        "lighting_save_lines": "667-680",
+        "editor_default_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+        "editor_default_lines": "58-70",
+        "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+        "editor_save_lines": "1128-1139",
+        "runtime_default_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+        "runtime_default_lines": "1012-1019",
+        "rule": "MaterialHelpers loads Diffuse, Specular, Emittance, Shininess, Opacity, and AlphaTest from XML attributes and saves lighting attributes only when they differ from renderer defaults. Sandbox Material initializes Illum, Opacity=1, Diffuse=1,1,1,1, and Smoothness=10. Exporter values that do not have confirmed default equivalence stay marked as compatibility-preserved."
+      }
+    },
+    "mtl_flags": {
+      "root_material": {
+        "mtl_flags": "524544",
+        "analysis": {
+          "value": 524544,
+          "names": [
+            "MTL_FLAG_MULTI_SUBMTL",
+            "MTL_64BIT_SHADERGENMASK"
+          ],
+          "unknown_mask": 0,
+          "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+          "lines": "46-77"
+        },
+        "usage": "multi_sub_material_container"
+      },
+      "sub_material": {
+        "mtl_flags": "524416",
+        "analysis": {
+          "value": 524416,
+          "names": [
+            "MTL_FLAG_PURE_CHILD",
+            "MTL_64BIT_SHADERGENMASK"
+          ],
+          "unknown_mask": 0,
+          "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+          "lines": "46-77"
+        },
+        "usage": "exported_sub_material"
+      },
+      "source_evidence": {
+        "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+        "lines": "46-77"
+      }
+    },
+    "shader_policy": {
+      "empty_material": {
+        "tokens": [
+          "%SUBSURFACE_SCATTERING"
+        ],
+        "token_reasons": {
+          "%SUBSURFACE_SCATTERING": {
+            "source": "exporter_default_compatibility",
+            "texture_type": ""
+          }
+        },
+        "gen_mask": 32,
+        "gen_mask_source": "EXPORT_COMPAT_SHADER_MASKS",
+        "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "string_gen_mask": "%SUBSURFACE_SCATTERING",
+        "string_gen_mask_source": "source_backed_token_names",
+        "public_params": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0"
+        },
+        "public_param_reasons": {
+          "EmittanceMapGamma": {
+            "source": "exporter_base_compatibility"
+          },
+          "SSSIndex": {
+            "source": "exporter_base_compatibility"
+          }
+        },
+        "public_params_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "source_evidence": {
+          "shader_mask_load_policy": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "451-475",
+            "editor_load_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_load_lines": "887-915",
+            "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_save_lines": "1132-1137",
+            "public_params_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "public_params_lines": "813-830",
+            "rule": "GenMask is read first, but a present StringGenMask is converted through EF_GetShaderGlobalMaskGenFromString and becomes the effective shader mask. If StringGenMask is absent, GenMask is remapped through EF_GetRemapedShaderMaskGen. The Material Editor saves both GenMask and StringGenMask."
+          },
+          "public_params_policy": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "800-830",
+            "editor_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+            "editor_save_lines": "774-803",
+            "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_cache_lines": "523-533",
+            "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
+          }
+        }
+      },
+      "normal_specular_displacement": {
+        "tokens": [
+          "%DISPLACEMENT_MAPPING",
+          "%NORMAL_MAP",
+          "%PHONG_TESSELLATION",
+          "%SPECULAR_MAP",
+          "%SUBSURFACE_SCATTERING"
+        ],
+        "token_reasons": {
+          "%SUBSURFACE_SCATTERING": {
+            "source": "exporter_default_compatibility",
+            "texture_type": ""
+          },
+          "%DISPLACEMENT_MAPPING": {
+            "source": "texture_presence",
+            "texture_type": "displacement"
+          },
+          "%PHONG_TESSELLATION": {
+            "source": "texture_presence",
+            "texture_type": "displacement"
+          },
+          "%NORMAL_MAP": {
+            "source": "texture_presence",
+            "texture_type": "normal"
+          },
+          "%SPECULAR_MAP": {
+            "source": "texture_presence",
+            "texture_type": "specular"
+          }
+        },
+        "gen_mask": 5664683906826272,
+        "gen_mask_source": "EXPORT_COMPAT_SHADER_MASKS",
+        "gen_mask_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "string_gen_mask": "%DISPLACEMENT_MAPPING%NORMAL_MAP%PHONG_TESSELLATION%SPECULAR_MAP%SUBSURFACE_SCATTERING",
+        "string_gen_mask_source": "source_backed_token_names",
+        "public_params": {
+          "EmittanceMapGamma": "1",
+          "SSSIndex": "0",
+          "TessellationDispBias": "0.5",
+          "TessellationFactor": "1",
+          "TessellationFactorMax": "32",
+          "TessellationFactorMin": "1",
+          "TessellationHeightScale": "1"
+        },
+        "public_param_reasons": {
+          "EmittanceMapGamma": {
+            "source": "exporter_base_compatibility"
+          },
+          "SSSIndex": {
+            "source": "exporter_base_compatibility"
+          },
+          "TessellationDispBias": {
+            "source": "displacement_texture_compatibility",
+            "texture_type": "displacement"
+          },
+          "TessellationFactor": {
+            "source": "displacement_texture_compatibility",
+            "texture_type": "displacement"
+          },
+          "TessellationFactorMax": {
+            "source": "displacement_texture_compatibility",
+            "texture_type": "displacement"
+          },
+          "TessellationFactorMin": {
+            "source": "displacement_texture_compatibility",
+            "texture_type": "displacement"
+          },
+          "TessellationHeightScale": {
+            "source": "displacement_texture_compatibility",
+            "texture_type": "displacement"
+          }
+        },
+        "public_params_policy": "compatibility_preserved_until_roundtrip_evidence",
+        "source_evidence": {
+          "shader_mask_load_policy": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "451-475",
+            "editor_load_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_load_lines": "887-915",
+            "editor_save_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_save_lines": "1132-1137",
+            "public_params_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "public_params_lines": "813-830",
+            "rule": "GenMask is read first, but a present StringGenMask is converted through EF_GetShaderGlobalMaskGenFromString and becomes the effective shader mask. If StringGenMask is absent, GenMask is remapped through EF_GetRemapedShaderMaskGen. The Material Editor saves both GenMask and StringGenMask."
+          },
+          "public_params_policy": {
+            "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
+            "runtime_lines": "800-830",
+            "editor_save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+            "editor_save_lines": "774-803",
+            "editor_cache_source": "Code/Sandbox/EditorQt/Material/Material.cpp",
+            "editor_cache_lines": "523-533",
+            "rule": "PublicParams XML attributes are parsed into SShaderParam color/vector storage with sscanf(\"%f,%f,%f,%f\"). Missing components keep the zero value assigned before parsing. MaterialHelpers saves byte/short/int/float params as scalar attributes and color/vector params as Vec3 attributes."
+          }
+        }
+      }
+    }
+  }
+}

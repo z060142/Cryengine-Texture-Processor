@@ -27,6 +27,18 @@ Write schema to a file:
 uv run python tools/converter_schema.py --output docs/converter_schema.json
 ```
 
+Check the committed snapshot for drift:
+
+```text
+uv run python tools/converter_schema.py --check docs/converter_schema.json
+```
+
+Committed snapshot:
+
+```text
+docs/converter_schema.json
+```
+
 ## Schema id
 
 ```text
@@ -128,3 +140,4 @@ texture_output_diagnostics.json
 
 - `uv run python -m pytest tests/test_converter_schema.py tests/test_cryengine_mtl_schema.py tests/test_texture_output_diagnostics.py tests/test_material_slot_mapping.py`
 - `uv run python tools/converter_schema.py --output %TEMP%/cryengine_converter_schema_test.json`
+- `uv run python tools/converter_schema.py --check docs/converter_schema.json`

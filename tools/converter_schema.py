@@ -114,23 +114,58 @@ def build_converter_schema():
 def write_converter_schema(schema, output_path):
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(schema, f, indent=2, ensure_ascii=False)
-        f.write("\n")
+        f.write(converter_schema_json(schema))
     return output_path
+
+
+def converter_schema_json(schema):
+    return json.dumps(schema, indent=2, ensure_ascii=False) + "\n"
+
+
+def check_converter_schema_snapshot(schema, snapshot_path):
+    try:
+        with open(snapshot_path, "r", encoding="utf-8") as f:
+            current = f.read()
+    except OSError as e:
+        return {
+            "ok": False,
+            "path": snapshot_path,
+            "error": str(e),
+            "message": "Converter schema snapshot could not be read.",
+        }
+
+    expected = converter_schema_json(schema)
+    return {
+        "ok": current == expected,
+        "path": snapshot_path,
+        "error": "",
+        "message": (
+            "Converter schema snapshot is current."
+            if current == expected
+            else "Converter schema snapshot is stale. Regenerate it with tools/converter_schema.py --output."
+        ),
+    }
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Export the CryEngine converter schema used by external tools.")
     parser.add_argument("--output", default="", help="Optional output JSON path. Prints to stdout when omitted.")
+    parser.add_argument("--check", default="", help="Check an existing schema JSON snapshot for drift.")
     args = parser.parse_args(argv)
 
     schema = build_converter_schema()
+    if args.check:
+        check_path = os.path.abspath(args.check)
+        result = check_converter_schema_snapshot(schema, check_path)
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0 if result["ok"] else 1
+
     if args.output:
         output_path = os.path.abspath(args.output)
         write_converter_schema(schema, output_path)
         print(output_path)
     else:
-        print(json.dumps(schema, indent=2, ensure_ascii=False))
+        print(converter_schema_json(schema), end="")
     return 0
 
 
