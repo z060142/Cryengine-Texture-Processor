@@ -151,6 +151,22 @@ def test_build_mtl_schema_report_summarizes_attrs_params_textures_and_tokens(tmp
     ]
 
 
+def test_build_mtl_schema_report_accepts_ddna_bumpmap_alias(tmp_path):
+    mtl_path = tmp_path / "normal_alpha.mtl"
+    root = ET.Element("Material", Name="NormalAlpha", Shader="Illum")
+    textures = ET.SubElement(root, "Textures")
+    ET.SubElement(textures, "Texture", Map="Bumpmap", File="./normal_alpha_ddna.tif")
+    ET.ElementTree(root).write(mtl_path, encoding="utf-8")
+
+    report = build_mtl_schema_report([str(mtl_path)])
+
+    assert {"name": "matches_accepted_alias_suffix", "count": 1} in report["schema"]["texture_suffix_statuses"]
+    suffix_analysis = report["files"][0]["materials"][0]["textures"][0]["texture_map_analysis"]["suffix_analysis"]
+    assert suffix_analysis["expected_suffix"] == "_ddn"
+    assert suffix_analysis["accepted_suffixes"] == ["_ddn", "_ddna"]
+    assert suffix_analysis["matched_suffix"] == "_ddna"
+
+
 def test_build_mtl_schema_report_can_omit_per_file_records(tmp_path):
     mtl_path = tmp_path / "asset.mtl"
     write_schema_mtl(mtl_path)

@@ -389,6 +389,32 @@ def test_build_material_diagnostics_report_warns_for_non_rc_texture_source_and_s
     assert report["summary"]["hazard_count"] == 0
 
 
+def test_build_material_diagnostics_report_accepts_ddna_bumpmap_alias():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Stone",
+                "id": 1,
+                "textures": {
+                    "normal": "stone_ddna.tif",
+                },
+            }
+        ],
+        source_model="normal_alpha.fbx",
+    )
+
+    exported = report["materials"][0]["mtl_texture_map_policy"]["exported"][0]
+    suffix_analysis = exported["suffix_analysis"]
+    assert suffix_analysis["expected_suffix"] == "_ddn"
+    assert suffix_analysis["accepted_suffixes"] == ["_ddn", "_ddna"]
+    assert suffix_analysis["matched_suffix"] == "_ddna"
+    assert suffix_analysis["suffix_status"] == "matches_accepted_alias_suffix"
+    assert report["mtl_texture_map_policy_summary"]["suffix_status_counts"] == {
+        "matches_accepted_alias_suffix": 1,
+    }
+    assert report["diagnostics"] == []
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [

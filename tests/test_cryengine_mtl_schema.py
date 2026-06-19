@@ -1,4 +1,5 @@
 from output_formats.cryengine_mtl_schema import (
+    CE_TEXTURE_ACCEPTED_SUFFIXES,
     CE_TEXTURE_MAP_TYPES,
     CE_TEXTURE_MAP_NAMES,
     CE_TEXTURE_SUFFIXES,
@@ -55,15 +56,25 @@ def test_ce_texture_suffixes_follow_material_helpers_suffixes():
     assert CE_TEXTURE_SUFFIXES["Smoothness"] == "_ddna"
     assert CE_TEXTURE_SUFFIXES["Heightmap"] == "_displ"
     assert CE_TEXTURE_SUFFIXES["Emittance"] == "_em"
+    assert CE_TEXTURE_ACCEPTED_SUFFIXES["Bumpmap"] == ("_ddn", "_ddna")
 
 
 def test_analyze_ce_texture_suffix_reports_match_and_mismatch():
     match = analyze_ce_texture_suffix("Diffuse", r"textures\wall_diff.dds")
     assert match["expected_suffix"] == "_diff"
+    assert match["accepted_suffixes"] == ["_diff"]
+    assert match["matched_suffix"] == "_diff"
     assert match["suffix_status"] == "matches_expected_suffix"
     assert match["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
 
-    mismatch = analyze_ce_texture_suffix("Bumpmap", "textures/wall_ddna.dds")
+    alias = analyze_ce_texture_suffix("Bumpmap", "textures/wall_ddna.dds")
+    assert alias["expected_suffix"] == "_ddn"
+    assert alias["accepted_suffixes"] == ["_ddn", "_ddna"]
+    assert alias["matched_suffix"] == "_ddna"
+    assert alias["suffix_status"] == "matches_accepted_alias_suffix"
+    assert alias["source_evidence"]["alias_source"].endswith("TextureCompiler.cpp")
+
+    mismatch = analyze_ce_texture_suffix("Bumpmap", "textures/wall_normal.dds")
     assert mismatch["expected_suffix"] == "_ddn"
     assert mismatch["suffix_status"] == "mismatch_expected_suffix"
 

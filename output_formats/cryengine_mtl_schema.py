@@ -44,6 +44,11 @@ CE_TEXTURE_SUFFIXES = {
     "Emittance": "_em",
 }
 
+CE_TEXTURE_ACCEPTED_SUFFIXES = {
+    **{ce_map_type: (suffix,) for ce_map_type, suffix in CE_TEXTURE_SUFFIXES.items()},
+    "Bumpmap": ("_ddn", "_ddna"),
+}
+
 CE_TEXTURE_MAP_NAMES = {
     ce_map_type
     for ce_map_type in CE_TEXTURE_MAP_TYPES.values()
@@ -63,6 +68,13 @@ CE_TEXTURE_MAP_SOURCE = {
 CE_TEXTURE_SUFFIX_SOURCE = {
     "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
     "suffix_lines": "source-backed CE Texture suffix names",
+    "alias_source": "Code/CryEngine/RenderDll/Common/Textures/TextureCompiler.cpp",
+    "alias_rule": (
+        "MaterialHelpers names Bumpmap as _ddn, while TextureCompiler also "
+        "handles _ddna normal-alpha placeholder textures. Diagnostics accept "
+        "_ddna as a Bumpmap alias instead of treating CE normal-alpha exports "
+        "as suffix mismatches."
+    ),
     "rule": (
         "Known CryEngine material Texture Map names have conventional filename "
         "suffixes. The exporter does not rename files here; diagnostics only "
@@ -417,9 +429,12 @@ def exported_material_attribute_policy():
 
 def analyze_ce_texture_suffix(ce_map_type, texture_path):
     expected_suffix = CE_TEXTURE_SUFFIXES.get(ce_map_type or "", "")
+    accepted_suffixes = CE_TEXTURE_ACCEPTED_SUFFIXES.get(ce_map_type or "", ())
     filename = os.path.basename(str(texture_path or "")).replace("\\", "/")
     stem = os.path.splitext(filename)[0].lower()
     expected_lower = expected_suffix.lower()
+    accepted_lower = tuple(suffix.lower() for suffix in accepted_suffixes)
+    matched_suffix = ""
 
     if not ce_map_type or not texture_path:
         suffix_status = "not_applicable"
@@ -427,11 +442,20 @@ def analyze_ce_texture_suffix(ce_map_type, texture_path):
         suffix_status = "no_source_backed_suffix"
     elif stem.endswith(expected_lower):
         suffix_status = "matches_expected_suffix"
+        matched_suffix = expected_suffix
     else:
-        suffix_status = "mismatch_expected_suffix"
+        for suffix, suffix_lower in zip(accepted_suffixes, accepted_lower):
+            if suffix_lower != expected_lower and stem.endswith(suffix_lower):
+                suffix_status = "matches_accepted_alias_suffix"
+                matched_suffix = suffix
+                break
+        else:
+            suffix_status = "mismatch_expected_suffix"
 
     return {
         "expected_suffix": expected_suffix,
+        "accepted_suffixes": list(accepted_suffixes),
+        "matched_suffix": matched_suffix,
         "suffix_status": suffix_status,
         "filename": filename,
         "source_evidence": CE_TEXTURE_SUFFIX_SOURCE,
