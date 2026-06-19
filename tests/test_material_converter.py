@@ -1,8 +1,5 @@
-from model_processing.material_converter import (
-    MaterialConverter,
-    infer_texture_type_from_path,
-    normalize_texture_type,
-)
+from model_processing.material_converter import MaterialConverter
+from model_processing.texture_type_resolver import infer_texture_type_from_path, normalize_texture_type
 
 
 def test_normalize_texture_type_accepts_common_aliases():
@@ -19,6 +16,7 @@ def test_infer_texture_type_from_filename_suffixes():
     assert infer_texture_type_from_path("wall_spec.tif") == "specular"
     assert infer_texture_type_from_path("wall_displ.tif") == "displacement"
     assert infer_texture_type_from_path("wall_emissive.tif") == "emissive"
+    assert infer_texture_type_from_path("wall_opacity.tif") == "alpha"
     assert infer_texture_type_from_path("wall_unknown.tif") is None
 
 
@@ -31,7 +29,7 @@ def test_convert_maps_classified_texture_keys_to_cryengine_fields():
             "specular": "wall_spec.tif",
             "displacement": "wall_displ.tif",
             "emissive": "wall_emissive.tif",
-            "opacity": "wall_opacity.tif",
+            "alpha": "wall_opacity.tif",
         },
     )
 
@@ -85,3 +83,11 @@ def test_set_texture_node_records_normalized_texture_type_on_dict():
     MaterialConverter()._set_texture_node(material, "Bumpmap", "wall_ddna.tif")
 
     assert material["textures"] == {"normal": "wall_ddna.tif"}
+
+
+def test_set_texture_node_maps_alpha_to_mtl_opacity_key_on_dict():
+    material = {"name": "Wall"}
+
+    MaterialConverter()._set_texture_node(material, "Alpha", "wall_opacity.tif")
+
+    assert material["textures"] == {"opacity": "wall_opacity.tif"}

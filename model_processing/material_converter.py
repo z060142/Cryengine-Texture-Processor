@@ -5,6 +5,10 @@
 import os
 from copy import deepcopy
 
+from model_processing.texture_type_resolver import (
+    infer_texture_type_from_path,
+    normalize_texture_type,
+)
 from output_formats.cryengine_mtl_schema import (
     BASE_PUBLIC_PARAMS,
     CE_TEXTURE_MAP_TYPES,
@@ -13,93 +17,12 @@ from output_formats.cryengine_mtl_schema import (
     exported_string_gen_mask,
 )
 
-
-TEXTURE_TYPE_ALIASES = {
-    "basecolor": "diffuse",
-    "base_color": "diffuse",
-    "color": "diffuse",
-    "albedo": "diffuse",
-    "diff": "diffuse",
-    "diffuse": "diffuse",
-    "n": "normal",
-    "nrm": "normal",
-    "normal": "normal",
-    "ddn": "normal",
-    "ddna": "normal",
-    "bumpmap": "normal",
-    "spec": "specular",
-    "specular": "specular",
-    "height": "displacement",
-    "heightmap": "displacement",
-    "disp": "displacement",
-    "displ": "displacement",
-    "displacement": "displacement",
-    "em": "emissive",
-    "emissive": "emissive",
-    "emittance": "emissive",
-    "opacity": "opacity",
-    "alpha": "opacity",
-    "mask": "opacity",
-    "sss": "subsurface",
-    "sub_surface": "subsurface",
-    "subsurface": "subsurface",
-}
-
-FILENAME_SUFFIX_TYPES = (
-    ("_basecolor", "diffuse"),
-    ("_albedo", "diffuse"),
-    ("_diffuse", "diffuse"),
-    ("_diff", "diffuse"),
-    ("_color", "diffuse"),
-    ("_ddna", "normal"),
-    ("_ddn", "normal"),
-    ("_normal", "normal"),
-    ("_nrm", "normal"),
-    ("_n", "normal"),
-    ("_specular", "specular"),
-    ("_spec", "specular"),
-    ("_displacement", "displacement"),
-    ("_displ", "displacement"),
-    ("_height", "displacement"),
-    ("_disp", "displacement"),
-    ("_emissive", "emissive"),
-    ("_emission", "emissive"),
-    ("_em", "emissive"),
-    ("_opacity", "opacity"),
-    ("_alpha", "opacity"),
-    ("_mask", "opacity"),
-    ("_sss", "subsurface"),
-)
-
 TEXTURE_MASK_TOKENS = {
     "normal": "%NORMAL_MAP",
     "specular": "%SPECULAR_MAP",
     "displacement": "%DISPLACEMENT_MAPPING",
     "subsurface": "%SUBSURFACE_SCATTERING",
 }
-
-
-def normalize_texture_type(texture_type):
-    """Return the internal texture type used by the MTL exporter."""
-    if texture_type is None:
-        return None
-    key = str(texture_type).strip().lower().replace(" ", "_").replace("-", "_")
-    if key in TEXTURE_TYPE_ALIASES:
-        return TEXTURE_TYPE_ALIASES[key]
-
-    for internal_type, ce_map_type in CE_TEXTURE_MAP_TYPES.items():
-        if ce_map_type and key == ce_map_type.lower():
-            return internal_type
-    return None
-
-
-def infer_texture_type_from_path(texture_path):
-    """Infer a texture type from a filename suffix without claiming certainty."""
-    stem = os.path.splitext(os.path.basename(str(texture_path or "")))[0].lower()
-    for suffix, texture_type in FILENAME_SUFFIX_TYPES:
-        if stem.endswith(suffix):
-            return texture_type
-    return None
 
 
 def _coerce_material_name(material):
@@ -129,6 +52,8 @@ def _normalize_texture_map(texture_map):
             texture_type = infer_texture_type_from_path(raw_key)
         if texture_type is None:
             continue
+        if texture_type == "alpha":
+            texture_type = "opacity"
 
         normalized[texture_type] = raw_value
     return normalized
@@ -231,6 +156,8 @@ class MaterialConverter:
         converter only records normalized data when given plain material dicts.
         """
         normalized_type = normalize_texture_type(texture_type) or str(texture_type)
+        if normalized_type == "alpha":
+            normalized_type = "opacity"
         if isinstance(material, dict):
             material.setdefault("textures", {})[normalized_type] = texture_path
         else:

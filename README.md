@@ -185,6 +185,7 @@ The harness also records `sandbox_edcommand`, a normal Editor launch strategy us
 - `.mtl` texture path emission now preserves CryEngine `%...%` aliases and uses explicit tested relative/absolute fallback rules
 - `model_processing.material_converter` now has a tested conservative data-conversion contract instead of placeholder Blender-node mutation code
 - Model loading and texture extraction now expose `load_status` and texture `source_mode` so filesystem-scan fallbacks are not confused with authoritative Blender material data
+- Blender extraction, filesystem scan, and material conversion now share `model_processing.texture_type_resolver` for texture type semantics
 - Controlled multi-mesh probes show that raw per-object local FBX slot ids are not enough: two meshes can both use local slot `0`, while RC writes CGF material ids `0` and `1`; a swapped request/MTL probe shows RC does not remap those ids by material name, so request/MTL slot order must mirror the exported FBX material table
 - Shared-material and duplicate-name probes show that Blender suffixes such as `.001` are RC-visible material identities, not cosmetic noise; request JSON and `.mtl` generation must preserve them unless the exporter deliberately creates another stable unique name
 - RC smoke material reports now read controlled fixture manifests when available and emit `fixture_material_semantic_alignment`, which distinguishes "CGF id exists" from "that id points to the expected material name"

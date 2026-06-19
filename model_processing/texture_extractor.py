@@ -9,6 +9,11 @@ This module provides functionality for extracting texture references from models
 import os
 import importlib
 
+from model_processing.texture_type_resolver import (
+    infer_texture_type_from_path,
+    infer_texture_type_from_text,
+)
+
 class TextureReference:
     """
     Class representing a reference to a texture in a model material.
@@ -65,31 +70,6 @@ class TextureExtractor:
         """
         Initialize the texture extractor.
         """
-        # Mapping from Blender texture types to our texture types
-        self.texture_type_map = {
-            "Base Color": "diffuse",
-            "Diffuse": "diffuse",
-            "Diffuse Color": "diffuse",
-            "Normal": "normal",
-            "Normal Map": "normal",
-            "Specular": "specular",
-            "Specular Color": "specular",
-            "Roughness": "roughness",
-            "Glossiness": "glossiness",
-            "Glossy": "glossiness",
-            "Glossy BSDF": "glossiness",
-            "Metallic": "metallic",
-            "Emission": "emissive",
-            "Emission Color": "emissive",
-            "Alpha": "alpha",
-            "Opacity": "alpha",
-            "Ambient Occlusion": "ao",
-            "AO": "ao",
-            "Height": "displacement",
-            "Displacement": "displacement",
-            "Bump": "displacement"
-        }
-        
         # Try to import bpy
         self.bpy = None
         try:
@@ -169,64 +149,23 @@ class TextureExtractor:
         Returns:
             Texture type string
         """
-        texture_type = "diffuse"  # Default to diffuse
-        
         # Check node connections
         if node.outputs and len(node.outputs) > 0:
             for output in node.outputs:
                 for link in output.links:
                     if link.to_socket:
-                        socket_name = link.to_socket.name
-                        if socket_name in self.texture_type_map:
-                            return self.texture_type_map[socket_name]
-                        
-                        # Check some common socket names
-                        socket_name_lower = socket_name.lower()
-                        if "color" in socket_name_lower or "albedo" in socket_name_lower:
-                            return "diffuse"
-                        elif "normal" in socket_name_lower:
-                            return "normal"
-                        elif "specular" in socket_name_lower:
-                            return "specular"
-                        elif "rough" in socket_name_lower:
-                            return "roughness"
-                        elif "gloss" in socket_name_lower or "glossy" in socket_name_lower:
-                            return "glossiness"
-                        elif "metal" in socket_name_lower:
-                            return "metallic"
-                        elif "emission" in socket_name_lower or "emissive" in socket_name_lower:
-                            return "emissive"
-                        elif "alpha" in socket_name_lower or "opacity" in socket_name_lower:
-                            return "alpha"
-                        elif "ao" in socket_name_lower or "ambient" in socket_name_lower or "occlusion" in socket_name_lower:
-                            return "ao"
-                        elif "height" in socket_name_lower or "displace" in socket_name_lower or "bump" in socket_name_lower:
-                            return "displacement"
-        
-        # Check node name
-        node_name = node.name.lower()
-        if "color" in node_name or "albedo" in node_name or "diffuse" in node_name:
-            return "diffuse"
-        elif "normal" in node_name:
-            return "normal"
-        elif "specular" in node_name:
-            return "specular"
-        elif "rough" in node_name:
-            return "roughness"
-        elif "gloss" in node_name or "glossy" in node_name:
-            return "glossiness"
-        elif "metal" in node_name:
-            return "metallic"
-        elif "emission" in node_name or "emissive" in node_name:
-            return "emissive"
-        elif "alpha" in node_name or "opacity" in node_name:
-            return "alpha"
-        elif "ao" in node_name or "ambient" in node_name or "occlusion" in node_name:
-            return "ao"
-        elif "height" in node_name or "displace" in node_name or "bump" in node_name:
-            return "displacement"
-        
-        return texture_type
+                        texture_type = infer_texture_type_from_text(link.to_socket.name)
+                        if texture_type:
+                            return texture_type
+
+        for attr in ("label", "name"):
+            texture_type = infer_texture_type_from_text(getattr(node, attr, ""))
+            if texture_type:
+                return texture_type
+
+        image = getattr(node, "image", None)
+        texture_type = infer_texture_type_from_path(getattr(image, "filepath", ""))
+        return texture_type or "diffuse"
     
     def _create_filesystem_references(self, model, source_mode="filesystem_import_only"):
         """
@@ -269,22 +208,6 @@ class TextureExtractor:
         # Texture extensions to look for
         texture_extensions = (".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".bmp")
         
-        # Mapping of filename patterns to texture types
-        # The order matters for priority
-        pattern_to_type = {
-            "normal": ["_normal", "_norm", "_n", "_nrm", "_ddn", "_ddna", "_nor", "_nor_dx", "_nor_gl"],
-            "diffuse": ["_diffuse", "_diff", "_albedo", "_color", "_col", "_d", "_basecolor"],
-            "specular": ["_specular", "_spec", "_s", "reflection", "_refl"],
-            "glossiness": ["_glossiness", "_gloss", "_glossy", "_g", "_smoothness"],
-            "roughness": ["_roughness", "_rough", "_r"],
-            "displacement": ["_displacement", "_disp", "_height", "_bump", "_h", "_displ"],
-            "metallic": ["_metallic", "_metal", "_m", "_metalness"],
-            "ao": ["_ao", "_ambient", "_occlusion"],
-            "alpha": ["_alpha", "_opacity", "_transparency", "_a"],
-            "emissive": ["_emissive", "_emission", "_glow", "_e"],
-            "sss": ["_sss", "_subsurface"]
-        }
-        
         # Scan all potential texture directories
         for directory in directories_to_check:
             if os.path.exists(directory) and os.path.isdir(directory):
@@ -302,14 +225,7 @@ class TextureExtractor:
                             seen_paths.add(normalized_file_path)
                             file_lower = file.lower()
                             
-                            # Determine texture type from filename
-                            texture_type = "diffuse"  # Default if no pattern matches
-                            
-                            # Check each pattern for a match
-                            for typ, patterns in pattern_to_type.items():
-                                if any(pattern in file_lower for pattern in patterns):
-                                    texture_type = typ
-                                    break
+                            texture_type = infer_texture_type_from_path(file_lower) or "diffuse"
                             
                             # Try to figure out which material this texture belongs to
                             material_name = material_names[0]  # Default to first material if no match

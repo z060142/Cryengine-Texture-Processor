@@ -85,3 +85,16 @@ def test_texture_extractor_import_only_scan_marks_import_only_source_mode(tmp_pa
     assert len(refs) == 1
     assert refs[0].texture_type == "normal"
     assert refs[0].source_mode == "filesystem_import_only"
+
+
+def test_texture_extractor_filesystem_scan_uses_shared_suffix_resolver(tmp_path):
+    model_path = tmp_path / "asset.fbx"
+    texture_path = tmp_path / "asset_opacity.png"
+    texture_path.write_text("texture", encoding="utf-8")
+    extractor = TextureExtractor.__new__(TextureExtractor)
+    extractor.bpy = None
+
+    refs = extractor.extract({"path": str(model_path), "materials": [{"name": "asset"}]})
+
+    assert len(refs) == 1
+    assert refs[0].texture_type == "alpha"

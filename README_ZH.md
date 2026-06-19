@@ -163,6 +163,7 @@ harness 也会记录 `sandbox_edcommand`，用于尝试普通 Editor 启动加 `
 - `.mtl` 贴图路径输出现在会保留 CryEngine `%...%` alias，并使用有测试覆盖的相对/绝对 fallback 规则
 - `model_processing.material_converter` 现在改为有测试覆盖的保守资料转换契约，不再保留假的 Blender 节点修改 placeholder
 - 模型载入与贴图提取现在会输出 `load_status` 与贴图 `source_mode`，避免把 filesystem scan fallback 误当成 Blender 材质的权威资料
+- Blender 提取、filesystem scan 与材质转换现在共用 `model_processing.texture_type_resolver` 作为贴图类型语意入口
 
 ## 许可证
 
