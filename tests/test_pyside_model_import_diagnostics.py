@@ -310,6 +310,43 @@ def test_collect_model_material_diagnostics_reports_degraded_texture_source():
     assert diagnostics[0]["texture_ref_evidence"][0]["filename"] == "wall_diff.png"
 
 
+def test_collect_model_material_diagnostics_reports_rc_unassigned_placeholders():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}],
+            "rc_material_smoke": {
+                "unassigned_slot_diagnostics": [
+                    {
+                        "ok": True,
+                        "type": "trailing_unassigned_placeholder",
+                        "slot": 3,
+                        "request_name": "<unassigned>",
+                        "mtl_slot_name": "<unassigned>",
+                        "used_by_cgf": False,
+                        "max_used_material_id": 2,
+                    },
+                    {
+                        "ok": False,
+                        "type": "used_unassigned_material",
+                        "slot": 1,
+                        "request_name": "unassigned",
+                        "mtl_slot_name": "unassigned",
+                        "used_by_cgf": True,
+                        "max_used_material_id": 1,
+                    },
+                ]
+            },
+        }
+    )
+
+    assert diagnostics[0]["severity"] == "info"
+    assert diagnostics[0]["code"] == "trailing_unassigned_placeholder"
+    assert diagnostics[0]["sub_index"] == 3
+    assert diagnostics[1]["severity"] == "hazard"
+    assert diagnostics[1]["code"] == "used_unassigned_material"
+    assert diagnostics[1]["used_by_cgf"] is True
+
+
 def test_model_display_name_marks_hazards():
     assert model_display_name({"filename": "tree.fbx", "material_diagnostics": []}) == "tree.fbx"
     assert (
@@ -410,9 +447,21 @@ def test_rc_material_smoke_summary_text_handles_states():
                 "success": True,
                 "semantic_alignment_ok": True,
                 "cgf_material_id_alignment_ok": False,
+                "unassigned_slot_diagnostics_ok": False,
             }
         )
-        == "passed / semantic ok / CGF ids mismatch"
+        == "passed / semantic ok / CGF ids mismatch / used unassigned"
+    )
+    assert (
+        rc_material_smoke_summary_text(
+            {
+                "success": True,
+                "semantic_alignment_ok": True,
+                "cgf_material_id_alignment_ok": True,
+                "unassigned_slot_diagnostics_ok": True,
+            }
+        )
+        == "passed / semantic ok / CGF ids ok / unassigned ok"
     )
     assert rc_material_smoke_summary_text({"error": "missing rc"}) == "failed: missing rc"
 
@@ -478,7 +527,21 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
             json.dumps(
                 {
                     "fixture_material_semantic_alignment": {"ok": True},
-                    "cgf_material_id_alignment": {"ok": True},
+                    "cgf_material_id_alignment": {
+                        "ok": True,
+                        "unassigned_slot_diagnostics_ok": True,
+                        "unassigned_slot_diagnostics": [
+                            {
+                                "ok": True,
+                                "type": "trailing_unassigned_placeholder",
+                                "slot": 2,
+                                "request_name": "<unassigned>",
+                                "mtl_slot_name": "<unassigned>",
+                                "used_by_cgf": False,
+                                "max_used_material_id": 1,
+                            }
+                        ],
+                    },
                 }
             ),
             encoding="utf-8",
@@ -497,3 +560,15 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
     assert smoke_info["material_report_path"] == str(report_path)
     assert smoke_info["semantic_alignment_ok"] is True
     assert smoke_info["cgf_material_id_alignment_ok"] is True
+    assert smoke_info["unassigned_slot_diagnostics_ok"] is True
+    assert smoke_info["unassigned_slot_diagnostics"] == [
+        {
+            "ok": True,
+            "type": "trailing_unassigned_placeholder",
+            "slot": 2,
+            "request_name": "<unassigned>",
+            "mtl_slot_name": "<unassigned>",
+            "used_by_cgf": False,
+            "max_used_material_id": 1,
+        }
+    ]

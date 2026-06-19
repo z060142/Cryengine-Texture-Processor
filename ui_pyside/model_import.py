@@ -103,8 +103,44 @@ def _degraded_texture_reference_diagnostics(material_name, material):
     ]
 
 
+def _rc_unassigned_material_diagnostics(smoke_info):
+    diagnostics = []
+    for item in (smoke_info or {}).get("unassigned_slot_diagnostics", []):
+        slot = item.get("slot")
+        diagnostic_type = item.get("type", "")
+        request_name = item.get("request_name", "")
+        mtl_name = item.get("mtl_slot_name", "")
+        severity = "hazard" if diagnostic_type == "used_unassigned_material" or not item.get("ok", True) else "info"
+        if diagnostic_type == "used_unassigned_material":
+            message = (
+                "CGF geometry uses an unassigned placeholder material. Fix the source material assignment before export."
+            )
+        elif diagnostic_type == "gap_unassigned_placeholder":
+            message = "Unassigned material slot is preserved as an index gap placeholder."
+        elif diagnostic_type == "trailing_unassigned_placeholder":
+            message = "Trailing unassigned material slot is an unused RC placeholder."
+        else:
+            message = "RC reported an unassigned material placeholder."
+        diagnostics.append(
+            {
+                "severity": severity,
+                "code": diagnostic_type or "unassigned_material_placeholder",
+                "material": request_name or mtl_name,
+                "fbx_slot": slot,
+                "sub_index": slot,
+                "request_name": request_name,
+                "mtl_slot_name": mtl_name,
+                "used_by_cgf": item.get("used_by_cgf"),
+                "max_used_material_id": item.get("max_used_material_id"),
+                "message": message,
+            }
+        )
+    return diagnostics
+
+
 def collect_model_material_diagnostics(model_data):
     diagnostics = _degraded_model_load_diagnostics(model_data or {})
+    diagnostics.extend(_rc_unassigned_material_diagnostics((model_data or {}).get("rc_material_smoke", {})))
     materials = model_data.get("materials", []) if model_data else []
     records = build_material_slot_records(
         materials,
@@ -176,6 +212,10 @@ def _alignment_ok(report, key):
     return alignment.get("ok")
 
 
+def _material_id_alignment(report):
+    return (report or {}).get("cgf_material_id_alignment", {}) or {}
+
+
 def run_model_material_rc_smoke(
     model_path,
     rc_exe_path,
@@ -193,6 +233,8 @@ def run_model_material_rc_smoke(
         "material_report_path": "",
         "semantic_alignment_ok": None,
         "cgf_material_id_alignment_ok": None,
+        "unassigned_slot_diagnostics": [],
+        "unassigned_slot_diagnostics_ok": None,
         "error": "",
     }
 
@@ -211,6 +253,7 @@ def run_model_material_rc_smoke(
     )
     report_path = getattr(result, "material_report_path", "") or ""
     report = _load_rc_material_report(report_path)
+    material_id_alignment = _material_id_alignment(report)
     result_info.update(
         {
             "success": bool(getattr(result, "success", False)),
@@ -220,7 +263,9 @@ def run_model_material_rc_smoke(
             "expected_output_path": getattr(result, "expected_output_path", ""),
             "material_report_path": report_path,
             "semantic_alignment_ok": _alignment_ok(report, "fixture_material_semantic_alignment"),
-            "cgf_material_id_alignment_ok": _alignment_ok(report, "cgf_material_id_alignment"),
+            "cgf_material_id_alignment_ok": material_id_alignment.get("ok"),
+            "unassigned_slot_diagnostics": material_id_alignment.get("unassigned_slot_diagnostics", []),
+            "unassigned_slot_diagnostics_ok": material_id_alignment.get("unassigned_slot_diagnostics_ok"),
             "error": getattr(result, "error", "") or "",
         }
     )
@@ -237,10 +282,13 @@ def rc_material_smoke_summary_text(smoke_info):
     checks = []
     semantic_ok = smoke_info.get("semantic_alignment_ok")
     cgf_ok = smoke_info.get("cgf_material_id_alignment_ok")
+    unassigned_ok = smoke_info.get("unassigned_slot_diagnostics_ok")
     if semantic_ok is not None:
         checks.append("semantic ok" if semantic_ok else "semantic mismatch")
     if cgf_ok is not None:
         checks.append("CGF ids ok" if cgf_ok else "CGF ids mismatch")
+    if unassigned_ok is not None:
+        checks.append("unassigned ok" if unassigned_ok else "used unassigned")
     return " / ".join([status, *checks])
 
 
@@ -710,9 +758,17 @@ class ModelImportPanel(QWidget):
         model_info["rc_material_smoke"] = smoke_info
         if model_info.get("model_obj"):
             model_info["model_obj"]["material_manifest"] = material_manifest
+            model_info["model_obj"]["rc_material_smoke"] = smoke_info
+            model_info["material_diagnostics"] = collect_model_material_diagnostics(model_info["model_obj"])
+        else:
+            model_info["material_diagnostics"] = collect_model_material_diagnostics(model_info)
         self.material_manifest_label.setText(material_manifest_summary_text(material_manifest))
         self.rc_smoke_label.setText(rc_material_smoke_summary_text(smoke_info))
+        self.diagnostics_label.setText(str(len(model_info.get("material_diagnostics", []))))
         self._populate_material_table(material_manifest.get("materials", []))
+        self._populate_diagnostics_table(model_info.get("material_diagnostics", []))
+        self._update_model_list_display()
+        self.models_list.setCurrentRow(row)
 
         message = rc_material_smoke_summary_text(smoke_info)
         if smoke_info.get("material_report_path"):
