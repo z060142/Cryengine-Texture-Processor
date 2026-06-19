@@ -1,6 +1,7 @@
 import os
 
 from model_processing.material_texture_resolver import (
+    build_material_texture_records,
     build_fbx_texture_data,
     build_mtl_material_data,
     clean_material_name,
@@ -10,9 +11,12 @@ from model_processing.material_texture_resolver import (
 
 
 class TextureRef:
-    def __init__(self, path, material_name):
+    def __init__(self, path, material_name, texture_type=None, source_mode="blender"):
         self.path = path
         self.material_name = material_name
+        self.texture_type = texture_type
+        self.source_mode = source_mode
+        self.filename = os.path.basename(path) if path else ""
 
 
 class TextureManagerStub:
@@ -43,6 +47,8 @@ def test_iter_unique_clean_materials_skips_defaults_and_preserves_suffixes():
 def test_strip_known_texture_suffix_handles_cryengine_outputs():
     assert strip_known_texture_suffix("wall_diff") == "wall"
     assert strip_known_texture_suffix("wall_ddna") == "wall"
+    assert strip_known_texture_suffix("wall_basecolor") == "wall"
+    assert strip_known_texture_suffix("wall_opacity") == "wall"
     assert strip_known_texture_suffix("wall") == "wall"
 
 
@@ -63,6 +69,32 @@ def test_build_fbx_texture_data_finds_existing_diff_and_ddna(tmp_path):
     )
 
     assert set(result["Wall"].keys()) == {"diff", "ddna"}
+
+
+def test_material_texture_records_capture_texture_ref_evidence(tmp_path):
+    source = tmp_path / "wall_opacity.png"
+    source.write_text("fake source")
+    (tmp_path / "wall_opacity.tif").write_text("fake opacity")
+    model_data = {"materials": [{"name": "Wall"}]}
+    refs = [TextureRef(str(source), "Wall", texture_type="alpha", source_mode="filesystem_no_bpy")]
+
+    records = build_material_texture_records(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert records[0]["textures"]["opacity"] == str(tmp_path / "wall_opacity.tif")
+    assert records[0]["texture_ref_evidence"] == [
+        {
+            "path": str(source),
+            "filename": "wall_opacity.png",
+            "texture_type": "alpha",
+            "source_mode": "filesystem_no_bpy",
+        }
+    ]
 
 
 def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_path):
@@ -95,6 +127,7 @@ def test_build_mtl_material_data_keeps_material_without_processed_textures(tmp_p
     assert result[0]["mesh_names"] == ["WallMesh"]
     assert result[0]["material_names"] == ["Wall", "WallAlt"]
     assert result[0]["slot_name_conflict"] is True
+    assert result[0]["texture_ref_evidence"] == []
 
 
 def test_build_mtl_material_data_follows_material_manifest_order(tmp_path):

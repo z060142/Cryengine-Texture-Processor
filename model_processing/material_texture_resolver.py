@@ -10,32 +10,11 @@ place so the next phase can swap them for RC-accurate material/sub-index logic.
 import os
 
 from model_processing.material_manifest import material_manifest_materials
+from model_processing.texture_type_resolver import FILENAME_SUFFIX_TYPES, infer_texture_type_from_path
 
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 
-COMMON_TEXTURE_BASE_SUFFIXES = (
-    "_diffuse",
-    "_diff",
-    "_color",
-    "_albedo",
-    "_basecolor",
-    "_n",
-    "_normal",
-    "_nrm",
-    "_ddn",
-    "_ddna",
-    "_spec",
-    "_specular",
-    "_h",
-    "_height",
-    "_disp",
-    "_displ",
-    "_displacement",
-    "_e",
-    "_emissive",
-    "_emission",
-    "_glow",
-)
+COMMON_TEXTURE_BASE_SUFFIXES = tuple(suffix for suffix, _ in FILENAME_SUFFIX_TYPES)
 
 FBX_OUTPUT_TEXTURE_SUFFIXES = {
     "diff": "_diff.{ext}",
@@ -103,6 +82,14 @@ def group_texture_refs_by_material(texture_refs):
     return refs_by_material
 
 
+def texture_ref_type(ref):
+    """Return a normalized texture type for a texture reference when known."""
+    texture_type = getattr(ref, "texture_type", None)
+    if texture_type:
+        return texture_type
+    return infer_texture_type_from_path(getattr(ref, "path", ""))
+
+
 def strip_known_texture_suffix(filename_no_ext, suffixes=COMMON_TEXTURE_BASE_SUFFIXES):
     """Strip one known texture suffix from a filename stem."""
     candidate = filename_no_ext or ""
@@ -111,6 +98,22 @@ def strip_known_texture_suffix(filename_no_ext, suffixes=COMMON_TEXTURE_BASE_SUF
         if candidate_lower.endswith(suffix):
             return candidate[: -len(suffix)]
     return candidate
+
+
+def texture_ref_evidence(material_refs):
+    """Summarize texture reference evidence used to resolve processed outputs."""
+    evidence = []
+    for ref in material_refs or []:
+        ref_path = getattr(ref, "path", "")
+        evidence.append(
+            {
+                "path": ref_path,
+                "filename": os.path.basename(ref_path) if ref_path else getattr(ref, "filename", ""),
+                "texture_type": texture_ref_type(ref),
+                "source_mode": getattr(ref, "source_mode", ""),
+            }
+        )
+    return evidence
 
 
 def resolve_base_name(material_refs, texture_manager, suffixes=COMMON_TEXTURE_BASE_SUFFIXES):
@@ -214,6 +217,7 @@ def build_material_texture_records(
                     "slot_name_conflict": material.get("slot_name_conflict", False),
                     "base_name": base_name,
                     "textures": processed_textures,
+                    "texture_ref_evidence": texture_ref_evidence(material_refs),
                     "source_texture_count": len(material_refs),
                 }
             )
@@ -254,6 +258,7 @@ def build_mtl_material_data(*args, **kwargs):
             "material_names": record["material_names"],
             "slot_name_conflict": record["slot_name_conflict"],
             "textures": record["textures"],
+            "texture_ref_evidence": record["texture_ref_evidence"],
         }
         for record in records
     ]
