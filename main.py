@@ -159,6 +159,17 @@ def main():
             processing_successful = False
             progress_dialog.show_completion(False, True)
             window.update_status(get_text("status.processing_cancelled", "Processing cancelled"))
+        elif not batch_processor.texture_output_gate_ok:
+            processing_successful = False
+            texture_report_path = batch_processor.texture_output_report_path
+            report_summary = (batch_processor.texture_output_report or {}).get("summary", {})
+            diagnostic_count = report_summary.get("diagnostic_count", 0)
+            report_status = f"Texture output gate failed: {diagnostic_count} diagnostics"
+            if texture_report_path:
+                report_status += f"; report: {texture_report_path}"
+            progress_dialog.update_progress(1.0, None, report_status)
+            progress_dialog.show_completion(False, True)
+            window.update_status(report_status)
         elif settings.get("generate_cry_dds", False):
             tif_files = []
             for group in texture_groups:

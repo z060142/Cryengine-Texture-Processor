@@ -146,8 +146,12 @@ def test_batch_processor_records_texture_output_policy(tmp_path):
     processor = BatchProcessor(texture_manager=None)
     processor.set_output_dir(str(tmp_path))
     processor.set_settings({"texture_types": {"diff": True, "spec": False, "ddna": True, "displ": False}})
-    processor.diff_exporter = ExporterStub(str(tmp_path / "wall_basecolor.png"))
-    processor.ddna_exporter = ExporterStub(str(tmp_path / "wall_ddna.tif"))
+    bad_diff = tmp_path / "wall_basecolor.png"
+    good_ddna = tmp_path / "wall_ddna.tif"
+    bad_diff.write_text("bad diff", encoding="utf-8")
+    good_ddna.write_text("good normal", encoding="utf-8")
+    processor.diff_exporter = ExporterStub(str(bad_diff))
+    processor.ddna_exporter = ExporterStub(str(good_ddna))
 
     processor._generate_output_formats(group)
 
@@ -158,6 +162,19 @@ def test_batch_processor_records_texture_output_policy(tmp_path):
         "unsupported_rc_texture_output_extension",
         "mismatch_texture_output_suffix",
     ]
+
+
+def test_batch_processor_records_missing_texture_output_file(tmp_path):
+    group = TextureGroup("wall")
+    processor = BatchProcessor(texture_manager=None)
+    processor.set_output_dir(str(tmp_path))
+    processor.set_settings({"texture_types": {"diff": True, "spec": False, "ddna": False, "displ": False}})
+    processor.diff_exporter = ExporterStub(str(tmp_path / "wall_diff.tif"))
+
+    processor._generate_output_formats(group)
+
+    assert group.output_policy["ok"] is False
+    assert [diagnostic["code"] for diagnostic in group.output_diagnostics] == ["missing_texture_output_file"]
 
 
 def test_build_texture_output_report_summarizes_groups_and_diagnostics():
@@ -208,6 +225,12 @@ def test_batch_processor_writes_texture_output_report(tmp_path):
 
     assert report_path == str(tmp_path / "texture_output_diagnostics.json")
     assert processor.texture_output_report_path == report_path
-    assert processor.texture_output_report["summary"]["diagnostic_count"] == 2
+    assert processor.texture_output_gate_ok is False
+    assert processor.texture_output_report["summary"]["diagnostic_count"] == 3
     written = json.loads((tmp_path / "texture_output_diagnostics.json").read_text(encoding="utf-8"))
-    assert written["summary"]["diagnostic_count"] == 2
+    assert written["summary"]["diagnostic_count"] == 3
+    assert [diagnostic["code"] for group in written["groups"] for diagnostic in group["diagnostics"]] == [
+        "missing_texture_output_file",
+        "unsupported_rc_texture_output_extension",
+        "mismatch_texture_output_suffix",
+    ]

@@ -161,9 +161,14 @@ def write_texture_output_report(report, output_path):
     return output_path
 
 
-def export_texture_output_report(texture_groups, output_dir, output_filename="texture_output_diagnostics.json"):
+def export_texture_output_report(
+    texture_groups,
+    output_dir,
+    output_filename="texture_output_diagnostics.json",
+    check_exists=False,
+):
     output_path = os.path.join(output_dir, output_filename)
-    report = build_texture_output_report(texture_groups)
+    report = build_texture_output_report(texture_groups, check_exists=check_exists)
     write_texture_output_report(report, output_path)
     return output_path, report
 

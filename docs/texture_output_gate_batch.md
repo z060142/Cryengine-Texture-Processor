@@ -51,6 +51,40 @@ Important behavior:
 - `_roughness` remains an observed compatibility alias mapped to the CE Opacity
   texture map
 
+## Batch Enforcement
+
+`BatchProcessor` now runs the same policy in strict mode for generated outputs.
+Strict mode checks that each exporter-returned path exists on disk, in addition
+to checking suffix and RC-supported source extension.
+
+The processor records:
+
+```text
+texture_output_report_path
+texture_output_report
+texture_output_gate_ok
+```
+
+The PySide entry point treats `texture_output_gate_ok = false` as a failed
+texture batch instead of showing a successful export with hidden diagnostics.
+
+Tiny raw texture batch result:
+
+```json
+{
+  "group_count": 1,
+  "output_count": 1,
+  "diagnostic_count": 0,
+  "ok": true
+}
+```
+
+Evidence report:
+
+```text
+docs/raw_texture_output_gate_report.json
+```
+
 ## Car Batch
 
 Standalone command:
@@ -121,3 +155,5 @@ Result:
 - car texture gate: `ok: True`, `group_count: 17`, `output_count: 73`,
   `diagnostic_count: 0`
 - RC smoke: `success: True`; embedded texture gate summary is also ok
+- raw texture batch: `ok: True`, `group_count: 1`, `output_count: 1`,
+  `diagnostic_count: 0`

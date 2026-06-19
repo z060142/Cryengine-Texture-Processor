@@ -50,6 +50,7 @@ class BatchProcessor:
         self._temp_dir_path = None # To store the path for cleanup
         self.texture_output_report_path = ""
         self.texture_output_report = {}
+        self.texture_output_gate_ok = True
 
         # Initialize processors
         self.albedo_processor = AlbedoProcessor()
@@ -145,6 +146,7 @@ class BatchProcessor:
             total_groups = len(texture_groups)
             self.texture_output_report_path = ""
             self.texture_output_report = {}
+            self.texture_output_gate_ok = True
             
             # --- Stage 1: Generate Intermediate Formats ---
             stage1_text = "Stage 1/2: Generating Intermediates"
@@ -191,9 +193,12 @@ class BatchProcessor:
             self._write_texture_output_report(texture_groups)
             report_summary = (self.texture_output_report or {}).get("summary", {})
             diagnostic_count = report_summary.get("diagnostic_count", 0)
+            self.texture_output_gate_ok = bool(report_summary.get("ok", diagnostic_count == 0))
             final_status = f"Processed {total_groups} texture groups"
             if self.texture_output_report_path:
                 final_status += f"; texture diagnostics: {diagnostic_count}; report: {self.texture_output_report_path}"
+            if not self.texture_output_gate_ok:
+                final_status += "; texture output gate failed"
 
             # Final progress update
             self._update_progress(
@@ -425,7 +430,7 @@ class BatchProcessor:
             if output_path:
                 group.output["sss"] = output_path
 
-        group.output_policy = build_texture_output_policy(group.output)
+        group.output_policy = build_texture_output_policy(group.output, check_exists=True)
         group.output_diagnostics = group.output_policy["diagnostics"]
 
     def _write_texture_output_report(self, texture_groups):
@@ -438,7 +443,9 @@ class BatchProcessor:
         self.texture_output_report_path, self.texture_output_report = export_texture_output_report(
             texture_groups,
             self.output_dir,
+            check_exists=True,
         )
+        self.texture_output_gate_ok = bool((self.texture_output_report or {}).get("summary", {}).get("ok", True))
         return self.texture_output_report_path
 
     # Corrected function definition to accept stage_text

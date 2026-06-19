@@ -1,0 +1,102 @@
+{
+  "schema": "cryengine_texture_output_diagnostics.v1",
+  "source": "batch_texture_export",
+  "summary": {
+    "group_count": 1,
+    "output_count": 1,
+    "diagnostic_count": 0,
+    "ok": true
+  },
+  "groups": [
+    {
+      "base_name": "panel",
+      "outputs": {
+        "diff": "S:\\Crytek\\crytek\\Stripped to the bone\\raw_texture_gate_batch\\output\\panel_diff.tif"
+      },
+      "output_policy": {
+        "entries": [
+          {
+            "output_key": "diff",
+            "texture_type": "diffuse",
+            "texture_path": "S:\\Crytek\\crytek\\Stripped to the bone\\raw_texture_gate_batch\\output\\panel_diff.tif",
+            "exists": true,
+            "policy": {
+              "texture_type": "diffuse",
+              "texture_path": "S:\\Crytek\\crytek\\Stripped to the bone\\raw_texture_gate_batch\\output\\panel_diff.tif",
+              "ce_map_type": "Diffuse",
+              "exported": true,
+              "reason": "source_backed_texture_map",
+              "suffix_analysis": {
+                "expected_suffix": "_diff",
+                "accepted_suffixes": [
+                  "_diff"
+                ],
+                "observed_suffixes": [],
+                "matched_suffix": "_diff",
+                "suffix_status": "matches_expected_suffix",
+                "filename": "panel_diff.tif",
+                "source_evidence": {
+                  "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+                  "suffix_lines": "source-backed CE Texture suffix names",
+                  "alias_source": "Code/CryEngine/RenderDll/Common/Textures/TextureCompiler.cpp",
+                  "alias_rule": "MaterialHelpers names Bumpmap as _ddn, while TextureCompiler also handles _ddna normal-alpha placeholder textures. Diagnostics accept _ddna as a Bumpmap alias instead of treating CE normal-alpha exports as suffix mismatches. The car sample also uses _emissive for Emittance textures, so diagnostics accept it as an observed export alias for the source-backed _em suffix.",
+                  "rule": "Known CryEngine material Texture Map names have conventional filename suffixes. The exporter does not rename files here; diagnostics only record whether exported texture paths already match the expected suffix."
+                }
+              },
+              "rc_source_extension_analysis": {
+                "filename": "panel_diff.tif",
+                "extension": "tif",
+                "supported": true,
+                "status": "supported_rc_texture_source_extension",
+                "supported_extensions": [
+                  "dds",
+                  "hdr",
+                  "tif"
+                ],
+                "source_evidence": {
+                  "source": "Code/CryEngine/RenderDll/Common/Textures/TextureCompiler.h",
+                  "lines": "165-181",
+                  "rule": "CTextureCompiler::IsImageFormatSupported accepts dds, hdr, and tif when texture compiling is enabled. TextureCompiler comments describe source files as usually TIFF and destinations as usually DDS."
+                }
+              },
+              "source_evidence": {
+                "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+                "map_type_lines": "source-backed CE Texture Map names",
+                "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+              },
+              "texmod_policy": {
+                "attributes": {
+                  "TexMod_RotateType": "0",
+                  "TexMod_TexGenType": "0",
+                  "TexMod_bTexGenProjected": "0"
+                },
+                "attribute_status": {
+                  "TexMod_RotateType": "compatibility_preserved_default_texmod",
+                  "TexMod_TexGenType": "compatibility_preserved_default_texmod",
+                  "TexMod_bTexGenProjected": "compatibility_preserved_default_texmod"
+                },
+                "emission_policy": "compatibility_preserved_emits_minimal_texmod",
+                "source_evidence": {
+                  "save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+                  "save_lines": "263-324",
+                  "rule": "MaterialHelpers saves a TexMod child only when the texture modifier differs from CryEngine's default modifier. The current exporter still emits a minimal TexMod child for compatibility, so these attributes are tracked as compatibility-preserved until round-trip evidence confirms whether they should be omitted for default modifiers."
+                }
+              }
+            },
+            "source_evidence": {
+              "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+              "map_type_lines": "source-backed CE Texture Map names",
+              "rule": "Only texture types with a CryEngine material Texture Map name are emitted as .mtl <Texture> entries. Known internal channels without a CE map remain available for conversion diagnostics but are not exported as Texture nodes."
+            }
+          }
+        ],
+        "diagnostics": [],
+        "diagnostic_count": 0,
+        "ok": true
+      },
+      "diagnostics": [],
+      "diagnostic_count": 0,
+      "ok": true
+    }
+  ]
+}
