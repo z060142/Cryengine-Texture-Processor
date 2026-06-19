@@ -30,8 +30,9 @@ It is intentionally a small JSON-driven tool, not a polished UI.
 
 Use `tools.asset_flow_spec_builder` when the next step is to run real user
 flows across a folder instead of hand-writing every case. It scans FBX files or
-folders, keeps the smallest files first, and writes `rc` cases that
-`tools.asset_flow_validator` can run directly.
+folders, keeps the smallest files first, optionally attaches same-name OBJ
+`.mtl` evidence, and writes `rc` cases that `tools.asset_flow_validator` can
+run directly.
 
 Example:
 
@@ -72,6 +73,69 @@ GardenDecorationTrim_67576cbd: True
 This batch is model-only: it proves FBX copy/import, generated JSON, generated
 MTL, material slot evidence, schema gate, and CGF output. It does not prove
 material-texture matching because these cases do not provide texture evidence.
+
+For asset packs with `FBX` and `OBJ` sibling folders, pass an OBJ MTL root:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\obj_mtl_batch_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\obj_mtl_batch" `
+  --limit 8 `
+  --max-mb 2
+```
+
+Observed OBJ MTL batch result:
+
+```text
+ok: True
+case_count: 8
+ok_count: 8
+failed_count: 0
+```
+
+All eight generated cases attached same-name OBJ `.mtl` evidence. Without a
+`texture_output_dir`, this remains model-only validation; the evidence is ready
+for texture-backed MTL export once processed textures are available.
+
+To build a texture-backed case, also attach the processed texture output
+directory:
+
+```powershell
+uv run python -m tools.asset_flow_spec_builder `
+  "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\FBX\Weed_b.fbx" `
+  --obj-mtl-root "D:\DATA\00_DATA2\Art Assets\Models\Unreal Engine\polypixel\PostApocalypticWorld\Models\OBJ" `
+  --texture-output-dir "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\Weed_b_textures" `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_builder_texture_spec.json" `
+  --work-root "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\weed_b_builder_texture" `
+  --limit 1 `
+  --max-mb 2
+```
+
+Observed texture-backed builder result:
+
+```text
+ok: True
+case_count: 1
+ok_count: 1
+failed_count: 0
+manifest_generated: true
+model_format_ok: true
+material_slots_ok: true
+mtl_format_ok: true
+texture_format_ok: true
+material_texture_ok: true
+```
+
+The generated MTL used the OBJ `.mtl` material evidence to connect
+`Weed_B_mat` to the processed CryEngine texture outputs:
+
+```text
+Diffuse: ../../Weed_b_textures/Weed_B_diff.tif
+Bumpmap: ../../Weed_b_textures/Weed_B_ddn.tif
+Specular: ../../Weed_b_textures/Weed_B_spec.tif
+```
 
 ## Spec Format
 

@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 FBX_EXTENSIONS = {".fbx"}
+MTL_EXTENSIONS = {".mtl"}
 
 
 def _safe_name(value):
@@ -36,6 +37,62 @@ def iter_fbx_files(roots):
                     yield os.path.abspath(os.path.join(dirpath, filename))
 
 
+def iter_mtl_files(roots):
+    for root in roots:
+        if not root or not os.path.exists(root):
+            continue
+        if os.path.isfile(root):
+            if Path(root).suffix.lower() in MTL_EXTENSIONS:
+                yield os.path.abspath(root)
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            for filename in filenames:
+                if Path(filename).suffix.lower() in MTL_EXTENSIONS:
+                    yield os.path.abspath(os.path.join(dirpath, filename))
+
+
+def build_mtl_index(roots):
+    index = {}
+    for path in iter_mtl_files(roots):
+        stem = Path(path).stem.lower()
+        index.setdefault(stem, []).append(path)
+    for paths in index.values():
+        paths.sort(key=lambda item: (len(item), item.lower()))
+    return index
+
+
+def _sibling_obj_dir_candidates(fbx_path):
+    path = Path(fbx_path)
+    parts = list(path.parts)
+    candidates = []
+    for index, part in enumerate(parts[:-1]):
+        if part.lower() == "fbx":
+            replaced = parts[:]
+            replaced[index] = "OBJ"
+            candidates.append(str(Path(*replaced).with_suffix(".mtl")))
+            replaced[index] = "Obj"
+            candidates.append(str(Path(*replaced).with_suffix(".mtl")))
+            replaced[index] = "obj"
+            candidates.append(str(Path(*replaced).with_suffix(".mtl")))
+    return candidates
+
+
+def find_obj_mtl_evidence(fbx_path, mtl_index=None):
+    stem = Path(fbx_path).stem
+    direct_candidates = [
+        str(Path(fbx_path).with_suffix(".mtl")),
+        *(_sibling_obj_dir_candidates(fbx_path)),
+    ]
+    for candidate in direct_candidates:
+        if os.path.exists(candidate):
+            return os.path.abspath(candidate)
+
+    for candidate in (mtl_index or {}).get(stem.lower(), []):
+        if os.path.exists(candidate):
+            return os.path.abspath(candidate)
+    return ""
+
+
 def collect_fbx_candidates(roots, max_bytes=None):
     candidates = []
     seen = set()
@@ -54,11 +111,22 @@ def collect_fbx_candidates(roots, max_bytes=None):
     return sorted(candidates, key=lambda item: (item["size_bytes"], item["path"].lower()))
 
 
-def build_spec(roots, work_root, limit=10, max_bytes=None, texture_output_format="tif"):
+def build_spec(
+    roots,
+    work_root,
+    limit=10,
+    max_bytes=None,
+    texture_output_format="tif",
+    texture_output_dir="",
+    obj_mtl_roots=None,
+    include_obj_mtl_evidence=True,
+):
     selected = collect_fbx_candidates(roots, max_bytes=max_bytes)
     if limit and limit > 0:
         selected = selected[:limit]
 
+    mtl_roots = list(obj_mtl_roots or roots)
+    mtl_index = build_mtl_index(mtl_roots) if include_obj_mtl_evidence else {}
     cases = []
     used_names = set()
     for candidate in selected:
@@ -68,14 +136,18 @@ def build_spec(roots, work_root, limit=10, max_bytes=None, texture_output_format
         while name in used_names:
             name = f"{name}_{len(used_names)}"
         used_names.add(name)
-        cases.append(
-            {
-                "name": name,
-                "type": "rc",
-                "fbx": path,
-                "source_size_bytes": candidate["size_bytes"],
-            }
-        )
+        case = {
+            "name": name,
+            "type": "rc",
+            "fbx": path,
+            "source_size_bytes": candidate["size_bytes"],
+        }
+        obj_mtl_evidence = find_obj_mtl_evidence(path, mtl_index) if include_obj_mtl_evidence else ""
+        if obj_mtl_evidence:
+            case["obj_mtl_evidence"] = obj_mtl_evidence
+        if texture_output_dir:
+            case["texture_output_dir"] = texture_output_dir
+        cases.append(case)
 
     return {
         "work_root": work_root,
@@ -85,6 +157,9 @@ def build_spec(roots, work_root, limit=10, max_bytes=None, texture_output_format
             "roots": [os.path.abspath(root) for root in roots],
             "limit": limit,
             "max_bytes": max_bytes,
+            "obj_mtl_roots": [os.path.abspath(root) for root in mtl_roots],
+            "include_obj_mtl_evidence": include_obj_mtl_evidence,
+            "texture_output_dir": texture_output_dir,
             "case_count": len(cases),
         },
         "cases": cases,
@@ -115,6 +190,22 @@ def main(argv=None):
     parser.add_argument("--limit", type=int, default=10, help="Maximum number of smallest FBX files to include.")
     parser.add_argument("--max-mb", default="10", help="Maximum FBX size in MB. Use 0 to disable.")
     parser.add_argument("--texture-output-format", default="tif", help="Texture output format passed through to the spec.")
+    parser.add_argument(
+        "--texture-output-dir",
+        default="",
+        help="Optional processed texture directory to attach to generated rc cases.",
+    )
+    parser.add_argument(
+        "--obj-mtl-root",
+        action="append",
+        default=[],
+        help="Optional root to scan for Wavefront OBJ .mtl evidence. Can be passed more than once.",
+    )
+    parser.add_argument(
+        "--no-obj-mtl-evidence",
+        action="store_true",
+        help="Do not try to attach OBJ .mtl evidence to generated rc cases.",
+    )
     args = parser.parse_args(argv)
 
     max_bytes = _parse_size_mb(args.max_mb)
@@ -124,12 +215,16 @@ def main(argv=None):
         limit=args.limit,
         max_bytes=max_bytes,
         texture_output_format=args.texture_output_format,
+        texture_output_dir=args.texture_output_dir,
+        obj_mtl_roots=args.obj_mtl_root or args.roots,
+        include_obj_mtl_evidence=not args.no_obj_mtl_evidence,
     )
     write_spec(args.output, spec)
     print(args.output)
     print(f"case_count: {len(spec['cases'])}")
     for case in spec["cases"]:
-        print(f"{case['name']}: {case['source_size_bytes']} bytes")
+        evidence = f" obj_mtl={case['obj_mtl_evidence']}" if case.get("obj_mtl_evidence") else ""
+        print(f"{case['name']}: {case['source_size_bytes']} bytes{evidence}")
 
 
 if __name__ == "__main__":
