@@ -72,6 +72,40 @@ def test_build_fbx_texture_data_finds_existing_diff_and_ddna(tmp_path):
     assert set(result["Wall"].keys()) == {"diff", "ddna"}
 
 
+def test_build_fbx_texture_data_accepts_ddn_when_no_normal_alpha_output_exists(tmp_path):
+    source = tmp_path / "wall_normal.png"
+    source.write_text("fake source")
+    (tmp_path / "wall_diff.tif").write_text("fake diff")
+    (tmp_path / "wall_ddn.tif").write_text("fake ddn")
+    model_data = {"materials": [{"name": "Wall"}]}
+    refs = [TextureRef(str(source), "Wall", texture_type="normal")]
+
+    result = build_fbx_texture_data(
+        model_data,
+        refs,
+        texture_manager=None,
+        texture_output_dir=str(tmp_path),
+        output_format="tif",
+    )
+
+    assert result["Wall"]["ddna"] == str(tmp_path / "wall_ddn.tif")
+
+
+def test_build_mtl_material_data_prefers_ddna_but_accepts_ddn(tmp_path):
+    source = tmp_path / "wall_normal.png"
+    source.write_text("fake source")
+    (tmp_path / "wall_ddn.tif").write_text("fake ddn")
+    model_data = {"materials": [{"name": "Wall"}]}
+    refs = [TextureRef(str(source), "Wall", texture_type="normal")]
+
+    ddn_result = build_mtl_material_data(model_data, refs, None, str(tmp_path), "tif")
+    assert ddn_result[0]["textures"]["normal"] == str(tmp_path / "wall_ddn.tif")
+
+    (tmp_path / "wall_ddna.tif").write_text("fake ddna")
+    ddna_result = build_mtl_material_data(model_data, refs, None, str(tmp_path), "tif")
+    assert ddna_result[0]["textures"]["normal"] == str(tmp_path / "wall_ddna.tif")
+
+
 def test_material_texture_records_capture_texture_ref_evidence(tmp_path):
     source = tmp_path / "wall_opacity.png"
     source.write_text("fake source")

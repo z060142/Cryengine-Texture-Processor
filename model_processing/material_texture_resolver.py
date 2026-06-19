@@ -11,24 +11,30 @@ import os
 
 from model_processing.material_manifest import material_manifest_materials
 from model_processing.texture_type_resolver import FILENAME_SUFFIX_TYPES, infer_texture_type_from_path
+from output_formats.texture_output_paths import texture_output_suffix
 
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
 
 COMMON_TEXTURE_BASE_SUFFIXES = tuple(suffix for suffix, _ in FILENAME_SUFFIX_TYPES)
 
+
+def _suffix_template(output_key, normal_alpha=False):
+    return f"{texture_output_suffix(output_key, normal_alpha=normal_alpha)}.{{ext}}"
+
+
 FBX_OUTPUT_TEXTURE_SUFFIXES = {
-    "diff": "_diff.{ext}",
-    "ddna": "_ddna.{ext}",
+    "diff": (_suffix_template("diff"),),
+    "ddna": (_suffix_template("ddna", normal_alpha=True), _suffix_template("ddna")),
 }
 
 MTL_OUTPUT_TEXTURE_SUFFIXES = {
-    "diffuse": "_diff.{ext}",
-    "normal": "_ddna.{ext}",
-    "specular": "_spec.{ext}",
-    "displacement": "_displ.{ext}",
-    "emissive": "_em.{ext}",
+    "diffuse": (_suffix_template("diff"),),
+    "normal": (_suffix_template("ddna", normal_alpha=True), _suffix_template("ddna")),
+    "specular": (_suffix_template("spec"),),
+    "displacement": (_suffix_template("displ"),),
+    "emissive": (_suffix_template("emissive"),),
     "opacity": "_opacity.{ext}",
-    "sss": "_sss.{ext}",
+    "sss": (_suffix_template("sss"),),
 }
 
 
@@ -150,11 +156,15 @@ def find_processed_textures(base_name, texture_output_dir, output_format, suffix
         return processed_textures
 
     ext = (output_format or "tif").lstrip(".")
-    for texture_key, suffix_template in suffix_map.items():
-        expected_filename = f"{base_name}{suffix_template.format(ext=ext)}"
-        expected_path = os.path.join(texture_output_dir, expected_filename)
-        if os.path.exists(expected_path):
-            processed_textures[texture_key] = expected_path
+    for texture_key, suffix_templates in suffix_map.items():
+        if isinstance(suffix_templates, str):
+            suffix_templates = (suffix_templates,)
+        for suffix_template in suffix_templates:
+            expected_filename = f"{base_name}{suffix_template.format(ext=ext)}"
+            expected_path = os.path.join(texture_output_dir, expected_filename)
+            if os.path.exists(expected_path):
+                processed_textures[texture_key] = expected_path
+                break
 
     return processed_textures
 
