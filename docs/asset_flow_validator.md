@@ -219,7 +219,9 @@ failed_count: 0
 ```
 
 The report summary includes check coverage so an all-green batch does not hide
-model-only cases:
+model-only cases. The same coverage is printed to stdout when running
+`tools.asset_flow_validator`, so broad runs can be scanned without opening the
+Markdown report:
 
 ```text
 manifest_generated: PASS 8, FAIL 0, N/A 0
@@ -230,6 +232,14 @@ texture_format_ok: PASS 4, FAIL 0, N/A 6
 material_texture_ok: PASS 2, FAIL 0, N/A 6
 raw_textures_found: PASS 2, FAIL 0, N/A 0
 texture_processing_started: PASS 2, FAIL 0, N/A 0
+```
+
+CLI form:
+
+```text
+check_counts:
+  material_texture_ok: pass=2 fail=0 na=6
+  texture_format_ok: pass=4 fail=0 na=6
 ```
 
 Here, `material_texture_ok` being `2 / 0 / 6` means two RC cases exercised

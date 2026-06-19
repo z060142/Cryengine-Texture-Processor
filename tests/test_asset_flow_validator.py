@@ -181,6 +181,37 @@ def test_format_markdown_report_summarizes_cases():
     assert "Diffuse:Mat_diff.tif" in markdown
 
 
+def test_main_prints_check_coverage(monkeypatch, tmp_path, capsys):
+    spec = tmp_path / "spec.json"
+    output = tmp_path / "report.json"
+    spec.write_text("{}", encoding="utf-8")
+
+    monkeypatch.setattr(
+        asset_flow_validator,
+        "run_validation",
+        lambda spec_payload: {
+            "schema": "cryengine_asset_flow_validation.v1",
+            "summary": {
+                "ok": True,
+                "case_count": 1,
+                "ok_count": 1,
+                "failed_count": 0,
+                "check_counts": {
+                    "material_texture_ok": {"pass": 1, "fail": 0, "na": 2},
+                },
+            },
+            "cases": [{"name": "asset", "ok": True}],
+        },
+    )
+
+    rc = asset_flow_validator.main(["--spec", str(spec), "--output", str(output)])
+
+    text = capsys.readouterr().out
+    assert rc == 0
+    assert "check_counts:" in text
+    assert "material_texture_ok: pass=1 fail=0 na=2" in text
+
+
 def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     fbx = tmp_path / "asset.fbx"
     fbx.write_text("fake")

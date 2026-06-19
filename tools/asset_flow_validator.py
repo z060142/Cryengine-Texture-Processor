@@ -87,6 +87,21 @@ def _check_counts(cases):
     return counts
 
 
+def _format_check_counts(check_counts):
+    lines = []
+    for name in sorted(check_counts or {}):
+        counts = check_counts[name]
+        lines.append(
+            "{name}: pass={passed} fail={failed} na={na}".format(
+                name=name,
+                passed=counts.get("pass", 0),
+                failed=counts.get("fail", 0),
+                na=counts.get("na", 0),
+            )
+        )
+    return lines
+
+
 def _mtl_value_summary(mtl_path):
     if not mtl_path or not os.path.exists(mtl_path):
         return []
@@ -489,6 +504,10 @@ def main(argv=None):
     print(f"case_count: {report['summary']['case_count']}")
     print(f"ok_count: {report['summary']['ok_count']}")
     print(f"failed_count: {report['summary']['failed_count']}")
+    if report["summary"].get("check_counts"):
+        print("check_counts:")
+        for line in _format_check_counts(report["summary"]["check_counts"]):
+            print(f"  {line}")
     for case in report["cases"]:
         print(f"{case.get('name')}: {case.get('ok')}")
         if case.get("error"):
