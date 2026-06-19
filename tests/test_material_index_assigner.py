@@ -170,3 +170,32 @@ def test_blender_duplicate_suffix_is_preserved_as_distinct_material():
     )
 
     assert sub_index_by_name(records) == {"Stone": 0, "Stone.001": 1}
+
+
+def test_explicit_sub_index_at_rc_limit_is_normalized_to_delete():
+    records = assign_material_sub_indices(
+        [{"name": "TooHigh", "sub_index": 128, "auto_assigned": False}],
+        existing_submaterial_names=[],
+    )
+
+    record = records[0]
+    diagnostic = record["diagnostics"][0]
+
+    assert record["sub_index"] == -1
+    assert record["requested_sub_index"] == 128
+    assert record["reason"] == "explicit_out_of_range"
+    assert diagnostic["code"] == "rc_sub_index_out_of_range_deleted"
+    assert diagnostic["requested_sub_index"] == 128
+    assert diagnostic["max_sub_materials"] == 128
+
+
+def test_fbx_material_id_beyond_rc_limit_is_normalized_to_delete():
+    records = assign_material_sub_indices(
+        [{"name": "Slot128", "id": 129}],
+        existing_submaterial_names=[],
+    )
+
+    assert records[0]["sub_index"] == -1
+    assert records[0]["requested_sub_index"] == 128
+    assert records[0]["reason"] == "fbx_material_id_out_of_range"
+    assert records[0]["diagnostics"][0]["fbx_slot"] == 128

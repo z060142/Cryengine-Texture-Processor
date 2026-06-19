@@ -40,6 +40,7 @@ def material_slot_from_record(record):
     material["assignment_reason"] = record["reason"]
     material["source_order"] = record["source_order"]
     material["fbx_material_id"] = record.get("fbx_material_id")
+    material["requested_sub_index"] = record.get("requested_sub_index")
     material["deleted"] = record["deleted"]
     material["diagnostics"] = record.get("diagnostics", [])
     return material

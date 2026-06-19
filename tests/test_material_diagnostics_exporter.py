@@ -172,6 +172,18 @@ def test_build_material_diagnostics_report_uses_existing_mtl_fallback_when_provi
     assert report["diagnostics"][0]["code"] == "sub_index_differs_from_fbx_slot_usage_unknown"
 
 
+def test_build_material_diagnostics_report_flags_rc_sub_index_limit():
+    report = build_material_diagnostics_report(
+        [{"name": "TooHigh", "sub_index": 128, "auto_assigned": False}],
+        source_model="too_high.fbx",
+    )
+
+    assert report["summary"]["hazard_count"] == 1
+    assert report["materials"][0]["sub_index"] == -1
+    assert report["materials"][0]["requested_sub_index"] == 128
+    assert report["diagnostics"][0]["code"] == "rc_sub_index_out_of_range_deleted"
+
+
 def test_export_material_diagnostics_writes_json(tmp_path):
     output_path = export_material_diagnostics(
         [{"name": "Removed", "id": 1, "deleted": True}],

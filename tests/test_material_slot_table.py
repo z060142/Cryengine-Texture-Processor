@@ -61,3 +61,11 @@ def test_expanded_material_slot_table_can_drop_gap_placeholders():
     )
 
     assert [slot["name"] for slot in slots] == ["First", "Third"]
+
+
+def test_expanded_material_slot_table_omits_rc_out_of_range_slots():
+    slots = build_expanded_material_slot_table(
+        [{"name": "Visible", "id": 1}, {"name": "TooHigh", "id": 129}]
+    )
+
+    assert [slot["name"] for slot in slots] == ["Visible"]

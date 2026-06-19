@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """Source-backed CryEngine RC FBX import request schema."""
 
+from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS, normalize_rc_sub_index
+
 RC_IMPORT_REQUEST_SOURCE = {
     "request_wrapper": {
         "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
@@ -118,7 +120,7 @@ RC_IMPORT_PRIMITIVE_VALUES = {
 }
 
 RC_IMPORT_OUTPUT_EXTENSIONS = {"cgf", "chr", "skin", "caf", "i_caf"}
-RC_IMPORT_MAX_SUB_MATERIALS = 128
+RC_IMPORT_MAX_SUB_MATERIALS = RC_MAX_SUB_MATERIALS
 
 
 def collect_unknown_request_fields(request):
@@ -153,12 +155,3 @@ def collect_unknown_request_fields(request):
             )
 
     return {key: value for key, value in unknown.items() if value}
-
-
-def normalize_rc_sub_index(sub_index):
-    if sub_index is None:
-        return -1
-    sub_index = int(sub_index)
-    if sub_index >= RC_IMPORT_MAX_SUB_MATERIALS:
-        return -1
-    return sub_index

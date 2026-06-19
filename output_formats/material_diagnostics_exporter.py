@@ -53,6 +53,7 @@ def _record_to_report_item(record):
         "fbx_material_id": fbx_id,
         "fbx_slot": fbx_slot,
         "sub_index": record["sub_index"],
+        "requested_sub_index": record.get("requested_sub_index"),
         "assignment_reason": record["reason"],
         "deleted": record["deleted"],
         "polygon_count": record["material"].get("polygon_count"),

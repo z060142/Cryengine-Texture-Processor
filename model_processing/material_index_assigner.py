@@ -5,6 +5,7 @@
 import os
 import xml.etree.ElementTree as ET
 
+from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS, normalize_rc_sub_index
 from model_processing.material_texture_resolver import clean_material_name, iter_model_materials
 
 
@@ -81,6 +82,16 @@ def _first_free_index(occupied):
     return index
 
 
+def _assign_sub_index(record, sub_index, reason):
+    normalized = normalize_rc_sub_index(sub_index)
+    record["sub_index"] = normalized
+    if normalized != int(sub_index):
+        record["reason"] = f"{reason}_out_of_range"
+        record["requested_sub_index"] = int(sub_index)
+        return
+    record["reason"] = reason
+
+
 def _known_polygon_usage(material):
     for key in ("polygon_count", "face_count", "used_polygon_count"):
         value = _coerce_int(material.get(key))
@@ -107,6 +118,26 @@ def diagnose_material_record(record):
     fbx_slot = _fbx_slot(record)
     polygon_usage = _known_polygon_usage(record["material"])
     material_names = record["material"].get("material_names", [])
+    requested_sub_index = record.get("requested_sub_index")
+
+    if requested_sub_index is not None:
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "rc_sub_index_out_of_range_deleted",
+                "material": record["clean_name"],
+                "fbx_slot": fbx_slot,
+                "sub_index": record["sub_index"],
+                "requested_sub_index": requested_sub_index,
+                "max_sub_materials": RC_MAX_SUB_MATERIALS,
+                "assignment_reason": record["reason"],
+                "message": (
+                    "RC normalizes material sub_index values greater than or equal to "
+                    "MAX_SUB_MATERIALS to -1. This makes the material behave like a delete entry, "
+                    "so geometry using that source material can disappear instead of mapping to a high slot."
+                ),
+            }
+        )
 
     if record["material"].get("slot_name_conflict", False):
         diagnostics.append(
@@ -193,6 +224,7 @@ def _normalized_records(materials):
                 "fbx_material_id": get_fbx_material_id(material, order),
                 "deleted": is_deleted_material(material),
                 "sub_index": None,
+                "requested_sub_index": None,
                 "reason": "",
                 "diagnostics": [],
             }
@@ -232,9 +264,9 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
             continue
 
         if explicit_index is not None and explicit_index >= 0 and not auto_assigned:
-            record["sub_index"] = explicit_index
-            record["reason"] = "explicit"
-            occupied.add(explicit_index)
+            _assign_sub_index(record, explicit_index, "explicit")
+            if record["sub_index"] >= 0:
+                occupied.add(record["sub_index"])
 
     for record in records:
         if record["sub_index"] is not None:
@@ -243,9 +275,9 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
         fbx_id = record["fbx_material_id"]
         preferred_index = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
         if preferred_index is not None and preferred_index not in occupied:
-            record["sub_index"] = preferred_index
-            record["reason"] = "fbx_material_id"
-            occupied.add(preferred_index)
+            _assign_sub_index(record, preferred_index, "fbx_material_id")
+            if record["sub_index"] >= 0:
+                occupied.add(record["sub_index"])
 
     for record in records:
         if record["sub_index"] is not None:
@@ -253,18 +285,18 @@ def assign_material_sub_indices(materials, existing_submaterial_names=None):
 
         existing_index = existing_lookup.get(record["clean_name"])
         if existing_index is not None and existing_index not in occupied:
-            record["sub_index"] = existing_index
-            record["reason"] = "existing_mtl_name"
-            occupied.add(existing_index)
+            _assign_sub_index(record, existing_index, "existing_mtl_name")
+            if record["sub_index"] >= 0:
+                occupied.add(record["sub_index"])
 
     remaining = [record for record in records if record["sub_index"] is None]
     remaining.sort(key=lambda record: (not is_dummy_material(record), record["clean_name"].lower()))
 
     for record in remaining:
         index = _first_free_index(occupied)
-        record["sub_index"] = index
-        record["reason"] = "first_free"
-        occupied.add(index)
+        _assign_sub_index(record, index, "first_free")
+        if record["sub_index"] >= 0:
+            occupied.add(record["sub_index"])
 
     attach_material_diagnostics(records)
     return records

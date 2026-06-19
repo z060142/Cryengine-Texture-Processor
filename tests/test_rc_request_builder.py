@@ -131,6 +131,16 @@ def test_normalize_rc_sub_index_matches_import_request_bounds():
     assert normalize_rc_sub_index(-1) == -1
 
 
+def test_material_request_normalizes_out_of_range_sub_index_like_rc():
+    materials = build_material_requests(
+        [{"name": "TooHigh", "sub_index": 128, "auto_assigned": False}],
+        include_diagnostics=True,
+    )
+
+    assert materials[0]["sub_index"] == -1
+    assert materials[0]["diagnostics"][0]["code"] == "rc_sub_index_out_of_range_deleted"
+
+
 def test_wrap_import_request_defaults_to_rc_request_name():
     request = build_import_request(sample_model(), "chair.fbx")
 
