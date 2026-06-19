@@ -104,7 +104,17 @@ COMMON_GLOBAL_LEGACY_FIX_MASKS = {
 # Source evidence:
 # CRYENGINE_Source-release/Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h
 MTL_FLAG_MULTI_SUBMTL = 0x0100
+MTL_FLAG_PURE_CHILD = 0x0080
 MTL_64BIT_SHADERGENMASK = 0x80000
+
+MTL_FLAG_NAMES = {
+    MTL_FLAG_PURE_CHILD: "MTL_FLAG_PURE_CHILD",
+    MTL_FLAG_MULTI_SUBMTL: "MTL_FLAG_MULTI_SUBMTL",
+    MTL_64BIT_SHADERGENMASK: "MTL_64BIT_SHADERGENMASK",
+}
+
+MTL_ROOT_DEFAULT_FLAGS = MTL_64BIT_SHADERGENMASK | MTL_FLAG_MULTI_SUBMTL
+MTL_SUB_MATERIAL_DEFAULT_FLAGS = MTL_64BIT_SHADERGENMASK | MTL_FLAG_PURE_CHILD
 
 MTL_SHADER_MASK_LOAD_POLICY = {
     "runtime_source": "Code/CryEngine/Cry3DEngine/MatMan.cpp",
@@ -159,7 +169,7 @@ EXPORT_DEFAULT_SHADER_TOKENS = ["%SUBSURFACE_SCATTERING"]
 ALPHA_TEXTURE_TYPES = {"alpha", "transparency", "opacity", "mask"}
 
 SUB_MATERIAL_DEFAULT_ATTRS = {
-    "MtlFlags": "524416",
+    "MtlFlags": str(MTL_SUB_MATERIAL_DEFAULT_FLAGS),
     "Shader": "Illum",
     "SurfaceType": "",
     "MatTemplate": "",
@@ -182,6 +192,32 @@ DISPLACEMENT_PUBLIC_PARAMS = {
     "TessellationFactorMin": "1",
     "TessellationHeightScale": "1",
 }
+
+
+def compose_mtl_flags(*flags):
+    value = 0
+    for flag in flags:
+        value |= int(flag)
+    return value
+
+
+def mtl_flags_attr(*flags):
+    return str(compose_mtl_flags(*flags))
+
+
+def describe_mtl_flags(value):
+    parsed_value = _parse_int_attr(value)
+    names = [
+        name
+        for flag, name in sorted(MTL_FLAG_NAMES.items())
+        if parsed_value & flag
+    ]
+    return {
+        "value": parsed_value,
+        "names": names,
+        "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
+        "lines": "46-77",
+    }
 
 
 def exported_string_gen_mask(tokens):

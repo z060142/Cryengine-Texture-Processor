@@ -2,6 +2,7 @@ import os
 import xml.etree.ElementTree as ET
 
 from output_formats import mtl_exporter
+from output_formats.cryengine_mtl_schema import MTL_ROOT_DEFAULT_FLAGS, MTL_SUB_MATERIAL_DEFAULT_FLAGS
 from output_formats.mtl_exporter import build_mtl_document, build_mtl_material_slots, export_mtl
 
 
@@ -52,8 +53,10 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     )
 
     assert [slot["name"] for slot in slots] == ["Stone"]
+    assert root.get("MtlFlags") == str(MTL_ROOT_DEFAULT_FLAGS)
     material = root.find("SubMaterials").find("Material")
     assert material.get("Name") == "Stone"
+    assert material.get("MtlFlags") == str(MTL_SUB_MATERIAL_DEFAULT_FLAGS)
     assert material.get("AlphaTest") == "0.5"
     assert material.get("Emittance") == "1,1,1,10"
     assert "%NORMAL_MAP" in material.get("StringGenMask")

@@ -17,6 +17,7 @@ from output_formats.cryengine_mtl_schema import (
     ALPHA_TEXTURE_TYPES,
     BASE_PUBLIC_PARAMS,
     CE_TEXTURE_MAP_TYPES,
+    MTL_ROOT_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
     exported_material_shader_policy,
 )
@@ -215,7 +216,7 @@ def _append_sub_material(sub_materials_elem, mat_info, model_output_dir):
 
 
 def build_mtl_document(materials_data, model_output_dir, existing_submaterial_names=None):
-    root_material = ET.Element("Material", MtlFlags="524544", vertModifType="0")
+    root_material = ET.Element("Material", MtlFlags=str(MTL_ROOT_DEFAULT_FLAGS), vertModifType="0")
     sub_materials = ET.SubElement(root_material, "SubMaterials")
     material_slots = build_mtl_material_slots(materials_data, existing_submaterial_names)
 

@@ -6,12 +6,19 @@ from output_formats.cryengine_mtl_schema import (
     ILLUM_EXT_SHADER_MASKS,
     MTL_64BIT_SHADERGENMASK,
     MTL_FLAG_MULTI_SUBMTL,
+    MTL_FLAG_PURE_CHILD,
+    MTL_ROOT_DEFAULT_FLAGS,
     MTL_PUBLIC_PARAMS_POLICY,
     MTL_SHADER_MASK_LOAD_POLICY,
+    MTL_SUB_MATERIAL_DEFAULT_FLAGS,
+    SUB_MATERIAL_DEFAULT_ATTRS,
     analyze_public_params,
+    compose_mtl_flags,
+    describe_mtl_flags,
     exported_gen_mask,
     exported_material_shader_policy,
     exported_string_gen_mask,
+    mtl_flags_attr,
     parse_public_param_value,
     shader_mask_load_policy,
 )
@@ -102,6 +109,7 @@ def test_exported_material_shader_policy_exposes_current_compatibility_rules():
 
 def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():
     assert MTL_FLAG_MULTI_SUBMTL == 0x0100
+    assert MTL_FLAG_PURE_CHILD == 0x0080
     assert MTL_64BIT_SHADERGENMASK == 0x80000
     assert MTL_SHADER_MASK_LOAD_POLICY["runtime_source"].endswith("MatMan.cpp")
 
@@ -123,6 +131,20 @@ def test_shader_mask_load_policy_follows_runtime_and_editor_source_precedence():
     policy = shader_mask_load_policy({"MtlFlags": str(MTL_FLAG_MULTI_SUBMTL)})
     assert policy["effective_source"] == "sub_materials"
     assert policy["operation"] == "skip_multi_submaterial_container_shader_mask"
+
+
+def test_default_mtl_flags_are_named_source_backed_compositions():
+    assert MTL_ROOT_DEFAULT_FLAGS == compose_mtl_flags(MTL_64BIT_SHADERGENMASK, MTL_FLAG_MULTI_SUBMTL)
+    assert MTL_SUB_MATERIAL_DEFAULT_FLAGS == compose_mtl_flags(MTL_64BIT_SHADERGENMASK, MTL_FLAG_PURE_CHILD)
+    assert mtl_flags_attr(MTL_64BIT_SHADERGENMASK, MTL_FLAG_MULTI_SUBMTL) == "524544"
+    assert SUB_MATERIAL_DEFAULT_ATTRS["MtlFlags"] == "524416"
+
+    root_flags = describe_mtl_flags(MTL_ROOT_DEFAULT_FLAGS)
+    assert root_flags["names"] == ["MTL_FLAG_MULTI_SUBMTL", "MTL_64BIT_SHADERGENMASK"]
+    assert root_flags["source"].endswith("IMaterial.h")
+
+    submaterial_flags = describe_mtl_flags(SUB_MATERIAL_DEFAULT_ATTRS["MtlFlags"])
+    assert submaterial_flags["names"] == ["MTL_FLAG_PURE_CHILD", "MTL_64BIT_SHADERGENMASK"]
 
 
 def test_public_param_parser_follows_matman_vector4_parsing():
