@@ -6,7 +6,13 @@ import json
 import os
 import xml.etree.ElementTree as ET
 
-from model_processing.material_manifest import coerce_material_slot, discover_material_manifest, load_material_manifest
+from model_processing.material_manifest import (
+    coerce_material_slot,
+    discover_material_manifest,
+    iter_manifest_material_rows,
+    iter_manifest_polygon_rows,
+    load_material_manifest,
+)
 from model_processing.rc_material_policy import RC_MAX_SUB_MATERIALS
 from utils.cgf_material_reader import read_cgf_material_summary
 
@@ -146,7 +152,7 @@ def _duplicate_values(values):
 
 def _fixture_polygon_actual_ids(manifest, cgf_material_summary):
     center_lookup = {}
-    for polygon in manifest.get("polygons", []):
+    for _, polygon in iter_manifest_polygon_rows(manifest):
         if "center_x" in polygon:
             center_lookup[round(float(polygon["center_x"]), 4)] = int(polygon["polygon"])
 
@@ -181,6 +187,29 @@ def _fixture_polygon_actual_ids(manifest, cgf_material_summary):
 def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_materials, mtl_slots):
     if not manifest:
         return {}
+    if not isinstance(manifest, dict):
+        return {
+            "ok": False,
+            "manifest_kind": "",
+            "material_checks": [
+                {
+                    "ok": False,
+                    "slot": None,
+                    "expected_name": "",
+                    "request_names": [],
+                    "mtl_slot_name": "",
+                    "request_ok": False,
+                    "mtl_ok": False,
+                    "error": "invalid_manifest_root",
+                    "root_type": type(manifest).__name__,
+                }
+            ],
+            "polygon_checks": [],
+            "duplicate_polygons": [],
+            "duplicate_request_material_names": [],
+            "duplicate_request_sub_indices": [],
+            "subset_entries": [],
+        }
 
     request_names_by_index = _request_names_by_sub_index(request_materials)
     request_sub_indices = [
@@ -193,7 +222,43 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
 
     material_checks = []
     ok = True
-    for material in manifest.get("materials", []):
+    raw_materials = manifest.get("materials") if isinstance(manifest, dict) else None
+    raw_polygons = manifest.get("polygons") if isinstance(manifest, dict) else None
+    if raw_materials is not None and not isinstance(raw_materials, list):
+        ok = False
+        material_checks.append(
+            {
+                "ok": False,
+                "slot": None,
+                "expected_name": "",
+                "request_names": [],
+                "mtl_slot_name": "",
+                "request_ok": False,
+                "mtl_ok": False,
+                "error": "invalid_manifest_materials_collection",
+                "collection_type": type(raw_materials).__name__,
+            }
+        )
+    elif isinstance(raw_materials, list):
+        for order, material in enumerate(raw_materials):
+            if not isinstance(material, dict):
+                ok = False
+                material_checks.append(
+                    {
+                        "ok": False,
+                        "slot": None,
+                        "expected_name": "",
+                        "request_names": [],
+                        "mtl_slot_name": "",
+                        "request_ok": False,
+                        "mtl_ok": False,
+                        "error": "invalid_manifest_material_row",
+                        "manifest_order": order,
+                        "row_type": type(material).__name__,
+                    }
+                )
+
+    for _, material in iter_manifest_material_rows(manifest):
         raw_slot = material.get("slot")
         slot = coerce_material_slot(raw_slot)
         expected_name = material.get("name", "")
@@ -248,7 +313,43 @@ def evaluate_fixture_material_semantics(manifest, cgf_material_summary, request_
 
     actual_by_polygon, subset_entries, duplicate_polygons = _fixture_polygon_actual_ids(manifest, cgf_material_summary)
     polygon_checks = []
-    for polygon in manifest.get("polygons", []):
+    if raw_polygons is not None and not isinstance(raw_polygons, list):
+        ok = False
+        polygon_checks.append(
+            {
+                "ok": False,
+                "polygon": None,
+                "expected_cgf_material_id": None,
+                "actual_cgf_material_id": None,
+                "expected_name": "",
+                "request_names_for_actual_id": [],
+                "mtl_name_for_actual_id": "",
+                "cgf_id_ok": False,
+                "error": "invalid_manifest_polygons_collection",
+                "collection_type": type(raw_polygons).__name__,
+            }
+        )
+    elif isinstance(raw_polygons, list):
+        for order, polygon in enumerate(raw_polygons):
+            if not isinstance(polygon, dict):
+                ok = False
+                polygon_checks.append(
+                    {
+                        "ok": False,
+                        "polygon": None,
+                        "expected_cgf_material_id": None,
+                        "actual_cgf_material_id": None,
+                        "expected_name": "",
+                        "request_names_for_actual_id": [],
+                        "mtl_name_for_actual_id": "",
+                        "cgf_id_ok": False,
+                        "error": "invalid_manifest_polygon_row",
+                        "polygon_order": order,
+                        "row_type": type(polygon).__name__,
+                    }
+                )
+
+    for _, polygon in iter_manifest_polygon_rows(manifest):
         polygon_index = int(polygon["polygon"])
         raw_expected_cgf_id = polygon.get("expected_cgf_material_id", polygon.get("material_slot", 0))
         expected_cgf_id = coerce_material_slot(raw_expected_cgf_id)

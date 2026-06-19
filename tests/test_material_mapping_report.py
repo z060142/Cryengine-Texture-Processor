@@ -297,6 +297,53 @@ def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
     assert result["polygon_checks"][3]["expected_cgf_material_id"] == 1.5
 
 
+def test_evaluate_fixture_material_semantics_reports_invalid_manifest_shape():
+    root_result = evaluate_fixture_material_semantics(
+        ["not", "an", "object"],
+        {"material_ids": []},
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not root_result["ok"]
+    assert root_result["material_checks"][0]["error"] == "invalid_manifest_root"
+    assert root_result["material_checks"][0]["root_type"] == "list"
+
+    collection_result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": {"slot": 0, "name": "Stone"},
+            "polygons": "not-a-list",
+        },
+        {"material_ids": []},
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not collection_result["ok"]
+    assert collection_result["material_checks"][0]["error"] == "invalid_manifest_materials_collection"
+    assert collection_result["material_checks"][0]["collection_type"] == "dict"
+    assert collection_result["polygon_checks"][0]["error"] == "invalid_manifest_polygons_collection"
+    assert collection_result["polygon_checks"][0]["collection_type"] == "str"
+
+    row_result = evaluate_fixture_material_semantics(
+        {
+            "manifest_kind": "blender-fbx-material-inspection",
+            "materials": ["bad-row", {"slot": 0, "name": "Stone"}],
+            "polygons": [False, {"polygon": 0, "material_name": "Stone", "material_table_slot": 0}],
+        },
+        {"material_ids": []},
+        [{"name": "Stone", "sub_index": 0}],
+        [{"slot": 0, "name": "Stone"}],
+    )
+
+    assert not row_result["ok"]
+    assert row_result["material_checks"][0]["error"] == "invalid_manifest_material_row"
+    assert row_result["material_checks"][0]["manifest_order"] == 0
+    assert row_result["polygon_checks"][0]["error"] == "invalid_manifest_polygon_row"
+    assert row_result["polygon_checks"][0]["polygon_order"] == 0
+
+
 def test_evaluate_fixture_material_semantics_reports_out_of_range_manifest_slots():
     manifest = {
         "manifest_kind": "blender-fbx-material-inspection",

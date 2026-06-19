@@ -283,6 +283,48 @@ def test_build_material_diagnostics_report_includes_invalid_manifest_slot_diagno
     assert report["summary"]["hazard_count"] >= 2
 
 
+def test_build_material_diagnostics_report_includes_invalid_manifest_shape_diagnostics():
+    root_report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}],
+        material_manifest_info={
+            "manifest": ["not", "an", "object"],
+        },
+    )
+
+    root_codes = [diagnostic["code"] for diagnostic in root_report["diagnostics"]]
+    assert "material_manifest_invalid_root" in root_codes
+
+    collection_report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": {"slot": 0, "name": "Stone"},
+                "polygons": "not-a-list",
+            }
+        },
+    )
+
+    collection_codes = [diagnostic["code"] for diagnostic in collection_report["diagnostics"]]
+    assert "material_manifest_invalid_materials_collection" in collection_codes
+    assert "material_manifest_invalid_polygons_collection" in collection_codes
+
+    row_report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": ["bad-row", {"slot": 0, "name": "Stone"}],
+                "polygons": [False, {"polygon": 0, "material_name": "Stone", "material_table_slot": 0}],
+            }
+        },
+    )
+
+    row_codes = [diagnostic["code"] for diagnostic in row_report["diagnostics"]]
+    assert "material_manifest_invalid_material_row" in row_codes
+    assert "material_manifest_invalid_polygon_row" in row_codes
+
+
 def test_build_material_diagnostics_report_includes_out_of_range_manifest_slot_diagnostics():
     report = build_material_diagnostics_report(
         [{"name": "LastValid", "id": 128}, {"name": "TooHigh", "id": 129}],

@@ -30,23 +30,47 @@ def load_material_manifest(manifest_path):
         return json.load(f)
 
 
+def _manifest_dict(manifest):
+    return manifest if isinstance(manifest, dict) else {}
+
+
 def material_manifest_kind(manifest):
-    return (manifest or {}).get("fixture_kind", (manifest or {}).get("manifest_kind", ""))
+    manifest = _manifest_dict(manifest)
+    return manifest.get("fixture_kind", manifest.get("manifest_kind", ""))
+
+
+def _manifest_collection(manifest, key):
+    value = _manifest_dict(manifest).get(key, [])
+    if isinstance(value, list):
+        return value
+    return []
+
+
+def iter_manifest_material_rows(manifest):
+    for order, material in enumerate(_manifest_collection(manifest, "materials")):
+        if isinstance(material, dict):
+            yield order, material
+
+
+def iter_manifest_polygon_rows(manifest):
+    for order, polygon in enumerate(_manifest_collection(manifest, "polygons")):
+        if isinstance(polygon, dict):
+            yield order, polygon
 
 
 def material_manifest_summary(manifest, manifest_path=""):
-    manifest = manifest or {}
+    manifest = _manifest_dict(manifest)
     return {
         "path": manifest_path,
         "kind": material_manifest_kind(manifest),
-        "material_count": len(manifest.get("materials", [])),
-        "polygon_count": len(manifest.get("polygons", [])),
+        "material_count": len(_manifest_collection(manifest, "materials")),
+        "polygon_count": len(_manifest_collection(manifest, "polygons")),
     }
 
 
 def material_manifest_table_rows(manifest):
     rows = []
-    for material in (manifest or {}).get("materials", []):
+    for _, material in iter_manifest_material_rows(manifest):
         rows.append(
             {
                 "slot": material.get("slot"),
@@ -86,16 +110,84 @@ def coerce_material_slot(value):
 
 
 def material_manifest_table_diagnostics(material_manifest_info=None):
-    manifest = _manifest_payload(material_manifest_info)
-    manifest_materials = manifest.get("materials", [])
-    manifest_polygons = manifest.get("polygons", [])
+    raw_manifest = _manifest_payload(material_manifest_info)
+    manifest = _manifest_dict(raw_manifest)
+    manifest_materials = _manifest_collection(manifest, "materials")
+    manifest_polygons = _manifest_collection(manifest, "polygons")
     diagnostics = []
+    if raw_manifest and not isinstance(raw_manifest, dict):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_invalid_root",
+                "root_type": type(raw_manifest).__name__,
+                "message": (
+                    "The material manifest root is not an object. "
+                    "The converter cannot read material table or polygon evidence from it."
+                ),
+            }
+        )
+        return diagnostics
+    raw_materials = manifest.get("materials")
+    raw_polygons = manifest.get("polygons")
+    if raw_materials is not None and not isinstance(raw_materials, list):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_invalid_materials_collection",
+                "collection_type": type(raw_materials).__name__,
+                "message": (
+                    "The material manifest materials field is not a list. "
+                    "Request JSON and MTL generation cannot use it as an RC material table."
+                ),
+            }
+        )
+    if raw_polygons is not None and not isinstance(raw_polygons, list):
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_invalid_polygons_collection",
+                "collection_type": type(raw_polygons).__name__,
+                "message": (
+                    "The material manifest polygons field is not a list. "
+                    "Polygon material-id evidence cannot be trusted."
+                ),
+            }
+        )
+    for order, material in enumerate(manifest_materials):
+        if not isinstance(material, dict):
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_material_row",
+                    "manifest_order": order,
+                    "row_type": type(material).__name__,
+                    "message": (
+                        "The material manifest has a materials[] row that is not an object. "
+                        "The row cannot define a stable source material slot."
+                    ),
+                }
+            )
+    for order, polygon in enumerate(manifest_polygons):
+        if not isinstance(polygon, dict):
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_polygon_row",
+                    "polygon_order": order,
+                    "row_type": type(polygon).__name__,
+                    "message": (
+                        "The material manifest has a polygons[] row that is not an object. "
+                        "The row cannot define polygon material evidence."
+                    ),
+                }
+            )
     if not manifest_materials and not manifest_polygons:
         return diagnostics
 
     by_slot = {}
     by_name = {}
-    for order, material in enumerate(manifest_materials):
+    for order, material in iter_manifest_material_rows(manifest):
         raw_slot = material.get("slot")
         slot = coerce_material_slot(raw_slot)
         name = material.get("name", "")
@@ -174,7 +266,7 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     }
     polygon_slots_by_name = {}
     polygon_mismatches = []
-    for order, polygon in enumerate(manifest_polygons):
+    for order, polygon in iter_manifest_polygon_rows(manifest):
         name = polygon.get("material_name", "")
         raw_slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot")))
         if raw_slot is None or not name:
@@ -257,8 +349,8 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
 
 
 def material_manifest_materials(source_materials, material_manifest_info=None):
-    manifest = _manifest_payload(material_manifest_info)
-    manifest_materials = manifest.get("materials", [])
+    manifest = _manifest_dict(_manifest_payload(material_manifest_info))
+    manifest_materials = _manifest_collection(manifest, "materials")
     if not manifest_materials:
         return list(source_materials or [])
 
@@ -269,7 +361,7 @@ def material_manifest_materials(source_materials, material_manifest_info=None):
     }
     polygon_count_by_slot = {}
     mesh_names_by_slot = {}
-    for polygon in manifest.get("polygons", []):
+    for _, polygon in iter_manifest_polygon_rows(manifest):
         slot = polygon.get("expected_cgf_material_id", polygon.get("material_table_slot", polygon.get("material_slot")))
         slot = coerce_material_slot(slot)
         if slot is None:
@@ -281,7 +373,7 @@ def material_manifest_materials(source_materials, material_manifest_info=None):
 
     materials = []
     sorted_materials = sorted(
-        manifest_materials,
+        [material for _, material in iter_manifest_material_rows(manifest)],
         key=lambda item: (
             coerce_material_slot(item.get("slot")) is None,
             coerce_material_slot(item.get("slot")) or 0,

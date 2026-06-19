@@ -10,6 +10,8 @@ import shutil
 from model_processing.material_manifest import (
     coerce_material_slot,
     discover_material_manifest,
+    iter_manifest_material_rows,
+    iter_manifest_polygon_rows,
     load_material_manifest,
     material_manifest_materials,
     material_manifest_table_diagnostics,
@@ -120,7 +122,7 @@ def source_material_specs_from_manifest(source_fbx_path):
         return []
 
     materials_by_name = {}
-    for material in manifest.get("materials", []):
+    for _, material in iter_manifest_material_rows(manifest):
         name = material.get("name", "")
         if not name:
             continue
@@ -136,7 +138,7 @@ def source_material_specs_from_manifest(source_fbx_path):
             "used_by_polygons": False,
         }
 
-    for polygon in manifest.get("polygons", []):
+    for _, polygon in iter_manifest_polygon_rows(manifest):
         name = polygon.get("material_name", "")
         if not name:
             continue

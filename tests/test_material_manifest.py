@@ -69,6 +69,52 @@ def test_material_manifest_helpers_summarize_table_rows(tmp_path):
     ]
 
 
+def test_material_manifest_helpers_ignore_invalid_collection_shapes():
+    manifest = {
+        "manifest_kind": "blender-fbx-material-inspection",
+        "materials": {"slot": 0, "name": "Stone"},
+        "polygons": "not-a-list",
+    }
+
+    assert material_manifest_summary(manifest, "asset.fbx_material_manifest.json") == {
+        "path": "asset.fbx_material_manifest.json",
+        "kind": "blender-fbx-material-inspection",
+        "material_count": 0,
+        "polygon_count": 0,
+    }
+    assert material_manifest_table_rows(manifest) == []
+
+
+def test_material_manifest_helpers_ignore_invalid_root_shape():
+    manifest = ["not", "an", "object"]
+
+    assert material_manifest_kind(manifest) == ""
+    assert material_manifest_summary(manifest, "asset.fbx_material_manifest.json") == {
+        "path": "asset.fbx_material_manifest.json",
+        "kind": "",
+        "material_count": 0,
+        "polygon_count": 0,
+    }
+    assert material_manifest_table_rows(manifest) == []
+
+
+def test_material_manifest_helpers_skip_invalid_rows():
+    manifest = {
+        "manifest_kind": "blender-fbx-material-inspection",
+        "materials": [
+            "bad-row",
+            {"slot": 0, "name": "Stone", "first_object": "MeshA", "first_local_slot": 0},
+        ],
+        "polygons": [False, {"polygon": 0, "material_name": "Stone", "material_table_slot": 0}],
+    }
+
+    assert material_manifest_summary(manifest)["material_count"] == 2
+    assert material_manifest_summary(manifest)["polygon_count"] == 2
+    assert material_manifest_table_rows(manifest) == [
+        {"slot": 0, "name": "Stone", "source": "MeshA", "local_slot": 0},
+    ]
+
+
 def test_material_manifest_materials_reorders_and_pins_sub_indices():
     manifest_info = {
         "manifest": {
@@ -201,6 +247,69 @@ def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crash
     assert diagnostics[7]["slot"] == 1.5
 
 
+def test_material_manifest_table_diagnostics_reports_invalid_collections_and_rows():
+    root_diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": ["not", "an", "object"],
+        }
+    )
+
+    assert root_diagnostics == [
+        {
+            "severity": "hazard",
+            "code": "material_manifest_invalid_root",
+            "root_type": "list",
+            "message": (
+                "The material manifest root is not an object. "
+                "The converter cannot read material table or polygon evidence from it."
+            ),
+        }
+    ]
+
+    collection_diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": {"slot": 0, "name": "Stone"},
+                "polygons": "not-a-list",
+            }
+        }
+    )
+
+    assert [diagnostic["code"] for diagnostic in collection_diagnostics] == [
+        "material_manifest_invalid_materials_collection",
+        "material_manifest_invalid_polygons_collection",
+    ]
+    assert collection_diagnostics[0]["collection_type"] == "dict"
+    assert collection_diagnostics[1]["collection_type"] == "str"
+
+    row_diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    "bad-row",
+                    {"slot": 0, "name": "Stone"},
+                ],
+                "polygons": [
+                    False,
+                    {"polygon": 0, "material_name": "Stone", "material_table_slot": 0},
+                ],
+            }
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in row_diagnostics]
+    assert "material_manifest_invalid_material_row" in codes
+    assert "material_manifest_invalid_polygon_row" in codes
+    material_row = next(diagnostic for diagnostic in row_diagnostics if diagnostic["code"] == "material_manifest_invalid_material_row")
+    polygon_row = next(diagnostic for diagnostic in row_diagnostics if diagnostic["code"] == "material_manifest_invalid_polygon_row")
+    assert material_row["manifest_order"] == 0
+    assert material_row["row_type"] == "str"
+    assert polygon_row["polygon_order"] == 0
+    assert polygon_row["row_type"] == "bool"
+
+
 def test_material_manifest_materials_skips_invalid_manifest_slots():
     materials = material_manifest_materials(
         [{"name": "Stone"}, {"name": "Metal"}],
@@ -227,6 +336,28 @@ def test_material_manifest_materials_skips_invalid_manifest_slots():
 
     assert [material["name"] for material in materials] == ["Metal"]
     assert materials[0]["sub_index"] == 1
+    assert materials[0]["mesh_names"] == ["MeshB"]
+
+
+def test_material_manifest_materials_skips_invalid_manifest_rows():
+    materials = material_manifest_materials(
+        [{"name": "Stone"}, {"name": "Metal"}],
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    "bad-row",
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    False,
+                    {"polygon": 0, "object": "MeshB", "expected_cgf_material_id": 1},
+                ],
+            }
+        },
+    )
+
+    assert [material["name"] for material in materials] == ["Metal"]
     assert materials[0]["mesh_names"] == ["MeshB"]
 
 

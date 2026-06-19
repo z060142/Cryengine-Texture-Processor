@@ -115,6 +115,28 @@ def test_source_material_specs_from_manifest_skips_invalid_slots(tmp_path):
     ]
 
 
+def test_source_material_specs_from_manifest_skips_invalid_rows(tmp_path):
+    fbx_path = tmp_path / "asset.fbx"
+    manifest_path = tmp_path / "asset.fbx_material_manifest.json"
+    fbx_path.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": ["bad-row", {"slot": 1, "name": "Visible"}],
+                "polygons": [False, {"polygon": 0, "material_name": "Visible", "material_table_slot": 1}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    specs = source_material_specs_from_manifest(str(fbx_path))
+
+    assert [(spec["name"], spec["material_table_slot"], spec["polygon_count"]) for spec in specs] == [
+        ("Visible", 1, 1),
+    ]
+
+
 def test_discover_default_fbx_returns_first_existing_candidate(tmp_path):
     missing = tmp_path / "missing.fbx"
     existing = tmp_path / "sample.fbx"
@@ -337,6 +359,52 @@ def test_prepare_smoke_bundle_reports_invalid_manifest_slots(tmp_path):
     codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
     assert codes.count("material_manifest_invalid_material_slot") == 4
     assert codes.count("material_manifest_invalid_polygon_slot") == 4
+
+
+def test_prepare_smoke_bundle_reports_invalid_manifest_shape(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": ["bad-row", {"slot": 0, "name": "Stone"}],
+                "polygons": [False, {"polygon": 0, "material_name": "Stone", "material_table_slot": 0}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
+    assert "material_manifest_invalid_material_row" in codes
+    assert "material_manifest_invalid_polygon_row" in codes
+
+
+def test_prepare_smoke_bundle_reports_invalid_manifest_root(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=[{"name": "Stone", "id": 1, "index": 0}],
+    )
+
+    codes = [diagnostic["code"] for diagnostic in bundle["material_diagnostics"]]
+    assert "material_manifest_invalid_root" in codes
 
 
 def test_prepare_smoke_bundle_reports_out_of_range_manifest_slots(tmp_path):
