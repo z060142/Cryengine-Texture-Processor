@@ -64,6 +64,60 @@ def _manifest_payload(material_manifest_info):
     return material_manifest_info
 
 
+def material_manifest_table_diagnostics(material_manifest_info=None):
+    manifest = _manifest_payload(material_manifest_info)
+    manifest_materials = manifest.get("materials", [])
+    diagnostics = []
+    if not manifest_materials:
+        return diagnostics
+
+    by_slot = {}
+    by_name = {}
+    for order, material in enumerate(manifest_materials):
+        slot = material.get("slot")
+        name = material.get("name", "")
+        if slot is not None:
+            by_slot.setdefault(int(slot), []).append({"order": order, "name": name})
+        if name:
+            by_name.setdefault(name, []).append({"order": order, "slot": slot})
+
+    for slot, rows in sorted(by_slot.items()):
+        if len(rows) <= 1:
+            continue
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_duplicate_slot",
+                "slot": slot,
+                "material_names": [row["name"] for row in rows],
+                "manifest_orders": [row["order"] for row in rows],
+                "message": (
+                    "The material manifest maps multiple material rows to the same slot. "
+                    "The generated request will target the same final RC sub_index more than once."
+                ),
+            }
+        )
+
+    for name, rows in sorted(by_name.items()):
+        if len(rows) <= 1:
+            continue
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": "material_manifest_duplicate_name",
+                "material": name,
+                "slots": [row["slot"] for row in rows],
+                "manifest_orders": [row["order"] for row in rows],
+                "message": (
+                    "The material manifest lists the same material name multiple times. "
+                    "The converter collapses exact duplicate request names, so one manifest row can disappear."
+                ),
+            }
+        )
+
+    return diagnostics
+
+
 def material_manifest_materials(source_materials, material_manifest_info=None):
     manifest = _manifest_payload(material_manifest_info)
     manifest_materials = manifest.get("materials", [])

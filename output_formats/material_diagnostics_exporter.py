@@ -6,6 +6,7 @@ import json
 import os
 
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
+from model_processing.material_manifest import material_manifest_table_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
 
@@ -106,6 +107,7 @@ def build_material_diagnostics_report(
         }
         for diagnostic in build_omitted_material_diagnostics(source_materials, records)
     ]
+    diagnostics.extend(material_manifest_table_diagnostics(material_manifest_info))
     for item in material_items:
         item["diagnostics"] = [
             *item["diagnostics"],

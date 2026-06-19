@@ -4,6 +4,7 @@ from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
+    material_manifest_table_diagnostics,
     material_manifest_kind,
     material_manifest_summary,
     material_manifest_table_rows,
@@ -81,3 +82,27 @@ def test_material_manifest_materials_reorders_and_pins_sub_indices():
     assert [material["auto_assigned"] for material in materials] == [False, False]
     assert materials[0]["textures"] == {"diffuse": "stone_diff.tif"}
     assert materials[1]["mesh_names"] == ["MeshB"]
+
+
+def test_material_manifest_table_diagnostics_reports_duplicate_slots_and_names():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 0, "name": "Metal"},
+                    {"slot": 2, "name": "Stone"},
+                ],
+            }
+        }
+    )
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "material_manifest_duplicate_slot",
+        "material_manifest_duplicate_name",
+    ]
+    assert diagnostics[0]["slot"] == 0
+    assert diagnostics[0]["material_names"] == ["Stone", "Metal"]
+    assert diagnostics[1]["material"] == "Stone"
+    assert diagnostics[1]["slots"] == [0, 2]

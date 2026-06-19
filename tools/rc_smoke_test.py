@@ -11,6 +11,7 @@ from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
+    material_manifest_table_diagnostics,
 )
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
@@ -218,6 +219,7 @@ def collect_material_slot_diagnostics(
         }
         for diagnostic in build_omitted_material_diagnostics(source_materials if source_materials is not None else material_specs, records)
     ]
+    diagnostics.extend(material_manifest_table_diagnostics(material_manifest_info))
     for record in records:
         for diagnostic in record.get("diagnostics", []):
             diagnostics.append(
@@ -242,6 +244,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
     if os.path.abspath(source_fbx_path) != os.path.abspath(copied_fbx_path):
         shutil.copy2(source_fbx_path, copied_fbx_path)
     copied_manifest_path = _copy_material_manifest(source_fbx_path, copied_fbx_path)
+    manifest_info = {"path": copied_manifest_path, "manifest": load_material_manifest(copied_manifest_path)} if copied_manifest_path else None
     source_materials = source_material_specs_from_manifest(source_fbx_path)
 
     materials_data = [{**spec, "textures": {}} for spec in material_specs]
@@ -267,6 +270,7 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
         "json_path": json_result,
         "material_diagnostics": collect_material_slot_diagnostics(
             materials_data,
+            material_manifest_info=manifest_info,
             source_materials=source_materials or materials_data,
         ),
     }

@@ -27,6 +27,7 @@ from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
     material_manifest_summary,
+    material_manifest_table_diagnostics,
     material_manifest_table_rows,
 )
 from model_processing.model_loader import ModelLoader
@@ -109,6 +110,7 @@ def collect_model_material_diagnostics(model_data):
         materials,
         material_manifest_info=(model_data or {}).get("material_manifest"),
     )
+    diagnostics.extend(material_manifest_table_diagnostics((model_data or {}).get("material_manifest")))
     diagnostics.extend(build_omitted_material_diagnostics(materials, records))
     for record in records:
         diagnostics.extend(_degraded_texture_reference_diagnostics(record["clean_name"], record["material"]))

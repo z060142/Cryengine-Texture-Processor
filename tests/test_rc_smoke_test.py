@@ -202,6 +202,35 @@ def test_prepare_smoke_bundle_reports_manifest_omitted_source_material(tmp_path)
     assert bundle["material_diagnostics"][0]["material"] == "Missing"
 
 
+def test_prepare_smoke_bundle_reports_manifest_duplicate_name(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone"},
+                    {"slot": 1, "name": "Stone"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    bundle = prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    assert bundle["material_diagnostics"][0]["code"] == "material_manifest_duplicate_name"
+    assert bundle["material_diagnostics"][0]["material"] == "Stone"
+
+
 def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_path):
     source_fbx = tmp_path / "source.fbx"
     source_fbx.write_text("fake fbx", encoding="utf-8")

@@ -96,6 +96,26 @@ def test_collect_model_material_diagnostics_reports_manifest_omitted_material():
     assert diagnostics[0]["omitted_reason"] == "not_in_request_materials"
 
 
+def test_collect_model_material_diagnostics_reports_manifest_duplicate_name():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [
+                        {"slot": 0, "name": "Stone"},
+                        {"slot": 1, "name": "Stone"},
+                    ],
+                }
+            },
+        }
+    )
+
+    assert diagnostics[0]["code"] == "material_manifest_duplicate_name"
+    assert diagnostics[0]["material"] == "Stone"
+
+
 def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
     diagnostics = collect_model_material_diagnostics(
         {
