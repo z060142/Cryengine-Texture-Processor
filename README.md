@@ -26,7 +26,7 @@ A powerful tool for processing and converting textures to CryEngine-compatible f
 - **DDS Generation**: Generate DDS files using RC.exe
 - **Multilingual Interface**: Support for English and Traditional Chinese
 
-> **Note:** The model export functionality is still under development and not fully implemented in the current version.
+> **Note:** Phase 1 status is tracked in [`docs/phase1_status_matrix.md`](docs/phase1_status_matrix.md). Model export currently preserves the compatibility path; final CryEngine/RC-correct conversion is Phase 2/3 work.
 
 ## Installation
 
@@ -68,6 +68,8 @@ The old Tkinter entry point is preserved as `legacy_tk_main.py` during the migra
 ## Refactor Scope
 
 Phase 1 is bounded in [`docs/phase1_refactor_scope.md`](docs/phase1_refactor_scope.md). New Phase 1 work should not be added unless it fixes a regression introduced by Phase 1 itself.
+
+The supported/degraded/unsupported/Phase-2-only boundary is tracked in [`docs/phase1_status_matrix.md`](docs/phase1_status_matrix.md).
 
 ## Usage
 
@@ -163,7 +165,7 @@ The harness also records `sandbox_edcommand`, a normal Editor launch strategy us
 
 ## Known Limitations
 
-- Model export functionality is still under development
+- Model export is a Phase 1 compatibility path; see [`docs/phase1_status_matrix.md`](docs/phase1_status_matrix.md) for supported, degraded, unsupported, and Phase-2-only boundaries
 - Certain advanced PBR workflow conversions may require manual tweaking
 - For proper DDS generation, RC.exe path must be configured in preferences
 - For model loading functionality, Blender Python API (bpy) is required or must be provided through a later Blender subprocess integration

@@ -117,6 +117,8 @@ commit and docs are added
 
 ### P1-5: Phase 1 Status Matrix
 
+Status: done in `phase1_status_matrix.md`.
+
 Problem:
 
 README still has broad statements such as model export being under development. Phase 1 needs a fixed, readable status matrix so Phase 2 starts from known boundaries.
