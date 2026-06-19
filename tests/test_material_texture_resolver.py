@@ -133,7 +133,7 @@ def test_material_texture_records_capture_texture_ref_evidence(tmp_path):
     ]
 
 
-def test_build_mtl_material_data_maps_roughness_output_to_opacity(tmp_path):
+def test_build_mtl_material_data_preserves_roughness_semantics_for_mtl_export(tmp_path):
     source = tmp_path / "carpaint_roughness.png"
     source.write_text("fake source")
     (tmp_path / "carpaint_roughness.tif").write_text("fake roughness")
@@ -148,7 +148,7 @@ def test_build_mtl_material_data_maps_roughness_output_to_opacity(tmp_path):
         output_format="tif",
     )
 
-    assert result[0]["textures"]["opacity"] == str(tmp_path / "carpaint_roughness.tif")
+    assert result[0]["textures"]["roughness"] == str(tmp_path / "carpaint_roughness.tif")
 
 
 def test_build_mtl_material_data_probes_multiple_output_extensions(tmp_path):
@@ -168,7 +168,7 @@ def test_build_mtl_material_data_probes_multiple_output_extensions(tmp_path):
     )
 
     assert result[0]["textures"]["diffuse"] == str(tmp_path / "carpaint_diff.dds")
-    assert result[0]["textures"]["opacity"] == str(tmp_path / "carpaint_roughness.tif")
+    assert result[0]["textures"]["roughness"] == str(tmp_path / "carpaint_roughness.tif")
 
 
 def test_texture_output_extensions_normalizes_lists_auto_and_csv():

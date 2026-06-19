@@ -180,6 +180,8 @@ def test_build_mtl_document_exports_roughness_as_observed_opacity_map(tmp_path):
         if texture.tag == "Texture"
     }
     assert texture_maps == {"Opacity": "./asset_roughness.dds"}
+    material = root.find("SubMaterials").find("Material")
+    assert material.get("AlphaTest") is None
 
 
 def test_build_mtl_document_does_not_probe_dds_diffuse_alpha_with_pillow(tmp_path, capsys):

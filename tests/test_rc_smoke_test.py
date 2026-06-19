@@ -693,7 +693,7 @@ def test_build_smoke_materials_data_uses_texture_outputs_and_manifest_order(tmp_
 
     assert [material["name"] for material in materials_data] == ["Stone", "Glass"]
     assert materials_data[0]["textures"]["diffuse"] == str(tmp_path / "Stone_diff.dds")
-    assert materials_data[1]["textures"]["opacity"] == str(tmp_path / "Glass_roughness.tif")
+    assert materials_data[1]["textures"]["roughness"] == str(tmp_path / "Glass_roughness.tif")
     assert diagnostics[0]["code"] == "texture_backed_mtl_material_summary"
     assert diagnostics[0]["texture_material_count"] == 2
 
