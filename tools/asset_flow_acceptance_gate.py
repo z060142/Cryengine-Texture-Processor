@@ -25,6 +25,20 @@ DEFAULT_REQUIREMENTS = {
     "material_texture_ok": 1,
 }
 
+PRESETS = {
+    "practical": DEFAULT_REQUIREMENTS,
+    "texture-backed-baseline": {
+        "raw_textures_found": 3,
+        "texture_processing_started": 3,
+        "texture_format_ok": 6,
+        "manifest_generated": 3,
+        "model_format_ok": 3,
+        "material_slots_ok": 3,
+        "mtl_format_ok": 3,
+        "material_texture_ok": 3,
+    },
+}
+
 
 def load_report(path):
     with open(path, "r", encoding="utf-8") as handle:
@@ -38,8 +52,13 @@ def parse_requirement(value):
     return name, int(count)
 
 
-def build_requirements(values=None, use_defaults=True):
-    requirements = dict(DEFAULT_REQUIREMENTS) if use_defaults else {}
+def build_requirements(values=None, use_defaults=True, preset=""):
+    if preset:
+        if preset not in PRESETS:
+            raise ValueError(f"Unknown acceptance preset: {preset}")
+        requirements = dict(PRESETS[preset])
+    else:
+        requirements = dict(DEFAULT_REQUIREMENTS) if use_defaults else {}
     for value in values or []:
         name, count = parse_requirement(value)
         requirements[name] = count
@@ -104,6 +123,12 @@ def main(argv=None):
         help="Required check coverage as name:min_pass. Can be passed more than once.",
     )
     parser.add_argument(
+        "--preset",
+        choices=sorted(PRESETS),
+        default="",
+        help="Named acceptance coverage preset. Explicit --require values override preset entries.",
+    )
+    parser.add_argument(
         "--no-defaults",
         action="store_true",
         help="Only enforce --require entries instead of the default practical acceptance checks.",
@@ -112,7 +137,7 @@ def main(argv=None):
 
     gate = evaluate_report(
         load_report(args.report),
-        requirements=build_requirements(args.require, use_defaults=not args.no_defaults),
+        requirements=build_requirements(args.require, use_defaults=not args.no_defaults, preset=args.preset),
     )
     if args.output:
         write_report(args.output, gate)

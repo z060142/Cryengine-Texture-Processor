@@ -76,8 +76,58 @@ def test_main_writes_gate_report_and_prints_counts(tmp_path, capsys):
     assert "material_texture_ok: pass=3 fail=0 na=0 required=3 ok=True" in text
 
 
+def test_main_accepts_texture_backed_baseline_preset(tmp_path):
+    report = tmp_path / "asset_flow.json"
+    report.write_text(
+        json.dumps(
+            report_with_counts(
+                raw_textures_found={"pass": 3, "fail": 0, "na": 0},
+                texture_processing_started={"pass": 3, "fail": 0, "na": 0},
+                texture_format_ok={"pass": 6, "fail": 0, "na": 0},
+                manifest_generated={"pass": 3, "fail": 0, "na": 0},
+                model_format_ok={"pass": 3, "fail": 0, "na": 0},
+                material_slots_ok={"pass": 3, "fail": 0, "na": 0},
+                mtl_format_ok={"pass": 3, "fail": 0, "na": 0},
+                material_texture_ok={"pass": 3, "fail": 0, "na": 0},
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    rc = asset_flow_acceptance_gate.main(
+        [
+            "--report",
+            str(report),
+            "--preset",
+            "texture-backed-baseline",
+        ]
+    )
+
+    assert rc == 0
+
+
 def test_build_requirements_keeps_defaults_and_overrides():
     requirements = asset_flow_acceptance_gate.build_requirements(["material_texture_ok:3"])
 
     assert requirements["raw_textures_found"] == 1
     assert requirements["material_texture_ok"] == 3
+
+
+def test_build_requirements_can_use_preset_and_override():
+    requirements = asset_flow_acceptance_gate.build_requirements(
+        ["material_texture_ok:4"],
+        preset="texture-backed-baseline",
+    )
+
+    assert requirements["raw_textures_found"] == 3
+    assert requirements["texture_format_ok"] == 6
+    assert requirements["material_texture_ok"] == 4
+
+
+def test_build_requirements_rejects_unknown_preset():
+    try:
+        asset_flow_acceptance_gate.build_requirements(preset="missing")
+    except ValueError as exc:
+        assert "Unknown acceptance preset" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError")

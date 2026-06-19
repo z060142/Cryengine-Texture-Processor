@@ -91,15 +91,8 @@ Machine gate:
 ```powershell
 uv run python -m tools.asset_flow_acceptance_gate `
   --report "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_batch_report.json" `
-  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_acceptance_gate.json" `
-  --require raw_textures_found:3 `
-  --require texture_processing_started:3 `
-  --require manifest_generated:3 `
-  --require model_format_ok:3 `
-  --require material_slots_ok:3 `
-  --require mtl_format_ok:3 `
-  --require material_texture_ok:3 `
-  --require texture_format_ok:6
+  --preset texture-backed-baseline `
+  --output "S:\Crytek\crytek\Stripped to the bone\e2e_asset_flow_validator\texture_backed_only_acceptance_gate_preset.json"
 ```
 
 Observed gate result:
