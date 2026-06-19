@@ -81,6 +81,31 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     assert public_params.get("TessellationFactorMax") == "32"
 
 
+def test_build_mtl_document_skips_known_non_mtl_texture_channels(tmp_path):
+    texture_paths = {
+        "diffuse": tmp_path / "asset_diff.dds",
+        "ao": tmp_path / "asset_ao.dds",
+        "glossiness": tmp_path / "asset_gloss.dds",
+    }
+    for texture_path in texture_paths.values():
+        texture_path.write_text("dds", encoding="utf-8")
+
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "Wall",
+                "textures": {texture_type: str(texture_path) for texture_type, texture_path in texture_paths.items()},
+            }
+        ],
+        str(tmp_path),
+    )
+
+    material = root.find("SubMaterials").find("Material")
+    texture_maps = [texture.get("Map") for texture in list(material.find("Textures")) if texture.tag == "Texture"]
+
+    assert texture_maps == ["Diffuse"]
+
+
 def test_calculate_relative_path_preserves_cryengine_aliases():
     assert (
         mtl_exporter._calculate_relative_path(

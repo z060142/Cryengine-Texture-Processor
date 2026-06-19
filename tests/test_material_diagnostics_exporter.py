@@ -245,6 +245,58 @@ def test_build_material_diagnostics_report_includes_mtl_flags_policy():
     assert summary["source_evidence"]["source"].endswith("IMaterial.h")
 
 
+def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Stone",
+                "id": 1,
+                "textures": {
+                    "diffuse": "stone_diff.dds",
+                    "normal": "stone_ddn.dds",
+                    "ao": "stone_ao.dds",
+                    "packed_orm": "stone_orm.dds",
+                },
+            },
+            {
+                "name": "Leaves",
+                "id": 2,
+                "textures": {
+                    "opacity": "leaves_opacity.dds",
+                },
+            },
+        ],
+        source_model="texture_maps.fbx",
+    )
+
+    material_policy = report["materials"][0]["mtl_texture_map_policy"]
+    summary = report["mtl_texture_map_policy_summary"]
+
+    assert [entry["ce_map_type"] for entry in material_policy["exported"]] == ["Diffuse", "Bumpmap"]
+    assert [entry["reason"] for entry in material_policy["skipped"]] == [
+        "known_internal_non_mtl_channel",
+        "unknown_texture_type",
+    ]
+    assert summary["material_count"] == 2
+    assert summary["input_texture_type_counts"] == {
+        "ao": 1,
+        "diffuse": 1,
+        "normal": 1,
+        "opacity": 1,
+        "packed_orm": 1,
+    }
+    assert summary["exported_ce_map_counts"] == {
+        "Bumpmap": 1,
+        "Diffuse": 1,
+        "Opacity": 1,
+    }
+    assert summary["skipped_reason_counts"] == {
+        "known_internal_non_mtl_channel": 1,
+        "unknown_texture_type": 1,
+    }
+    assert summary["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
+
+
 def test_build_material_diagnostics_report_summarizes_mtl_shader_policy():
     report = build_material_diagnostics_report(
         [
@@ -606,5 +658,7 @@ def test_export_material_diagnostics_writes_json(tmp_path):
     assert payload["summary"]["hazard_count"] == 1
     assert payload["materials"][0]["mtl_flags_policy"]["mtl_flags"] == "524416"
     assert payload["mtl_flags_policy_summary"]["sub_material_flag_counts"] == {"524416": 1}
+    assert payload["materials"][0]["mtl_texture_map_policy"]["entries"] == []
+    assert payload["mtl_texture_map_policy_summary"]["exported_ce_map_counts"] == {}
     assert payload["materials"][0]["mtl_shader_policy"]["string_gen_mask"] == "%SUBSURFACE_SCATTERING"
     assert payload["mtl_shader_policy_summary"]["token_counts"] == {"%SUBSURFACE_SCATTERING": 1}

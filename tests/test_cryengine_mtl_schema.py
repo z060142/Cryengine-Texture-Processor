@@ -20,9 +20,11 @@ from output_formats.cryengine_mtl_schema import (
     exported_gen_mask,
     exported_material_shader_policy,
     exported_mtl_flags_policy,
+    exported_texture_map_policy,
     exported_string_gen_mask,
     mtl_flags_attr,
     parse_public_param_value,
+    resolve_ce_texture_map,
     shader_mask_load_policy,
 )
 
@@ -43,6 +45,45 @@ def test_ce_texture_suffixes_follow_material_helpers_suffixes():
     assert CE_TEXTURE_SUFFIXES["Smoothness"] == "_ddna"
     assert CE_TEXTURE_SUFFIXES["Heightmap"] == "_displ"
     assert CE_TEXTURE_SUFFIXES["Emittance"] == "_em"
+
+
+def test_resolve_ce_texture_map_exposes_export_and_skip_reasons():
+    diffuse = resolve_ce_texture_map("Diffuse", "wall_diff.dds")
+    assert diffuse["texture_type"] == "diffuse"
+    assert diffuse["ce_map_type"] == "Diffuse"
+    assert diffuse["exported"] is True
+    assert diffuse["reason"] == "source_backed_texture_map"
+    assert diffuse["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
+
+    ao = resolve_ce_texture_map("ao", "wall_ao.dds")
+    assert ao["ce_map_type"] == ""
+    assert ao["exported"] is False
+    assert ao["reason"] == "known_internal_non_mtl_channel"
+
+    missing = resolve_ce_texture_map("normal", "")
+    assert missing["exported"] is False
+    assert missing["reason"] == "missing_texture_path"
+
+    unknown = resolve_ce_texture_map("packed_orm", "wall_orm.dds")
+    assert unknown["exported"] is False
+    assert unknown["reason"] == "unknown_texture_type"
+
+
+def test_exported_texture_map_policy_splits_exported_and_skipped_entries():
+    policy = exported_texture_map_policy(
+        {
+            "diffuse": "wall_diff.dds",
+            "normal": "wall_ddn.dds",
+            "ao": "wall_ao.dds",
+            "glossiness": "wall_gloss.dds",
+        }
+    )
+
+    assert [entry["ce_map_type"] for entry in policy["exported"]] == ["Diffuse", "Bumpmap"]
+    assert [entry["reason"] for entry in policy["skipped"]] == [
+        "known_internal_non_mtl_channel",
+        "known_internal_non_mtl_channel",
+    ]
 
 
 def test_illum_ext_shader_masks_are_source_evidence_not_export_compat_values():

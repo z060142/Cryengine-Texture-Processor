@@ -10,9 +10,9 @@ from model_processing.texture_type_resolver import (
     normalize_texture_type,
 )
 from output_formats.cryengine_mtl_schema import (
-    CE_TEXTURE_MAP_TYPES,
     SUB_MATERIAL_DEFAULT_ATTRS,
     exported_material_shader_policy,
+    resolve_ce_texture_map,
 )
 
 
@@ -53,9 +53,9 @@ def _normalize_texture_map(texture_map):
 def _texture_map_to_ce_fields(textures):
     ce_textures = {}
     for texture_type, texture_path in textures.items():
-        ce_map_type = CE_TEXTURE_MAP_TYPES.get(texture_type)
-        if ce_map_type and texture_path:
-            ce_textures[ce_map_type] = texture_path
+        texture_policy = resolve_ce_texture_map(texture_type, texture_path)
+        if texture_policy["exported"]:
+            ce_textures[texture_policy["ce_map_type"]] = texture_path
     return ce_textures
 
 

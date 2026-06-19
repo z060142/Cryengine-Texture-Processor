@@ -45,6 +45,22 @@ def test_convert_maps_classified_texture_keys_to_cryengine_fields():
     assert "%DISPLACEMENT_MAPPING" in result["StringGenMask"]
 
 
+def test_convert_skips_known_non_mtl_texture_channels():
+    result = MaterialConverter().convert(
+        {"name": "Wall"},
+        {
+            "diffuse": "wall_diff.tif",
+            "ao": "wall_ao.tif",
+            "glossiness": "wall_gloss.tif",
+        },
+    )
+
+    assert result["Textures"]["Diffuse"] == "wall_diff.tif"
+    assert "ao" not in result["Textures"]
+    assert "glossiness" not in result["Textures"]
+    assert "Occlusion" not in result["Textures"]
+
+
 def test_convert_can_infer_original_to_processed_texture_map():
     result = MaterialConverter().convert(
         {"name": "Wall"},

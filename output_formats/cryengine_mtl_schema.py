@@ -40,6 +40,16 @@ CE_TEXTURE_SUFFIXES = {
     "Emittance": "_em",
 }
 
+CE_TEXTURE_MAP_SOURCE = {
+    "source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "map_type_lines": "source-backed CE Texture Map names",
+    "rule": (
+        "Only texture types with a CryEngine material Texture Map name are emitted "
+        "as .mtl <Texture> entries. Known internal channels without a CE map remain "
+        "available for conversion diagnostics but are not exported as Texture nodes."
+    ),
+}
+
 # Source evidence:
 # CRYENGINE_Source-release/Engine/Shaders/Illum.ext
 ILLUM_EXT_SHADER_MASKS = {
@@ -291,6 +301,44 @@ def exported_mtl_flags_policy():
             "source": "Code/CryEngine/CryCommon/Cry3DEngine/IMaterial.h",
             "lines": "46-77",
         },
+    }
+
+
+def resolve_ce_texture_map(texture_type, texture_path=""):
+    normalized_type = str(texture_type or "").lower()
+    texture_path = str(texture_path or "")
+    ce_map_type = CE_TEXTURE_MAP_TYPES.get(normalized_type)
+    known_type = normalized_type in CE_TEXTURE_MAP_TYPES
+
+    if not texture_path:
+        reason = "missing_texture_path"
+    elif ce_map_type:
+        reason = "source_backed_texture_map"
+    elif known_type:
+        reason = "known_internal_non_mtl_channel"
+    else:
+        reason = "unknown_texture_type"
+
+    return {
+        "texture_type": normalized_type,
+        "texture_path": texture_path,
+        "ce_map_type": ce_map_type or "",
+        "exported": bool(texture_path and ce_map_type),
+        "reason": reason,
+        "source_evidence": CE_TEXTURE_MAP_SOURCE,
+    }
+
+
+def exported_texture_map_policy(textures):
+    entries = [
+        resolve_ce_texture_map(texture_type, texture_path)
+        for texture_type, texture_path in sorted((textures or {}).items())
+    ]
+    return {
+        "entries": entries,
+        "exported": [entry for entry in entries if entry["exported"]],
+        "skipped": [entry for entry in entries if not entry["exported"]],
+        "source_evidence": CE_TEXTURE_MAP_SOURCE,
     }
 
 

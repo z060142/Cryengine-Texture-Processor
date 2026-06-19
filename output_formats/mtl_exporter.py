@@ -16,10 +16,10 @@ from PIL import Image
 from output_formats.cryengine_mtl_schema import (
     ALPHA_TEXTURE_TYPES,
     BASE_PUBLIC_PARAMS,
-    CE_TEXTURE_MAP_TYPES,
     MTL_ROOT_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
     exported_material_shader_policy,
+    resolve_ce_texture_map,
 )
 from model_processing.material_index_assigner import (
     parse_mtl_submaterial_names,
@@ -163,8 +163,8 @@ def _sub_material_attrs(material_name, textures):
 
 def _append_texture_entries(textures_elem, textures, model_output_dir, material_name):
     for map_type, abs_texture_path in _normalize_texture_keys(textures).items():
-        ce_map_type = CE_TEXTURE_MAP_TYPES.get(map_type)
-        if not ce_map_type or not abs_texture_path:
+        texture_policy = resolve_ce_texture_map(map_type, abs_texture_path)
+        if not texture_policy["exported"]:
             continue
 
         relative_texture_path = _calculate_relative_path(abs_texture_path, model_output_dir)
@@ -175,7 +175,7 @@ def _append_texture_entries(textures_elem, textures, model_output_dir, material_
             )
             continue
 
-        tex_elem = ET.SubElement(textures_elem, "Texture", Map=ce_map_type, File=relative_texture_path)
+        tex_elem = ET.SubElement(textures_elem, "Texture", Map=texture_policy["ce_map_type"], File=relative_texture_path)
         ET.SubElement(
             tex_elem,
             "TexMod",

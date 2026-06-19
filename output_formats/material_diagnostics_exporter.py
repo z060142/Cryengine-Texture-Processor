@@ -10,7 +10,11 @@ from model_processing.material_index_assigner import build_omitted_material_diag
 from model_processing.material_manifest import material_manifest_table_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
-from output_formats.cryengine_mtl_schema import exported_material_shader_policy, exported_mtl_flags_policy
+from output_formats.cryengine_mtl_schema import (
+    exported_material_shader_policy,
+    exported_mtl_flags_policy,
+    exported_texture_map_policy,
+)
 
 
 AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
@@ -54,6 +58,7 @@ def _record_to_report_item(record):
     physicalize_resolution = resolve_rc_physicalize(record["material"], fallback_name=record["original_name"])
     mtl_shader_policy = exported_material_shader_policy(record["material"].get("textures", {}))
     mtl_flags_policy = exported_mtl_flags_policy()["sub_material"]
+    mtl_texture_map_policy = exported_texture_map_policy(record["material"].get("textures", {}))
     return {
         "name": record["clean_name"],
         "original_name": record["original_name"],
@@ -78,6 +83,7 @@ def _record_to_report_item(record):
         "duplicate_sub_index_material_names": record.get("duplicate_sub_index_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
         "mtl_flags_policy": mtl_flags_policy,
+        "mtl_texture_map_policy": mtl_texture_map_policy,
         "mtl_shader_policy": mtl_shader_policy,
         "diagnostics": [
             *record.get("diagnostics", []),
@@ -131,6 +137,29 @@ def _mtl_flags_policy_summary(material_items):
         "sub_material_flag_counts": _counter_to_sorted_dict(sub_material_flag_counts),
         "sub_material_flag_name_counts": _counter_to_sorted_dict(sub_material_flag_name_counts),
         "source_evidence": export_policy["source_evidence"],
+    }
+
+
+def _mtl_texture_map_policy_summary(material_items):
+    input_texture_type_counts = Counter()
+    exported_ce_map_counts = Counter()
+    skipped_reason_counts = Counter()
+
+    for item in material_items:
+        policy = item.get("mtl_texture_map_policy", {})
+        for entry in policy.get("entries", []):
+            input_texture_type_counts.update([entry.get("texture_type", "")])
+            if entry.get("exported"):
+                exported_ce_map_counts.update([entry.get("ce_map_type", "")])
+            else:
+                skipped_reason_counts.update([entry.get("reason", "")])
+
+    return {
+        "material_count": len(material_items),
+        "input_texture_type_counts": _counter_to_sorted_dict(input_texture_type_counts),
+        "exported_ce_map_counts": _counter_to_sorted_dict(exported_ce_map_counts),
+        "skipped_reason_counts": _counter_to_sorted_dict(skipped_reason_counts),
+        "source_evidence": exported_texture_map_policy({})["source_evidence"],
     }
 
 
@@ -197,6 +226,7 @@ def build_material_diagnostics_report(
             "hazard_count": hazard_count,
         },
         "mtl_flags_policy_summary": _mtl_flags_policy_summary(material_items),
+        "mtl_texture_map_policy_summary": _mtl_texture_map_policy_summary(material_items),
         "mtl_shader_policy_summary": _mtl_shader_policy_summary(material_items),
         "materials": material_items,
         "diagnostics": diagnostics,
