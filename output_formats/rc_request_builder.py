@@ -13,9 +13,10 @@ from model_processing.rc_material_policy import (
     rc_physicalize_diagnostics,
     resolve_rc_physicalize,
 )
-from output_formats.rc_import_schema import assert_rc_import_request_schema
+from output_formats.rc_import_schema import RC_IMPORT_NODE_FIELDS, assert_rc_import_request_schema
 
 VALID_WRAPPER_NAMES = {"request", "metadata"}
+DERIVED_NODE_FIELDS = {"path", "nodes"}
 
 
 def get_node_path(node_name, parent_path=None):
@@ -125,6 +126,9 @@ def process_node_hierarchy(nodes, parent_path=None):
             "nodes": [],
             "_is_proxy": node_type["is_proxy"],
         }
+        for field in sorted(RC_IMPORT_NODE_FIELDS - DERIVED_NODE_FIELDS - {"name"}):
+            if field in node:
+                json_node[field] = node[field]
 
         children = node.get("children", [])
         if children:

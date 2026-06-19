@@ -41,8 +41,19 @@ material_first_evidence = {{}}
 objects = []
 polygons = []
 
+def scene_node(obj):
+    children = sorted(obj.children, key=lambda child: child.name)
+    return {{
+        'name': obj.name,
+        'mass': -1.0,
+        'density': -1.0,
+        'children': [scene_node(child) for child in children],
+    }}
+
 mesh_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
 mesh_objects.sort(key=lambda obj: obj.name)
+root_objects = sorted([obj for obj in bpy.context.scene.objects if obj.parent is None], key=lambda obj: obj.name)
+scene_hierarchy = [scene_node(obj) for obj in root_objects]
 
 for obj in mesh_objects:
     objects.append(obj.name)
@@ -133,6 +144,7 @@ manifest = {{
     'material_slot_order_source': 'fbx_name_first_offset',
     'polygon_verification': 'material_table_only',
     'objects': objects,
+    'scene_hierarchy': scene_hierarchy,
     'materials': material_slots,
     'polygons': polygons,
     'expect_cgf_material_ids': sorted(set(polygon['expected_cgf_material_id'] for polygon in polygons)),

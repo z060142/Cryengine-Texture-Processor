@@ -7,6 +7,7 @@ import os
 import traceback
 
 from model_processing.material_index_assigner import parse_mtl_submaterial_names
+from output_formats.rc_import_schema import assert_rc_import_request_schema
 from output_formats.rc_request_builder import build_import_request, wrap_import_request
 
 
@@ -15,16 +16,15 @@ def export_json(
     source_filename,
     output_path,
     texture_output_dir=None,
-    wrapper_name="request",
+    wrapper_name="direct",
     output_ext="cgf",
     material_filename=None,
 ):
     """
     Export a CryEngine Resource Compiler FBX import request.
 
-    RC-side `CImportRequest::LoadFromFile()` reads the root object named
-    `request`. The old editor-style `metadata` wrapper can still be requested
-    explicitly during transition with `wrapper_name="metadata"`.
+    RC-side `CImportRequest::LoadFromFile()` reads the import fields from the
+    JSON root object. Wrapper output is only for legacy/report fixtures.
 
     Args:
         model_data: Loaded model dict containing materials, meshes, and hierarchy.
@@ -32,7 +32,7 @@ def export_json(
             by RC relative to the JSON file.
         output_path: Directory where the JSON file should be written.
         texture_output_dir: Kept for legacy call compatibility; unused here.
-        wrapper_name: `request` for RC, or `metadata` for editor-style JSON.
+        wrapper_name: `direct` for RC, or a legacy wrapper such as `metadata`.
         output_ext: Target model extension, usually `cgf`, `chr`, `skin`, `caf`.
         material_filename: CryEngine material filename without extension.
 
@@ -63,7 +63,11 @@ def export_json(
             output_ext=output_ext,
             existing_submaterial_names=existing_submaterial_names,
         )
-        json_data = wrap_import_request(request, wrapper_name=wrapper_name)
+        if wrapper_name in (None, "", "direct"):
+            assert_rc_import_request_schema(request)
+            json_data = request
+        else:
+            json_data = wrap_import_request(request, wrapper_name=wrapper_name)
 
         os.makedirs(os.path.dirname(json_file_path), exist_ok=True)
         with open(json_file_path, "w", encoding="utf-8") as file:

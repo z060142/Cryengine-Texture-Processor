@@ -186,6 +186,14 @@ def test_build_smoke_model_data_uses_empty_node_list():
     ]
 
 
+def test_build_smoke_model_data_accepts_manifest_scene_hierarchy():
+    hierarchy = [{"name": "Root", "mass": -1.0, "density": -1.0, "children": []}]
+
+    model_data = build_smoke_model_data("asset", ["Bark"], scene_hierarchy=hierarchy)
+
+    assert model_data["scene_hierarchy"] == hierarchy
+
+
 def test_collect_material_slot_diagnostics_reports_deleted_known_slot():
     diagnostics = collect_material_slot_diagnostics(
         [{"name": "Visible", "id": 1}, {"name": "Removed", "id": 2, "deleted": True}]
@@ -212,9 +220,9 @@ def test_prepare_smoke_bundle_copies_fbx_and_writes_mtl_and_request(tmp_path):
     assert (work_dir / "asset.fbx").read_text(encoding="utf-8") == "fake fbx"
     assert os.path.exists(bundle["mtl_path"])
     payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
-    assert set(payload.keys()) == {"request"}
-    assert payload["request"]["source_filename"] == "asset.fbx"
-    assert payload["request"]["materials"] == [
+    assert payload["source_filename"] == "asset.fbx"
+    assert "request" not in payload
+    assert payload["materials"] == [
         {"name": "Bark", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Leaves", "physicalize": "no_collide", "sub_index": 1},
     ]
@@ -249,13 +257,62 @@ def test_prepare_smoke_bundle_copies_material_manifest_sidecar(tmp_path):
     assert bundle["copied_manifest_path"] == str(copied_manifest)
     assert copied_manifest.exists()
     payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
-    assert payload["request"]["materials"] == [
+    assert payload["materials"] == [
         {"name": "Stone", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Stone.001", "physicalize": "no_collide", "sub_index": 1},
     ]
     root = ET.parse(bundle["mtl_path"]).getroot()
     sub_materials = root.find("SubMaterials")
     assert [material.get("Name") for material in list(sub_materials)] == ["Stone", "Stone.001"]
+
+
+def test_prepare_smoke_bundle_uses_material_manifest_scene_hierarchy(tmp_path):
+    source_fbx = tmp_path / "source.fbx"
+    manifest_path = tmp_path / "source.fbx_material_manifest.json"
+    source_fbx.write_text("fake fbx", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [{"slot": 0, "name": "Stone", "physicalize": "no"}],
+                "scene_hierarchy": [
+                    {
+                        "name": "Root",
+                        "mass": -1.0,
+                        "density": -1.0,
+                        "children": [{"name": "Mesh", "mass": -1.0, "density": -1.0, "children": []}],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    work_dir = tmp_path / "work"
+
+    prepare_smoke_bundle(
+        str(source_fbx),
+        str(work_dir),
+        asset_name="asset",
+        material_specs=material_specs_from_manifest(str(source_fbx)),
+    )
+
+    payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
+    assert payload["nodes"] == [
+        {
+            "name": "Root",
+            "path": ["Root"],
+            "mass": -1.0,
+            "density": -1.0,
+            "nodes": [
+                {
+                    "name": "Mesh",
+                    "path": ["Root", "Mesh"],
+                    "mass": -1.0,
+                    "density": -1.0,
+                }
+            ],
+        }
+    ]
 
 
 def test_prepare_smoke_bundle_reports_manifest_omitted_source_material(tmp_path):
@@ -556,7 +613,7 @@ def test_prepare_smoke_bundle_writes_deleted_material_request_and_mtl_gap(tmp_pa
     )
 
     payload = json.loads((work_dir / "asset.json").read_text(encoding="utf-8"))
-    assert payload["request"]["materials"] == [
+    assert payload["materials"] == [
         {"name": "Slot_0_Red", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Slot_1_Green", "physicalize": "no_collide", "sub_index": -1},
         {"name": "Slot_2_Blue", "physicalize": "no_collide", "sub_index": 2},

@@ -69,6 +69,14 @@ def material_manifest_summary(manifest, manifest_path=""):
     }
 
 
+def material_manifest_scene_hierarchy(material_manifest_info=None):
+    manifest = _manifest_dict(_manifest_payload(material_manifest_info))
+    scene_hierarchy = manifest.get("scene_hierarchy", [])
+    if not isinstance(scene_hierarchy, list):
+        return []
+    return scene_hierarchy
+
+
 def material_manifest_table_rows(manifest):
     rows = []
     for _, material in iter_manifest_material_rows(manifest):

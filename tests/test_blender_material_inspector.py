@@ -24,6 +24,9 @@ def test_blender_script_imports_fbx_and_writes_material_table_manifest():
     assert "'physicalize': 'no'" in script
     assert "'material_slot_order_source': 'fbx_name_first_offset'" in script
     assert "'polygon_verification': 'material_table_only'" in script
+    assert "'scene_hierarchy': scene_hierarchy" in script
+    assert "'mass': -1.0" in script
+    assert "'density': -1.0" in script
 
 
 def test_inspect_fbx_materials_rejects_missing_blender(tmp_path):

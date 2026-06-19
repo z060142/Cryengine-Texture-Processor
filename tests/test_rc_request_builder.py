@@ -370,6 +370,52 @@ def test_nodes_and_joint_physics_use_path_arrays():
     ]
 
 
+def test_nodes_preserve_source_backed_physics_fields():
+    request = build_import_request(
+        {
+            "path": "asset.fbx",
+            "materials": [{"name": "Stone"}],
+            "scene_hierarchy": [
+                {
+                    "name": "Root",
+                    "mass": -1.0,
+                    "density": -1.0,
+                    "debug": True,
+                    "children": [
+                        {
+                            "name": "Mesh",
+                            "mass": 2.5,
+                            "density": 3.5,
+                            "no_hit_refinement": True,
+                            "children": [],
+                        }
+                    ],
+                }
+            ],
+        },
+        "asset.fbx",
+    )
+
+    assert request["nodes"] == [
+        {
+            "name": "Root",
+            "path": ["Root"],
+            "mass": -1.0,
+            "density": -1.0,
+            "nodes": [
+                {
+                    "name": "Mesh",
+                    "path": ["Root", "Mesh"],
+                    "mass": 2.5,
+                    "density": 3.5,
+                    "no_hit_refinement": True,
+                }
+            ],
+        }
+    ]
+    assert collect_request_schema_diagnostics(request) == []
+
+
 def test_normalize_rc_sub_index_matches_import_request_bounds():
     assert normalize_rc_sub_index(0) == 0
     assert normalize_rc_sub_index(127) == 127
@@ -425,13 +471,13 @@ def test_wrap_import_request_rejects_invalid_animation_fields():
         wrap_import_request(request)
 
 
-def test_export_json_writes_request_wrapper_by_default(tmp_path):
+def test_export_json_writes_direct_request_by_default(tmp_path):
     success, output_file = export_json(sample_model(), "chair.fbx", str(tmp_path))
 
     assert success
     payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
-    assert set(payload.keys()) == {"request"}
-    assert payload["request"]["source_filename"] == "chair.fbx"
+    assert payload["source_filename"] == "chair.fbx"
+    assert "request" not in payload
     assert output_file.endswith("chair.json")
 
 
@@ -454,7 +500,7 @@ def test_export_json_preserves_fbx_slot_order_over_existing_mtl_name_order(tmp_p
 
     assert success
     payload = json.loads((tmp_path / "chair.json").read_text(encoding="utf-8"))
-    assert payload["request"]["materials"] == [
+    assert payload["materials"] == [
         {"name": "Chair", "physicalize": "no_collide", "sub_index": 0},
         {"name": "Chair.001", "physicalize": "no_collide", "sub_index": 1},
         {"name": "collision_proxy", "physicalize": "proxy_only", "sub_index": 2},

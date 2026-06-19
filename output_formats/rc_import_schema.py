@@ -9,10 +9,10 @@ from model_processing.rc_material_policy import (
 )
 
 RC_IMPORT_REQUEST_SOURCE = {
-    "request_wrapper": {
+    "request_archive_label": {
         "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
         "lines": "275-284",
-        "field": "request",
+        "field": "direct_root",
     },
     "root_fields": {
         "source": "Code/Tools/RC/ResourceCompilerPC/FBX/ImportRequest.cpp",
@@ -249,8 +249,8 @@ def collect_request_value_diagnostics(request):
                 "code": "rc_request_invalid_root",
                 "location": "request",
                 "value_type": _type_name(request),
-                "schema_source": RC_IMPORT_REQUEST_SOURCE["request_wrapper"],
-                "message": "RC import request must be a JSON object under the request wrapper.",
+                "schema_source": RC_IMPORT_REQUEST_SOURCE["request_archive_label"],
+                "message": "RC import request must be a JSON object at the file root.",
             }
         ]
 

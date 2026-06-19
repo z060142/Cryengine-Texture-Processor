@@ -11,7 +11,7 @@ from utils.rc_import_runner import (
 
 def write_request(path, output_ext="cgf"):
     path.write_text(
-        json.dumps({"request": {"source_filename": "asset.fbx", "output_ext": output_ext}}),
+        json.dumps({"source_filename": "asset.fbx", "output_ext": output_ext}),
         encoding="utf-8",
     )
 
@@ -38,6 +38,16 @@ def test_expected_output_path_uses_request_output_ext(tmp_path):
     write_request(json_path, output_ext="skin")
 
     assert expected_output_path_for_request(str(json_path)) == str(tmp_path / "asset.skin")
+
+
+def test_expected_output_path_still_accepts_legacy_request_wrapper(tmp_path):
+    json_path = tmp_path / "asset.json"
+    json_path.write_text(
+        json.dumps({"request": {"source_filename": "asset.fbx", "output_ext": "chr"}}),
+        encoding="utf-8",
+    )
+
+    assert expected_output_path_for_request(str(json_path)) == str(tmp_path / "asset.chr")
 
 
 def test_runner_reports_missing_rc_path(tmp_path):

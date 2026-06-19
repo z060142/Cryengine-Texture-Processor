@@ -7,6 +7,7 @@ from model_processing.material_manifest import (
     discover_material_manifest,
     load_material_manifest,
     material_manifest_materials,
+    material_manifest_scene_hierarchy,
     material_manifest_table_diagnostics,
     material_manifest_kind,
     material_manifest_summary,
@@ -91,6 +92,20 @@ def test_material_manifest_helpers_summarize_table_rows(tmp_path):
         {"slot": 0, "name": "Stone", "source": "MeshA", "local_slot": 0},
         {"slot": 1, "name": "Stone.001", "source": "MeshB", "local_slot": 0},
     ]
+
+
+def test_material_manifest_scene_hierarchy_reads_manifest_nodes():
+    hierarchy = [
+        {
+            "name": "Root",
+            "mass": -1.0,
+            "density": -1.0,
+            "children": [{"name": "Mesh", "mass": -1.0, "density": -1.0, "children": []}],
+        }
+    ]
+
+    assert material_manifest_scene_hierarchy({"manifest": {"scene_hierarchy": hierarchy}}) == hierarchy
+    assert material_manifest_scene_hierarchy({"manifest": {"scene_hierarchy": "bad"}}) == []
 
 
 def test_material_manifest_helpers_ignore_invalid_collection_shapes():

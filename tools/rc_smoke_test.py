@@ -15,6 +15,7 @@ from model_processing.material_manifest import (
     iter_manifest_polygon_rows,
     load_material_manifest,
     material_manifest_materials,
+    material_manifest_scene_hierarchy,
     material_manifest_table_diagnostics,
 )
 from model_processing.material_index_assigner import build_omitted_material_diagnostics
@@ -184,13 +185,12 @@ def _normalize_material_specs(material_names=None, material_specs=None):
     ]
 
 
-def build_smoke_model_data(asset_name, material_names=None, material_specs=None):
+def build_smoke_model_data(asset_name, material_names=None, material_specs=None, scene_hierarchy=None):
     material_specs = _normalize_material_specs(material_names, material_specs)
     return {
         "path": f"{asset_name}.fbx",
         "materials": material_specs,
-        # Empty nodes avoids guessing Blender/FBX scene paths for arbitrary samples.
-        "scene_hierarchy": [],
+        "scene_hierarchy": scene_hierarchy if scene_hierarchy is not None else [],
         "meshes": [],
     }
 
@@ -261,7 +261,13 @@ def prepare_smoke_bundle(source_fbx_path, work_dir, asset_name=None, material_na
     if not mtl_success:
         raise RuntimeError(mtl_result)
 
-    model_data = build_smoke_model_data(asset_name, material_specs=material_specs)
+    model_data = build_smoke_model_data(
+        asset_name,
+        material_specs=material_specs,
+        scene_hierarchy=material_manifest_scene_hierarchy(manifest_info),
+    )
+    if manifest_info:
+        model_data["material_manifest"] = manifest_info
     json_success, json_result = export_json(
         model_data,
         f"{asset_name}.fbx",
