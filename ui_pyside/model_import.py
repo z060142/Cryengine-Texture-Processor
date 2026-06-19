@@ -177,6 +177,40 @@ def _rc_cgf_material_id_diagnostics(smoke_info):
     return diagnostics
 
 
+def _rc_material_slot_evidence_diagnostics(smoke_info):
+    diagnostics = []
+    for row in (smoke_info or {}).get("material_slot_evidence_rows", []):
+        if row.get("ok", False):
+            continue
+        slot = row.get("slot")
+        status = row.get("status", "material_slot_evidence_mismatch")
+        request_names = row.get("request_names", []) or []
+        manifest_names = row.get("manifest_names", []) or []
+        material = (
+            (request_names[0] if request_names else "")
+            or row.get("mtl_name", "")
+            or row.get("cgf_mtl_name", "")
+            or (manifest_names[0] if manifest_names else "")
+        )
+        diagnostics.append(
+            {
+                "severity": "hazard",
+                "code": status,
+                "material": material,
+                "fbx_slot": slot,
+                "sub_index": slot,
+                "slot": slot,
+                "manifest_names": manifest_names,
+                "request_names": request_names,
+                "mtl_slot_name": row.get("mtl_name", ""),
+                "cgf_mtl_name": row.get("cgf_mtl_name", ""),
+                "used_by_cgf": row.get("used_by_cgf"),
+                "message": "Material slot evidence row does not align across manifest, request, MTL, and CGF.",
+            }
+        )
+    return diagnostics
+
+
 def _mtl_texture_map_diagnostics(material_name, record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = (
@@ -198,6 +232,7 @@ def collect_model_material_diagnostics(model_data):
     rc_smoke = (model_data or {}).get("rc_material_smoke", {})
     diagnostics.extend(_rc_unassigned_material_diagnostics(rc_smoke))
     diagnostics.extend(_rc_cgf_material_id_diagnostics(rc_smoke))
+    diagnostics.extend(_rc_material_slot_evidence_diagnostics(rc_smoke))
     materials = model_data.get("materials", []) if model_data else []
     records = build_material_slot_records(
         materials,
@@ -319,6 +354,7 @@ def run_model_material_rc_smoke(
     report = _load_rc_material_report(report_path)
     material_id_alignment = _material_id_alignment(report)
     material_report_summary = _material_report_summary(report)
+    slot_evidence = (report or {}).get("material_slot_evidence", {}) or {}
     result_info.update(
         {
             "success": bool(getattr(result, "success", False)),
@@ -332,6 +368,8 @@ def run_model_material_rc_smoke(
             "cgf_material_id_alignment_checks": material_id_alignment.get("checks", []),
             "unassigned_slot_diagnostics": material_id_alignment.get("unassigned_slot_diagnostics", []),
             "unassigned_slot_diagnostics_ok": material_id_alignment.get("unassigned_slot_diagnostics_ok"),
+            "material_slot_evidence_summary": slot_evidence.get("summary", {}),
+            "material_slot_evidence_rows": slot_evidence.get("rows", []),
             "material_report_summary": material_report_summary,
             "error": getattr(result, "error", "") or "",
         }

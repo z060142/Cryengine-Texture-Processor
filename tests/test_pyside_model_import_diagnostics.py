@@ -441,6 +441,43 @@ def test_collect_model_material_diagnostics_reports_rc_cgf_material_id_mismatch(
     )
 
 
+def test_collect_model_material_diagnostics_reports_material_slot_evidence_mismatch():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}],
+            "rc_material_smoke": {
+                "material_slot_evidence_rows": [
+                    {
+                        "ok": True,
+                        "status": "matched_used_slot",
+                        "slot": 0,
+                        "request_names": ["Stone"],
+                        "mtl_name": "Stone",
+                        "cgf_mtl_name": "Stone",
+                    },
+                    {
+                        "ok": False,
+                        "status": "cgf_mtl_name_mismatch",
+                        "slot": 1,
+                        "manifest_names": ["Glass"],
+                        "request_names": ["Glass"],
+                        "mtl_name": "Glass",
+                        "cgf_mtl_name": "WrongGlass",
+                        "used_by_cgf": True,
+                    },
+                ]
+            },
+        }
+    )
+
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["severity"] == "hazard"
+    assert diagnostics[0]["code"] == "cgf_mtl_name_mismatch"
+    assert diagnostics[0]["material"] == "Glass"
+    assert diagnostics[0]["sub_index"] == 1
+    assert diagnostics[0]["cgf_mtl_name"] == "WrongGlass"
+
+
 def test_model_display_name_marks_hazards():
     assert model_display_name({"filename": "tree.fbx", "material_diagnostics": []}) == "tree.fbx"
     assert (
@@ -643,6 +680,36 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
                         "unassigned_placeholder_count": 1,
                         "used_unassigned_material_count": 0,
                     },
+                    "material_slot_evidence": {
+                        "summary": {
+                            "ok": True,
+                            "row_count": 2,
+                            "status_counts": {
+                                "matched_used_slot": 1,
+                                "trailing_unassigned_placeholder": 1,
+                            },
+                        },
+                        "rows": [
+                            {
+                                "ok": True,
+                                "status": "matched_used_slot",
+                                "slot": 0,
+                                "request_names": ["Stone"],
+                                "mtl_name": "Stone",
+                                "cgf_mtl_name": "Stone",
+                                "used_by_cgf": True,
+                            },
+                            {
+                                "ok": True,
+                                "status": "trailing_unassigned_placeholder",
+                                "slot": 2,
+                                "request_names": ["<unassigned>"],
+                                "mtl_name": "<unassigned>",
+                                "cgf_mtl_name": "",
+                                "used_by_cgf": False,
+                            },
+                        ],
+                    },
                     "fixture_material_semantic_alignment": {"ok": True},
                     "cgf_material_id_alignment": {
                         "ok": True,
@@ -704,6 +771,8 @@ def test_run_model_material_rc_smoke_uses_manifest_material_specs(tmp_path):
         "unassigned_placeholder_count": 1,
         "used_unassigned_material_count": 0,
     }
+    assert smoke_info["material_slot_evidence_summary"]["row_count"] == 2
+    assert smoke_info["material_slot_evidence_rows"][0]["status"] == "matched_used_slot"
     assert smoke_info["unassigned_slot_diagnostics"] == [
         {
             "ok": True,
