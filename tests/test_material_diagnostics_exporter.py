@@ -298,6 +298,14 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
     summary = report["mtl_texture_map_policy_summary"]
 
     assert [entry["ce_map_type"] for entry in material_policy["exported"]] == ["Diffuse", "Bumpmap", "Specular"]
+    assert material_policy["exported"][0]["texmod_policy"]["attributes"] == {
+        "TexMod_RotateType": "0",
+        "TexMod_TexGenType": "0",
+        "TexMod_bTexGenProjected": "0",
+    }
+    assert material_policy["exported"][0]["texmod_policy"]["emission_policy"] == (
+        "compatibility_preserved_emits_minimal_texmod"
+    )
     assert [entry["suffix_analysis"]["suffix_status"] for entry in material_policy["exported"]] == [
         "matches_expected_suffix",
         "matches_expected_suffix",
@@ -336,6 +344,12 @@ def test_build_material_diagnostics_report_includes_mtl_texture_map_policy():
         "mismatch_expected_suffix": 1,
         "no_source_backed_suffix": 1,
         "not_applicable": 2,
+    }
+    assert summary["texmod_emission_policy_counts"] == {
+        "compatibility_preserved_emits_minimal_texmod": 4,
+    }
+    assert summary["texmod_attribute_status_counts"] == {
+        "compatibility_preserved_default_texmod": 12,
     }
     assert summary["source_evidence"]["source"].endswith("MaterialHelpers.cpp")
 

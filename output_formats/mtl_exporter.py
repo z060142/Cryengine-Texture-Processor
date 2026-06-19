@@ -19,6 +19,7 @@ from output_formats.cryengine_mtl_schema import (
     MTL_ROOT_DEFAULT_FLAGS,
     SUB_MATERIAL_DEFAULT_ATTRS,
     exported_material_shader_policy,
+    exported_texture_modifier_policy,
     resolve_ce_texture_map,
 )
 from model_processing.material_index_assigner import (
@@ -179,9 +180,7 @@ def _append_texture_entries(textures_elem, textures, model_output_dir, material_
         ET.SubElement(
             tex_elem,
             "TexMod",
-            TexMod_RotateType="0",
-            TexMod_TexGenType="0",
-            TexMod_bTexGenProjected="0",
+            **exported_texture_modifier_policy()["attributes"],
         )
 
 

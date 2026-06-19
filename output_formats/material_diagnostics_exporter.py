@@ -149,6 +149,8 @@ def _mtl_texture_map_policy_summary(material_items):
     skipped_reason_counts = Counter()
     expected_suffix_counts = Counter()
     suffix_status_counts = Counter()
+    texmod_emission_policy_counts = Counter()
+    texmod_attribute_status_counts = Counter()
 
     for item in material_items:
         policy = item.get("mtl_texture_map_policy", {})
@@ -161,6 +163,9 @@ def _mtl_texture_map_policy_summary(material_items):
                 expected_suffix = suffix_analysis.get("expected_suffix", "")
                 if expected_suffix:
                     expected_suffix_counts.update([expected_suffix])
+                texmod_policy = entry.get("texmod_policy", {})
+                texmod_emission_policy_counts.update([texmod_policy.get("emission_policy", "")])
+                texmod_attribute_status_counts.update(texmod_policy.get("attribute_status", {}).values())
             else:
                 skipped_reason_counts.update([entry.get("reason", "")])
 
@@ -171,6 +176,8 @@ def _mtl_texture_map_policy_summary(material_items):
         "skipped_reason_counts": _counter_to_sorted_dict(skipped_reason_counts),
         "expected_suffix_counts": _counter_to_sorted_dict(expected_suffix_counts),
         "suffix_status_counts": _counter_to_sorted_dict(suffix_status_counts),
+        "texmod_emission_policy_counts": _counter_to_sorted_dict(texmod_emission_policy_counts),
+        "texmod_attribute_status_counts": _counter_to_sorted_dict(texmod_attribute_status_counts),
         "source_evidence": exported_texture_map_policy({})["source_evidence"],
     }
 

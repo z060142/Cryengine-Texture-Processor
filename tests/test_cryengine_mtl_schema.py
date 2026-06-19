@@ -23,6 +23,7 @@ from output_formats.cryengine_mtl_schema import (
     exported_material_shader_policy,
     exported_mtl_flags_policy,
     exported_texture_map_policy,
+    exported_texture_modifier_policy,
     exported_string_gen_mask,
     mtl_flags_attr,
     parse_public_param_value,
@@ -107,6 +108,22 @@ def test_exported_texture_map_policy_splits_exported_and_skipped_entries():
         "known_internal_non_mtl_channel",
         "known_internal_non_mtl_channel",
     ]
+
+
+def test_exported_texture_modifier_policy_preserves_minimal_texmod_attrs():
+    policy = exported_texture_modifier_policy()
+
+    assert policy["attributes"] == {
+        "TexMod_RotateType": "0",
+        "TexMod_TexGenType": "0",
+        "TexMod_bTexGenProjected": "0",
+    }
+    assert policy["emission_policy"] == "compatibility_preserved_emits_minimal_texmod"
+    assert set(policy["attribute_status"].values()) == {"compatibility_preserved_default_texmod"}
+    assert policy["source_evidence"]["save_source"].endswith("MaterialHelpers.cpp")
+
+    texture_policy = resolve_ce_texture_map("diffuse", "wall_diff.dds")
+    assert texture_policy["texmod_policy"]["attributes"]["TexMod_RotateType"] == "0"
 
 
 def test_illum_ext_shader_masks_are_source_evidence_not_export_compat_values():

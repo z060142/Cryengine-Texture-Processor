@@ -79,6 +79,14 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     }
     public_params = material.find("PublicParams")
     assert public_params.get("TessellationFactorMax") == "32"
+    diffuse_texmod = next(texture for texture in list(material.find("Textures")) if texture.get("Map") == "Diffuse").find(
+        "TexMod"
+    )
+    assert diffuse_texmod.attrib == {
+        "TexMod_RotateType": "0",
+        "TexMod_TexGenType": "0",
+        "TexMod_bTexGenProjected": "0",
+    }
 
 
 def test_build_mtl_document_skips_known_non_mtl_texture_channels(tmp_path):

@@ -62,6 +62,24 @@ CE_TEXTURE_SUFFIX_SOURCE = {
     ),
 }
 
+CE_TEXMOD_SOURCE = {
+    "save_source": "Code/CryEngine/Cry3DEngine/MaterialHelpers.cpp",
+    "save_lines": "263-324",
+    "rule": (
+        "MaterialHelpers saves a TexMod child only when the texture modifier "
+        "differs from CryEngine's default modifier. The current exporter still "
+        "emits a minimal TexMod child for compatibility, so these attributes are "
+        "tracked as compatibility-preserved until round-trip evidence confirms "
+        "whether they should be omitted for default modifiers."
+    ),
+}
+
+EXPORT_TEXMOD_DEFAULT_ATTRS = {
+    "TexMod_RotateType": "0",
+    "TexMod_TexGenType": "0",
+    "TexMod_bTexGenProjected": "0",
+}
+
 # Source evidence:
 # CRYENGINE_Source-release/Engine/Shaders/Illum.ext
 ILLUM_EXT_SHADER_MASKS = {
@@ -349,6 +367,18 @@ def exported_mtl_flags_policy():
     }
 
 
+def exported_texture_modifier_policy():
+    return {
+        "attributes": dict(EXPORT_TEXMOD_DEFAULT_ATTRS),
+        "attribute_status": {
+            name: "compatibility_preserved_default_texmod"
+            for name in sorted(EXPORT_TEXMOD_DEFAULT_ATTRS)
+        },
+        "emission_policy": "compatibility_preserved_emits_minimal_texmod",
+        "source_evidence": CE_TEXMOD_SOURCE,
+    }
+
+
 def exported_material_attribute_policy():
     return {
         "attributes": dict(SUB_MATERIAL_DEFAULT_ATTRS),
@@ -401,7 +431,7 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
     else:
         reason = "unknown_texture_type"
 
-    return {
+    policy = {
         "texture_type": normalized_type,
         "texture_path": texture_path,
         "ce_map_type": ce_map_type or "",
@@ -410,6 +440,9 @@ def resolve_ce_texture_map(texture_type, texture_path=""):
         "suffix_analysis": analyze_ce_texture_suffix(ce_map_type, texture_path),
         "source_evidence": CE_TEXTURE_MAP_SOURCE,
     }
+    if policy["exported"]:
+        policy["texmod_policy"] = exported_texture_modifier_policy()
+    return policy
 
 
 def exported_texture_map_policy(textures):
