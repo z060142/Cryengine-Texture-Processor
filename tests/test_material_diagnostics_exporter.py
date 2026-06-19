@@ -259,6 +259,30 @@ def test_build_material_diagnostics_report_includes_manifest_polygon_diagnostics
     assert "material_manifest_polygon_name_multiple_slots" in codes
 
 
+def test_build_material_diagnostics_report_includes_invalid_manifest_slot_diagnostics():
+    report = build_material_diagnostics_report(
+        [{"name": "Stone", "id": 1}, {"name": "Metal", "id": 2}],
+        material_manifest_info={
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": "bad-slot", "name": "Stone"},
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Stone", "material_table_slot": "bad-polygon-slot"},
+                    {"polygon": 1, "material_name": "Metal", "material_table_slot": 1},
+                ],
+            }
+        },
+    )
+
+    codes = [diagnostic["code"] for diagnostic in report["diagnostics"]]
+    assert "material_manifest_invalid_material_slot" in codes
+    assert "material_manifest_invalid_polygon_slot" in codes
+    assert report["summary"]["hazard_count"] >= 2
+
+
 def test_build_material_diagnostics_report_checks_source_materials_separately_from_output_materials():
     report = build_material_diagnostics_report(
         [{"name": "Visible", "id": 1}],

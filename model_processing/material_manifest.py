@@ -64,6 +64,15 @@ def _manifest_payload(material_manifest_info):
     return material_manifest_info
 
 
+def coerce_material_slot(value):
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def material_manifest_table_diagnostics(material_manifest_info=None):
     manifest = _manifest_payload(material_manifest_info)
     manifest_materials = manifest.get("materials", [])
@@ -75,10 +84,25 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     by_slot = {}
     by_name = {}
     for order, material in enumerate(manifest_materials):
-        slot = material.get("slot")
+        raw_slot = material.get("slot")
+        slot = coerce_material_slot(raw_slot)
         name = material.get("name", "")
+        if raw_slot is not None and slot is None:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_material_slot",
+                    "manifest_order": order,
+                    "material": name,
+                    "slot": raw_slot,
+                    "message": (
+                        "The material manifest has a material row with a non-integer slot. "
+                        "Request JSON and MTL generation cannot map this source material to a stable RC sub-index."
+                    ),
+                }
+            )
         if slot is not None:
-            by_slot.setdefault(int(slot), []).append({"order": order, "name": name})
+            by_slot.setdefault(slot, []).append({"order": order, "name": name})
         if name:
             by_name.setdefault(name, []).append({"order": order, "slot": slot})
 
@@ -125,10 +149,25 @@ def material_manifest_table_diagnostics(material_manifest_info=None):
     polygon_mismatches = []
     for order, polygon in enumerate(manifest_polygons):
         name = polygon.get("material_name", "")
-        slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot")))
-        if slot is None or not name:
+        raw_slot = polygon.get("material_table_slot", polygon.get("expected_cgf_material_id", polygon.get("material_slot")))
+        if raw_slot is None or not name:
             continue
-        slot = int(slot)
+        slot = coerce_material_slot(raw_slot)
+        if slot is None:
+            diagnostics.append(
+                {
+                    "severity": "hazard",
+                    "code": "material_manifest_invalid_polygon_slot",
+                    "polygon_order": order,
+                    "polygon_material_name": name,
+                    "slot": raw_slot,
+                    "message": (
+                        "The material manifest has polygon evidence with a non-integer material slot. "
+                        "The converter cannot prove which RC material id this polygon should use."
+                    ),
+                }
+            )
+            continue
         polygon_slots_by_name.setdefault(name, set()).add(slot)
         table_name = table_name_by_slot.get(slot)
         if table_name and table_name != name:
@@ -190,17 +229,26 @@ def material_manifest_materials(source_materials, material_manifest_info=None):
     mesh_names_by_slot = {}
     for polygon in manifest.get("polygons", []):
         slot = polygon.get("expected_cgf_material_id", polygon.get("material_table_slot", polygon.get("material_slot")))
+        slot = coerce_material_slot(slot)
         if slot is None:
             continue
-        slot = int(slot)
         polygon_count_by_slot[slot] = polygon_count_by_slot.get(slot, 0) + 1
         mesh_name = polygon.get("object")
         if mesh_name:
             mesh_names_by_slot.setdefault(slot, set()).add(mesh_name)
 
     materials = []
-    for material in sorted(manifest_materials, key=lambda item: int(item.get("slot", 0))):
-        slot = int(material.get("slot", 0))
+    sorted_materials = sorted(
+        manifest_materials,
+        key=lambda item: (
+            coerce_material_slot(item.get("slot")) is None,
+            coerce_material_slot(item.get("slot")) or 0,
+        ),
+    )
+    for material in sorted_materials:
+        slot = coerce_material_slot(material.get("slot"))
+        if slot is None:
+            continue
         name = material.get("name", "")
         merged = dict(source_by_name.get(name, {}))
         merged.update(

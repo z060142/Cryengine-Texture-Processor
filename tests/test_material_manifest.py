@@ -132,3 +132,53 @@ def test_material_manifest_table_diagnostics_reports_polygon_slot_name_mismatch(
     assert mismatch["slot"] == 1
     assert mismatch["polygon_material_name"] == "Stone"
     assert mismatch["table_material_name"] == "Metal"
+
+
+def test_material_manifest_table_diagnostics_reports_invalid_slots_without_crashing():
+    diagnostics = material_manifest_table_diagnostics(
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": "bad-slot", "name": "Stone"},
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "material_name": "Stone", "material_table_slot": "bad-polygon-slot"},
+                    {"polygon": 1, "material_name": "Metal", "material_table_slot": 1},
+                ],
+            }
+        }
+    )
+
+    assert [diagnostic["code"] for diagnostic in diagnostics] == [
+        "material_manifest_invalid_material_slot",
+        "material_manifest_invalid_polygon_slot",
+    ]
+    assert diagnostics[0]["material"] == "Stone"
+    assert diagnostics[0]["slot"] == "bad-slot"
+    assert diagnostics[1]["polygon_material_name"] == "Stone"
+    assert diagnostics[1]["slot"] == "bad-polygon-slot"
+
+
+def test_material_manifest_materials_skips_invalid_manifest_slots():
+    materials = material_manifest_materials(
+        [{"name": "Stone"}, {"name": "Metal"}],
+        {
+            "manifest": {
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": "bad-slot", "name": "Stone"},
+                    {"slot": 1, "name": "Metal"},
+                ],
+                "polygons": [
+                    {"polygon": 0, "object": "MeshA", "expected_cgf_material_id": "bad-polygon-slot"},
+                    {"polygon": 1, "object": "MeshB", "expected_cgf_material_id": 1},
+                ],
+            }
+        },
+    )
+
+    assert [material["name"] for material in materials] == ["Metal"]
+    assert materials[0]["sub_index"] == 1
+    assert materials[0]["mesh_names"] == ["MeshB"]

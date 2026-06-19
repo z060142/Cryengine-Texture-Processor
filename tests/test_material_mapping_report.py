@@ -227,6 +227,43 @@ def test_evaluate_fixture_material_semantics_accepts_preserved_suffix_names():
     assert result["polygon_checks"][1]["request_names_for_actual_id"] == ["DuplicateSurface.001"]
 
 
+def test_evaluate_fixture_material_semantics_reports_invalid_manifest_slots():
+    manifest = {
+        "manifest_kind": "blender-fbx-material-inspection",
+        "materials": [
+            {"slot": "bad-slot", "name": "Broken"},
+            {"slot": 1, "name": "Visible"},
+        ],
+        "polygons": [
+            {
+                "polygon": 0,
+                "material_slot": "bad-polygon-slot",
+                "material_name": "Broken",
+                "expected_cgf_material_id": "bad-polygon-slot",
+            },
+            {
+                "polygon": 1,
+                "material_slot": 1,
+                "material_name": "Visible",
+                "expected_cgf_material_id": 1,
+            },
+        ],
+    }
+
+    result = evaluate_fixture_material_semantics(
+        manifest,
+        {"material_ids": []},
+        [{"name": "Visible", "sub_index": 1}],
+        [{"slot": 1, "name": "Visible"}],
+    )
+
+    assert not result["ok"]
+    assert result["material_checks"][0]["error"] == "invalid_manifest_material_slot"
+    assert result["material_checks"][0]["slot"] == "bad-slot"
+    assert result["polygon_checks"][0]["error"] == "invalid_manifest_polygon_slot"
+    assert result["polygon_checks"][0]["expected_cgf_material_id"] == "bad-polygon-slot"
+
+
 def test_build_and_write_material_mapping_report(tmp_path):
     json_path = tmp_path / "asset.json"
     json_path.write_text(

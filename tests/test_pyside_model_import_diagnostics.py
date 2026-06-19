@@ -141,6 +141,31 @@ def test_collect_model_material_diagnostics_reports_manifest_polygon_mismatch():
     assert diagnostics[0]["table_material_name"] == "Metal"
 
 
+def test_collect_model_material_diagnostics_reports_invalid_manifest_slots():
+    diagnostics = collect_model_material_diagnostics(
+        {
+            "materials": [{"name": "Stone", "id": 1}, {"name": "Metal", "id": 2}],
+            "material_manifest": {
+                "manifest": {
+                    "manifest_kind": "blender-fbx-material-inspection",
+                    "materials": [
+                        {"slot": "bad-slot", "name": "Stone"},
+                        {"slot": 1, "name": "Metal"},
+                    ],
+                    "polygons": [
+                        {"polygon": 0, "material_name": "Stone", "material_table_slot": "bad-polygon-slot"},
+                        {"polygon": 1, "material_name": "Metal", "material_table_slot": 1},
+                    ],
+                }
+            },
+        }
+    )
+
+    codes = [diagnostic["code"] for diagnostic in diagnostics]
+    assert "material_manifest_invalid_material_slot" in codes
+    assert "material_manifest_invalid_polygon_slot" in codes
+
+
 def test_collect_model_material_diagnostics_reports_degraded_model_load_status():
     diagnostics = collect_model_material_diagnostics(
         {
