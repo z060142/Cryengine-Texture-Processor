@@ -22,6 +22,13 @@ from PySide6.QtWidgets import (
 from language.language_manager import get_text
 from ui_pyside.progress_dialog import ProgressDialog
 
+RC_OUTPUT_FORMAT_OPTIONS = ("tif",)
+
+
+def _normalize_output_format(value):
+    value = str(value or "tif").strip().lower()
+    return value if value in RC_OUTPUT_FORMAT_OPTIONS else "tif"
+
 
 class ExportSettingsPanel(QWidget):
     def __init__(self, parent=None):
@@ -97,7 +104,7 @@ class ExportSettingsPanel(QWidget):
         form.addRow(self.metallic_process_check)
 
         self.format_combo = QComboBox()
-        self.format_combo.addItems(["tif", "png", "dds"])
+        self.format_combo.addItems(list(RC_OUTPUT_FORMAT_OPTIONS))
         form.addRow(get_text("export.output_format", "Output Format:"), self.format_combo)
 
         self.resolution_combo = QComboBox()
@@ -373,7 +380,7 @@ class ExportSettingsPanel(QWidget):
         self.settings["normal_flip_green"] = self.normal_flip_check.isChecked()
         self.settings["generate_missing_spec"] = self.spec_gen_check.isChecked()
         self.settings["process_metallic"] = self.metallic_process_check.isChecked()
-        self.settings["output_format"] = self.format_combo.currentText()
+        self.settings["output_format"] = _normalize_output_format(self.format_combo.currentText())
         self.settings["output_resolution"] = self.resolution_combo.currentText()
         self.settings["generate_cry_dds"] = self.generate_dds_check.isChecked()
         self.settings["delete_after_export"] = {
@@ -388,13 +395,14 @@ class ExportSettingsPanel(QWidget):
 
     def set_settings(self, settings):
         self.settings.update({key: value for key, value in settings.items() if key in self.settings})
+        self.settings["output_format"] = _normalize_output_format(self.settings.get("output_format", "tif"))
         self.texture_output_dir_edit.setText(self.settings.get("texture_output_directory", ""))
         self.model_output_dir_edit.setText(self.settings.get("model_output_directory", ""))
         self.diff_format_combo.setCurrentText(self.settings.get("diff_format", "albedo"))
         self.normal_flip_check.setChecked(self.settings.get("normal_flip_green", False))
         self.spec_gen_check.setChecked(self.settings.get("generate_missing_spec", True))
         self.metallic_process_check.setChecked(self.settings.get("process_metallic", True))
-        self.format_combo.setCurrentText(self.settings.get("output_format", "tif"))
+        self.format_combo.setCurrentText(_normalize_output_format(self.settings.get("output_format", "tif")))
         self.resolution_combo.setCurrentText(self.settings.get("output_resolution", "original"))
         self.generate_dds_check.setChecked(self.settings.get("generate_cry_dds", False))
         delete_settings = self.settings.get("delete_after_export", {})

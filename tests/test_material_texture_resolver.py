@@ -172,9 +172,10 @@ def test_build_mtl_material_data_probes_multiple_output_extensions(tmp_path):
 
 
 def test_texture_output_extensions_normalizes_lists_auto_and_csv():
-    assert texture_output_extensions("dds,tif;png") == ["dds", "tif", "png"]
+    assert texture_output_extensions("dds,tif;png") == ["dds", "tif"]
     assert texture_output_extensions([".dds", "dds", "TIF"]) == ["dds", "tif"]
-    assert texture_output_extensions("auto")[:3] == ["dds", "tif", "tiff"]
+    assert texture_output_extensions("auto") == ["dds", "hdr", "tif"]
+    assert texture_output_extensions("png") == ["tif"]
 
 
 def test_build_mtl_material_data_finds_ce_emissive_output_suffix(tmp_path):

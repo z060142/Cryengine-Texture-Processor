@@ -59,6 +59,28 @@ def test_build_model_export_context_prepares_shared_paths_and_material_data(tmp_
     assert set(context.fbx_texture_data["Chair"].keys()) == {"diff", "ddna"}
 
 
+def test_build_model_export_context_normalizes_legacy_png_output_format(tmp_path):
+    source = tmp_path / "chair_albedo.png"
+    source.write_text("fake source")
+    (tmp_path / "chair_diff.tif").write_text("fake diff")
+    model_output_dir = tmp_path / "models"
+    texture_output_dir = tmp_path
+    model_data = {"materials": [{"name": "Chair"}]}
+
+    context = build_model_export_context(
+        model_data,
+        "chair.fbx",
+        str(model_output_dir),
+        str(texture_output_dir),
+        [TextureRef(str(source), "Chair")],
+        TextureManagerStub(),
+        "png",
+    )
+
+    assert context.mtl_materials[0]["textures"]["diffuse"] == str(tmp_path / "chair_diff.tif")
+    assert context.fbx_texture_data["Chair"]["diff"] == str(tmp_path / "chair_diff.tif")
+
+
 def test_build_model_export_context_keeps_manifest_order_for_mtl_materials(tmp_path):
     model_data = {
         "materials": [{"name": "Stone.001"}, {"name": "Stone"}],

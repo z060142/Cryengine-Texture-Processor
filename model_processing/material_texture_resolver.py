@@ -11,9 +11,12 @@ import os
 
 from model_processing.material_manifest import material_manifest_materials
 from model_processing.texture_type_resolver import FILENAME_SUFFIX_TYPES, infer_texture_type_from_path
+from output_formats.cryengine_mtl_schema import RC_TEXTURE_SOURCE_EXTENSIONS
 from output_formats.texture_output_paths import texture_output_suffix
 
 IGNORED_MATERIAL_NAMES = {"Material", "Dots Stroke"}
+DEFAULT_TEXTURE_OUTPUT_EXTENSION = "tif"
+AUTO_TEXTURE_OUTPUT_EXTENSIONS = ("dds", "hdr", "tif")
 
 COMMON_TEXTURE_BASE_SUFFIXES = tuple(suffix for suffix, _ in FILENAME_SUFFIX_TYPES)
 MTL_MATERIAL_OVERRIDE_KEYS = (
@@ -225,21 +228,22 @@ def texture_output_extensions(output_format):
     if isinstance(output_format, (list, tuple)):
         raw_extensions = output_format
     else:
-        raw_value = str(output_format or "tif")
+        raw_value = str(output_format or DEFAULT_TEXTURE_OUTPUT_EXTENSION)
         if raw_value.strip().lower() == "auto":
-            raw_extensions = ("dds", "tif", "tiff", "png", "tga")
+            raw_extensions = AUTO_TEXTURE_OUTPUT_EXTENSIONS
         else:
             raw_extensions = raw_value.replace(";", ",").split(",")
 
     extensions = []
     seen = set()
+    supported_extensions = set(RC_TEXTURE_SOURCE_EXTENSIONS)
     for ext in raw_extensions:
         normalized = str(ext or "").strip().lstrip(".").lower()
-        if not normalized or normalized in seen:
+        if not normalized or normalized in seen or normalized not in supported_extensions:
             continue
         seen.add(normalized)
         extensions.append(normalized)
-    return extensions or ["tif"]
+    return extensions or [DEFAULT_TEXTURE_OUTPUT_EXTENSION]
 
 
 def build_material_texture_records(

@@ -16,6 +16,14 @@ from ui.progress_dialog import ProgressDialog
 # from output_formats.mtl_exporter import export_mtl 
 # from model_processing.texture_extractor import TextureExtractor
 
+RC_OUTPUT_FORMAT_OPTIONS = ("tif",)
+
+
+def _normalize_output_format(value):
+    value = str(value or "tif").strip().lower()
+    return value if value in RC_OUTPUT_FORMAT_OPTIONS else "tif"
+
+
 class ExportSettingsPanel:
     """
     UI panel for configuring export settings.
@@ -168,7 +176,7 @@ class ExportSettingsPanel:
         
         self.format_var = tk.StringVar(value=self.settings["output_format"])
         format_combo = ttk.Combobox(settings_content, textvariable=self.format_var, width=10)
-        format_combo['values'] = ('tif', 'png', 'dds')
+        format_combo['values'] = RC_OUTPUT_FORMAT_OPTIONS
         format_combo.current(0)
         format_combo.grid(row=4, column=1, sticky=tk.W, padx=5, pady=5)
         
@@ -701,7 +709,7 @@ class ExportSettingsPanel:
         self.settings["normal_flip_green"] = self.normal_flip_var.get()
         self.settings["generate_missing_spec"] = self.spec_gen_var.get()
         self.settings["process_metallic"] = self.metallic_process_var.get()
-        self.settings["output_format"] = self.format_var.get()
+        self.settings["output_format"] = _normalize_output_format(self.format_var.get())
         self.settings["output_resolution"] = self.resolution_var.get()
         self.settings["generate_cry_dds"] = self.generate_dds_var.get()
         
@@ -725,7 +733,7 @@ class ExportSettingsPanel:
         self.settings["normal_flip_green"] = self.normal_flip_var.get()
         self.settings["generate_missing_spec"] = self.spec_gen_var.get()
         self.settings["process_metallic"] = self.metallic_process_var.get()
-        self.settings["output_format"] = self.format_var.get()
+        self.settings["output_format"] = _normalize_output_format(self.format_var.get())
         self.settings["output_resolution"] = self.resolution_var.get()
         self.settings["generate_cry_dds"] = self.generate_dds_var.get()
         
@@ -769,7 +777,7 @@ class ExportSettingsPanel:
         self.normal_flip_var.set(self.settings["normal_flip_green"])
         self.spec_gen_var.set(self.settings["generate_missing_spec"])
         self.metallic_process_var.set(self.settings["process_metallic"])
-        self.format_var.set(self.settings["output_format"])
+        self.format_var.set(_normalize_output_format(self.settings["output_format"]))
         self.resolution_var.set(self.settings["output_resolution"])
         self.generate_dds_var.set(self.settings.get("generate_cry_dds", False))
         

@@ -76,3 +76,14 @@ def test_export_textures_stops_cleanup_path_after_texture_gate_fails(tmp_path, m
     assert fake_main_window.fbx_calls == 0
     assert panel._new_generated_files is None
     panel.close()
+
+
+def test_output_format_options_are_limited_to_rc_source_format(tmp_path, monkeypatch):
+    fake_main_window = FakeMainWindow(texture_result=True)
+    panel = _panel(tmp_path, monkeypatch, fake_main_window)
+
+    assert [panel.format_combo.itemText(index) for index in range(panel.format_combo.count())] == ["tif"]
+
+    panel.set_settings({"output_format": "png"})
+    assert panel.get_settings()["output_format"] == "tif"
+    panel.close()
