@@ -9,6 +9,7 @@ from model_processing.material_index_assigner import build_omitted_material_diag
 from model_processing.material_manifest import material_manifest_table_diagnostics
 from model_processing.material_slot_table import build_material_slot_records
 from model_processing.rc_material_policy import rc_physicalize_diagnostics, resolve_rc_physicalize
+from output_formats.cryengine_mtl_schema import exported_material_shader_policy
 
 
 AUTHORITATIVE_TEXTURE_SOURCE_MODES = {"", "blender"}
@@ -50,6 +51,7 @@ def _record_to_report_item(record):
     fbx_id = record.get("fbx_material_id")
     fbx_slot = fbx_id - 1 if fbx_id is not None and fbx_id >= 1 else None
     physicalize_resolution = resolve_rc_physicalize(record["material"], fallback_name=record["original_name"])
+    mtl_shader_policy = exported_material_shader_policy(record["material"].get("textures", {}))
     return {
         "name": record["clean_name"],
         "original_name": record["original_name"],
@@ -73,6 +75,7 @@ def _record_to_report_item(record):
         "duplicate_sub_index_conflict": record.get("duplicate_sub_index_conflict", False),
         "duplicate_sub_index_material_names": record.get("duplicate_sub_index_material_names", []),
         "texture_ref_evidence": record["material"].get("texture_ref_evidence", []),
+        "mtl_shader_policy": mtl_shader_policy,
         "diagnostics": [
             *record.get("diagnostics", []),
             *rc_physicalize_diagnostics(record["clean_name"], physicalize_resolution),

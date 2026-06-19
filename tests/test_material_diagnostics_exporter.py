@@ -175,6 +175,44 @@ def test_build_material_diagnostics_report_keeps_clean_material_records_without_
     assert [item["sub_index"] for item in report["materials"]] == [0, 1]
 
 
+def test_build_material_diagnostics_report_includes_mtl_shader_policy():
+    report = build_material_diagnostics_report(
+        [
+            {
+                "name": "Stone",
+                "id": 1,
+                "textures": {
+                    "normal": "stone_ddn.dds",
+                    "specular": "stone_spec.dds",
+                    "displacement": "stone_displ.dds",
+                },
+            }
+        ],
+        source_model="stone.fbx",
+    )
+
+    policy = report["materials"][0]["mtl_shader_policy"]
+
+    assert policy["tokens"] == [
+        "%DISPLACEMENT_MAPPING",
+        "%NORMAL_MAP",
+        "%PHONG_TESSELLATION",
+        "%SPECULAR_MAP",
+        "%SUBSURFACE_SCATTERING",
+    ]
+    assert policy["gen_mask_policy"] == "compatibility_preserved_until_roundtrip_evidence"
+    assert policy["string_gen_mask_source"] == "source_backed_token_names"
+    assert policy["token_reasons"]["%NORMAL_MAP"] == {
+        "source": "texture_presence",
+        "texture_type": "normal",
+    }
+    assert policy["public_params"]["TessellationFactorMax"] == "32"
+    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
+        "source": "displacement_texture_compatibility",
+        "texture_type": "displacement",
+    }
+
+
 def test_build_material_diagnostics_report_flags_used_ignored_source_material():
     report = build_material_diagnostics_report(
         [
@@ -488,3 +526,4 @@ def test_export_material_diagnostics_writes_json(tmp_path):
     assert output_path.endswith("asset.material_diagnostics.json")
     assert payload["source_model"] == "asset.fbx"
     assert payload["summary"]["hazard_count"] == 1
+    assert payload["materials"][0]["mtl_shader_policy"]["string_gen_mask"] == "%SUBSURFACE_SCATTERING"
