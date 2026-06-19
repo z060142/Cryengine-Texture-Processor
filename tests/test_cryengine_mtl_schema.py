@@ -37,8 +37,10 @@ from output_formats.cryengine_mtl_schema import (
 def test_ce_texture_map_types_follow_material_helpers_names():
     assert CE_TEXTURE_MAP_TYPES["diffuse"] == "Diffuse"
     assert CE_TEXTURE_MAP_TYPES["normal"] == "Bumpmap"
+    assert CE_TEXTURE_MAP_TYPES["bumpmap"] == "Bumpmap"
     assert CE_TEXTURE_MAP_TYPES["specular"] == "Specular"
     assert CE_TEXTURE_MAP_TYPES["displacement"] == "Heightmap"
+    assert CE_TEXTURE_MAP_TYPES["heightmap"] == "Heightmap"
     assert CE_TEXTURE_MAP_TYPES["opacity"] == "Opacity"
     assert CE_TEXTURE_MAP_TYPES["emissive"] == "Emittance"
     assert CE_TEXTURE_MAP_TYPES["ao"] is None
@@ -209,6 +211,37 @@ def test_exported_material_shader_policy_exposes_current_compatibility_rules():
     assert policy["public_param_reasons"]["TessellationFactorMax"] == {
         "source": "displacement_texture_compatibility",
         "texture_type": "displacement",
+    }
+
+
+def test_exported_material_shader_policy_accepts_ce_map_names_as_texture_keys():
+    policy = exported_material_shader_policy(
+        {
+            "Bumpmap": "asset_ddn.dds",
+            "Specular": "asset_spec.dds",
+            "Heightmap": "asset_displ.dds",
+        }
+    )
+
+    assert policy["tokens"] == [
+        "%DISPLACEMENT_MAPPING",
+        "%NORMAL_MAP",
+        "%PHONG_TESSELLATION",
+        "%SPECULAR_MAP",
+        "%SUBSURFACE_SCATTERING",
+    ]
+    assert policy["token_reasons"]["%NORMAL_MAP"] == {
+        "source": "texture_presence",
+        "texture_type": "bumpmap",
+    }
+    assert policy["token_reasons"]["%DISPLACEMENT_MAPPING"] == {
+        "source": "texture_presence",
+        "texture_type": "heightmap",
+    }
+    assert policy["public_params"]["TessellationFactorMax"] == "32"
+    assert policy["public_param_reasons"]["TessellationFactorMax"] == {
+        "source": "displacement_texture_compatibility",
+        "texture_type": "heightmap",
     }
 
 

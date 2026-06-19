@@ -89,6 +89,43 @@ def test_build_mtl_document_maps_textures_and_shader_params(tmp_path):
     }
 
 
+def test_build_mtl_document_accepts_cryengine_texture_map_names_for_shader_masks(tmp_path):
+    texture_paths = {
+        "Bumpmap": tmp_path / "asset_ddn.dds",
+        "Specular": tmp_path / "asset_spec.dds",
+        "Heightmap": tmp_path / "asset_displ.dds",
+    }
+    for texture_path in texture_paths.values():
+        texture_path.write_text("dds", encoding="utf-8")
+
+    root, _ = build_mtl_document(
+        [
+            {
+                "name": "Stone",
+                "textures": {texture_type: str(texture_path) for texture_type, texture_path in texture_paths.items()},
+            }
+        ],
+        str(tmp_path),
+    )
+
+    material = root.find("SubMaterials").find("Material")
+    assert "%NORMAL_MAP" in material.get("StringGenMask")
+    assert "%SPECULAR_MAP" in material.get("StringGenMask")
+    assert "%DISPLACEMENT_MAPPING" in material.get("StringGenMask")
+    assert "%PHONG_TESSELLATION" in material.get("StringGenMask")
+
+    texture_maps = {
+        texture.get("Map"): texture.get("File")
+        for texture in list(material.find("Textures"))
+        if texture.tag == "Texture"
+    }
+    assert texture_maps == {
+        "Bumpmap": "./asset_ddn.dds",
+        "Specular": "./asset_spec.dds",
+        "Heightmap": "./asset_displ.dds",
+    }
+
+
 def test_build_mtl_document_skips_known_non_mtl_texture_channels(tmp_path):
     texture_paths = {
         "diffuse": tmp_path / "asset_diff.dds",

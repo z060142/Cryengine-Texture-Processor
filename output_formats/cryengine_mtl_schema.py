@@ -9,12 +9,14 @@ import os
 CE_TEXTURE_MAP_TYPES = {
     "diffuse": "Diffuse",
     "normal": "Bumpmap",
+    "bumpmap": "Bumpmap",
     "specular": "Specular",
     "environment": "Environment",
     "detail": "Detail",
     "smoothness": "Smoothness",
     "height": "Heightmap",
     "displacement": "Heightmap",
+    "heightmap": "Heightmap",
     "decal": "Decal",
     "subsurface": "SubSurface",
     "custom": "Custom",
@@ -287,8 +289,10 @@ EXPORT_COMPAT_SHADER_MASKS = {
 
 EXPORT_SHADER_TOKEN_BY_TEXTURE_TYPE = {
     "normal": ["%NORMAL_MAP"],
+    "bumpmap": ["%NORMAL_MAP"],
     "specular": ["%SPECULAR_MAP"],
     "displacement": ["%DISPLACEMENT_MAPPING", "%PHONG_TESSELLATION"],
+    "heightmap": ["%DISPLACEMENT_MAPPING", "%PHONG_TESSELLATION"],
 }
 
 EXPORT_DEFAULT_SHADER_TOKENS = ["%SUBSURFACE_SCATTERING"]
@@ -533,12 +537,16 @@ def exported_material_shader_policy(textures):
                 "texture_type": texture_type,
             }
 
-    if "displacement" in texture_keys:
+    displacement_texture_type = "displacement" if "displacement" in texture_keys else ""
+    if not displacement_texture_type and "heightmap" in texture_keys:
+        displacement_texture_type = "heightmap"
+
+    if displacement_texture_type:
         public_params.update(DISPLACEMENT_PUBLIC_PARAMS)
         for name in DISPLACEMENT_PUBLIC_PARAMS:
             public_param_reasons[name] = {
                 "source": "displacement_texture_compatibility",
-                "texture_type": "displacement",
+                "texture_type": displacement_texture_type,
             }
 
     return {
