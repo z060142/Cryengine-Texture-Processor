@@ -6,7 +6,8 @@
 
 ## 前置
 
-- 業主提供 car.fbx（與必要的小型 FBX）放入 `rebuild/fixtures/`。fixtures 目前不進 git（Q3），路徑存在即可。
+- 素材已備妥（見 `fixtures/README.md`）：`fixtures/car/car.fbx`、小型 FBX `fixtures/KB3D_ENC_PropAxe_A_grp.fbx`。
+- 額外比對材料：`fixtures/car/car-reference.material_report.json` 是既有工具鏈對同一資產的 material report，與 docs/ 證據並列比對。
 - 讀 `docs/converter_contract.md` 中材質 id 基底的記載（one-based、raw slot = fbx_material_id − 1）。
 - 讀既有 Blender 側證據：`docs/phase98_car_example_material_alignment.json`、`docs/current_car_user_flow_material_slot_evidence.json`（作為比對對象）。
 - 讀 `model_processing/material_texture_resolver.py` 的貼圖路徑優先序政策（relative/absolute/embedded）。
@@ -34,7 +35,8 @@
 
 ## DoD
 
-- `converter dump fixtures/car.fbx --out docs/ufbx_alignment_report.json` 可重跑。
+- `converter dump fixtures/car/car.fbx --out docs/ufbx_alignment_report.json` 可重跑（docs/ 指 repo 根的 docs）。
+- 小型 FBX 也 dump 一次確認 reader 不是只對 car 特化（結果不必比對，跑得過即可）。
 - 三個核心問題各有帶數值證據的結論。
 - 與 Blender 側證據的差異全部列舉（零差異也要明說「零差異」）。
 
