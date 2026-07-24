@@ -1,6 +1,6 @@
 # T-002 (M0b) — ce-schema crate
 
-狀態：OPEN
+狀態：DONE（2026-07-25 審查通過：5 測試綠、凍結檔位元相同、suffix 委派鏈與 Python 逐 key 等價。已接受差異：未知 key 回 "" 而非 Python 的 _{key}。備註：票面 DoD 的七 key 清單漏了 opacity/roughness，Fox 依 Python 源碼補齊，正確）
 上游文件：`rebuild/rust-workspace-design.md`（D-11）、`fbx-converter-migration.md` §2.1
 
 ## 前置閱讀（動手前必讀）
