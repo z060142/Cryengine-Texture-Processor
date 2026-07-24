@@ -1,7 +1,3 @@
-*.fbx
-*.png
-*.jpg
-*.jpeg
-*.tif
-*.tiff
-*.exr
+*
+!.gitignore
+!README.md
