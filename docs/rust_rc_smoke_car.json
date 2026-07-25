@@ -1,0 +1,386 @@
+{
+  "schema": "cryengine_rust_rc_smoke.v1",
+  "summary": {
+    "ok": true,
+    "rc_exit_ok": true,
+    "rc_returncode": 0,
+    "cgf_exists": true,
+    "cgf_read_ok": true,
+    "material_alignment_ok": true,
+    "material_match_count": 16,
+    "material_expected_count": 16,
+    "placeholder_ok": true,
+    "mtl_schema_gate_ok": true
+  },
+  "paths": {
+    "rc_exe": "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+    "converter_exe": "E:\\CryEngineTextureProcessor\\rebuild\\target\\release\\converter.exe",
+    "source_fbx": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\car\\car.fbx",
+    "copied_fbx": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\car.fbx",
+    "manifest": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\car\\car.fbx_material_manifest.json",
+    "overrides": "E:\\CryEngineTextureProcessor\\docs\\car_native_material_overrides.json",
+    "texture_dir": "",
+    "request": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.json",
+    "mtl": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.mtl",
+    "cgf": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.cgf",
+    "mtl_schema_gate": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.mtl_schema_gate.json",
+    "report": "E:\\CryEngineTextureProcessor\\docs\\rust_rc_smoke_car.json"
+  },
+  "converter": {
+    "command": [
+      "E:\\CryEngineTextureProcessor\\rebuild\\target\\release\\converter.exe",
+      "convert",
+      "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\car.fbx",
+      "--manifest",
+      "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\car\\car.fbx_material_manifest.json",
+      "--out-dir",
+      "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work",
+      "--overrides",
+      "E:\\CryEngineTextureProcessor\\docs\\car_native_material_overrides.json"
+    ],
+    "returncode": 0,
+    "stdout": "{\n  \"request\": \"C:\\\\Users\\\\Bigspring\\\\AppData\\\\Local\\\\Temp\\\\t007-rust-rc-smoke-car\\\\rc_work\\\\kb3d_citycarsessentialssedan-native.json\",\n  \"mtl\": \"C:\\\\Users\\\\Bigspring\\\\AppData\\\\Local\\\\Temp\\\\t007-rust-rc-smoke-car\\\\rc_work\\\\kb3d_citycarsessentialssedan-native.mtl\"\n}\n",
+    "stderr": ""
+  },
+  "rc": {
+    "command": [
+      "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+      "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.json",
+      "/overwriteextension=fbx",
+      "/overwritesourcefile=C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\car.fbx",
+      "/overwritefilename=kb3d_citycarsessentialssedan-native.cgf"
+    ],
+    "returncode": 0,
+    "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.json\"\n       \"/overwriteextension=fbx\"\n       \"/overwritesourcefile=C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\car.fbx\"\n       \"/overwritefilename=kb3d_citycarsessentialssedan-native.cgf\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 14:35:26 2026\n      0:00 Memory: working set 7.5Mb (peak 7.5Mb), pagefile 1.5Mb (peak 1.5Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.3Mb (peak 11.3Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.3Mb (peak 11.3Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='kb3d_citycarsessentialssedan-native.json'\n     1>  0:00 Importing scene from file 'C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\car.fbx' to 'C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work/kb3d_citycarsessentialssedan-native.cgf'\n     1>  0:00 FBX unit: centimeter, 1 cm\n     1>  0:00 Converting scene's forward & up coordinate axes '-Y+Z' to CryEngine's '-Y+Z'\n     1>  0:00 Source unit size: 1 cm\n     1>  0:00 User scale: 1\n     1>  0:00 Final scale (includes user scale and conversion to meters): 0.010000\n     1>  0:00 Loading CryPhysicsRC.dll...\n     1>  0:00   Loaded CryPhysicsRC.dll\n     1>  0:00 Auto create Lod Path: C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work/kb3d_citycarsessentialssedan-native.cgf\n     1>  0:00 Init AutoGenerator\n     1>  0:00 Unloading CryPhysicsRC.dll...\n",
+    "stderr": ""
+  },
+  "artifacts": {
+    "request_sha256": "D5DC502DED846158B33FE7EEE30C7420B5A2C308AC6B7734823B0D05CFEDBA2F",
+    "mtl_sha256": "71A8C07CBDAA5565774481771B385894EB969CA6C306C77B4EE31E699AECAC18",
+    "cgf_sha256": "2F85AAC2E0283A8A9D45198AA080DDDD445D4794E1417B995B4F47796366B5A2",
+    "cgf_size_bytes": 11487970
+  },
+  "cgf_material_summary": {
+    "path": "C:\\Users\\Bigspring\\AppData\\Local\\Temp\\t007-rust-rc-smoke-car\\rc_work\\kb3d_citycarsessentialssedan-native.cgf",
+    "file_version": "0x746",
+    "chunk_count": 173,
+    "material_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "materials": [
+      {
+        "chunk_id": 2,
+        "name": "kb3d_citycarsessentialssedan-native",
+        "sub_material_count": 16,
+        "physicalize_types": [
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1,
+          -1
+        ],
+        "sub_materials": [
+          {
+            "slot": 0,
+            "name": "KB3D_CEV_UndercarriageTrim",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 1,
+            "name": "KB3D_CEV_SeatsDriverATrim",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 2,
+            "name": "KB3D_CEV_TiresSedans",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 3,
+            "name": "KB3D_CEV_WheelRimsA",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 4,
+            "name": "KB3D_CEV_RubberTrim",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 5,
+            "name": "KB3D_CEV_PlasticTileableA",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 6,
+            "name": "KB3D_CEV_PlasticTrimA",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 7,
+            "name": "KB3D_CEV_SedanExteriorBody",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 8,
+            "name": "KB3D_CEV_CarAtlas",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 9,
+            "name": "KB3D_CEV_CarsLicensePlates",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 10,
+            "name": "KB3D_CEV_TapesTrimA",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 11,
+            "name": "KB3D_CEV_WindowFritsTrim",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 12,
+            "name": "KB3D_CEV_FeltA",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 13,
+            "name": "KB3D_CEV_FeltB",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 14,
+            "name": "KB3D_CEV_GlassMirror",
+            "physicalize_type": -1
+          },
+          {
+            "slot": 15,
+            "name": "KB3D_CEV_TranslElemSedans",
+            "physicalize_type": -1
+          }
+        ]
+      }
+    ]
+  },
+  "cgf_read_error": "",
+  "material_alignment": {
+    "ok": true,
+    "expected_count": 16,
+    "matched_count": 16,
+    "actual_sub_material_count": 16,
+    "expected_cgf_material_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "actual_cgf_material_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "material_ids_ok": true,
+    "material_names_ok": true,
+    "material_table_name": "kb3d_citycarsessentialssedan-native",
+    "checks": [
+      {
+        "slot": 0,
+        "expected_name": "KB3D_CEV_UndercarriageTrim",
+        "actual_name": "KB3D_CEV_UndercarriageTrim",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 1,
+        "expected_name": "KB3D_CEV_SeatsDriverATrim",
+        "actual_name": "KB3D_CEV_SeatsDriverATrim",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 2,
+        "expected_name": "KB3D_CEV_TiresSedans",
+        "actual_name": "KB3D_CEV_TiresSedans",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 3,
+        "expected_name": "KB3D_CEV_WheelRimsA",
+        "actual_name": "KB3D_CEV_WheelRimsA",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 4,
+        "expected_name": "KB3D_CEV_RubberTrim",
+        "actual_name": "KB3D_CEV_RubberTrim",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 5,
+        "expected_name": "KB3D_CEV_PlasticTileableA",
+        "actual_name": "KB3D_CEV_PlasticTileableA",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 6,
+        "expected_name": "KB3D_CEV_PlasticTrimA",
+        "actual_name": "KB3D_CEV_PlasticTrimA",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 7,
+        "expected_name": "KB3D_CEV_SedanExteriorBody",
+        "actual_name": "KB3D_CEV_SedanExteriorBody",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 8,
+        "expected_name": "KB3D_CEV_CarAtlas",
+        "actual_name": "KB3D_CEV_CarAtlas",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 9,
+        "expected_name": "KB3D_CEV_CarsLicensePlates",
+        "actual_name": "KB3D_CEV_CarsLicensePlates",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 10,
+        "expected_name": "KB3D_CEV_TapesTrimA",
+        "actual_name": "KB3D_CEV_TapesTrimA",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 11,
+        "expected_name": "KB3D_CEV_WindowFritsTrim",
+        "actual_name": "KB3D_CEV_WindowFritsTrim",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 12,
+        "expected_name": "KB3D_CEV_FeltA",
+        "actual_name": "KB3D_CEV_FeltA",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 13,
+        "expected_name": "KB3D_CEV_FeltB",
+        "actual_name": "KB3D_CEV_FeltB",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 14,
+        "expected_name": "KB3D_CEV_GlassMirror",
+        "actual_name": "KB3D_CEV_GlassMirror",
+        "physicalize_type": -1,
+        "ok": true
+      },
+      {
+        "slot": 15,
+        "expected_name": "KB3D_CEV_TranslElemSedans",
+        "actual_name": "KB3D_CEV_TranslElemSedans",
+        "physicalize_type": -1,
+        "ok": true
+      }
+    ],
+    "placeholder": {
+      "name": "<unassigned>",
+      "request_present": true,
+      "request_slot": 16,
+      "mtl_present": true,
+      "mtl_slots": [
+        16
+      ],
+      "expected_in_cgf": false,
+      "cgf_present": false,
+      "cgf_slots": [],
+      "classification": "trailing_unassigned_not_expected_in_cgf",
+      "ok": true
+    }
+  },
+  "mtl_schema_report": {
+    "summary": {
+      "file_count": 1,
+      "material_count": 18,
+      "multi_material_file_count": 1,
+      "tokenized_material_count": 16,
+      "compatibility_preserved_default_count": 19
+    },
+    "gate": {
+      "schema": "cryengine_mtl_schema_gate.v1",
+      "summary": {
+        "ok": true,
+        "diagnostic_count": 0,
+        "error_count": 0,
+        "warning_count": 0
+      },
+      "diagnostics": []
+    }
+  }
+}

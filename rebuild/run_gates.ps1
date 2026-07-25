@@ -1,5 +1,7 @@
 [CmdletBinding()]
-param()
+param(
+    [switch]$SkipRC
+)
 
 $ErrorActionPreference = "Stop"
 $rebuildRoot = $PSScriptRoot
@@ -142,6 +144,44 @@ try {
         ForEach-Object FullName
     Invoke-NativeStep "Python asset_flow E2E" {
         & uv run pytest @assetFlowTests -q
+    }
+    Invoke-NativeStep "Python RC smoke policy tests" {
+        & uv run pytest (Join-Path $repoRoot "tests\test_rc_smoke_rust.py") -q
+    }
+
+    $defaultRcExe = "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe"
+    $rcExe = $null
+    if ($SkipRC) {
+        Write-Host ""
+        Write-Host "==> Optional RC smoke: SKIP (-SkipRC)"
+    }
+    elseif ($env:CE_RC_EXE) {
+        if (-not (Test-Path -LiteralPath $env:CE_RC_EXE -PathType Leaf)) {
+            throw "CE_RC_EXE does not point to a file: $env:CE_RC_EXE"
+        }
+        $rcExe = (Resolve-Path -LiteralPath $env:CE_RC_EXE).Path
+    }
+    elseif (Test-Path -LiteralPath $defaultRcExe -PathType Leaf) {
+        $rcExe = $defaultRcExe
+    }
+    else {
+        Write-Host ""
+        Write-Host "==> Optional RC smoke: SKIP (CE_RC_EXE/default RC not found)"
+    }
+
+    if ($rcExe) {
+        $rcSmokeRoot = Join-Path $tempRoot "rust-rc-smoke"
+        $rcSmokeReport = Join-Path $rcSmokeRoot "rust_rc_smoke_car.json"
+        Invoke-NativeStep "Optional RC smoke" {
+            & uv run python "..\tools\rc_smoke_rust.py" `
+                --rc $rcExe `
+                --converter $converterExe `
+                --fbx "fixtures\car\car.fbx" `
+                --manifest "fixtures\car\car.fbx_material_manifest.json" `
+                --overrides "..\docs\car_native_material_overrides.json" `
+                --work-dir $rcSmokeRoot `
+                --output $rcSmokeReport
+        }
     }
 
     Write-Host ""
