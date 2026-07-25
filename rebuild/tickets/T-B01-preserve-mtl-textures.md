@@ -1,6 +1,6 @@
 # T-B01 (Backlog) — `--preserve-mtl-textures`：以既有 MTL 為貼圖佈局權威
 
-狀態：CLOSED（2026-07-25；DoD 與完整 gate 通過）
+狀態：DONE（2026-07-25 審查通過：完整 gate 獨立實跑全綠；T-B01 native smoke 17/17 preserved 零差異、合成 golden 維持無旗標（保鮮條款機器化成立）、--help 契約同步、未復用 overrides 的 source_mtl 欄位）
 出處：T-005 審查退回的 `source_mtl` authoritative 通道——想法收貨、時機退回。實作可自 T-005 首版撿回：`git show 74eab90^:rebuild/converter/src/mtl.rs` 的 native MTL parser 與貼圖覆蓋段。
 
 ## 補充約束（排程時追加）
