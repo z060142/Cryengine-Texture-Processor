@@ -229,6 +229,26 @@ normal DX/GL 判定，不應混成分組缺陷。
 接受現有 JSON 形狀；但 DEF-13–24 中所有建議修正均須業主先裁決，T1 才能把
 「相容」精確定義為保留資料格式，而非照抄上述缺陷。
 
+#### D-06.7 業主簽核紀錄（2026-07-25，DEF-13–24 全數裁決，T1 放行）
+
+- **DEF-13/15/16/18/20/21/22/23/24**：照建議修。DEF-16 補充：`arm/orm/rma`
+  檔名 alias 對照到 channel order（arm→ARM、orm→ORM、rma→RMA），覆蓋
+  `--arm-order` 的預設；歧義 alias（`_rm`/`_ra`）出 diagnostic 並按
+  `--arm-order` 處理。
+- **DEF-14（業主方案，優於原兩案）**：`_a`/`_d` 保留為「歧義後綴」，以
+  **header 通道探測**消歧——只讀檔頭 metadata（PNG IHDR / TIFF tags /
+  EXR channel list / JPEG components），不解碼像素，deterministic 且無損：
+  - 3/4 通道（RGB/RGBA）→ `diffuse`
+  - 1/2 通道（G/GA）→ `_a` 判 `alpha`、`_d` 判 `displacement`
+  - header 讀不出 → unknown + diagnostic
+  此 header probe 成為 T1 的正式元件（`probe_header(path) -> {channels, depth, w, h}`），
+  DEF-19 的解析度優先序同樣消費它。
+- **DEF-17**：像素猜測移除，scan/process 純檔名+header 判定，未命中列
+  unknown。unknown 的人工指派改由 GUI 承接 → backlog 票 T-B02
+  （egui 最小 group 檢視/指派面板，CLI 線 T5 完工後做）。
+- **DEF-19（採建議）**：衝突必出 warning；優先序 = header 像素面積大者勝，
+  同面積則後輸入者勝。明文規則,不再 silent。
+
 ### D-07 Resize
 
 Lanczos3、只縮不放（`>` 語意）、保持長寬比。不追求與 ImageMagick 位元一致（錨點只要求語意一致）。副圖與主圖套用同一目標尺寸。
