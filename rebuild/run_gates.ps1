@@ -51,6 +51,29 @@ try {
     }
     $env:CE_CONVERTER_EXE = $converterExe
 
+    $texprocExe = Join-Path $rebuildRoot "target\release\texproc.exe"
+    if (-not (Test-Path -LiteralPath $texprocExe -PathType Leaf)) {
+        throw "release texproc was not produced at $texprocExe"
+    }
+    $texprocSmokeInput = Join-Path $tempRoot "texproc-smoke-input"
+    $texprocSmokeOutput = Join-Path $tempRoot "texproc-smoke-output"
+    $texprocSmokeGroups = Join-Path $tempRoot "texproc-smoke-groups.json"
+    Invoke-NativeStep "T-012 generate texproc smoke inputs" {
+        & uv run python "..\tools\generate_t012_smoke_inputs.py" --out $texprocSmokeInput
+    }
+    Invoke-NativeStep "T-012 texproc scan smoke" {
+        & $texprocExe scan --out $texprocSmokeGroups $texprocSmokeInput
+    }
+    Invoke-NativeStep "T-012 texproc process reviewed groups smoke" {
+        & $texprocExe process --groups $texprocSmokeGroups --out $texprocSmokeOutput
+    }
+    foreach ($suffix in "diff", "spec", "ddna", "displ") {
+        $textureOutput = Join-Path $texprocSmokeOutput "Smoke_$suffix.tif"
+        if (-not (Test-Path -LiteralPath $textureOutput -PathType Leaf)) {
+            throw "T-012 texproc smoke did not produce $textureOutput"
+        }
+    }
+
     $dumpPath = Join-Path $tempRoot "car-dump.json"
     $reportPath = Join-Path $tempRoot "car-report.json"
     Invoke-NativeStep "T-003 dump evidence" {

@@ -1,0 +1,25 @@
+{
+  "output_resolution": "64",
+  "diff_format": "albedo",
+  "normal_flip_green": false,
+  "normalize_height": false,
+  "process_metallic": false,
+  "normal_from_height_strength": 10.0,
+  "generate_missing_spec": true,
+  "generate_missing_emissive": false,
+  "generate_missing_sss": false,
+  "generate_sss_from_diffuse": false,
+  "emissive_brightness": 1.0,
+  "sss_intensity": 1.0,
+  "sss_contrast": 0.8,
+  "arm_order": "ARM",
+  "dither": false,
+  "texture_types": {
+    "diff": false,
+    "spec": false,
+    "ddna": true,
+    "displ": false,
+    "emissive": false,
+    "sss": false
+  }
+}

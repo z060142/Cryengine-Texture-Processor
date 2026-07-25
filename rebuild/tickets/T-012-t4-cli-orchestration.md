@@ -1,6 +1,6 @@
 # T-012 (T4) — texproc 分組引擎 + rayon 平行 + CLI 定形
 
-狀態：OPEN
+狀態：CLOSED（2026-07-25）
 上游文件：`rust-workspace-design.md` D-06（含 D-06.7 全部簽核裁決）、D-08；T-B02 的接口預留
 前置：T-011。
 
@@ -32,3 +32,56 @@
 - KB3D 全目錄 scan 對照報告：每筆差異 × DEF 編號表。
 - CLI 契約表 + 退出碼入 `--help`；契約凍結。
 - rayon 平行實測：全目錄 process 的 wall-clock 與單執行緒比一次，數字貼回報（不設門檻，只留證據）。
+
+## CLI 契約（T-012 凍結）
+
+| 子命令 | 語法 | stdout | stderr | 成功條件 |
+|---|---|---|---|---|
+| `scan` | `texproc scan [--suffixes s.json] [--out groups.json] INPUTS...` | 未指定 `--out` 時為完整分組 JSON | 無正常進度 | 所有輸入完成 deterministic scan；unknown 留在 JSON，不單獨令 scan 失敗 |
+| `process`（內部 scan） | `texproc process [--settings cfg.json] [--suffixes s.json] [--allow-unknown] --out DIR INPUTS...` | 無 | 每 group 一行進度 + rayon 摘要 | 無 unknown-only group，或已顯式給 `--allow-unknown` |
+| `process`（已確認分組） | `texproc process [--settings cfg.json] --groups groups.json [--allow-unknown] --out DIR` | 無 | 每 group 一行進度 + rayon 摘要 | groups JSON 可解析且通過同一 unknown-only gate |
+
+`--groups` 與 `--suffixes` 互斥；使用 `--groups` 時不得再給位置輸入。settings
+採嚴格鍵檢查，接受規格 §7 鍵與 `arm_order`、`sss_contrast`、`dither`，未知鍵
+是 configuration error。退出碼已寫入頂層 `--help` 並由整合測試凍結：
+
+| code | 契約 |
+|---:|---|
+| `0` | 成功 |
+| `1` | runtime / I/O failure |
+| `2` | CLI / configuration error |
+| `3` | grouping gate failure |
+
+## KB3D 全目錄對照（2026-07-25）
+
+命令由 `tools/run_t012_grouping_comparison.py` 驅動 active Python
+`TextureManager.classify_texture()` 與 release Rust `scan`，輸入為
+`Z:\enchanted\KB3DTextures\4k`。共掃描 793 檔、Rust 產生 132 groups；
+Rust scan wall-clock 6.065 秒。差異 5、非預期差異 0：
+
+| 檔名 | Python | Rust | 簽核差異 |
+|---|---|---|---|
+| `KB3D_ENC_GlassClean_refraction.png` | glossiness | unknown | DEF-17：移除像素猜測 |
+| `KB3D_ENC_GlassDirty_refraction.png` | glossiness | unknown | DEF-17：移除像素猜測 |
+| `KB3D_ENC_StainedGlassGreen_refraction.png` | specular | unknown | DEF-17：移除像素猜測 |
+| `KB3D_ENC_StainedGlassMulti_refraction.png` | specular | unknown | DEF-17：移除像素猜測 |
+| `KB3D_ENC_Water_refraction.png` | roughness | unknown | DEF-17：移除像素猜測 |
+
+## Rayon 實測（2026-07-25）
+
+相同 release binary、相同 132-group JSON、相同 DDNA-only 64px settings
+（`texproc/tests/t012-benchmark-settings.json`），只改
+`RAYON_NUM_THREADS`。兩次各產生 127 個 TIFF，檔名集合差異為 0。
+
+| 模式 | wall-clock | 輸出 | 相對單執行緒 |
+|---|---:|---:|---:|
+| `RAYON_NUM_THREADS=1` | 281.783 秒 | 127 | 1.000× |
+| `RAYON_NUM_THREADS=4` | 88.097 秒 | 127 | 3.199× |
+
+## 驗證紀錄
+
+- `cargo test -p texproc --release --locked`：46 unit + 2 T-011 fixture +
+  4 T-012 CLI integration，全部通過。
+- `cargo clippy -p texproc --all-targets --release --locked -- -D warnings`：通過。
+- `run_gates.ps1 -SkipRC`：`ALL GATES PASSED`，包含 T-012 生成 PNG、
+  `scan --out`、`process --groups` 與四個 CE TIFF 輸出檢查。
