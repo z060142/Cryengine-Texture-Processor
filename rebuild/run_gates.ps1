@@ -169,7 +169,9 @@ try {
         & uv run pytest @assetFlowTests -q
     }
     Invoke-NativeStep "Python RC smoke policy tests" {
-        & uv run pytest (Join-Path $repoRoot "tests\test_rc_smoke_rust.py") -q
+        & uv run pytest `
+            (Join-Path $repoRoot "tests\test_rc_smoke_rust.py") `
+            (Join-Path $repoRoot "tests\test_texproc_rc_smoke.py") -q
     }
 
     $defaultRcExe = "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe"
@@ -195,7 +197,7 @@ try {
     if ($rcExe) {
         $rcSmokeRoot = Join-Path $tempRoot "rust-rc-smoke"
         $rcSmokeReport = Join-Path $rcSmokeRoot "rust_rc_smoke_car.json"
-        Invoke-NativeStep "Optional RC smoke" {
+        Invoke-NativeStep "Optional converter RC smoke" {
             & uv run python "..\tools\rc_smoke_rust.py" `
                 --rc $rcExe `
                 --converter $converterExe `
@@ -204,6 +206,39 @@ try {
                 --overrides "..\docs\car_native_material_overrides.json" `
                 --work-dir $rcSmokeRoot `
                 --output $rcSmokeReport
+        }
+
+        $texprocFixtureRoot = Join-Path $rebuildRoot "fixtures\textures"
+        $texprocFixtureNames = @(
+            "KB3D_ENC_AtlasA_ao.png",
+            "KB3D_ENC_AtlasA_basecolor.png",
+            "KB3D_ENC_AtlasA_height.png",
+            "KB3D_ENC_AtlasA_metallic.png",
+            "KB3D_ENC_AtlasA_normal.png",
+            "KB3D_ENC_AtlasA_opacity.png",
+            "KB3D_ENC_AtlasA_roughness.png",
+            "KB3D_ENC_GlassClean_ao.png",
+            "KB3D_ENC_GlassClean_basecolor.png",
+            "KB3D_ENC_GlassClean_height.png",
+            "KB3D_ENC_GlassClean_metallic.png",
+            "KB3D_ENC_GlassClean_normal.png",
+            "KB3D_ENC_GlassClean_roughness.png"
+        )
+        foreach ($fixtureName in $texprocFixtureNames) {
+            $fixturePath = Join-Path $texprocFixtureRoot $fixtureName
+            if (-not (Test-Path -LiteralPath $fixturePath -PathType Leaf)) {
+                throw "T-013 texproc RC fixture missing: $fixturePath (see fixtures\README.md)"
+            }
+        }
+        $texprocRcSmokeRoot = Join-Path $tempRoot "rust-texproc-rc-smoke"
+        $texprocRcSmokeReport = Join-Path $texprocRcSmokeRoot "rust_texproc_rc_smoke.json"
+        Invoke-NativeStep "Optional texproc RC/DDS smoke" {
+            & uv run python "..\tools\texproc_rc_smoke.py" `
+                --rc $rcExe `
+                --texproc $texprocExe `
+                --work-dir $texprocRcSmokeRoot `
+                --output $texprocRcSmokeReport `
+                $texprocFixtureRoot
         }
     }
 

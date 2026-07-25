@@ -1,0 +1,410 @@
+{
+  "schema": "cryengine_rust_texproc_rc_smoke.v1",
+  "summary": {
+    "ok": true,
+    "input_count": 1,
+    "tif_count": 8,
+    "rc_success_count": 8,
+    "dds_count": 8,
+    "dds_header_ok_count": 8,
+    "ddna_count": 2,
+    "ddna_alpha_ok_count": 2
+  },
+  "paths": {
+    "rc_exe": "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+    "texproc_exe": "E:\\CryEngineTextureProcessor\\rebuild\\target\\release\\texproc.exe",
+    "inputs": [
+      "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\textures"
+    ],
+    "settings": "",
+    "suffixes": "",
+    "work_dir": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual",
+    "texture_dir": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures",
+    "visual_instructions": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\VISUAL_CHECK.md",
+    "report": "E:\\CryEngineTextureProcessor\\docs\\rust_texproc_rc_smoke.json"
+  },
+  "texproc": {
+    "command": [
+      "E:\\CryEngineTextureProcessor\\rebuild\\target\\release\\texproc.exe",
+      "process",
+      "--out",
+      "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures",
+      "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\textures"
+    ],
+    "returncode": 0,
+    "stdout": "",
+    "stderr": "processed KB3D_ENC_AtlasA: 4 output(s), 8.265s\nprocessed KB3D_ENC_GlassClean: 4 output(s), 6.744s\nprocessed 2 group(s) in 8.434s with 20 rayon thread(s)\n"
+  },
+  "textures": [
+    {
+      "name": "KB3D_ENC_AtlasA_ddna.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_ddna.tif",
+      "tif_sha256": "EA09A3C127413AAFCD5F5EC3670DB756BC90763450BC7952FE2795DAF0581D3D",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_ddna.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 33554744,
+      "dds_sha256": "3A0405B15665661894336232D937CC0C042039BCD5454CFF29527A7142D388C6",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 1024,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": true,
+        "dxgi_format": 84,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": true,
+        "alpha_reasons": [
+          "cry_eif_attached_alpha"
+        ]
+      },
+      "dds_header_error": "",
+      "requires_alpha": true,
+      "alpha_ok": true,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_ddna.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_ddna.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:09:39 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.1Mb (peak 11.1Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_AtlasA_ddna.tif'\n     1>  0:01 Auto-selecting preset 'NormalsWithSmoothness' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_AtlasA_ddna.tif' (4096 x 4096)\n     1>  0:07    Processed DDS (33554424 bytes, including 11184808 bytes attached): KB3D_ENC_AtlasA_ddna.dds\n     \n     1 file processed in 6.8 sec.\n     \n     Memory: working set 13.1Mb (peak 930.9Mb), pagefile 5.6Mb (peak 1186.8Mb)\n     \n     Finished at: Sat Jul 25 22:09:46 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_AtlasA_diff.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_diff.tif",
+      "tif_sha256": "7C95042F65B8A5A217989D7742CCEB5149B6BD38B44C445655A82888034D41A7",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_diff.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 22369772,
+      "dds_sha256": "42670E991BB511AEAB74E7F314C249FE0EECA924F71726D728AAA752EEFB3982",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 2048,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 78,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": true,
+        "alpha_reasons": [
+          "dxgi_format:78"
+        ]
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_diff.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_diff.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:09:47 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.2Mb (peak 4.2Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.2Mb (peak 4.2Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_AtlasA_diff.tif'\n     1>  0:01 Auto-selecting preset 'AlbedoWithGenericAlpha' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_AtlasA_diff.tif' (4096 x 4096)\n     1>  0:12    Processed DDS (22369616 bytes): KB3D_ENC_AtlasA_diff.dds\n     \n     1 file processed in 11.7 sec.\n     \n     Memory: working set 13.1Mb (peak 1443.3Mb), pagefile 5.8Mb (peak 1439.2Mb)\n     \n     Finished at: Sat Jul 25 22:09:59 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_AtlasA_displ.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_displ.tif",
+      "tif_sha256": "FC770EEE09B339550C7183E6219136FDFD136BCA09D3382F2E286D4F94A743F9",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_displ.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 22369772,
+      "dds_sha256": "53CD65BC3C2BEE3709EA54E4537C479ED94CBD665D250AFC14FD771B2E3AC16C",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 2048,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 78,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": true,
+        "alpha_reasons": [
+          "dxgi_format:78"
+        ]
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_displ.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_displ.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:09:59 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.1Mb (peak 11.1Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_AtlasA_displ.tif'\n     1>  0:00 Auto-selecting preset 'AlbedoWithGenericAlpha' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_AtlasA_displ.tif' (4096 x 4096)\n     1>  0:10    Processed DDS (22369616 bytes): KB3D_ENC_AtlasA_displ.dds\n     \n     1 file processed in 9.6 sec.\n     \n     Memory: working set 13.1Mb (peak 1443.5Mb), pagefile 5.4Mb (peak 1439.3Mb)\n     \n     Finished at: Sat Jul 25 22:10:09 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_AtlasA_spec.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_spec.tif",
+      "tif_sha256": "216AAB3EC50D5B71B2D9776DF21733C676BB745B65A563B99D2BF510738D86A2",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_spec.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 11184964,
+      "dds_sha256": "415E59EE357EBDED8C5DF26BFB9BB5A0C1184E983AE1D558340401FC72DCE664",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 2048,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 72,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": false,
+        "alpha_reasons": []
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_spec.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_AtlasA_spec.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:10:09 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.1Mb (peak 11.1Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_AtlasA_spec.tif'\n     1>  0:00 Auto-selecting preset 'Reflectance' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_AtlasA_spec.tif' (4096 x 4096)\n     1>  0:11    Processed DDS (11184808 bytes): KB3D_ENC_AtlasA_spec.dds\n     \n     1 file processed in 10.9 sec.\n     \n     Memory: working set 13.2Mb (peak 1443.5Mb), pagefile 5.4Mb (peak 1439.7Mb)\n     \n     Finished at: Sat Jul 25 22:10:21 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_GlassClean_ddna.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_ddna.tif",
+      "tif_sha256": "C9FD009A864360077582CCCA316E26074E573743181121B41341910182185D33",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_ddna.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 33554744,
+      "dds_sha256": "B22BEC9D5DA38E9D129AEE3831768E9C2A773E261CB411B4ACDF78F6B24CD09B",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 1024,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": true,
+        "dxgi_format": 84,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": true,
+        "alpha_reasons": [
+          "cry_eif_attached_alpha"
+        ]
+      },
+      "dds_header_error": "",
+      "requires_alpha": true,
+      "alpha_ok": true,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_ddna.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_ddna.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:10:21 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_GlassClean_ddna.tif'\n     1>  0:00 Auto-selecting preset 'NormalsWithSmoothness' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_GlassClean_ddna.tif' (4096 x 4096)\n     1>  0:07    Processed DDS (33554424 bytes, including 11184808 bytes attached): KB3D_ENC_GlassClean_ddna.dds\n     \n     1 file processed in 6.8 sec.\n     \n     Memory: working set 13.0Mb (peak 930.8Mb), pagefile 5.9Mb (peak 1186.8Mb)\n     \n     Finished at: Sat Jul 25 22:10:28 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_GlassClean_diff.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_diff.tif",
+      "tif_sha256": "77CE2EE8949DA942013A3A6B68078967814E91F8CFE242BD764BE583445EB3E9",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_diff.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 11184964,
+      "dds_sha256": "278141FB53BDFE83C4166B4474075FADBD82EB72A92A5787356F0BEEDA94CD19",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 2048,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 72,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": false,
+        "alpha_reasons": []
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_diff.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_diff.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:10:29 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.5Mb (peak 1.5Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_GlassClean_diff.tif'\n     1>  0:00 Auto-selecting preset 'Albedo' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_GlassClean_diff.tif' (4096 x 4096)\n     1>  0:11    Processed DDS (11184808 bytes): KB3D_ENC_GlassClean_diff.dds\n     \n     1 file processed in 10.5 sec.\n     \n     Memory: working set 13.2Mb (peak 1443.6Mb), pagefile 6.0Mb (peak 1439.7Mb)\n     \n     Finished at: Sat Jul 25 22:10:40 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_GlassClean_displ.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_displ.tif",
+      "tif_sha256": "2C447FCA5A7828E9BA8764131596C54153EA378C180C35A7C237E17C7AB05005",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_displ.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 22369772,
+      "dds_sha256": "2F82C836361132008E5AEB08F238BB099620BE4DBC391BB8601B60674F6ABA27",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 2048,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 78,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": true,
+        "alpha_reasons": [
+          "dxgi_format:78"
+        ]
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_displ.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_displ.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:10:40 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_GlassClean_displ.tif'\n     1>  0:00 Auto-selecting preset 'AlbedoWithGenericAlpha' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_GlassClean_displ.tif' (4096 x 4096)\n     1>  0:10    Processed DDS (22369616 bytes): KB3D_ENC_GlassClean_displ.dds\n     \n     1 file processed in 9.6 sec.\n     \n     Memory: working set 13.2Mb (peak 1443.6Mb), pagefile 6.1Mb (peak 1439.5Mb)\n     \n     Finished at: Sat Jul 25 22:10:50 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    },
+    {
+      "name": "KB3D_ENC_GlassClean_spec.tif",
+      "tif": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_spec.tif",
+      "tif_sha256": "6D42D51DEF70E4027367258227695FECA9B0EE8226B14741EF0C409B183092CC",
+      "dds": "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_spec.dds",
+      "dds_exists": true,
+      "dds_size_bytes": 11184964,
+      "dds_sha256": "668EFE77784D12F6CC7CFC816DD8DF026025138747E96F7A773542D93B61FFA1",
+      "dds_header": {
+        "header_size": 124,
+        "flags": 135175,
+        "width": 4096,
+        "height": 4096,
+        "pixel_format_size": 32,
+        "pixel_format_flags": 4,
+        "fourcc": "DX10",
+        "rgb_bit_count": 0,
+        "red_mask": 0,
+        "green_mask": 0,
+        "blue_mask": 0,
+        "alpha_mask": 0,
+        "cry_image_flags": 0,
+        "cry_texture_stage": "FYRC",
+        "cry_attached_alpha": false,
+        "dxgi_format": 71,
+        "dx10_misc_flags2": 0,
+        "alpha_capable": false,
+        "alpha_reasons": []
+      },
+      "dds_header_error": "",
+      "requires_alpha": false,
+      "alpha_ok": null,
+      "rc": {
+        "command": [
+          "S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe",
+          "E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_spec.tif",
+          "/refresh",
+          "/userdialog=0"
+        ],
+        "returncode": 0,
+        "stdout": "     ResourceCompiler  32-bit\n     Platform support: PC, XboxOne, PS4, PowerVR\n     Version 1.1.8.7  May 18 2022 02:38:34\n     \n     Copyright (c) 2001-2016 Crytek GmbH. All rights reserved.\n     \n     Exe directory:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/\"\n     Temp directory:\n       \"C:\\Users\\BIGSPR~1\\AppData\\Local\\Temp/\"\n     Current directory:\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/\"\n     \n     \n     Command line:\n       \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.exe\"\n       \"E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures\\KB3D_ENC_GlassClean_spec.tif\"\n       \"/refresh\"\n       \"/userdialog=0\"\n     \n     Platforms specified in rc.ini:\n     \n     Started at: Sat Jul 25 22:10:50 2026\n      0:00 Memory: working set 7.4Mb (peak 7.4Mb), pagefile 1.4Mb (peak 1.4Mb)\n      0:00 \n      0:00 Loading \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00   Loaded \"S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc\\rc.ini\"\n      0:00 \n      0:00 Platform (/p) not specified, defaulting to 'pc'.\n      0:00 \n      0:00 Initializing pak management\n      0:00 \n      0:00 Loading compiler plug-ins (ResourceCompiler*.dll)\n      0:00 Searching for S:\\Crytek\\crytek\\cryengine-57-lts\\5.7.1\\Tools\\rc/ResourceCompiler*.dll\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered AlembicCompiler (\"abc\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered ImageConverter (\"tif\", \"hdr\")\n      0:00     Registered TextureSplitter (\"dds\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered StatCGFCompiler (\"cga\", \"cgf\", \"i_cgf\")\n      0:00     Registered ChunkCompiler (\"chunk\")\n      0:00     Registered LuaCompiler (\"lua\")\n      0:00     Registered FbxConverter (\"fbx\")\n      0:00     Registered MetadataCompiler (\"cryasset\")\n      0:00     Registered CharacterCompiler (\"chr\", \"cdf\", \"skin\")\n      0:00     Registered AnimationConverter (\"i_caf\")\n      0:00     Registered ColladaCompiler (\"dae\", \"dae.zip\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered SubstanceConverter (\"crysub\")\n      0:00 Loading \"S\"\n      0:00   Loaded \"R\"\n      0:00     Registered XMLConverter (\"xml\")\n      0:00 \n      0:00 \n      0:00 Loading zip & pak compiler module\n      0:00     Registered zip & pak compiler (\"pak\", \"zip\")\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 \n      0:00 CPU cores: 14 available (14 in system).\n      0:00 Logical processors: 20 available (20 in system).\n      0:00 /threads was not specified. Using up to 1 thread.\n      0:00 \n      0:00 Memory: working set 11.0Mb (peak 11.0Mb), pagefile 4.3Mb (peak 4.3Mb)\n      0:00 Spawning 1 thread\n      0:00 \n     1>  0:00 ---------------------------------\n     1>  0:00 File='KB3D_ENC_GlassClean_spec.tif'\n     1>  0:00 Auto-selecting preset 'Reflectance' for file 'E:\\CryEngineTextureProcessor\\rebuild\\fixtures\\t013-visual\\textures/KB3D_ENC_GlassClean_spec.tif' (4096 x 4096)\n     1>  0:09    Processed DDS (11184808 bytes): KB3D_ENC_GlassClean_spec.dds\n     \n     1 file processed in 9.2 sec.\n     \n     Memory: working set 13.2Mb (peak 1443.6Mb), pagefile 5.6Mb (peak 1439.5Mb)\n     \n     Finished at: Sat Jul 25 22:11:00 2026\n",
+        "stderr": ""
+      },
+      "ok": true
+    }
+  ]
+}
