@@ -38,11 +38,11 @@ try {
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
     Set-Location $rebuildRoot
 
-    Invoke-NativeStep "Build release workspace" {
-        & cargo build --workspace --release --locked
+    Invoke-NativeStep "Build release core workspace (GUI excluded)" {
+        & cargo build --workspace --exclude texproc-gui --release --locked
     }
-    Invoke-NativeStep "Run Rust workspace tests" {
-        & cargo test --workspace --release --locked
+    Invoke-NativeStep "Run Rust core workspace tests (GUI excluded)" {
+        & cargo test --workspace --exclude texproc-gui --release --locked
     }
 
     $converterExe = Join-Path $rebuildRoot "target\release\converter.exe"

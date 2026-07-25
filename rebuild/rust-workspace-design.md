@@ -12,15 +12,16 @@
 
 ```
 rebuild/
-├── Cargo.toml            # [workspace] members = ce-schema, texproc, converter
+├── Cargo.toml            # workspace：ce-schema / texproc / converter / texproc-gui
 ├── .cargo/config.toml    # [target.x86_64-pc-windows-msvc] rustflags = ["-C", "target-feature=+crt-static"]
 ├── ce-schema/            # lib crate
-├── texproc/              # bin crate
+├── texproc/              # lib + CLI bin crate
+├── texproc-gui/          # egui/eframe native group review bin crate
 ├── converter/            # bin crate
 └── fixtures/             # 測試資產（見 D-12）
 ```
 
-Edition 2021。靜態 CRT，兩個 exe 零執行期依賴（含 ImageMagick 歸零）。
+Edition 2021。靜態 CRT，三個 exe 零專案內附 runtime 依賴（含 ImageMagick 歸零）。
 
 ### D-02 依賴清單（封頂，新增需業主同意）
 
@@ -28,6 +29,7 @@ Edition 2021。靜態 CRT，兩個 exe 零執行期依賴（含 ImageMagick 歸�
 |---|---|---|
 | ce-schema | `serde`, `serde_json` | schema 型別 + `include_str!` 嵌入 |
 | texproc | `image`（png/jpeg/tiff/exr features）, `tiff`（直接用 encoder 以取得 LZW）, `rayon`, `clap`, `serde`, `serde_json` | IO / 平行 / CLI / settings |
+| texproc-gui | `eframe 0.33`（含 egui）、`serde_json`、workspace `texproc` | native group 檢視／unknown 人工指派；GUI 依賴不進 texproc lib |
 | converter | `ufbx`（crates.io 官方 binding，vendored C，build.rs 編譯）, `quick-xml`（writer）, `clap`, `serde`, `serde_json` | FBX 讀取 / .mtl / CLI |
 
 注意：`image` crate 的 TIFF encoder 不暴露壓縮選項，**輸出一律走 `tiff` crate 的 encoder 指定 LZW**；`image` 只負責解碼輸入。

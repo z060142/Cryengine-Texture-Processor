@@ -1,3 +1,3 @@
 [workspace]
-members = ["ce-schema", "texproc", "converter"]
+members = ["ce-schema", "texproc", "converter", "texproc-gui"]
 resolver = "2"
