@@ -30,8 +30,28 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
-    Convert,
-    Validate,
+    /// Serialize an RC import request and CryEngine multi-material.
+    Convert {
+        /// Source FBX file.
+        input: PathBuf,
+        /// Optional material manifest used as explicit policy-layer input.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        /// Optional CryEngine material override payload.
+        #[arg(long)]
+        overrides: Option<PathBuf>,
+        /// Destination directory for request JSON and MTL.
+        #[arg(long)]
+        out_dir: PathBuf,
+    },
+    /// Validate a serialized RC import request and write a schema gate.
+    Validate {
+        /// RC import request JSON.
+        input: PathBuf,
+        /// Destination schema-gate JSON.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -52,6 +72,30 @@ fn run(cli: Cli) -> Result<(), String> {
             manifest,
             out,
         } => converter::report_file(&input, manifest.as_deref(), &out),
-        Command::Convert | Command::Validate => Err("not implemented".to_owned()),
+        Command::Convert {
+            input,
+            manifest,
+            overrides,
+            out_dir,
+        } => {
+            let outputs = converter::convert_file(
+                &input,
+                manifest.as_deref(),
+                overrides.as_deref(),
+                &out_dir,
+            )?;
+            let json = serde_json::to_string_pretty(&outputs)
+                .map_err(|error| format!("failed to serialize output paths: {error}"))?;
+            println!("{json}");
+            Ok(())
+        }
+        Command::Validate { input, out } => {
+            let out = out.unwrap_or_else(|| input.with_extension("schema_gate.json"));
+            if converter::validate_file(&input, &out)? {
+                Ok(())
+            } else {
+                Err(format!("request schema gate failed: {}", out.display()))
+            }
+        }
     }
 }

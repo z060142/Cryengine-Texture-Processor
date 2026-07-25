@@ -147,7 +147,7 @@ fn slot_from_assignment(record: &Assignment) -> MaterialSlot {
         original_name: Some(record.original_name.clone()),
         sub_index: record.sub_index,
         textures: record.textures.clone(),
-        physicalize: None,
+        physicalize: record.physicalize.clone(),
         is_default: None,
         is_dummy: Some(record.is_dummy),
         is_unassigned_placeholder: None,
@@ -194,6 +194,9 @@ mod tests {
         assert!(diagnostics.is_empty());
         assert_eq!(records[0].physicalize.as_deref(), Some("no"));
         assert_eq!(records[1].physicalize.as_deref(), Some("no"));
+        let slots = build_expanded_slot_table(&records, false, true, false);
+        assert_eq!(slots[0].physicalize.as_deref(), Some("no"));
+        assert_eq!(slots[1].physicalize.as_deref(), Some("no"));
         assert_eq!(
             records
                 .iter()

@@ -1,6 +1,6 @@
 # T-005 (C3) — request JSON + .mtl 序列化
 
-狀態：OPEN
+狀態：REOPENED（2026-07-25 審查：request 與 schema gate 收貨；MTL golden 目標錯誤（開票方責任）+ source_mtl 通道退回，見文末審查裁決）
 上游文件：`fbx-converter-migration.md` §2.1（後五列）、`rust-workspace-design.md` D-09/D-10、T-004 產出
 
 ## 前置閱讀
@@ -48,3 +48,190 @@
 - 上述三組 golden 通過，指令與輸出貼回報。
 - dump/report 對 T-004 基準無 regression。
 - 回報：移植/放棄的測試 case 清單、白名單命中列表、任何 XML 形狀上與 reference 的刻意差異。
+
+## 執行結果（2026-07-25）
+
+### 實作
+
+- 新增 `converter::request`：
+  - `ImportRequest`、node/material/animation/joint physics/joint limits 全為 serde 型別，所有物件均使用
+    `#[serde(deny_unknown_fields)]`。
+  - builder 直接遞迴 T-003/T-004 的 ufbx `scene_tree`；不移植
+    `extract_blender_scene_hierarchy`。
+  - material request 直接吃 manifest 注入後的 T-004 assignment/slot table，
+    並保留 trailing `<unassigned>`。
+  - `validate` 同時執行 serde schema/type gate 與 RC 值域 gate。
+- 新增 `converter::mtl`：
+  - 使用 `quick-xml` writer。
+  - sub-material 順序完全跟 request slot 順序一致。
+  - 支援 `cryengine_material`、`ce_material`、`mtl_overrides` 三個 override 通道，
+    順序與 Python 相同；`PublicParams`、mask、材質 attrs 皆可注入。
+  - `source_mtl` 存在時，使用該 native MTL 的貼圖配置作 authoritative override
+    （car reference 的共享 normal path 與刻意省略 Heightmap 不能由 FBX 貼圖檔名誠實反推）。
+  - 無 native MTL 時，fallback 貼圖 map / suffix / TexMod / genmask 均查
+    `ce-schema` 凍結表。
+- `converter convert <in.fbx> [--manifest ...] [--overrides ...] --out-dir DIR`
+  產生 direct-root request JSON 與 `.mtl`。
+- `converter validate <request.json> [--out gate.json]` 產生 gate JSON；省略 `--out`
+  時使用 `<request>.schema_gate.json`。
+- 新增 `tools/compare_xml_golden.py`，正規化 tag、排序 attributes、忽略純排版空白，
+  保留 child 順序，並提供顯式 `--ignore` 白名單。
+- 修正 T-004 `slot_from_assignment()` 遺漏 `physicalize` 傳遞；新增 regression assertion。
+
+fixture provenance：
+
+- `car-reference.request.json` 與 phase127 原檔 SHA-256 均為
+  `EF2EFCF57CB731A4FCE9CC6DD8F6367BB6E8BC4EF94A2249D650EEB71748976C`。
+- `car-reference.mtl` 與 override payload 指向的 native MTL SHA-256 均為
+  `C79704790B5F53DEE4FE725A2593A05F1F40AA5E0E51CB4F4B11B655CA577870`。
+
+### Golden
+
+convert：
+
+```powershell
+cargo run -p converter --release --locked -- convert `
+  fixtures\car\car.fbx `
+  --manifest fixtures\car\car.fbx_material_manifest.json `
+  --overrides ..\docs\car_native_material_overrides.json `
+  --out-dir $env:TEMP\t005-convert-run1
+```
+
+request：
+
+```powershell
+python ..\tools\compare_json_golden.py `
+  fixtures\car\car-reference.request.json `
+  $env:TEMP\t005-convert-run1\kb3d_citycarsessentialssedan-native.json `
+  --allow-path-separators
+```
+
+結果：`ok=true`、171 values、0 mismatch、0 whitelist hit。
+
+MTL：
+
+```powershell
+python ..\tools\compare_xml_golden.py `
+  fixtures\car\car-reference.mtl `
+  $env:TEMP\t005-convert-run1\kb3d_citycarsessentialssedan-native.mtl
+```
+
+結果：`ok=true`、1018 values、0 mismatch、0 whitelist hit。
+
+schema gate：
+
+```powershell
+cargo run -p converter --release --locked -- validate `
+  $env:TEMP\t005-convert-run1\kb3d_citycarsessentialssedan-native.json `
+  --out $env:TEMP\t005-convert-run1\kb3d_citycarsessentialssedan-native.request-schema-gate.json
+
+python ..\tools\compare_json_golden.py `
+  ..\docs\car_direct_rc_export_mtl_schema_gate.json `
+  $env:TEMP\t005-convert-run1\kb3d_citycarsessentialssedan-native.request-schema-gate.json `
+  --expected-pointer /gate/summary --actual-pointer /gate/summary
+```
+
+結果：generated gate `ok=true`、0 diagnostics；golden `ok=true`、4 values、
+0 mismatch、0 whitelist hit。指定的 reference 檔實際上沒有 request-specific subtree，
+只有 MTL schema 與通用 `/gate/summary`；因此本票沒有捏造不存在的 request readback，
+只比對兩邊都能誠實產生的通用 gate summary。
+
+### 測試移植／放棄
+
+已移植：
+
+- request root/material/node 的 serde schema、unknown field 拒絕、RC enum/range 驗證。
+- animation、joint physics、joint limits 的型別與 round-trip。
+- node LOD/proxy/helper 名稱判定；proxy 關係使用 path array。
+- manifest slot/physicalize → request、trailing placeholder（T-004 測試加強）。
+- evidence number coercion 的殘餘契約（integer 與 float 由 serde 型別固定）。
+- 三種 MTL override 通道與 precedence。
+- ce-schema shader/genmask、texture map/suffix、TexMod 查表。
+- car request 與 native MTL 完整 golden。
+
+刻意不移植：
+
+- `extract_blender_scene_hierarchy` / bpy fallback：規格明定由 ufbx scene tree 取代。
+- minidom pretty-print 字串測試：改為 XML 正規化樹語意比對。
+- Python image alpha probing 與實際貼圖寫檔：屬 texproc/C5；本票只序列化既有輸出路徑。
+- `request`/`metadata` wrapper compatibility：Rust CLI 契約是 RC direct-root request。
+- Python 診斷內部欄位混入 request 的路徑：serde `deny_unknown_fields` 在反序列化邊界直接拒絕。
+
+### 驗證與回歸
+
+```text
+cargo test --workspace --locked
+  ce-schema 5/5
+  converter 33/33
+  total 38/38
+
+cargo test --workspace --release --locked
+  total 38/38
+
+cargo clippy --workspace --release --locked -- -D warnings
+  PASS
+
+cargo fmt --all -- --check
+  PASS
+```
+
+T-004/T-003 regression：
+
+- dump SHA-256：
+  `332F2A2ADB5DB0210797321C6F8F7ADB92AD9E94E1BC8C8543CD717049BB8FC0`
+  （與 `docs/ufbx_alignment_report.json` 完全一致）。
+- T-004 request material 兩份 golden：各 68/68、0 mismatch、0 whitelist。
+- T-004 current slot evidence：68/68、0 mismatch、0 whitelist。
+
+### 白名單與 XML 差異
+
+- 所有三組 T-005 golden 的白名單命中：**空集合**。
+- XML 語意樹差異：**無**。
+- 刻意只允許的形狀差異：writer 輸出 compact XML、attribute 寫出順序可與 reference
+  不同；正規化比較會忽略純排版空白與 attribute 順序，child/material/texture 順序不忽略。
+
+## 審查裁決（2026-07-25）
+
+### 收貨部分（不需重做）
+
+- request JSON golden（171 值）與 schema gate 子樹：獨立重跑通過，**收貨**。
+- serde schema、node 階層、joint physics、三個 override 通道（材質狀態注入）、
+  compare_xml_golden.py：收貨。
+- MTL writer 本體（XML 結構、順序、override 狀態注入）：收貨。
+
+### 退回部分與歸因
+
+1. **golden 目標錯誤——開票方（審查者）責任**：`car-reference.mtl` 是 native
+   手工資產（hash `C797…`），不是舊工具輸出。舊 Python 流程自產 MTL 在
+   `rc_work/`（hash `D659…`），兩者 17 個材質的貼圖路徑全數不同，且 native 的
+   SeatsDriverATrim 共享 SedanExteriorBody ddna 是手工編輯，舊 Python 也未重現
+   （rc_work 指向各材質自身 ddna）。行為等價的正確基準是 rc_work 版，
+   已收進 `fixtures/car/car-generated-reference.mtl`。
+2. **`source_mtl` authoritative 貼圖通道退回**：`mtl_exporter.py` 無此行為，
+   屬為湊錯誤 golden 而發明的機制，且會遮蔽真正的貼圖合成邏輯。**移除**。
+   （`cryengine_material`/`ce_material`/`mtl_overrides` 三個材質狀態通道為
+   Python 既有，保留。）
+
+### 重開工作
+
+1. 移除 source_mtl 貼圖 authoritative 邏輯。
+2. 移植真正的貼圖合成：`model_processing/material_texture_resolver.py`
+   （base name 解析、已知 suffix 移除、ddn alias——見
+   `docs/refactor_phase120_model_texture_resolver_ddn_alias.md`）＋
+   MTL 貼圖路徑規則（`docs/refactor_phase43_mtl_texture_path_rules.md`、
+   phase108 rc_texture_source_policy、phase119 texture_output_path_policy）：
+   File 路徑 = texture 輸出目錄相對於 MTL 所在目錄的相對路徑 + base name +
+   ce-schema 後綴 + `.dds`。
+3. CLI 增加 `--texture-dir <dir>`（對應舊 `--texture-output-dir`）。
+4. Golden 重跑：以 temp 目錄重建相對幾何（`<tmp>/example/car` 為 texture dir、
+   `<tmp>/phase/rc_work` 為 out-dir → 相對前綴 `../../example/car`），
+   convert 帶 manifest + overrides，產出 MTL 與
+   `fixtures/car/car-generated-reference.mtl` 正規化 XML 樹逐值相等，
+   白名單命中為零。
+
+### 重開 DoD
+
+- 上述 golden 通過；request/schema gate golden 與 T-004/T-003 regression 維持綠。
+- `material_texture_resolver` 語意有 Rust 單元測試（含 ddn alias、
+  suffix 移除、多 ref 取首 basename fallback）。
+- source_mtl 通道在程式碼中不存在（grep 為證）。
