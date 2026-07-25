@@ -1,6 +1,6 @@
 # T-012 (T4) — texproc 分組引擎 + rayon 平行 + CLI 定形
 
-狀態：CLOSED（2026-07-25）
+狀態：DONE（2026-07-25 審查通過：gate 全綠含新 smoke 段；審查者獨立 scan KB3D 全目錄——132 groups、unknown 恰為 5 個 refraction 檔且全數歸因 DEF-17，無不可歸因差異；rayon 4 執行緒 3.2× 證據合理。備註：scan 接受目錄輸入，繞過 Windows 命令列長度限制）
 上游文件：`rust-workspace-design.md` D-06（含 D-06.7 全部簽核裁決）、D-08；T-B02 的接口預留
 前置：T-011。
 
