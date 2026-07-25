@@ -5,6 +5,7 @@
 | `car/car.fbx` | `S:\Crytek\crytek\Stripped to the bone\example\car\kb3d_citycarsessentialssedan-native.fbx` | T-003 ufbx 對齊、C1–C5 golden 主資產 |
 | `car/car-reference.mtl` | 同上目錄 `.mtl` | C3 的 MTL 比對參考 |
 | `car/car-reference.material_report.json` | 同上目錄 `.material_report.json` | T-003 比對證據（既有工具鏈產出） |
+| `car/car.fbx_material_manifest.json` | `S:\Crytek\crytek\Stripped to the bone\e2e_car_user_flow_phase127_material_overrides\rc_work\` | golden 流程實際使用的 material manifest（16 材質 explicit `physicalize: no` 的出處），T-004 起 golden 比對必用 |
 | `KB3D_ENC_PropAxe_A_grp.fbx` | `Z:\enchanted\output\` | 最小重現用小型 FBX（128 KB） |
 | `textures/KB3D_ENC_AtlasA_*.png` | `Z:\enchanted\KB3DTextures\4k\` | texproc 線（T 線）輸入樣本：ao/basecolor/height/metallic/normal/opacity/roughness 一套 |
 
