@@ -1,7 +1,13 @@
 # T-B01 (Backlog) — `--preserve-mtl-textures`：以既有 MTL 為貼圖佈局權威
 
-狀態：BACKLOG（排 C5 之後；前置條件 = T-005 重開完成，貼圖合成邏輯有自己的 golden）
-出處：T-005 審查退回的 `source_mtl` authoritative 通道——想法收貨、時機退回。實作可自 T-005 首版（commit `74eab90` 前的 mtl.rs）撿回。
+狀態：OPEN（2026-07-25 排程啟動；前置條件已全數滿足——T-005 合成 golden 穩定、主線完工）
+出處：T-005 審查退回的 `source_mtl` authoritative 通道——想法收貨、時機退回。實作可自 T-005 首版撿回：`git show 74eab90^:rebuild/converter/src/mtl.rs` 的 native MTL parser 與貼圖覆蓋段。
+
+## 補充約束（排程時追加）
+
+- CLI 契約已凍結（T-006）：新增 `--preserve-mtl-textures <ref.mtl>` 旗標屬契約變更，本票即為其開票程序；回報時把更新後的 convert 契約列表附上，`--help` 同步。
+- 完成後 `run_gates.ps1` 追加一段 smoke：帶旗標對 car + `fixtures/car/car-reference.mtl`（native），貼圖段逐值相等；**合成 golden 段維持不帶旗標**（保鮮條款的機器化）。
+- 診斷欄位 `texture_source: synthesized | preserved_from_ref` 進 convert 的材質診斷輸出。
 
 ## 動機
 
