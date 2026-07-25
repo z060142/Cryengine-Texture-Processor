@@ -1,6 +1,6 @@
 # T-013 (T5) — texproc → RC.exe → DDS 端到端
 
-狀態：IMPLEMENTED（2026-07-25；等待業主引擎內目視簽核）
+狀態：IMPLEMENTED（2026-07-25 審查：自動化 DoD 全數通過——審查者獨立實跑 run_gates 全模式，8/8 DDS、2/2 _ddna attached alpha（CRYF/EIF_AttachedAlpha 判定屬實）、RC 另產 .cryasset 正常。僅剩業主引擎內目視簽核）
 上游文件：遷移計畫 T5 里程碑；T-007 的 RC smoke 模式
 前置：T-012。最終驗收含業主引擎內目視（不可自動化）。
 
