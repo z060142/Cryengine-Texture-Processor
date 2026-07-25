@@ -150,6 +150,37 @@ try {
             "fixtures\car\car-generated-reference.mtl" $mtlPath
     }
 
+    $preserveMtlOutDir = Join-Path $tempRoot "preserve-mtl\rc_work"
+    $preserveMtlStdout = Join-Path $tempRoot "preserve-mtl\convert-output.json"
+    New-Item -ItemType Directory -Force -Path $preserveMtlOutDir | Out-Null
+    Invoke-NativeStep "T-B01 convert with native MTL texture authority" {
+        & $converterExe convert "fixtures\car\car.fbx" `
+            --manifest "fixtures\car\car.fbx_material_manifest.json" `
+            --overrides "..\docs\car_native_material_overrides.json" `
+            --texture-dir $textureDir `
+            --preserve-mtl-textures "fixtures\car\car-reference.mtl" `
+            --out-dir $preserveMtlOutDir > $preserveMtlStdout
+    }
+    $preserveMtlPath = Join-Path $preserveMtlOutDir "kb3d_citycarsessentialssedan-native.mtl"
+    Invoke-NativeStep "T-B01 native MTL texture sections" {
+        & uv run python "..\tools\compare_mtl_textures.py" `
+            "fixtures\car\car-reference.mtl" $preserveMtlPath
+    }
+    $preserveMtlResult = Get-Content -LiteralPath $preserveMtlStdout -Raw | ConvertFrom-Json
+    $preserveDiagnostics = @($preserveMtlResult.material_diagnostics)
+    $preservedCount = @(
+        $preserveDiagnostics |
+        Where-Object { $_.texture_source -eq "preserved_from_ref" }
+    ).Count
+    $preserveWarnings = @(
+        $preserveDiagnostics |
+        Where-Object { $_.severity -eq "warning" }
+    )
+    if ($preservedCount -ne 17 -or $preserveWarnings.Count -ne 0) {
+        throw "T-B01 diagnostics mismatch: preserved=$preservedCount warnings=$($preserveWarnings.Count)"
+    }
+    Write-Host "preserved texture layouts: $preservedCount/17; warnings: 0"
+
     Invoke-NativeStep "T-005 request schema gate" {
         & $converterExe validate $requestPath
     }

@@ -30,9 +30,17 @@ pub fn convert_file(
     manifest: Option<&Path>,
     overrides: Option<&Path>,
     texture_dir: Option<&Path>,
+    preserve_mtl_textures: Option<&Path>,
     out_dir: &Path,
 ) -> Result<convert::ConvertOutputs, String> {
-    convert::convert_file(input, manifest, overrides, texture_dir, out_dir)
+    convert::convert_file(
+        input,
+        manifest,
+        overrides,
+        texture_dir,
+        preserve_mtl_textures,
+        out_dir,
+    )
 }
 
 pub fn validate_file(input: &Path, out: &Path) -> Result<bool, String> {

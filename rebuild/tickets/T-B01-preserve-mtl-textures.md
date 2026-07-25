@@ -1,6 +1,6 @@
 # T-B01 (Backlog) — `--preserve-mtl-textures`：以既有 MTL 為貼圖佈局權威
 
-狀態：OPEN（2026-07-25 排程啟動；前置條件已全數滿足——T-005 合成 golden 穩定、主線完工）
+狀態：CLOSED（2026-07-25；DoD 與完整 gate 通過）
 出處：T-005 審查退回的 `source_mtl` authoritative 通道——想法收貨、時機退回。實作可自 T-005 首版撿回：`git show 74eab90^:rebuild/converter/src/mtl.rs` 的 native MTL parser 與貼圖覆蓋段。
 
 ## 補充約束（排程時追加）
@@ -28,3 +28,34 @@
   保鮮條款：本功能永不參與行為等價 golden。
 - 帶旗標對 car + native reference：貼圖段與 native 逐值相等（= T-005 首版已證明的能力）。
 - 名稱不匹配、ref 缺 Textures 段等邊界各一測試。
+
+## 完成紀錄（2026-07-25）
+
+- `converter convert` 新契約：
+  `converter convert <INPUT> [--manifest <MANIFEST>] [--overrides <OVERRIDES>] [--texture-dir <TEXTURE_DIR>] [--preserve-mtl-textures <REF_MTL>] --out-dir <OUT_DIR>`。
+  `--help` 已同步，reference MTL 不存在時沿用 CLI 輸入錯誤 exit code `2`。
+- 本功能只由顯式 `--preserve-mtl-textures` 啟用；未復用 overrides JSON 的 `source_mtl`。
+- ref 子材質按名稱精確匹配：
+  - 有 `<Textures>`（包含顯式空段）時整段採用 reference，診斷為 `preserved_from_ref`。
+  - output 未匹配時維持正常合成，診斷為 `synthesized`。
+  - ref 未匹配 output 時輸出 warning；已匹配但缺 `<Textures>` 時安全回退合成並輸出 warning。
+- convert JSON stdout 新增 `material_diagnostics`，每個 output 材質都有
+  `texture_source: synthesized | preserved_from_ref`；ref-only warning 的 `texture_source` 為 `null`。
+- `run_gates.ps1` 保留原 T-005 合成 golden 的無旗標路徑，另加 T-B01 native car smoke。
+  `tools/compare_mtl_textures.py` 依材質名比較 `<Textures>`：
+  `17/17` preserved、`17` 段逐值相等、`0` mismatch、`0` warning。
+- 專屬邊界測試涵蓋共享 normal/TexMod、顯式空 `<Textures>`、缺 `<Textures>` 回退、
+  output/ref 名稱不匹配與 ref-only warning。
+
+## 驗證證據
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p converter --all-targets --release --locked -- -D warnings`：PASS。
+- `run_gates.ps1 -SkipRC`：PASS。
+- `run_gates.ps1`：PASS。
+  - Rust：`ce_schema 5`、`converter 39`、converter CLI `7`、`texproc 46`、
+    fixture comparison `2`、texproc CLI `4`。
+  - Python：asset flow `28 passed, 2 skipped`；RC policy `6 passed`。
+  - converter RC：return code `0`、CGF exists、material alignment `16/16`、
+    placeholder/schema gate PASS。
+  - texproc RC/DDS：TIFF→DDS `8/8`、DDNA alpha `2/2`。

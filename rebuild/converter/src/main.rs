@@ -47,6 +47,9 @@ enum Command {
         /// Directory containing processed RC-ready texture outputs.
         #[arg(long)]
         texture_dir: Option<PathBuf>,
+        /// Preserve matched material <Textures> layouts from this reference MTL.
+        #[arg(long)]
+        preserve_mtl_textures: Option<PathBuf>,
         /// Destination directory for request JSON and MTL.
         #[arg(long)]
         out_dir: PathBuf,
@@ -138,6 +141,7 @@ fn run(cli: Cli) -> Result<(), CliFailure> {
             manifest,
             overrides,
             texture_dir,
+            preserve_mtl_textures,
             out_dir,
         } => {
             require_input_file(&input, "FBX input")?;
@@ -150,11 +154,15 @@ fn run(cli: Cli) -> Result<(), CliFailure> {
             if let Some(path) = &texture_dir {
                 require_input_directory(path, "texture directory")?;
             }
+            if let Some(path) = &preserve_mtl_textures {
+                require_input_file(path, "preserve-MTL reference")?;
+            }
             let outputs = converter::convert_file(
                 &input,
                 manifest.as_deref(),
                 overrides.as_deref(),
                 texture_dir.as_deref(),
+                preserve_mtl_textures.as_deref(),
                 &out_dir,
             )
             .map_err(classify_converter_error)?;

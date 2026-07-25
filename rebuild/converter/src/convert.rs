@@ -1,6 +1,6 @@
 use crate::manifest::MaterialManifest;
 use crate::model::ConverterModel;
-use crate::mtl::{write_mtl, MaterialOverridePayload};
+use crate::mtl::{write_mtl, MaterialOverridePayload, MaterialTextureDiagnostic};
 use crate::request::{build_import_request, write_request};
 use serde::Serialize;
 use std::fs;
@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 pub struct ConvertOutputs {
     pub request: PathBuf,
     pub mtl: PathBuf,
+    pub material_diagnostics: Vec<MaterialTextureDiagnostic>,
 }
 
 pub fn convert_file(
@@ -17,6 +18,7 @@ pub fn convert_file(
     manifest: Option<&Path>,
     overrides: Option<&Path>,
     texture_dir: Option<&Path>,
+    preserve_mtl_textures: Option<&Path>,
     out_dir: &Path,
 ) -> Result<ConvertOutputs, String> {
     let model = ConverterModel::load(input)?;
@@ -38,9 +40,17 @@ pub fn convert_file(
     let mtl_path = out_dir.join(format!("{base_name}.mtl"));
     let texture_dir = texture_dir.unwrap_or(out_dir);
     write_request(&request, &request_path)?;
-    write_mtl(&model, &request, overrides.as_ref(), texture_dir, &mtl_path)?;
+    let material_diagnostics = write_mtl(
+        &model,
+        &request,
+        overrides.as_ref(),
+        texture_dir,
+        preserve_mtl_textures,
+        &mtl_path,
+    )?;
     Ok(ConvertOutputs {
         request: request_path,
         mtl: mtl_path,
+        material_diagnostics,
     })
 }

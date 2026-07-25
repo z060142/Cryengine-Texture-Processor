@@ -2,10 +2,10 @@ use crate::model::ConverterModel;
 use crate::request::ImportRequest;
 use crate::texture_resolver::resolve_material_textures;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
-use quick_xml::Writer;
-use serde::Deserialize;
+use quick_xml::{Reader, Writer};
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -45,7 +45,22 @@ struct MaterialState {
 struct TextureEntry {
     map: String,
     file: String,
-    texmod: BTreeMap<String, String>,
+    texmod: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct PreservedMaterial {
+    name: String,
+    textures: Option<Vec<TextureEntry>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MaterialTextureDiagnostic {
+    pub severity: String,
+    pub code: String,
+    pub material: String,
+    pub texture_source: Option<String>,
+    pub message: String,
 }
 
 impl MaterialOverridePayload {
@@ -139,14 +154,25 @@ pub fn write_mtl(
     request: &ImportRequest,
     overrides: Option<&MaterialOverridePayload>,
     texture_dir: &Path,
+    preserve_mtl_textures: Option<&Path>,
     out: &Path,
-) -> Result<(), String> {
+) -> Result<Vec<MaterialTextureDiagnostic>, String> {
+    let preserved_materials = preserve_mtl_textures
+        .map(parse_preserved_materials)
+        .transpose()?
+        .unwrap_or_default();
+    let preserved_by_name: BTreeMap<_, _> = preserved_materials
+        .iter()
+        .map(|material| (material.name.as_str(), material))
+        .collect();
+    let mut matched_preserved_names = BTreeSet::new();
     let source_by_name: BTreeMap<_, _> = model
         .materials
         .iter()
         .map(|material| (material.name.as_str(), material))
         .collect();
     let mtl_dir = out.parent().unwrap_or_else(|| Path::new(""));
+    let mut diagnostics = Vec::new();
 
     let mut writer = Writer::new(Vec::new());
     write_start(
@@ -160,19 +186,50 @@ pub fn write_mtl(
     write_start(&mut writer, "SubMaterials", &[])?;
 
     for material in &request.materials {
-        let textures: Vec<TextureEntry> = source_by_name
-            .get(material.name.as_str())
-            .map(|source| {
-                resolve_material_textures(source, texture_dir, mtl_dir)
-                    .into_iter()
-                    .map(|texture| TextureEntry {
-                        map: texture.ce_map,
-                        file: texture.mtl_file,
-                        texmod: default_texmod(),
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .unwrap_or_default();
+        let synthesized = || {
+            source_by_name
+                .get(material.name.as_str())
+                .map(|source| synthesized_textures(source, texture_dir, mtl_dir))
+                .unwrap_or_default()
+        };
+        let (textures, diagnostic) = match preserved_by_name.get(material.name.as_str()) {
+            Some(preserved) => {
+                matched_preserved_names.insert(material.name.as_str());
+                match &preserved.textures {
+                    Some(textures) => (
+                        textures.clone(),
+                        texture_diagnostic(
+                            "info",
+                            "mtl_textures_preserved",
+                            &material.name,
+                            Some("preserved_from_ref"),
+                            "Textures were preserved from the explicit reference MTL.",
+                        ),
+                    ),
+                    None => (
+                        synthesized(),
+                        texture_diagnostic(
+                            "warning",
+                            "preserve_mtl_textures_missing",
+                            &material.name,
+                            Some("synthesized"),
+                            "Matched reference material has no Textures element; synthesized textures were used.",
+                        ),
+                    ),
+                }
+            }
+            None => (
+                synthesized(),
+                texture_diagnostic(
+                    "info",
+                    "mtl_textures_synthesized",
+                    &material.name,
+                    Some("synthesized"),
+                    "No matching reference texture layout was applied.",
+                ),
+            ),
+        };
+        diagnostics.push(diagnostic);
         let fallback_policy = fallback_shader_policy(&textures);
         let override_state = overrides.and_then(|payload| payload.state(&material.name));
         let mut attrs = default_material_attrs();
@@ -202,11 +259,13 @@ pub fn write_mtl(
                     ("File".to_owned(), texture.file),
                 ],
             )?;
-            write_empty(
-                &mut writer,
-                "TexMod",
-                &texture.texmod.into_iter().collect::<Vec<_>>(),
-            )?;
+            if let Some(texmod) = texture.texmod {
+                write_empty(
+                    &mut writer,
+                    "TexMod",
+                    &texmod.into_iter().collect::<Vec<_>>(),
+                )?;
+            }
             write_end(&mut writer, "Texture")?;
         }
         write_end(&mut writer, "Textures")?;
@@ -236,7 +295,51 @@ pub fn write_mtl(
 
     let xml = String::from_utf8(writer.into_inner())
         .map_err(|error| format!("MTL writer produced invalid UTF-8: {error}"))?;
-    fs::write(out, xml).map_err(|error| format!("failed to write {}: {error}", out.display()))
+    fs::write(out, xml).map_err(|error| format!("failed to write {}: {error}", out.display()))?;
+
+    for preserved in &preserved_materials {
+        if !matched_preserved_names.contains(preserved.name.as_str()) {
+            diagnostics.push(texture_diagnostic(
+                "warning",
+                "preserve_mtl_material_unmatched",
+                &preserved.name,
+                None,
+                "Reference MTL material did not match any output material.",
+            ));
+        }
+    }
+    Ok(diagnostics)
+}
+
+fn synthesized_textures(
+    source: &crate::model::MaterialRecord,
+    texture_dir: &Path,
+    mtl_dir: &Path,
+) -> Vec<TextureEntry> {
+    resolve_material_textures(source, texture_dir, mtl_dir)
+        .into_iter()
+        .map(|texture| TextureEntry {
+            map: texture.ce_map,
+            file: texture.mtl_file,
+            texmod: Some(default_texmod()),
+        })
+        .collect()
+}
+
+fn texture_diagnostic(
+    severity: &str,
+    code: &str,
+    material: &str,
+    texture_source: Option<&str>,
+    message: &str,
+) -> MaterialTextureDiagnostic {
+    MaterialTextureDiagnostic {
+        severity: severity.to_owned(),
+        code: code.to_owned(),
+        material: material.to_owned(),
+        texture_source: texture_source.map(str::to_owned),
+        message: message.to_owned(),
+    }
 }
 
 fn default_material_attrs() -> BTreeMap<String, String> {
@@ -305,6 +408,134 @@ fn default_texmod() -> BTreeMap<String, String> {
         .unwrap_or_default()
 }
 
+fn parse_preserved_materials(path: &Path) -> Result<Vec<PreservedMaterial>, String> {
+    let mut reader = Reader::from_file(path)
+        .map_err(|error| format!("failed to read reference MTL {}: {error}", path.display()))?;
+    reader.config_mut().trim_text(true);
+    let mut buffer = Vec::new();
+    let mut in_submaterials = false;
+    let mut current_material: Option<PreservedMaterial> = None;
+    let mut current_texture: Option<TextureEntry> = None;
+    let mut materials = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(event)) if event.name().as_ref() == b"SubMaterials" => {
+                in_submaterials = true;
+            }
+            Ok(Event::End(event)) if event.name().as_ref() == b"SubMaterials" => {
+                in_submaterials = false;
+            }
+            Ok(Event::Start(event)) if in_submaterials && event.name().as_ref() == b"Material" => {
+                let attrs = read_attrs(&event)?;
+                current_material = Some(PreservedMaterial {
+                    name: attrs.get("Name").cloned().unwrap_or_default(),
+                    textures: None,
+                });
+            }
+            Ok(Event::End(event)) if in_submaterials && event.name().as_ref() == b"Material" => {
+                if let Some(material) = current_material.take() {
+                    materials.push(material);
+                }
+            }
+            Ok(Event::Start(event))
+                if current_material.is_some() && event.name().as_ref() == b"Textures" =>
+            {
+                if let Some(material) = &mut current_material {
+                    material.textures = Some(Vec::new());
+                }
+            }
+            Ok(Event::Empty(event))
+                if current_material.is_some() && event.name().as_ref() == b"Textures" =>
+            {
+                if let Some(material) = &mut current_material {
+                    material.textures = Some(Vec::new());
+                }
+            }
+            Ok(Event::Start(event))
+                if current_material
+                    .as_ref()
+                    .is_some_and(|material| material.textures.is_some())
+                    && event.name().as_ref() == b"Texture" =>
+            {
+                current_texture = Some(texture_from_attrs(read_attrs(&event)?));
+            }
+            Ok(Event::Empty(event))
+                if current_material
+                    .as_ref()
+                    .is_some_and(|material| material.textures.is_some())
+                    && event.name().as_ref() == b"Texture" =>
+            {
+                if let Some(textures) = current_material
+                    .as_mut()
+                    .and_then(|material| material.textures.as_mut())
+                {
+                    textures.push(texture_from_attrs(read_attrs(&event)?));
+                }
+            }
+            Ok(Event::Start(event))
+                if current_texture.is_some() && event.name().as_ref() == b"TexMod" =>
+            {
+                if let Some(texture) = &mut current_texture {
+                    texture.texmod = Some(read_attrs(&event)?);
+                }
+            }
+            Ok(Event::Empty(event))
+                if current_texture.is_some() && event.name().as_ref() == b"TexMod" =>
+            {
+                if let Some(texture) = &mut current_texture {
+                    texture.texmod = Some(read_attrs(&event)?);
+                }
+            }
+            Ok(Event::End(event))
+                if current_material.is_some() && event.name().as_ref() == b"Texture" =>
+            {
+                if let (Some(textures), Some(texture)) = (
+                    current_material
+                        .as_mut()
+                        .and_then(|material| material.textures.as_mut()),
+                    current_texture.take(),
+                ) {
+                    textures.push(texture);
+                }
+            }
+            Ok(Event::Eof) => break,
+            Ok(_) => {}
+            Err(error) => {
+                return Err(format!(
+                    "failed to parse reference MTL {}: {error}",
+                    path.display()
+                ));
+            }
+        }
+        buffer.clear();
+    }
+    Ok(materials)
+}
+
+fn texture_from_attrs(attrs: BTreeMap<String, String>) -> TextureEntry {
+    TextureEntry {
+        map: attrs.get("Map").cloned().unwrap_or_default(),
+        file: attrs.get("File").cloned().unwrap_or_default(),
+        texmod: None,
+    }
+}
+
+fn read_attrs(event: &BytesStart<'_>) -> Result<BTreeMap<String, String>, String> {
+    event
+        .attributes()
+        .map(|attribute| {
+            let attribute = attribute.map_err(|error| format!("invalid XML attribute: {error}"))?;
+            let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
+            let value = attribute
+                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+                .map_err(|error| format!("invalid XML attribute value: {error}"))?
+                .into_owned();
+            Ok((key, value))
+        })
+        .collect()
+}
+
 fn write_start(
     writer: &mut Writer<Vec<u8>>,
     name: &str,
@@ -342,9 +573,87 @@ fn write_end(writer: &mut Writer<Vec<u8>>, name: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{MaterialRecord, NodeRecord, TextureRef};
+    use crate::request::{ImportRequest, RequestMaterial};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn payload(json: &str) -> MaterialOverridePayload {
         serde_json::from_str(json).unwrap()
+    }
+
+    fn temp_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "converter-mtl-{label}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn model(names: &[&str]) -> ConverterModel {
+        ConverterModel {
+            source_fbx: "fixture.fbx".to_owned(),
+            materials: names
+                .iter()
+                .enumerate()
+                .map(|(index, name)| MaterialRecord {
+                    name: (*name).to_owned(),
+                    typed_id: index as u32,
+                    element_id: index as u32,
+                    textures: vec![TextureRef {
+                        material_prop: "DiffuseColor".to_owned(),
+                        shader_prop: "DiffuseColor".to_owned(),
+                        filename: format!("{name}_basecolor.png"),
+                        absolute_filename: String::new(),
+                        relative_filename: String::new(),
+                        embedded: false,
+                        content_size: 0,
+                    }],
+                })
+                .collect(),
+            meshes: Vec::new(),
+            scene_tree: NodeRecord {
+                name: "Root".to_owned(),
+                element_id: 0,
+                typed_id: 0,
+                children: Vec::new(),
+            },
+            node_count: 1,
+        }
+    }
+
+    fn request(names: &[&str]) -> ImportRequest {
+        ImportRequest {
+            source_filename: "fixture.fbx".to_owned(),
+            output_ext: "cgf".to_owned(),
+            material_filename: Some("fixture".to_owned()),
+            forward_up_axes: Some("-Y+Z".to_owned()),
+            unit_size: Some("cm".to_owned()),
+            scale: Some(1.0),
+            physics_primitive: None,
+            merge_all_nodes: Some(false),
+            scene_origin: Some(false),
+            ignore_custom_normals: Some(false),
+            ignore_uv: Some(false),
+            materials: names
+                .iter()
+                .enumerate()
+                .map(|(index, name)| RequestMaterial {
+                    name: (*name).to_owned(),
+                    physicalize: "no".to_owned(),
+                    sub_index: index as i32,
+                })
+                .collect(),
+            nodes: Vec::new(),
+            autolodsettings: None,
+            animation: None,
+            joint_physics_data: Vec::new(),
+        }
     }
 
     #[test]
@@ -399,5 +708,87 @@ mod tests {
         assert_eq!(texmod["TexMod_RotateType"], "0");
         assert_eq!(texmod["TexMod_TexGenType"], "0");
         assert_eq!(texmod["TexMod_bTexGenProjected"], "0");
+    }
+
+    #[test]
+    fn preserve_layout_handles_empty_missing_and_unmatched_materials() {
+        let root = temp_dir("preserve-boundaries");
+        let reference = root.join("reference.mtl");
+        let output = root.join("output.mtl");
+        fs::write(
+            &reference,
+            r#"<Material><SubMaterials>
+                <Material Name="Exact"><Textures>
+                    <Texture Map="Bumpmap" File="./shared_normal.dds"><TexMod Custom="yes"/></Texture>
+                </Textures></Material>
+                <Material Name="Empty"><Textures/></Material>
+                <Material Name="Missing"></Material>
+                <Material Name="Extra"><Textures><Texture Map="Diffuse" File="./unused.dds"/></Textures></Material>
+            </SubMaterials></Material>"#,
+        )
+        .unwrap();
+        for name in ["Exact", "Empty", "Missing"] {
+            fs::write(root.join(format!("{name}_diff.tif")), b"fixture").unwrap();
+        }
+
+        let diagnostics = write_mtl(
+            &model(&["Exact", "Empty", "Missing"]),
+            &request(&["Exact", "Empty", "Missing"]),
+            None,
+            &root,
+            Some(&reference),
+            &output,
+        )
+        .unwrap();
+        let parsed = parse_preserved_materials(&output).unwrap();
+        let by_name: BTreeMap<_, _> = parsed
+            .iter()
+            .map(|material| (material.name.as_str(), material))
+            .collect();
+
+        let exact = by_name["Exact"].textures.as_ref().unwrap();
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].map, "Bumpmap");
+        assert_eq!(exact[0].file, "./shared_normal.dds");
+        assert_eq!(exact[0].texmod.as_ref().unwrap()["Custom"], "yes");
+        assert!(by_name["Empty"].textures.as_ref().unwrap().is_empty());
+        assert_eq!(
+            by_name["Missing"].textures.as_ref().unwrap()[0].file,
+            "./Missing_diff.tif"
+        );
+
+        let diagnostic_by_material: BTreeMap<_, _> = diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.material.as_str(), diagnostic))
+            .collect();
+        assert_eq!(
+            diagnostic_by_material["Exact"].texture_source.as_deref(),
+            Some("preserved_from_ref")
+        );
+        assert_eq!(
+            diagnostic_by_material["Empty"].texture_source.as_deref(),
+            Some("preserved_from_ref")
+        );
+        assert_eq!(
+            diagnostic_by_material["Missing"].code,
+            "preserve_mtl_textures_missing"
+        );
+        assert_eq!(
+            diagnostic_by_material["Missing"].texture_source.as_deref(),
+            Some("synthesized")
+        );
+        assert_eq!(
+            diagnostic_by_material["Extra"].code,
+            "preserve_mtl_material_unmatched"
+        );
+        assert_eq!(diagnostic_by_material["Extra"].severity, "warning");
+        let extra_json = serde_json::to_value(diagnostic_by_material["Extra"]).unwrap();
+        assert!(extra_json
+            .as_object()
+            .unwrap()
+            .contains_key("texture_source"));
+        assert!(extra_json["texture_source"].is_null());
+
+        fs::remove_dir_all(root).unwrap();
     }
 }

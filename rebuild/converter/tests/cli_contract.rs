@@ -35,6 +35,15 @@ fn top_level_help_freezes_exit_code_contract() {
 }
 
 #[test]
+fn convert_help_includes_preserve_mtl_contract() {
+    let output = run(&["convert", "--help"]);
+    assert_eq!(output.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("--preserve-mtl-textures"));
+    assert!(stdout.contains("reference MTL"));
+}
+
+#[test]
 fn clap_argument_errors_exit_two() {
     let output = run(&["dump"]);
     assert_eq!(output.status.code(), Some(2));
@@ -87,5 +96,24 @@ fn output_io_failure_exits_one() {
         .output()
         .unwrap();
     assert_eq!(output.status.code(), Some(1));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn missing_preserve_mtl_reference_exits_two() {
+    let root = temp_dir("missing-preserve-reference");
+    let fbx = fixture("fixtures/car/car.fbx");
+    let missing = root.join("missing.mtl");
+    let output = Command::new(converter())
+        .arg("convert")
+        .arg(&fbx)
+        .args(["--preserve-mtl-textures"])
+        .arg(&missing)
+        .args(["--out-dir"])
+        .arg(&root)
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("preserve-MTL reference"));
     fs::remove_dir_all(root).unwrap();
 }
