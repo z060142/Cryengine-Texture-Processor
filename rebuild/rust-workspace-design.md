@@ -53,12 +53,181 @@ Edition 2021。靜態 CRT，兩個 exe 零執行期依賴（含 ImageMagick 歸�
 - **資料圖（gloss/normal/height/mask/alpha）永不 dither** —— 錨點 1（ddna.a == 255−roughness 逐像素）必須位元精確。
 - 顏色圖 dither 做成 `--dither` 開關，**預設 off**。遷移計畫寫「+ dither」，此處降級為 opt-in；若引擎內目視出現 banding 再翻預設。
 
-### D-06 輸入分組（規格未涵蓋，需從 Python 移植)
+### D-06 輸入分組（T0 Python 實際行為考古）
 
-- 後綴分類語意移植自 repo 根的 `suffix_settings.json` + `core/` 的分組邏輯（Fox 任務 T0 先定位並摘錄該邏輯，寫進本節再實作）。
-- 預設表以 `include_str!` 嵌入，`--suffixes <json>` 可覆蓋，格式與現有 `suffix_settings.json` 相容。
-- 注意 `arm` 不在 suffix_settings.json 內，其偵測樣式（arm/orm…）要從 Python 碼裡挖出並記錄。
-- DEF-04 修正：`--arm-order` 設定通道排列，預設 `ARM`。
+本節凍結的是 2026-07-25 的 Python **實際行為**，不是理想設計。現行主程式是
+PySide6 入口（`main.py:4-7,31,70-83`）；檔案選取與模型抽出的貼圖最後都進
+`TextureImportPanel.import_textures()`，再逐檔呼叫 `TextureManager.add_texture()`
+（`ui_pyside/texture_import.py:89-123`、`ui_pyside/model_import.py:668-669,921-933`）。
+真正有權威性的分組實作只有 `core/name_parser.py` +
+`core/texture_manager.py`；`utils/` 沒有另一套分組器。
+
+舊 Tkinter 的 `TextureImportPanel.classify_textures()` / `group_textures()`
+（`ui/texture_import.py:377-503`）在 repo 內沒有呼叫者，且演算法不同，**不得移植**。
+
+#### D-06.1 設定載入與後綴匹配
+
+1. `TextureManager` 建立時先建 `TextureNameParser`，再固定讀 repo 根
+   `suffix_settings.json` 並呼叫 `load_patterns()`；檔案不存在或解析失敗才保留
+   parser 的內建預設（`core/texture_manager.py:149-189`）。
+2. JSON 的每個一般 suffix 先 `strip()`、`re.escape()`，再編成
+   `_{suffix}(?:_?\d+k)?$`；全部 regex 使用 `re.IGNORECASE`
+   （`core/name_parser.py:130-137,139-180`）。因此：
+   - 不是把整個檔名按 `_` token 化後查表，而是要求「一個自動補上的 `_` +
+     suffix」位於 stem 結尾；suffix 後只准選配解析度 `4k` / `_4k`
+     （實際上 `\d+k` 接受任意位數）。
+   - 大小寫不影響**型別匹配**；`Normal` 與 `normal` 重複但語意相同。
+   - 設定值若自己帶 `_`，底線會被 escape、外面再補一個 `_`。所以根設定的
+     `_n/_s/_g/_r/_h/_m/_e` 實際要求 `__n/__s/...`，普通 `foo_n` 不會命中
+     這一層（`suffix_settings.json:12-76`）。
+   - 根設定的 `a`、`d` 不是任意子字串，而是結尾 `_a`、`_d`；兩者都屬
+     `diffuse`，且 `alpha` 沒有單字母 `a`（`suffix_settings.json:2-10,62-66`）。
+3. JSON regex 前另有一層不可覆蓋的 CryEngine 表：
+   `_diff/_ddna/_displ/_spec/_em/_emissive/_sss`，依
+   diffuse → normal → displacement → specular → emissive → sss 順序先查
+   （`core/name_parser.py:220-249`）。
+4. 一命中就立即 return。優先序是：
+   **硬編碼 CE 表順序 → JSON key 的檔案插入順序 → 該 key 內 suffix 陣列順序**。
+   所有 regex 都錨定結尾，所以 `wall_normal_diff` 只會以最後的 `_diff`
+   判 diffuse；若自訂 JSON 把同一 terminal suffix 配給多型別，先出現的 key
+   勝出（`core/name_parser.py:230-249`）。
+5. 前兩層都沒命中才開影像做 `TextureAnalyzer` fallback；analyzer 先以不具
+   token 邊界的子字串表判斷，再看像素統計。confidence ≥ 0.5 才採用，否則
+   `unknown`（`core/name_parser.py:251-263`、
+   `core/texture_analyzer.py:29-79,81-126,182-241`）。所以 fallback 結果會受
+   檔案是否能解碼、像素內容與 Pillow build 影響，不是純檔名函式。
+
+#### D-06.2 stem 清理、base name 與 group
+
+1. `os.path.splitext(os.path.basename(path))[0]` 只去最後一段副檔名；沒有副檔名
+   白名單或存在性檢查（`core/name_parser.py:204-218`）。
+2. 分類前 `_clean_filename()` 只按 `_` 切段，將與
+   `removable_suffixes` **完全相等且不分大小寫**的段全部移除，再用 `_` 接回；
+   位置不限結尾、`-dx` 不算 token（`core/name_parser.py:182-202`）。
+   active 根設定只列 `dx/gl`（`suffix_settings.json:77-80`），因此 parser
+   建構時的 `2k/4k/8k/directx/opengl` 預設會被覆寫掉
+   （`core/name_parser.py:23-26,152-155`）。
+3. regex 命中後先切掉整個「型別 suffix + 其後解析度」，再跑
+   `_extract_base_name()`。後者若仍找不到 terminal pattern，會按 `_` 切段，
+   移除**任何位置**與該型別 identifier 相等的段，不只末段
+   （`core/name_parser.py:233-249,265-328`）。
+4. group key 就是原樣保留大小寫的 `base_name`；用 Python 字串 `==` 查找，
+   沒有 `casefold()` 或路徑/資料夾 namespace
+   （`core/texture_manager.py:229-269`）。因此 `Wall` 與 `wall` 是兩組；
+   不同資料夾但同 base name 會合為一組。
+5. 去重只比較 `os.path.abspath()` 的字串 set，沒有 Windows case 正規化
+   （`core/texture_manager.py:153-155,205-220,246-247`）。
+6. 一組內已知型別各只有一格；同 stem、同型別再次加入時直接覆蓋舊值，
+   所以不同副檔名或 `_2k/_4k` 合併後由**輸入順序最後一張**勝出，沒有解析度、
+   尺寸、mtime 或格式優先序。只有 `unknown` 是 append list
+   （`core/texture_manager.py:31-46,75-87`）。
+
+#### D-06.3 ARM
+
+`arm` 不在根 JSON；`load_patterns()` 每次在缺少 `arm` key 時硬加
+（`core/name_parser.py:169-177`）。實際 regex 接受：
+
+| terminal spelling | 是否命中 `arm` | 來源 |
+|---|---:|---|
+| `_arm` | 是 | `_arm` / `_a?rm` |
+| `_rm` | 是 | `_a?rm` |
+| `_ra` | 是 | `_rm?a` |
+| `_rma` | 是 | `_rm?a` |
+| `_occlusion-roughness-metallic`、底線變體 | 是 | 長名 regex |
+| `_ao-rough-metal`、底線變體 | 是 | 短長名 regex |
+| `_orm` | **否** | 無對應 regex |
+
+來源：`core/name_parser.py:117-124,169-177`。`TextureAnalyzer` fallback 也只認
+子字串 `_arm`（`core/texture_analyzer.py:120-125`），所以 ORM 沒有固定的
+檔名語意，會落到像素猜測。`--arm-order` 仍按 DEF-04 設定通道排列，預設
+`ARM`；檔名 alias 本身不攜帶 channel-order metadata。
+
+#### D-06.4 unknown 的去向
+
+- 未知檔仍建立/加入其 base-name group，放進 `textures["unknown"]` list
+  （`core/texture_manager.py:31-46,75-87,239-244`）。
+- PySide group panel顯示 unknown 數量與檔名，允許人工指定型別；指定時從 list
+  移出並直接寫入該型別單格（已有同型別會被覆蓋）
+  （`ui_pyside/texture_group_panel.py:83-105,116-131,154-170`）。
+- batch 不拒絕含 unknown 或 unknown-only 的 group；所有 group 都走兩階段，
+  但中間層只查已知型別，沒有任何 processor 讀 `unknown`
+  （`core/batch_processor.py:143-193,251-386`）。結果通常是該 unknown 不產出
+  任何貼圖，也沒有「尚未分類」的 hard gate。
+
+#### D-06.5 輸入格式的實際入口
+
+PySide file dialog 顯示
+`jpg/jpeg/png/tga/tif/tiff/bmp/hdr/exr`，同時提供 `All files (*.*)`
+（`ui_pyside/texture_import.py:89-101`）。迴圈不再檢查 extension、bit depth、
+檔案存在或可解碼，直接呼叫 manager（`ui_pyside/texture_import.py:103-123`）；
+manager/name parser 也不做這些 admission checks。因此這不是白名單：
+
+- 上述九種格式會出現在 picker filter，但任意 extension 的 programmatic path
+  或經 All files 選入的檔都能進 group。
+- 16-bit TIFF 與 EXR **確實能進分組層**。T0 以 ImageMagick 建立兩張 2×2、
+  depth=16 的 `probe_normal.tif/.exr` 實跑，兩者皆得到
+  `type=normal, base_name=probe`。
+- 這不保證後續 processor 能解碼；檔名在前兩層命中時根本不會開檔，未命中時
+  才由 Pillow analyzer 嘗試解碼，失敗仍以 `unknown` 加入。T1 必須另行凍結
+  真正 decoder whitelist，不能把 file-dialog filter 當契約。
+
+#### D-06.6 可複核判例
+
+前五列取自 `Z:\enchanted\KB3DTextures\4k` 的真實檔名；其餘用同一張可解碼
+PNG 複製改名後直接呼叫 active `TextureNameParser` / `TextureManager`。DEF-07
+三個名稱在 source-type 分組都判 normal；DEF-07 的錯誤發生在其後的
+normal DX/GL 判定，不應混成分組缺陷。
+
+| # | 輸入檔名 | 實際 source type | 實際 base name | 判定重點 |
+|---:|---|---|---|---|
+| 1 | `KB3D_ENC_AtlasA_basecolor.png` | diffuse | `KB3D_ENC_AtlasA` | JSON terminal suffix |
+| 2 | `KB3D_ENC_AtlasFruitsB_emissive.png` | emissive | `KB3D_ENC_AtlasFruitsB` | CE `_emissive` 先命中 |
+| 3 | `KB3D_ENC_AtlasA_opacity.png` | alpha | `KB3D_ENC_AtlasA` | JSON terminal suffix |
+| 4 | `KB3D_ENC_AtlasA_normal.png` | normal | `KB3D_ENC_AtlasA` | JSON terminal suffix |
+| 5 | `KB3D_ENC_AtlasA_ao.png` | ao | `KB3D_ENC_AtlasA` | JSON terminal suffix |
+| 6 | `glass_normal.png` | normal | `glass` | DEF-07 名；分組本身正常 |
+| 7 | `single_nrm.png` | normal | `single` | DEF-07 名；分組本身正常 |
+| 8 | `shingle_n.png` | normal | `shingle` | DEF-07 名；`_n` 設定失效後由 analyzer 子字串 fallback |
+| 9 | `plaza_a.png` | diffuse | `plaza` | `a` 屬 diffuse，不是 alpha |
+| 10 | `facade_d.png` | diffuse | `facade` | 單字母 `d` |
+| 11 | `packed_arm.png` | arm | `packed` | hardcoded ARM |
+| 12 | `packed_rm.png` | arm | `packed` | `_a?rm` 也接受 `rm` |
+| 13 | `packed_rma.png` | arm | `packed` | `_rm?a` |
+| 14 | `packed_orm.png` | diffuse（本次像素） | `packed_orm` | 無 ORM pattern；落到像素 fallback，結果不穩定 |
+| 15 | `stone_normal_dx.png` | normal | `stone` | 先移除任意位置的 `dx` token |
+| 16 | `stone_gl_normal.png` | normal | `stone` | 先移除任意位置的 `gl` token |
+| 17 | `stone_normal_4k.png` | normal | `stone` | type 後解析度併入 regex 一起切除 |
+| 18 | `stone_4k_normal.png` | normal | `stone_4k` | type 前 `4k` 不再是 removable |
+| 19 | `Wall_normal.png` + `wall_roughness.png` | normal + roughness | `Wall` + `wall` | 大小寫分成兩組 |
+| 20 | `same_normal.tif` 後加入 `same_normal.exr` | normal | `same` | 同格合併，EXR 靜默覆蓋 TIFF |
+| 21 | `normal_wall_normal.png` | normal | `wall` | base extractor 連 stem 內部 `normal` token 也移除 |
+
+判例 1–18 的分類/取 stem 規則來源為
+`core/name_parser.py:182-263,265-328`；19–20 的合併結果來源為
+`core/texture_manager.py:75-87,216-269`。
+
+#### D-06.7 新發現缺陷與建議裁決（⚖ 均待業主簽核）
+
+建議只代表 T1/T4 的預設提案；未簽核前不得把「建議修」視為已授權行為變更。
+
+| 缺陷 | 實際問題 | Fox 建議 |
+|---|---|---|
+| `DEF-13` | 設定值自帶 `_` 被編成雙底線，根表七組短 suffix 失效。 | **修**：載入時正規化成恰好一個 separator，並測 `_n/_s/_g/_r/_h/_m/_e`。 |
+| `DEF-14` | `_a` 被 diffuse 先吃掉；`a/d` 單字母語意高度含糊。 | **修**：預設移除單字母 alias；若要保留，要求自訂表明確 opt-in。 |
+| `DEF-15` | `dx/gl` 按 `_` token 在任意位置全刪，可能破壞合法 stem；active 表又意外丟掉 2k/4k/8k defaults。 | **修**：只從 terminal qualifier 區逐段 peel，解析度位置語法明文化。 |
+| `DEF-16` | ARM 接受含糊的 `rm/ra`，接受 `rma` 卻不接受常見 `orm`，且 alias 不表達 channel order。 | **修**：只留明確 token，至少定義 `arm/orm/rma` 到 channel order 的對照；歧義 alias 報 diagnostic。 |
+| `DEF-17` | regex 未命中後改以 Pillow/像素猜型別，結果依內容與 decoder 環境而變；ORM 可被猜成 diffuse。 | **修**：`scan` 保持 filename-only deterministic；不明者列 unknown，不偷偷猜。 |
+| `DEF-18` | base/group 與 absolute-path 去重都大小寫敏感，不符 Windows 檔名直覺。 | **修**：group/去重 key 使用 Windows-aware casefold/canonical form，另保留首個 display spelling。 |
+| `DEF-19` | 同 group 同型別是 silent last-write-wins；解析度/格式衝突由輸入順序決定。 | **修**：衝突必出 diagnostic；由業主另選 reject、顯式 precedence 或保留全部 variants。 |
+| `DEF-20` | picker filter 被誤當白名單；任意 extension、甚至不可解碼/不存在 path 都可入組。 | **修**：T1 依真 decoder features 凍結 extension + decode preflight；16-bit/EXR 各有測試。 |
+| `DEF-21` | unknown-only group 仍走完整 batch，通常零輸出且無 hard failure。 | **修**：`scan` 明列；`process` 預設 gate fail（或需顯式 `--allow-unknown`）。 |
+| `DEF-22` | base extractor 會刪除 stem 中間所有型別 identifier，不只 terminal suffix。 | **修**：只移除已命中的 terminal span，不再二次全 stem 過濾。 |
+| `DEF-23` | priority 同時受不可覆蓋 CE 表與 JSON key order 控制；自訂表無法真正覆蓋 CE suffix。 | **修**：凍結明示 priority，ambiguity 報錯；`--suffixes` 的 override/extend 語意分開。 |
+| `DEF-24` | 舊 Tk panel 還留著未使用且不同的分類/分組演算法，容易被誤移植。 | **修**：Rust 規格只以本節 active call chain 為準；舊函式標 deprecated/後續另票移除。 |
+
+`texproc` 預設 suffix 表仍預定以 `include_str!` 嵌入，`--suffixes <json>`
+接受現有 JSON 形狀；但 DEF-13–24 中所有建議修正均須業主先裁決，T1 才能把
+「相容」精確定義為保留資料格式，而非照抄上述缺陷。
 
 ### D-07 Resize
 
