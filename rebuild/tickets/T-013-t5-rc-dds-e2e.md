@@ -1,6 +1,6 @@
 # T-013 (T5) — texproc → RC.exe → DDS 端到端
 
-狀態：IMPLEMENTED（2026-07-25 審查：自動化 DoD 全數通過——審查者獨立實跑 run_gates 全模式，8/8 DDS、2/2 _ddna attached alpha（CRYF/EIF_AttachedAlpha 判定屬實）、RC 另產 .cryasset 正常。僅剩業主引擎內目視簽核）
+狀態：DONE（2026-07-25：自動化 DoD 全數通過 + 業主引擎內目視簽核 PASS。T5 完工，重構主線 C1–C5 / T1–T5 全數結案）
 上游文件：遷移計畫 T5 里程碑；T-007 的 RC smoke 模式
 前置：T-012。最終驗收含業主引擎內目視（不可自動化）。
 
@@ -82,11 +82,11 @@ displacement。GlassClean 另檢查 metallic 路徑沒有平坦化或破圖。
 
 ## 業主引擎內目視簽核
 
-狀態：**PENDING**。
+狀態：**PASS**（2026-07-25）。
 
 | 日期 | Engine / project | 結果 | 備註 |
 |---|---|---|---|
-| — | — | PENDING | 等待業主依上述視覺包驗收 |
+| 2026-07-25 | CryEngine 5.7.1 LTS | PASS | 業主目視簽核：無問題 |
 
 ## Gate 驗證（2026-07-25）
 
