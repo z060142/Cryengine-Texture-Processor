@@ -289,6 +289,7 @@ mod tests {
             relative_filename: filename.to_owned(),
             embedded: false,
             content_size: 0,
+            content: Vec::new(),
         }
     }
 

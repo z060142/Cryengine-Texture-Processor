@@ -28,6 +28,8 @@ pub struct TextureRef {
     pub relative_filename: String,
     pub embedded: bool,
     pub content_size: usize,
+    #[serde(skip)]
+    pub content: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -91,6 +93,7 @@ impl ConverterModel {
                             relative_filename: texture.relative_filename.to_string(),
                             embedded: !texture.content.is_empty(),
                             content_size: texture.content.len(),
+                            content: texture.content.to_vec(),
                         }
                     })
                     .collect(),

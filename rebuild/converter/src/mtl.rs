@@ -613,6 +613,7 @@ mod tests {
                         relative_filename: String::new(),
                         embedded: false,
                         content_size: 0,
+                        content: Vec::new(),
                     }],
                 })
                 .collect(),

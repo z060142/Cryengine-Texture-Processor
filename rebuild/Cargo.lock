@@ -2183,6 +2183,7 @@ dependencies = [
 name = "texproc-gui"
 version = "0.1.0"
 dependencies = [
+ "converter",
  "eframe",
  "serde_json",
  "texproc",
