@@ -2,6 +2,7 @@ use crate::{
     constants::DEFAULT_NONMETAL_REFLECTION,
     error::{Result, TexprocError},
     ops::{flip_green, gray, invert, linear_burn, normal_from_height, srgb_decode, srgb_encode},
+    output::OutputTextures,
     planar::PlanarImage,
 };
 
@@ -56,6 +57,7 @@ pub struct TextureGroup {
     pub base_name: String,
     pub sources: SourceTextures,
     pub intermediate: IntermediateTextures,
+    pub output: OutputTextures,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -468,6 +470,7 @@ mod tests {
             base_name: "sample".to_owned(),
             sources,
             intermediate: IntermediateTextures::default(),
+            output: OutputTextures::default(),
         };
         let report = process_stage1(&mut group, &IntermediateSettings::default()).unwrap();
         (group, report)
