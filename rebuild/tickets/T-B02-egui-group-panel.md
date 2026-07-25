@@ -1,6 +1,6 @@
 # T-B02 (Backlog) — egui 最小 group 檢視/指派面板
 
-狀態：IMPLEMENTED／AWAITING OWNER VISUAL SIGNOFF（2026-07-26；程式、存檔→process、release build 與 gates 已通過）
+狀態：UI/UX REWORKED／AWAITING OWNER RE-SIGNOFF（2026-07-26；核心、release build 與重做後原生 GUI 煙測已通過）
 出處：DEF-17 業主裁決——像素猜測移除後，unknown 的人工指派由 UI 承接（對應舊 PySide `texture_group_panel` 的 unknown 指派功能）。
 
 ## 範圍（最小可用）
@@ -22,8 +22,13 @@
   workspace `texproc` 只存在 GUI crate。`cargo tree -p texproc --depth 1 --locked`
   證明 `texproc` library 的依賴面未出現 eframe/egui。
 - 單視窗 UI 直接 deserialize/serialize `texproc::ScanResult`：
-  - group × 12 個 process source-type 欄位；
-  - unknown review rows與每檔下拉指派；
+  - 依舊 PySide `texture_group_panel` 回復「群組總覽 → 群組詳情 →
+    單一 unknown 指派」的 master-detail 資訊架構；
+  - 左側保留舊版 `Base Name / Detected Textures / Unknown` 三欄，並提供
+    搜尋與 `Needs review` 篩選；有 unknown 時預設只顯示待處理群組；
+  - 右側分開呈現 `Group Details` 與 `Unknown Textures`，一次只對選取的
+    unknown 做 `Set Type`；
+  - 指派完成後從待處理清單移除該組並自動前進到下一個 unknown；
   - 既有 DEF-19 diagnostics、unknown 計數與被佔用 target 的紅色衝突提示；
   - 被佔用 target 禁止靜默覆蓋；
   - 路徑輸入、拖放載入、另存路徑與 dirty `*`。
@@ -49,12 +54,18 @@
     `texproc process --groups ... --out ...` 無 `--allow-unknown` 直接成功消費，
     exit `0`，產出 `_diff.tif` 與 `_spec.tif`。
 - KB3D `Z:\enchanted\KB3DTextures\4k` scan：GUI 載入 `132 groups / 5 unknown`；
-  group/type 表格、refraction unknown review rows與下拉選項可見。
+  master-detail 群組清單、refraction unknown、下拉選項可見。
+- 業主首輪視覺驗收判定 UI/UX 與舊版差距過大；12 欄橫向矩陣已移除。
+  重做後再次以 KB3D `132 groups / 5 unknown` 原生視窗驗證：
+  - 預設 `Needs review` 只列 5 組並選取第一組；
+  - 點選第二組時右側詳情與 unknown 同步切換；
+  - `Set Type` 後計數 `5 → 4`、dirty `*` 出現、完成組退出篩選，
+    焦點自動前進到下一個待處理組。
 - `run_gates.ps1 -SkipRC`：PASS；`run_gates.ps1`：PASS。
   converter RC `0`、material alignment `16/16`；texproc RC/DDS `8/8`、
   DDNA alpha `2/2`。
 
 ## 尚待 DoD
 
-- 業主在最終 release GUI 視窗確認 KB3D group/type/unknown 操作可接受；
+- 業主在重做後 release GUI 視窗確認 KB3D group/type/unknown 操作可接受；
   簽核後才能把本票改為 CLOSED。
