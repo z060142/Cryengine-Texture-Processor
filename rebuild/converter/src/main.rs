@@ -40,6 +40,9 @@ enum Command {
         /// Optional CryEngine material override payload.
         #[arg(long)]
         overrides: Option<PathBuf>,
+        /// Directory containing processed RC-ready texture outputs.
+        #[arg(long)]
+        texture_dir: Option<PathBuf>,
         /// Destination directory for request JSON and MTL.
         #[arg(long)]
         out_dir: PathBuf,
@@ -76,12 +79,14 @@ fn run(cli: Cli) -> Result<(), String> {
             input,
             manifest,
             overrides,
+            texture_dir,
             out_dir,
         } => {
             let outputs = converter::convert_file(
                 &input,
                 manifest.as_deref(),
                 overrides.as_deref(),
+                texture_dir.as_deref(),
                 &out_dir,
             )?;
             let json = serde_json::to_string_pretty(&outputs)

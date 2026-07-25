@@ -10,6 +10,7 @@ pub mod report;
 pub mod request;
 pub mod slot_contract;
 pub mod slot_table;
+pub mod texture_resolver;
 
 use std::path::Path;
 
@@ -28,9 +29,10 @@ pub fn convert_file(
     input: &Path,
     manifest: Option<&Path>,
     overrides: Option<&Path>,
+    texture_dir: Option<&Path>,
     out_dir: &Path,
 ) -> Result<convert::ConvertOutputs, String> {
-    convert::convert_file(input, manifest, overrides, out_dir)
+    convert::convert_file(input, manifest, overrides, texture_dir, out_dir)
 }
 
 pub fn validate_file(input: &Path, out: &Path) -> Result<bool, String> {

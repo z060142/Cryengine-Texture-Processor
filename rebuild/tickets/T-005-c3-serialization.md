@@ -1,6 +1,6 @@
 # T-005 (C3) — request JSON + .mtl 序列化
 
-狀態：REOPENED（2026-07-25 審查：request 與 schema gate 收貨；MTL golden 目標錯誤（開票方責任）+ source_mtl 通道退回，見文末審查裁決）
+狀態：DONE（2026-07-25 重開 DoD 完成；正確 generated MTL golden、texture resolver、source_mtl 移除與全套回歸均通過，見文末執行結果）
 上游文件：`fbx-converter-migration.md` §2.1（後五列）、`rust-workspace-design.md` D-09/D-10、T-004 產出
 
 ## 前置閱讀
@@ -235,3 +235,84 @@ T-004/T-003 regression：
 - `material_texture_resolver` 語意有 Rust 單元測試（含 ddn alias、
   suffix 移除、多 ref 取首 basename fallback）。
 - source_mtl 通道在程式碼中不存在（grep 為證）。
+
+## 重開 DoD 執行結果（2026-07-25）
+
+本節是重開後的最終現況，**取代前文首次執行結果中以 native
+`car-reference.mtl` 及 `source_mtl` 為基礎的錯誤結論**；前文僅保留為審查歷程。
+
+### 實作
+
+- 移除 `source_mtl` 欄位、native MTL parser 與 authoritative 貼圖通道；
+  `rg -n 'source_mtl' converter/src` 結果為 no matches。
+- 新增 Rust `texture_resolver`，依 model texture refs 的第一個非空 basename
+  解析 base name、移除已知 suffix、接受 `ddna`/`ddn` normal alias，並只輸出
+  texture dir 中實際存在的處理後檔案。
+- normal 同時存在時優先 `ddna`；副檔名探測順序為 `.dds`、`.hdr`、`.tif`；
+  輸出保留磁碟上實際檔名大小寫。
+- MTL texture `File` 使用 texture dir 相對 MTL out-dir 的 forward-slash 路徑。
+  `convert` CLI 新增 `--texture-dir <PATH>`；未指定時預設為 out-dir。
+- MTL 材質屬性先套 Python exporter 的 default，再套三種既有 override 通道；
+  trailing unassigned 材質維持空 textures，不捏造 engine-white fallback。
+- resolver 單元測試涵蓋 suffix 移除、first-ref basename fallback、ddna 優先、
+  ddn alias、相對路徑幾何與 roughness compatibility alias。
+
+### 正確 golden
+
+temp 幾何：
+
+```text
+texture dir = <tmp>/t005-reopen-golden/example/car
+out-dir     = <tmp>/t005-reopen-golden/phase/rc_work
+MTL prefix  = ../../example/car
+```
+
+convert 使用 car FBX + manifest + overrides + `--texture-dir`。texture dir 依
+`car-generated-reference.mtl` 所列 processed texture basename 建立測試輸入；
+repo 內沒有新增生成檔。
+
+```text
+MTL:     fixtures/car/car-generated-reference.mtl
+         ok=true, 999 values, 0 mismatch, 0 whitelist hit
+request: fixtures/car/car-reference.request.json
+         ok=true, 171 values, 0 mismatch, 0 whitelist hit
+gate:    docs/car_direct_rc_export_mtl_schema_gate.json /gate/summary
+         ok=true, 4 values, 0 mismatch, 0 whitelist hit
+```
+
+XML 比對允許的差異只有 compact formatting 與 attribute 順序；material、
+texture 與 child 順序均有比對，語意樹零差異。
+
+### 測試與回歸
+
+```text
+cargo test --workspace --release --locked
+  ce-schema 5/5
+  converter 38/38
+  total 43/43
+
+CARGO_PROFILE_DEV_BUILD_OVERRIDE_OPT_LEVEL=3
+CARGO_TARGET_DIR=<isolated temp target>
+cargo test --workspace --locked
+  total 43/43
+
+cargo clippy --workspace --release --locked -- -D warnings
+  PASS
+
+cargo fmt --all -- --check
+  PASS
+```
+
+T-003/T-004 regression：
+
+- dump SHA-256：
+  `332F2A2ADB5DB0210797321C6F8F7ADB92AD9E94E1BC8C8543CD717049BB8FC0`
+  （與 `docs/ufbx_alignment_report.json` 完全一致）。
+- `car_direct_rc_export_material_report.json` request materials：68/68、
+  0 mismatch、0 whitelist。
+- `phase104_car_trailing_unassigned_material_report.json` request materials：
+  68/68、0 mismatch、0 whitelist。
+- `current_car_user_flow_material_slot_evidence.json` rows：68/68、
+  0 mismatch、0 whitelist。
+
+重開 DoD 全數完成；沒有把 T-B01 的 preserve-MTL-textures 工作偷渡進本票。

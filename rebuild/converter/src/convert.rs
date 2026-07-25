@@ -16,6 +16,7 @@ pub fn convert_file(
     input: &Path,
     manifest: Option<&Path>,
     overrides: Option<&Path>,
+    texture_dir: Option<&Path>,
     out_dir: &Path,
 ) -> Result<ConvertOutputs, String> {
     let model = ConverterModel::load(input)?;
@@ -35,8 +36,9 @@ pub fn convert_file(
         .map_err(|error| format!("failed to create {}: {error}", out_dir.display()))?;
     let request_path = out_dir.join(format!("{base_name}.json"));
     let mtl_path = out_dir.join(format!("{base_name}.mtl"));
+    let texture_dir = texture_dir.unwrap_or(out_dir);
     write_request(&request, &request_path)?;
-    write_mtl(&model, &request, overrides.as_ref(), &mtl_path)?;
+    write_mtl(&model, &request, overrides.as_ref(), texture_dir, &mtl_path)?;
     Ok(ConvertOutputs {
         request: request_path,
         mtl: mtl_path,

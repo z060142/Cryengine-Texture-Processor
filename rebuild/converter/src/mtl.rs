@@ -1,12 +1,13 @@
-use crate::model::{ConverterModel, MaterialRecord};
+use crate::model::ConverterModel;
 use crate::request::ImportRequest;
+use crate::texture_resolver::resolve_material_textures;
 use quick_xml::events::{BytesEnd, BytesStart, Event};
-use quick_xml::{Reader, Writer};
+use quick_xml::Writer;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const ROOT_MTL_FLAGS: &str = "524544";
 const SUB_MTL_FLAGS: &str = "524416";
@@ -31,11 +32,7 @@ pub struct MaterialOverridePayload {
     #[serde(default)]
     pub schema: Option<String>,
     #[serde(default)]
-    source_mtl: Option<String>,
-    #[serde(default)]
     material_overrides: BTreeMap<String, Value>,
-    #[serde(skip)]
-    payload_dir: PathBuf,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -51,17 +48,11 @@ struct TextureEntry {
     texmod: BTreeMap<String, String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct NativeMaterial {
-    name: String,
-    textures: Vec<TextureEntry>,
-}
-
 impl MaterialOverridePayload {
     pub fn load(path: &Path) -> Result<Self, String> {
         let json = fs::read_to_string(path)
             .map_err(|error| format!("failed to read overrides {}: {error}", path.display()))?;
-        let mut payload: Self = serde_json::from_str(&json)
+        let payload: Self = serde_json::from_str(&json)
             .map_err(|error| format!("failed to parse overrides {}: {error}", path.display()))?;
         if let Some(schema) = &payload.schema {
             if schema != "cryengine_material_overrides.v1" {
@@ -71,7 +62,6 @@ impl MaterialOverridePayload {
                 ));
             }
         }
-        payload.payload_dir = path.parent().unwrap_or_else(|| Path::new("")).to_owned();
         Ok(payload)
     }
 
@@ -112,15 +102,6 @@ impl MaterialOverridePayload {
         state.attrs.remove("Name");
         Some(state)
     }
-
-    fn source_mtl_path(&self) -> Option<PathBuf> {
-        let path = PathBuf::from(self.source_mtl.as_deref()?);
-        Some(if path.is_absolute() {
-            path
-        } else {
-            self.payload_dir.join(path)
-        })
-    }
 }
 
 fn override_sources(row: &Map<String, Value>) -> Vec<&Map<String, Value>> {
@@ -157,23 +138,15 @@ pub fn write_mtl(
     model: &ConverterModel,
     request: &ImportRequest,
     overrides: Option<&MaterialOverridePayload>,
+    texture_dir: &Path,
     out: &Path,
 ) -> Result<(), String> {
-    let native_materials = overrides
-        .and_then(MaterialOverridePayload::source_mtl_path)
-        .filter(|path| path.is_file())
-        .map(|path| parse_native_materials(&path))
-        .transpose()?
-        .unwrap_or_default();
-    let native_by_name: BTreeMap<_, _> = native_materials
-        .into_iter()
-        .map(|material| (material.name.clone(), material))
-        .collect();
     let source_by_name: BTreeMap<_, _> = model
         .materials
         .iter()
         .map(|material| (material.name.as_str(), material))
         .collect();
+    let mtl_dir = out.parent().unwrap_or_else(|| Path::new(""));
 
     let mut writer = Writer::new(Vec::new());
     write_start(
@@ -187,21 +160,25 @@ pub fn write_mtl(
     write_start(&mut writer, "SubMaterials", &[])?;
 
     for material in &request.materials {
-        let textures = native_by_name
-            .get(&material.name)
-            .map(|native| native.textures.clone())
-            .unwrap_or_else(|| {
-                source_by_name.get(material.name.as_str()).map_or_else(
-                    || fallback_placeholder_textures(&material.name),
-                    |source| fallback_source_textures(source),
-                )
-            });
+        let textures: Vec<TextureEntry> = source_by_name
+            .get(material.name.as_str())
+            .map(|source| {
+                resolve_material_textures(source, texture_dir, mtl_dir)
+                    .into_iter()
+                    .map(|texture| TextureEntry {
+                        map: texture.ce_map,
+                        file: texture.mtl_file,
+                        texmod: default_texmod(),
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         let fallback_policy = fallback_shader_policy(&textures);
         let override_state = overrides.and_then(|payload| payload.state(&material.name));
-        let mut attrs = override_state
-            .as_ref()
-            .map(|state| state.attrs.clone())
-            .unwrap_or_else(default_material_attrs);
+        let mut attrs = default_material_attrs();
+        if let Some(state) = &override_state {
+            attrs.extend(state.attrs.clone());
+        }
         if !attrs.contains_key("GenMask") || !attrs.contains_key("StringGenMask") {
             attrs
                 .entry("GenMask".to_owned())
@@ -314,85 +291,6 @@ fn fallback_shader_policy(textures: &[TextureEntry]) -> (String, String, BTreeMa
     (gen_mask, string_gen_mask, public_params)
 }
 
-fn fallback_source_textures(material: &MaterialRecord) -> Vec<TextureEntry> {
-    let props: Vec<_> = material
-        .textures
-        .iter()
-        .map(|texture| texture.material_prop.to_ascii_lowercase())
-        .collect();
-    let channels = [
-        (
-            "diffuse",
-            "diff",
-            props.iter().any(|prop| prop == "diffusecolor"),
-        ),
-        (
-            "normal",
-            "ddna",
-            props.iter().any(|prop| prop == "normalmap"),
-        ),
-        (
-            "specular",
-            "spec",
-            props
-                .iter()
-                .any(|prop| prop == "reflectionfactor" || prop == "shininessexponent"),
-        ),
-        (
-            "displacement",
-            "displ",
-            props.iter().any(|prop| prop == "shininessexponent"),
-        ),
-        (
-            "opacity",
-            "opacity",
-            props.iter().any(|prop| prop == "transparencyfactor"),
-        ),
-        (
-            "emissive",
-            "emissive",
-            props.iter().any(|prop| prop == "emissivecolor"),
-        ),
-    ];
-    channels
-        .into_iter()
-        .filter(|(_, _, present)| *present)
-        .filter_map(|(texture_type, output_key, _)| {
-            let policy = ce_schema::ce_texture_map(texture_type)?;
-            policy.exported.then(|| TextureEntry {
-                map: policy.ce_map_type.clone(),
-                file: format!(
-                    "./{}{}.dds",
-                    material.name,
-                    ce_schema::texture_suffix(output_key, output_key == "ddna")
-                ),
-                texmod: default_texmod(),
-            })
-        })
-        .collect()
-}
-
-fn fallback_placeholder_textures(name: &str) -> Vec<TextureEntry> {
-    if !matches!(
-        name.to_ascii_lowercase().as_str(),
-        "unassigned" | "<unassigned>"
-    ) {
-        return Vec::new();
-    }
-    vec![
-        TextureEntry {
-            map: "Diffuse".to_owned(),
-            file: "%ENGINE%/EngineAssets/Textures/white.dds".to_owned(),
-            texmod: default_texmod(),
-        },
-        TextureEntry {
-            map: "Bumpmap".to_owned(),
-            file: "%ENGINE%/EngineAssets/Textures/white_ddn.dds".to_owned(),
-            texmod: default_texmod(),
-        },
-    ]
-}
-
 fn default_texmod() -> BTreeMap<String, String> {
     ce_schema::texmod_table()["attributes"]
         .as_object()
@@ -405,91 +303,6 @@ fn default_texmod() -> BTreeMap<String, String> {
                 .collect()
         })
         .unwrap_or_default()
-}
-
-fn parse_native_materials(path: &Path) -> Result<Vec<NativeMaterial>, String> {
-    let mut reader = Reader::from_file(path)
-        .map_err(|error| format!("failed to read source MTL {}: {error}", path.display()))?;
-    reader.config_mut().trim_text(true);
-    let mut buffer = Vec::new();
-    let mut in_submaterials = false;
-    let mut current_material: Option<NativeMaterial> = None;
-    let mut current_texture: Option<TextureEntry> = None;
-    let mut materials = Vec::new();
-
-    loop {
-        match reader.read_event_into(&mut buffer) {
-            Ok(Event::Start(event)) if event.name().as_ref() == b"SubMaterials" => {
-                in_submaterials = true;
-            }
-            Ok(Event::End(event)) if event.name().as_ref() == b"SubMaterials" => {
-                in_submaterials = false;
-            }
-            Ok(Event::Start(event)) if in_submaterials && event.name().as_ref() == b"Material" => {
-                let attrs = read_attrs(&event)?;
-                current_material = Some(NativeMaterial {
-                    name: attrs.get("Name").cloned().unwrap_or_default(),
-                    textures: Vec::new(),
-                });
-            }
-            Ok(Event::End(event)) if in_submaterials && event.name().as_ref() == b"Material" => {
-                if let Some(material) = current_material.take() {
-                    materials.push(material);
-                }
-            }
-            Ok(Event::Start(event))
-                if current_material.is_some() && event.name().as_ref() == b"Texture" =>
-            {
-                let attrs = read_attrs(&event)?;
-                current_texture = Some(TextureEntry {
-                    map: attrs.get("Map").cloned().unwrap_or_default(),
-                    file: attrs.get("File").cloned().unwrap_or_default(),
-                    texmod: BTreeMap::new(),
-                });
-            }
-            Ok(Event::Empty(event))
-                if current_texture.is_some() && event.name().as_ref() == b"TexMod" =>
-            {
-                if let Some(texture) = &mut current_texture {
-                    texture.texmod = read_attrs(&event)?;
-                }
-            }
-            Ok(Event::End(event))
-                if current_material.is_some() && event.name().as_ref() == b"Texture" =>
-            {
-                if let (Some(material), Some(texture)) =
-                    (&mut current_material, current_texture.take())
-                {
-                    material.textures.push(texture);
-                }
-            }
-            Ok(Event::Eof) => break,
-            Ok(_) => {}
-            Err(error) => {
-                return Err(format!(
-                    "failed to parse source MTL {}: {error}",
-                    path.display()
-                ));
-            }
-        }
-        buffer.clear();
-    }
-    Ok(materials)
-}
-
-fn read_attrs(event: &BytesStart<'_>) -> Result<BTreeMap<String, String>, String> {
-    event
-        .attributes()
-        .map(|attribute| {
-            let attribute = attribute.map_err(|error| format!("invalid XML attribute: {error}"))?;
-            let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
-            let value = attribute
-                .normalized_value(quick_xml::XmlVersion::Implicit1_0)
-                .map_err(|error| format!("invalid XML attribute value: {error}"))?
-                .into_owned();
-            Ok((key, value))
-        })
-        .collect()
 }
 
 fn write_start(
@@ -581,24 +394,10 @@ mod tests {
     }
 
     #[test]
-    fn fallback_paths_use_ce_schema_suffix_and_map_tables() {
-        let material = MaterialRecord {
-            name: "Stone".to_owned(),
-            typed_id: 0,
-            element_id: 0,
-            textures: vec![crate::model::TextureRef {
-                material_prop: "NormalMap".to_owned(),
-                shader_prop: "NormalMap".to_owned(),
-                filename: "stone_normal.png".to_owned(),
-                absolute_filename: String::new(),
-                relative_filename: String::new(),
-                embedded: false,
-                content_size: 0,
-            }],
-        };
-        let textures = fallback_source_textures(&material);
-        assert_eq!(textures[0].map, "Bumpmap");
-        assert_eq!(textures[0].file, "./Stone_ddna.dds");
-        assert_eq!(textures[0].texmod["TexMod_RotateType"], "0");
+    fn texture_modifier_defaults_are_loaded_from_ce_schema() {
+        let texmod = default_texmod();
+        assert_eq!(texmod["TexMod_RotateType"], "0");
+        assert_eq!(texmod["TexMod_TexGenType"], "0");
+        assert_eq!(texmod["TexMod_bTexGenProjected"], "0");
     }
 }
