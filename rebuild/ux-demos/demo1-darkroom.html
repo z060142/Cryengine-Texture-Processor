@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暗房 — 貼圖沖印</title>
+<style>
+  :root{
+    --bg:#141010; --bg2:#1c1614; --paper:#efe7d8; --paper-edge:#d8cdb8;
+    --amber:#ff7a2e; --amber-soft:#ffb066; --red:#e84a3c; --ink:#2a221c;
+    --glow:rgba(255,122,46,.35);
+    font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 70% -10%, #2a1a12 0%, transparent 60%),
+      radial-gradient(900px 600px at 10% 110%, #241512 0%, transparent 55%),
+      var(--bg);
+    color:var(--paper); overflow-x:hidden; min-width:1180px;
+  }
+  /* ambient darkroom safelight */
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(1000px 800px at 85% 8%, rgba(232,74,60,.10), transparent 70%);
+    mix-blend-mode:screen;
+  }
+
+  /* ---------- drop zone (state 0) ---------- */
+  #drop{
+    position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center;
+    transition:opacity .5s ease, visibility .5s;
+  }
+  #drop.hide{opacity:0; visibility:hidden}
+  .dropbox{
+    width:640px; height:380px; border-radius:26px; cursor:pointer;
+    border:2px dashed rgba(255,176,102,.45);
+    background:linear-gradient(180deg, rgba(40,26,18,.6), rgba(20,14,12,.6));
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+    box-shadow:inset 0 0 80px rgba(255,122,46,.06), 0 30px 80px rgba(0,0,0,.5);
+    transition:transform .25s ease, border-color .25s, box-shadow .25s;
+  }
+  .dropbox:hover,.dropbox.drag{
+    transform:translateY(-4px) scale(1.01); border-color:var(--amber);
+    box-shadow:inset 0 0 120px rgba(255,122,46,.14), 0 40px 100px rgba(0,0,0,.55);
+  }
+  .lens{
+    width:110px; height:110px; border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, #ffd7a8, #ff7a2e 45%, #7a2c12 100%);
+    box-shadow:0 0 0 10px rgba(255,122,46,.08), 0 0 60px var(--glow);
+    position:relative;
+  }
+  .lens::after{content:"";position:absolute;inset:26px;border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, rgba(255,255,255,.65), transparent 55%);}
+  .dropbox h1{font-size:26px; font-weight:600; letter-spacing:2px; color:var(--paper)}
+  .dropbox p{color:#b8a78f; font-size:15px}
+  .shimmer{display:none; width:260px; height:6px; border-radius:3px; overflow:hidden;
+    background:rgba(255,255,255,.08)}
+  .shimmer.on{display:block}
+  .shimmer i{display:block; width:40%; height:100%; border-radius:3px;
+    background:linear-gradient(90deg,transparent,var(--amber),transparent);
+    animation:sweep 1s linear infinite}
+  @keyframes sweep{from{transform:translateX(-120%)}to{transform:translateX(320%)}}
+
+  /* ---------- workspace (state 1) ---------- */
+  #stage{position:relative; z-index:1; opacity:0; transition:opacity .6s ease .1s; padding:26px 46px 160px}
+  #stage.show{opacity:1}
+  .topbar{display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:26px}
+  .brand{display:flex; align-items:center; gap:14px}
+  .brand .dot{width:34px;height:34px;border-radius:50%;
+    background:radial-gradient(circle at 38% 34%, #ffd7a8, #ff7a2e 55%, #7a2c12);
+    box-shadow:0 0 22px var(--glow)}
+  .brand b{font-size:19px; font-weight:600; letter-spacing:1px}
+  .brand span{display:block; font-size:12.5px; color:#9c8b74; margin-top:2px}
+
+  .presets{display:flex; gap:10px}
+  .chip{
+    border:1px solid rgba(255,176,102,.28); background:rgba(255,255,255,.03);
+    color:#cbb89d; padding:9px 16px; border-radius:20px; font-size:13.5px; cursor:pointer;
+    transition:all .2s ease; user-select:none;
+  }
+  .chip:hover{border-color:var(--amber-soft); color:var(--paper); transform:translateY(-1px)}
+  .chip.on{
+    background:linear-gradient(180deg, rgba(255,122,46,.9), rgba(200,70,30,.9));
+    color:#fff; border-color:transparent; box-shadow:0 6px 18px var(--glow)}
+
+  .counter{display:flex; align-items:baseline; gap:8px; margin:2px 0 22px}
+  .counter b{font-size:40px; font-weight:700; color:var(--amber-soft);
+    text-shadow:0 0 24px var(--glow)}
+  .counter span{font-size:15px; color:#9c8b74}
+  .counter em{font-style:normal; color:var(--amber); margin-left:14px; font-size:14px}
+
+  /* card grid */
+  .grid{display:grid; grid-template-columns:repeat(4, 240px); gap:38px 40px; justify-content:start}
+
+  .stack{position:relative; width:240px; height:296px; perspective:1200px; cursor:pointer}
+  /* the piled paper behind */
+  .stack::before,.stack::after{
+    content:""; position:absolute; inset:0; top:8px; border-radius:14px;
+    background:var(--paper-edge); box-shadow:0 10px 26px rgba(0,0,0,.5);
+    transition:transform .3s ease;
+  }
+  .stack::before{transform:rotate(-3deg) translateY(6px)}
+  .stack::after{transform:rotate(2.5deg) translateY(3px)}
+  .stack:hover::before{transform:rotate(-5deg) translateY(2px)}
+  .stack:hover::after{transform:rotate(4.5deg) translateY(1px)}
+
+  .card{
+    position:absolute; inset:0; border-radius:14px; transform-style:preserve-3d;
+    transition:transform .55s cubic-bezier(.4,.05,.2,1);
+  }
+  .stack:hover .card{transform:translateY(-10px)}
+  .stack.flip .card{transform:rotateY(180deg) translateY(-4px)}
+
+  .face{
+    position:absolute; inset:0; border-radius:14px; backface-visibility:hidden;
+    background:var(--paper); padding:12px 12px 0;
+    box-shadow:0 16px 34px rgba(0,0,0,.5), inset 0 0 0 1px rgba(0,0,0,.04);
+    display:flex; flex-direction:column;
+  }
+  /* polaroid photo window */
+  .photo{
+    height:196px; border-radius:6px; position:relative; overflow:hidden;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.12);
+    /* dark until developed */
+    transition:filter 1.1s ease, opacity 1.1s ease;
+    filter:brightness(.14) saturate(.3);
+  }
+  .photo.dev{filter:brightness(1) saturate(1)}
+  .photo::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(160deg, rgba(255,255,255,.22), transparent 40%);}
+  .caption{padding:12px 4px 0; flex:1}
+  .caption .name{color:var(--ink); font-size:13.5px; font-weight:600; letter-spacing:.3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .caption .meta{color:#8a7a63; font-size:11.5px; margin-top:3px; display:flex; justify-content:space-between}
+
+  /* unknown orange dot */
+  .udot{
+    position:absolute; top:-6px; right:-6px; width:20px; height:20px; border-radius:50%; z-index:5;
+    background:radial-gradient(circle at 38% 34%, #ffd08a, var(--amber) 60%, #b23b12);
+    box-shadow:0 0 0 4px rgba(20,16,16,.9), 0 0 16px var(--amber);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(20,16,16,.9),0 0 6px var(--amber)}
+    50%{box-shadow:0 0 0 4px rgba(20,16,16,.9),0 0 20px var(--amber),0 0 34px var(--glow)}}
+
+  /* back face = type picker */
+  .back{transform:rotateY(180deg); background:linear-gradient(180deg,#efe7d8,#e3d8c2);
+    justify-content:flex-start; padding:16px 14px}
+  .back .q{color:var(--ink); font-size:13px; font-weight:600; text-align:center; margin-bottom:4px}
+  .back .fname{color:#8a7a63; font-size:11px; text-align:center; margin-bottom:12px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .picker{display:grid; grid-template-columns:repeat(4,1fr); gap:8px}
+  .ptype{
+    display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 2px 6px;
+    border-radius:9px; background:rgba(42,34,28,.05); cursor:pointer;
+    border:1px solid transparent; transition:all .16s ease;
+  }
+  .ptype:hover{background:rgba(255,122,46,.14); border-color:var(--amber); transform:translateY(-2px)}
+  .ptype svg{width:24px; height:24px}
+  .ptype small{color:var(--ink); font-size:10.5px}
+
+  /* fbx card is visually distinct: film strip */
+  .stack.fbx .face{background:#20130c;}
+  .stack.fbx .photo{filter:brightness(.14)}
+  .stack.fbx .photo.dev{filter:brightness(1)}
+  .stack.fbx .caption .name{color:var(--amber-soft)}
+  .stack.fbx .caption .meta{color:#a88a6a}
+  .filmstrip{position:absolute; inset:0;
+    background:
+      repeating-linear-gradient(90deg, #0000 0 26px, #00000055 26px 34px),
+      linear-gradient(135deg,#3a2418,#61371c 40%,#3a2418);
+  }
+  .filmstrip .sprock{position:absolute; left:6px; right:6px; height:8px;
+    background:repeating-linear-gradient(90deg,#00000088 0 8px,transparent 8px 20px)}
+  .filmstrip .sprock.t{top:6px} .filmstrip .sprock.b{bottom:6px}
+  .fbxbadge{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#ffcf9e; font-size:14px; font-weight:600; letter-spacing:3px; text-shadow:0 2px 6px #000}
+
+  /* develop sweep line */
+  .sweepline{position:absolute; left:-40px; top:0; bottom:0; width:60px; z-index:6; opacity:0;
+    background:linear-gradient(90deg,transparent,rgba(255,122,46,.55),transparent);
+    filter:blur(2px)}
+  .stack.developing .sweepline{opacity:1; animation:passdown 1.1s ease forwards}
+  @keyframes passdown{from{left:-60px}to{left:110%}}
+
+  /* ---------- bottom bar ---------- */
+  .dock{position:fixed; left:0; right:0; bottom:0; z-index:20; height:150px; pointer-events:none;
+    background:linear-gradient(0deg, rgba(10,7,6,.92) 20%, transparent);
+    display:flex; align-items:center; justify-content:center}
+  .dock.hidden{display:none}
+  .developbtn{
+    pointer-events:auto; width:104px; height:104px; border-radius:50%; border:none; cursor:pointer;
+    background:radial-gradient(circle at 40% 34%, #ff9a52, var(--amber) 55%, #b23b12);
+    color:#fff; font-size:19px; font-weight:700; letter-spacing:3px;
+    box-shadow:0 0 0 8px rgba(255,122,46,.12), 0 14px 40px var(--glow);
+    transition:transform .18s ease, box-shadow .18s;
+  }
+  .developbtn:hover{transform:translateY(-4px) scale(1.04);
+    box-shadow:0 0 0 10px rgba(255,122,46,.16), 0 20px 54px var(--glow)}
+  .developbtn:active{transform:scale(.97)}
+  .developbtn:disabled{opacity:.5; cursor:default; transform:none;
+    background:radial-gradient(circle at 40% 34%,#7a6b5a,#4a3f34)}
+
+  .fbxdrop{
+    pointer-events:auto; position:absolute; right:46px; bottom:44px;
+    display:flex; align-items:center; gap:10px; padding:12px 18px; border-radius:14px;
+    border:1px dashed rgba(255,176,102,.4); background:rgba(30,20,14,.7); cursor:pointer;
+    color:#cbb89d; font-size:13.5px; transition:all .2s;
+  }
+  .fbxdrop:hover{border-color:var(--amber); color:var(--paper); transform:translateY(-2px)}
+  .fbxdrop.gone{opacity:.35; pointer-events:none}
+  .fbxdrop svg{width:22px;height:22px}
+
+  .progwrap{pointer-events:none; position:absolute; left:46px; bottom:56px; width:340px;
+    opacity:0; transition:opacity .3s}
+  .progwrap.on{opacity:1}
+  .progwrap .lbl{font-size:12.5px; color:#b8a78f; margin-bottom:7px; letter-spacing:.5px}
+  .progbar{height:7px; border-radius:4px; background:rgba(255,255,255,.09); overflow:hidden}
+  .progbar i{display:block; height:100%; width:0; border-radius:4px;
+    background:linear-gradient(90deg,var(--amber-soft),var(--amber)); transition:width .35s ease;
+    box-shadow:0 0 14px var(--glow)}
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:44px; transform:translate(-50%,140%); z-index:60;
+    display:flex; align-items:center; gap:18px; padding:16px 22px; border-radius:16px;
+    background:linear-gradient(180deg,#20160f,#160f0b); border:1px solid rgba(255,176,102,.3);
+    box-shadow:0 20px 60px rgba(0,0,0,.6), 0 0 40px rgba(255,122,46,.12);
+    transition:transform .5s cubic-bezier(.2,.8,.2,1);
+  }
+  .toast.show{transform:translate(-50%,0)}
+  .toast .ok{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 40% 34%,#7ee08a,#2fae4a);color:#fff;font-size:20px}
+  .toast b{font-size:15.5px;color:var(--paper)}
+  .toast span{display:block;font-size:12.5px;color:#9c8b74;margin-top:2px}
+  .toast .open{margin-left:8px; padding:9px 16px; border-radius:10px; border:none; cursor:pointer;
+    background:linear-gradient(180deg,var(--amber),#c8461e); color:#fff; font-size:13.5px; font-weight:600}
+  .toast .open:hover{filter:brightness(1.08)}
+
+  .hint{text-align:center;color:#7a6b5a;font-size:12.5px;margin-top:6px;letter-spacing:.5px}
+</style>
+</head>
+<body>
+
+<!-- STATE 0 : drop zone -->
+<div id="drop">
+  <div class="dropbox" id="dropbox">
+    <div class="lens"></div>
+    <h1 id="dropTitle">把素材丟進暗房</h1>
+    <p id="dropSub">拖進來，或點一下開始沖印</p>
+    <div class="shimmer" id="shimmer"><i></i></div>
+  </div>
+</div>
+
+<!-- STATE 1 : workspace -->
+<div id="stage">
+  <div class="topbar">
+    <div class="brand">
+      <div class="dot"></div>
+      <div><b>暗房</b><span>把底片丟進去，取件</span></div>
+    </div>
+    <div class="presets" id="presets">
+      <div class="chip on" data-p="遊戲資產">遊戲資產</div>
+      <div class="chip" data-p="高精度">高精度</div>
+      <div class="chip" data-p="快速預覽">快速預覽</div>
+    </div>
+  </div>
+
+  <div class="counter">
+    <b id="total">132</b><span>組素材已就緒</span>
+    <em id="unknownNote">· 5 疊有問題，點開角落亮橘點指認</em>
+  </div>
+
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- bottom dock -->
+<div class="dock hidden" id="dock">
+  <div class="progwrap" id="progwrap">
+    <div class="lbl" id="progLbl">顯影中…</div>
+    <div class="progbar"><i id="progFill"></i></div>
+  </div>
+  <button class="developbtn" id="developBtn">沖洗</button>
+  <div class="fbxdrop" id="fbxdrop">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ffb066" stroke-width="1.8"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>
+    car.fbx · 拖進來一起沖
+  </div>
+</div>
+
+<!-- toast -->
+<div class="toast" id="toast">
+  <div class="ok">✓</div>
+  <div><b id="toastTitle">完成 132 組</b><span>已輸出到來源旁的 _cryengine/</span></div>
+  <button class="open" id="openFolder">開啟資料夾</button>
+</div>
+
+<script>
+/* ---------- fake dataset (DESIGNS.md 共用假資料) ---------- */
+// two-tone basecolor-ish gradient per group
+const groups = [
+  {n:"KB3D_ENC_AtlasA",          f:7, g:["#8a6a4a","#3a2a1c"]},
+  {n:"KB3D_ENC_GlassClean",      f:6, u:true, g:["#bfe6ea","#4a7d86"]},
+  {n:"KB3D_ENC_Water",           f:5, u:true, g:["#3f7fa8","#123246"]},
+  {n:"KB3D_ENC_StainedGlassGreen",f:6,u:true, g:["#7fbf5a","#1e4a24"]},
+  {n:"KB3D_ENC_StainedGlassMulti",f:8,u:true, g:["#c85a9a","#3a2a7a"]},
+  {n:"KB3D_ENC_GlassFrosted",    f:5, u:true, g:["#d4dbe0","#6a7076"]},
+  {n:"KB3D_ENC_ConcreteWall",    f:6, g:["#9a938a","#3f3b36"]},
+  {n:"KB3D_ENC_MetalPanel",      f:7, g:["#b8bcc2","#43484f"]},
+  {n:"KB3D_ENC_BrickWall",       f:6, g:["#b0563a","#3f1f16"]},
+  {n:"KB3D_ENC_WoodPlank",       f:5, g:["#a9743f","#4a2f18"]},
+  {n:"KB3D_ENC_RustedPipe",      f:6, g:["#a5623a","#3a251a"]},
+  {n:"KB3D_ENC_NeonSign",        f:4, g:["#ff5ea8","#2a0f3a"]},
+];
+
+// icon-based type picker (icons + tiny labels, no jargon words like glossiness)
+const types = [
+  {k:"顏色",  ic:'<circle cx="12" cy="12" r="8" fill="url(#g)"/><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a2e"/><stop offset="1" stop-color="#3a7bd5"/></linearGradient></defs>'},
+  {k:"法線",  ic:'<rect x="4" y="4" width="16" height="16" rx="3" fill="#8f9bff"/><path d="M12 7v10M7 12h10" stroke="#2a2f6a" stroke-width="1.6"/>'},
+  {k:"粗糙",  ic:'<circle cx="12" cy="12" r="8" fill="#c9c2b6"/><circle cx="9" cy="10" r="1.2" fill="#7a7266"/><circle cx="14" cy="9" r="1" fill="#7a7266"/><circle cx="12" cy="14" r="1.3" fill="#7a7266"/><circle cx="15" cy="14" r="1" fill="#7a7266"/>'},
+  {k:"金屬",  ic:'<circle cx="12" cy="12" r="8" fill="#c0c4ca"/><path d="M6 12a6 6 0 0 1 12 0" fill="#eef0f3"/><path d="M6 12a6 6 0 0 0 12 0" fill="#8b9199"/>'},
+  {k:"高度",  ic:'<path d="M4 18h16M4 18l4-9 3 5 3-8 6 12" fill="none" stroke="#6a7078" stroke-width="1.8"/>'},
+  {k:"透明",  ic:'<rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke="#79c6d0" stroke-width="1.6"/><path d="M4 12h16M12 4v16" stroke="#79c6d0" stroke-width="1"/><rect x="4" y="4" width="8" height="8" fill="#79c6d033"/>'},
+  {k:"自發光",ic:'<circle cx="12" cy="12" r="4" fill="#ffcf5a"/><g stroke="#ffcf5a" stroke-width="1.6"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M6 6l2 2M16 16l2 2M18 6l-2 2M8 16l-2 2"/></g>'},
+];
+
+/* ---------- DOM refs ---------- */
+const $=s=>document.querySelector(s);
+const grid=$("#grid"), stage=$("#stage"), drop=$("#drop");
+let unknownLeft = groups.filter(g=>g.u).length; // 5
+let fbxAdded=false, developed=false;
+
+/* ---------- build one stack card ---------- */
+function makeCard(g){
+  const el=document.createElement("div");
+  el.className="stack"+(g.fbx?" fbx":"");
+  const cover = g.fbx
+    ? `<div class="filmstrip"><div class="sprock t"></div><div class="sprock b"></div></div><div class="fbxbadge">FBX</div>`
+    : `<div style="position:absolute;inset:0;background:linear-gradient(150deg,${g.g[0]},${g.g[1]})"></div>`;
+  const picker = types.map(t=>
+    `<div class="ptype" data-t="${t.k}"><svg viewBox="0 0 24 24">${t.ic}</svg><small>${t.k}</small></div>`).join("");
+  el.innerHTML=`
+    ${g.u?'<div class="udot" title="有一個未指認的檔案"></div>':''}
+    <div class="sweepline"></div>
+    <div class="card">
+      <div class="face front">
+        <div class="photo">${cover}</div>
+        <div class="caption">
+          <div class="name">${g.n}</div>
+          <div class="meta"><span>${g.fbx?'16 材質':g.f+' 張圖'}</span><span>${g.fbx?'材質底片':'一疊'}</span></div>
+        </div>
+      </div>
+      <div class="face back">
+        <div class="q">這一張是什麼？</div>
+        <div class="fname">${g.fbx?'&lt;unassigned&gt; 材質槽':'refraction_01.png'}</div>
+        <div class="picker">${picker}</div>
+      </div>
+    </div>`;
+
+  // flip only when it has an unknown to resolve
+  el.addEventListener("click",e=>{
+    if(el.classList.contains("developing")) return;
+    if(e.target.closest(".ptype")){
+      const chosen=e.target.closest(".ptype").dataset.t;
+      el.classList.remove("flip");
+      const dot=el.querySelector(".udot"); if(dot) dot.remove();
+      g.u=false; unknownLeft--; updateUnknownNote();
+      // brief confirm flash on caption
+      const nm=el.querySelector(".name"); const old=nm.textContent;
+      nm.textContent="已指認為 "+chosen; nm.style.color="#2fae4a";
+      setTimeout(()=>{nm.textContent=old; nm.style.color="";},1100);
+      return;
+    }
+    if(g.u) el.classList.toggle("flip");
+  });
+  return el;
+}
+
+function render(){ grid.innerHTML=""; groups.forEach(g=>grid.appendChild(makeCard(g))); }
+function updateUnknownNote(){
+  const note=$("#unknownNote");
+  note.textContent = unknownLeft>0 ? `· ${unknownLeft} 疊有問題，點開角落亮橘點指認` : "· 全部指認完成，可以沖洗了";
+  note.style.color = unknownLeft>0 ? "" : "#7ee08a";
+}
+
+/* ---------- state 0 -> 1 : import ---------- */
+const dropbox=$("#dropbox");
+function startImport(){
+  if(dropbox.dataset.busy) return; dropbox.dataset.busy=1;
+  $("#dropTitle").textContent="沖印中…";
+  $("#dropSub").textContent="正在讀取素材與自動分組";
+  $("#shimmer").classList.add("on");
+  setTimeout(()=>{
+    drop.classList.add("hide");
+    stage.classList.add("show");
+    $("#dock").classList.remove("hidden");
+    render(); updateUnknownNote();
+  },1400);
+}
+dropbox.addEventListener("click",startImport);
+["dragover","dragenter"].forEach(ev=>dropbox.addEventListener(ev,e=>{e.preventDefault();dropbox.classList.add("drag")}));
+["dragleave","drop"].forEach(ev=>dropbox.addEventListener(ev,e=>{e.preventDefault();dropbox.classList.remove("drag")}));
+dropbox.addEventListener("drop",startImport);
+
+/* ---------- presets ---------- */
+$("#presets").addEventListener("click",e=>{
+  const c=e.target.closest(".chip"); if(!c) return;
+  $("#presets").querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));
+  c.classList.add("on");
+});
+
+/* ---------- FBX chip ---------- */
+const fbxdrop=$("#fbxdrop");
+function addFbx(){
+  if(fbxAdded) return; fbxAdded=true;
+  fbxdrop.classList.add("gone"); fbxdrop.textContent="car.fbx 已加入 →";
+  groups.push({n:"car.fbx", f:16, fbx:true, g:["#3a2418","#61371c"]});
+  render(); updateUnknownNote();
+  const last=grid.lastElementChild;
+  last.animate([{transform:"translateY(30px) scale(.9)",opacity:0},{transform:"none",opacity:1}],{duration:420,easing:"cubic-bezier(.2,.8,.2,1)"});
+}
+fbxdrop.addEventListener("click",addFbx);
+["dragover"].forEach(ev=>fbxdrop.addEventListener(ev,e=>e.preventDefault()));
+fbxdrop.addEventListener("drop",e=>{e.preventDefault();addFbx()});
+
+/* ---------- develop (沖洗) ---------- */
+$("#developBtn").addEventListener("click",develop);
+function develop(){
+  if(developed) return;
+  const btn=$("#developBtn"); btn.disabled=true; btn.textContent="…";
+  const stacks=[...grid.querySelectorAll(".stack")];
+  const total=groups.length;
+  const pw=$("#progwrap"), fill=$("#progFill"), lbl=$("#progLbl");
+  pw.classList.add("on");
+
+  let i=0;
+  const step=()=>{
+    if(i>0){ // finish previous
+      const prev=stacks[i-1]; prev.classList.remove("developing");
+      prev.querySelector(".photo").classList.add("dev");
+    }
+    if(i>=stacks.length){
+      fill.style.width="100%"; lbl.textContent="沖洗完成";
+      finish(); return;
+    }
+    const s=stacks[i];
+    s.classList.remove("flip"); s.classList.add("developing");
+    lbl.textContent=`顯影中… ${i+1}/${total}`;
+    fill.style.width=Math.round((i+1)/stacks.length*100)+"%";
+    i++;
+    setTimeout(step, 260);
+  };
+  step();
+}
+
+function finish(){
+  developed=true;
+  $("#toastTitle").textContent=`完成 ${$("#total").textContent} 組`+(fbxAdded?" + 1 材質":"");
+  const t=$("#toast"); t.classList.add("show");
+  setTimeout(()=>{ /* leave it up */ },10);
+}
+$("#openFolder").addEventListener("click",()=>{
+  const t=$("#toast");
+  t.querySelector("b").textContent="已開啟 _cryengine/ 資料夾";
+  t.querySelector(".open").textContent="✓";
+  setTimeout(()=>t.classList.remove("show"),1200);
+});
+</script>
+</body>
+</html>

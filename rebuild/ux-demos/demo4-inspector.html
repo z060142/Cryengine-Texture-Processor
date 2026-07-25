@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>案 4 檢核站 — texproc inspector</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#fff; --line:#d6dae0; --line2:#e6e9ee;
+    --ink:#1c2128; --dim:#6a737d; --mono:#24292f;
+    --accent:#0b62d6; --accent-bg:#e7f0fd;
+    --warn:#8a6d00; --warn-bg:#fff6d6; --warn-line:#e8cf6b;
+    --err:#a01722; --err-bg:#fde8ea; --err-line:#e79aa2;
+    --ok:#137a3d; --run:#0b62d6;
+    --mfont:"Cascadia Code","Consolas","SFMono-Regular",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font:13px/1.45 "Segoe UI",system-ui,sans-serif;min-width:1280px}
+  code,.mono,td.m,.json{font-family:var(--mfont)}
+  button{font:inherit;cursor:pointer}
+  /* ---- top bar ---- */
+  header{display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:14px;margin:0;font-weight:600;letter-spacing:.02em}
+  header .badge{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:3px;padding:1px 6px}
+  .srctabs{margin-left:auto;display:flex;gap:2px}
+  .srctabs button{background:none;border:1px solid var(--line);border-bottom:none;border-radius:4px 4px 0 0;padding:6px 14px;color:var(--dim);margin-bottom:-9px}
+  .srctabs button.on{background:var(--bg);color:var(--ink);font-weight:600;border-color:var(--line)}
+  /* ---- process strip ---- */
+  .strip{display:flex;align-items:stretch;background:var(--panel);border-bottom:1px solid var(--line);padding:0 16px}
+  .strip .stg{display:flex;align-items:center;gap:8px;padding:10px 20px 10px 16px;color:var(--dim);position:relative;border:none;background:none}
+  .strip .stg .n{width:20px;height:20px;border-radius:50%;background:var(--line2);color:var(--dim);display:grid;place-items:center;font-size:12px;font-weight:700}
+  .strip .stg.on{color:var(--ink);font-weight:600}
+  .strip .stg.on .n{background:var(--accent);color:#fff}
+  .strip .stg.done .n{background:var(--ok);color:#fff}
+  .strip .stg:not(:last-child)::after{content:"→";margin-left:14px;color:var(--line);font-weight:400}
+  .strip .stg small{color:var(--dim);font-weight:400}
+  /* ---- layout ---- */
+  .wrap{display:flex;align-items:flex-start;gap:0}
+  aside{width:280px;flex:none;background:var(--panel);border-right:1px solid var(--line);padding:12px 14px;height:calc(100vh - 88px);overflow:auto}
+  .json-col{width:330px;flex:none;background:#fbfcfd;border-right:1px solid var(--line);height:calc(100vh - 88px);display:flex;flex-direction:column}
+  main{flex:1;min-width:0;height:calc(100vh - 88px);overflow:auto;padding:14px 16px}
+  h2.sec{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:2px 0 10px;font-weight:600}
+  /* ---- settings form ---- */
+  .fld{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line2)}
+  .fld label{color:var(--mono);font-family:var(--mfont);font-size:11.5px}
+  .fld input[type=number],.fld select{font-family:var(--mfont);font-size:11.5px;border:1px solid var(--line);border-radius:3px;padding:2px 4px;background:#fff;width:96px;text-align:right}
+  .fld input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+  .subhdr{margin:12px 0 4px;font-family:var(--mfont);font-size:11px;color:var(--dim)}
+  .tt{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px 8px}
+  .tt label{display:flex;align-items:center;gap:5px;font-family:var(--mfont);font-size:11px;color:var(--mono)}
+  /* ---- json panel ---- */
+  .json-col h2{margin:12px 14px 6px}
+  .json{flex:1;margin:0 12px;border:1px solid var(--line);border-radius:4px;padding:8px;font-size:11.5px;line-height:1.5;background:#fff;color:var(--mono);resize:none;white-space:pre;overflow:auto;tab-size:2}
+  .json.bad{border-color:var(--err-line);background:var(--err-bg)}
+  .json-bar{display:flex;align-items:center;gap:8px;padding:8px 14px 12px}
+  .json-bar button{border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;padding:5px 12px;font-weight:600}
+  .json-bar .msg{font-size:11px}
+  .json-bar .msg.err{color:var(--err)} .json-bar .msg.ok{color:var(--ok)}
+  /* ---- data table ---- */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .toolbar .sp{flex:1}
+  .runbtn{border:1px solid var(--ok);background:var(--ok);color:#fff;border-radius:4px;padding:6px 18px;font-weight:600}
+  .runbtn.wide{padding:6px 26px}
+  .runbtn:disabled{opacity:.45;cursor:not-allowed}
+  .ghost{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:4px;padding:6px 14px}
+  table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--line)}
+  th,td{text-align:left;padding:4px 8px;border-bottom:1px solid var(--line2);white-space:nowrap}
+  th{background:#eef1f4;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;font-weight:600;cursor:pointer;user-select:none;position:sticky;top:0}
+  th.sorted{color:var(--accent)}
+  th .ar{font-size:9px;margin-left:3px}
+  td.m{font-family:var(--mfont);font-size:12px;color:var(--mono)}
+  tr:hover td{background:#f7f9fb}
+  tr.unk td{background:var(--warn-bg)}
+  tr.unk:hover td{background:#fdefc4}
+  .tag{font-family:var(--mfont);font-size:10.5px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);background:#fff;color:var(--dim)}
+  .tag.ce{color:#2b4a7a;border-color:#b9cdec;background:#eef4fc}
+  .tag.json{color:#5a3b8a;border-color:#cfbde8;background:#f3eefb}
+  .tag.hdr{color:#7a5a1a;border-color:#e0cd9a;background:#fbf4e2}
+  .tag.unk{color:var(--warn);border-color:var(--warn-line);background:#fff}
+  .tag.man{color:var(--ok);border-color:#a6d6b6;background:#eaf7ee}
+  td.pick{cursor:pointer}
+  tr.unk td.pick::after{content:" ▾";color:var(--warn)}
+  td.pick select{font-family:var(--mfont);font-size:12px;border:1px solid var(--accent);border-radius:3px;padding:1px 2px}
+  .dim{color:var(--dim)}
+  /* swatch tooltip */
+  .fname{position:relative;cursor:default}
+  .fname .sw{display:none;position:absolute;left:0;top:100%;z-index:9;width:120px;height:80px;border:1px solid var(--line);border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,.18);margin-top:2px}
+  .fname:hover .sw{display:block}
+  .fname .sw b{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font:10px var(--mfont);padding:1px 4px;border-radius:0 0 4px 4px}
+  /* ---- plan (stage2) ---- */
+  .plan-sum{display:flex;gap:10px;margin-bottom:12px;font-family:var(--mfont);font-size:12px}
+  .plan-sum span{border:1px solid var(--line);border-radius:4px;padding:5px 12px;background:#fff}
+  .plan-sum span b{color:var(--accent)}
+  .plan-sum span.w b{color:var(--warn)}
+  .grp{border:1px solid var(--line);border-radius:5px;margin-bottom:8px;background:#fff;overflow:hidden}
+  .grp>.ghdr{display:flex;align-items:center;gap:10px;padding:7px 12px;cursor:pointer;background:#f0f3f6}
+  .grp>.ghdr .tw{color:var(--dim);width:12px;font-family:var(--mfont)}
+  .grp>.ghdr .gn{font-family:var(--mfont);font-weight:600}
+  .grp>.ghdr .meta{margin-left:auto;font-family:var(--mfont);font-size:11px;color:var(--dim)}
+  .grp .body{padding:8px 12px 10px 34px;display:none}
+  .grp.open .body{display:block}
+  .chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:8px}
+  .chain .node{font-family:var(--mfont);font-size:11px;border:1px solid #b9cdec;background:#eef4fc;color:#2b4a7a;border-radius:3px;padding:2px 7px}
+  .chain .node.out{border-color:#a6d6b6;background:#eaf7ee;color:var(--ok)}
+  .chain .sep{color:var(--line)}
+  .otbl{width:100%;border:1px solid var(--line2);border-collapse:collapse;margin-top:2px}
+  .otbl td{font-family:var(--mfont);font-size:11.5px;padding:3px 8px}
+  .diag{font-family:var(--mfont);font-size:11.5px;padding:4px 10px;border-radius:3px;margin-top:5px}
+  .diag.warn{background:var(--warn-bg);border:1px solid var(--warn-line);color:var(--warn)}
+  .diag.err{background:var(--err-bg);border:1px solid var(--err-line);color:var(--err)}
+  .diag b{font-family:var(--mfont)}
+  .skip{font-family:var(--mfont);font-size:11.5px;color:var(--warn);background:var(--warn-bg);border:1px dashed var(--warn-line);border-radius:5px;padding:8px 12px;margin-bottom:8px}
+  /* results */
+  .st-run{color:var(--run)} .st-ok{color:var(--ok);font-weight:700}
+  .spin{display:inline-block;width:10px;height:10px;border:2px solid var(--line);border-top-color:var(--run);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  tr.running td{background:#eaf2fd!important}
+  .banner{background:var(--accent-bg);border:1px solid #b9cdec;color:#2b4a7a;border-radius:5px;padding:8px 14px;margin-bottom:12px;font-family:var(--mfont);font-size:12px}
+  .banner.ok{background:#eaf7ee;border-color:#a6d6b6;color:var(--ok)}
+</style>
+</head>
+<body>
+<header>
+  <h1>texproc · 檢核站</h1>
+  <span class="badge">dry-run inspector</span>
+  <div class="srctabs">
+    <button id="tab-tex" class="on" onclick="setSrc('tex')">貼圖</button>
+    <button id="tab-fbx" onclick="setSrc('fbx')">FBX 材質</button>
+  </div>
+</header>
+
+<nav class="strip" id="strip"></nav>
+
+<div class="wrap">
+  <aside id="side"></aside>
+  <div class="json-col">
+    <h2 class="sec" id="json-title">settings JSON（雙向）</h2>
+    <textarea class="json" id="json" spellcheck="false"></textarea>
+    <div class="json-bar" id="json-bar">
+      <button onclick="applyJson()">套用 JSON</button>
+      <span class="msg" id="json-msg"></span>
+    </div>
+  </div>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ============ 假資料 ============ */
+const TYPES = ["diffuse","albedo","normal","specular","glossiness","roughness",
+  "displacement","height","metallic","ao","alpha","emissive","sss","arm","unknown"];
+
+// 25 列：AtlasA(7) + GlassClean(6+1 unknown) + KB3D_Concrete_A(6) + 5 unknown refraction
+let rows = [
+  ["AtlasA_basecolor.png","diffuse","hdr","AtlasA","AtlasA_diff.tif"],
+  ["AtlasA_normal-dx.png","normal","ce","AtlasA","AtlasA_ddna.tif"],
+  ["AtlasA_arm.png","arm","json","AtlasA","→ ao / roughness / metallic"],
+  ["AtlasA_height.png","height","ce","AtlasA","AtlasA_displ.tif"],
+  ["AtlasA_emissive.png","emissive","ce","AtlasA","AtlasA_em.tif"],
+  ["AtlasA_metallic.png","metallic","ce","AtlasA","→ reflection"],
+  ["AtlasA_specular.png","specular","ce","AtlasA","AtlasA_spec.tif"],
+  ["GlassClean_basecolor.png","diffuse","hdr","GlassClean","GlassClean_diff.tif"],
+  ["GlassClean_normal-gl.png","normal","ce","GlassClean","GlassClean_ddna.tif"],
+  ["GlassClean_glossiness.png","glossiness","ce","GlassClean","GlassClean_ddna.tif (α)"],
+  ["GlassClean_spec.png","specular","ce","GlassClean","GlassClean_spec.tif"],
+  ["GlassClean_metallic.png","metallic","ce","GlassClean","→ reflection ⚠ 衝突"],
+  ["GlassClean_sss.png","sss","ce","GlassClean","GlassClean_sss.tif"],
+  ["GlassClean_refraction.png","unknown","unk","GlassClean","—"],
+  ["KB3D_MTL_Concrete_A_diffuse.png","diffuse","ce","KB3D_MTL_Concrete_A","..._diff.tif"],
+  ["KB3D_MTL_Concrete_A_normal.png","normal","ce","KB3D_MTL_Concrete_A","..._ddna.tif"],
+  ["KB3D_MTL_Concrete_A_roughness.png","roughness","ce","KB3D_MTL_Concrete_A","..._ddna.tif (α)"],
+  ["KB3D_MTL_Concrete_A_ao.png","ao","ce","KB3D_MTL_Concrete_A","..._diff.tif (AO)"],
+  ["KB3D_MTL_Concrete_A_displacement.png","displacement","ce","KB3D_MTL_Concrete_A","..._displ.tif"],
+  ["KB3D_MTL_Concrete_A_metallic.png","metallic","ce","KB3D_MTL_Concrete_A","→ reflection"],
+  ["KB3D_MTL_Glass_A_refraction.png","unknown","unk","KB3D_MTL_Glass_A","—"],
+  ["KB3D_MTL_Glass_B_refraction.png","unknown","unk","KB3D_MTL_Glass_B","—"],
+  ["KB3D_MTL_Water_refraction.png","unknown","unk","KB3D_MTL_Water","—"],
+  ["KB3D_MTL_Ice_refraction.png","unknown","unk","KB3D_MTL_Ice","—"],
+  ["KB3D_MTL_Crystal_refraction.png","unknown","unk","KB3D_MTL_Crystal","—"],
+].map(r=>({file:r[0],type:r[1],src:r[2],base:r[3],out:r[4]}));
+
+const SRC_LABEL={ce:"CE硬編碼",json:"JSON表",hdr:"header探測",unk:"unknown",man:"人工指派"};
+
+// dry-run 計畫
+const plan=[
+ {name:"AtlasA",open:true,
+  chain:["INT-ARM","INT-ALBEDO","INT-NORMAL","INT-GLOSS (invert roughness)","INT-HEIGHT"],
+  outs:[["OUT-DIFF","AtlasA_diff.tif",""],["OUT-DDNA","AtlasA_ddna.tif","alpha=gloss"],
+    ["OUT-DISPL","AtlasA_displ.tif","RGBA 同值"],["OUT-EM","AtlasA_em.tif","×brightness"],
+    ["OUT-SPEC","AtlasA_spec.tif","from reflection"]],
+  diags:[["warn","DEF-03","INT-REFLECTION 於 glossiness 之前生成，specular 的 gloss_source 讀到 None"]]},
+ {name:"GlassClean",open:false,
+  chain:["INT-ALBEDO","INT-NORMAL (OP-FLIPG · GL→DX)","INT-REFLECTION","INT-GLOSS"],
+  outs:[["OUT-DIFF","GlassClean_diff.tif",""],["OUT-DDNA","GlassClean_ddna.tif","alpha=gloss"],
+    ["OUT-SPEC","GlassClean_spec.tif","from specular"],["OUT-SSS","GlassClean_sss.tif","×intensity"]],
+  diags:[["err","DEF-19","reflection 來源衝突：specular 與 metallic 同時存在 — INT-REFLECTION 分支①(specular) 勝出，metallic 遭忽略"],
+    ["warn","DEF-08","metallic 未參與 reflection 運算（-composite 只吃兩張圖）"]]},
+ {name:"KB3D_MTL_Concrete_A",open:false,
+  chain:["INT-NORMAL","INT-GLOSS (invert roughness)","INT-REFLECTION","INT-HEIGHT","INT-AO"],
+  outs:[["OUT-DIFF","KB3D_MTL_Concrete_A_diff.tif","diffuse_ao"],
+    ["OUT-DDNA","KB3D_MTL_Concrete_A_ddna.tif","alpha=gloss"],
+    ["OUT-DISPL","KB3D_MTL_Concrete_A_displ.tif",""],
+    ["OUT-SPEC","KB3D_MTL_Concrete_A_spec.tif","from reflection"]],
+  diags:[["warn","DEF-09","diff_format=diffuse_ao：AO 以 Darken 混合，淺色 AO 近乎無效（PBR 慣例應為 Multiply）"]]},
+];
+const skipped=["KB3D_MTL_Glass_A","KB3D_MTL_Glass_B","KB3D_MTL_Water","KB3D_MTL_Ice","KB3D_MTL_Crystal"];
+
+// FBX：car.fbx 16 材質 + <unassigned>
+const PHYS=["default","no","obstruct","no_collide","proxy_only"];
+let slots=[
+ ["Body_Paint","default","fbx_id−1"],["Glass","no","fbx_id−1"],
+ ["Chrome_Trim","default","fbx_id−1"],["Rubber_Tire","obstruct","fbx_id−1"],
+ ["Interior_Leather","no","MTL child order"],["Dashboard","no","MTL child order"],
+ ["Headlight_Glass","no","fbx_id−1"],["Taillight","no","fbx_id−1"],
+ ["Grille","obstruct","explicit"],["Brake_Disc","obstruct","fbx_id−1"],
+ ["Exhaust_Chrome","default","fbx_id−1"],["License_Plate","default","first free"],
+ ["Undercarriage_proxy","proxy_only","explicit"],["Mirror","no","fbx_id−1"],
+ ["Seat_Fabric","no","MTL child order"],["Engine_Block","obstruct","fbx_id−1"],
+ ["<unassigned>","no","first free"],
+].map((s,i)=>({idx:i,name:s[0],phys:s[1],from:s[2]}));
+
+/* ============ 設定（§7）============ */
+let settings={
+  output_resolution:"original", diff_format:"albedo",
+  normal_flip_green:false, normalize_height:false, process_metallic:true,
+  normal_from_height_strength:10.0, generate_missing_spec:true,
+  generate_missing_emissive:false, generate_missing_sss:false,
+  generate_sss_from_diffuse:false, emissive_brightness:1.0, sss_intensity:1.0,
+  texture_types:{diff:true,spec:true,ddna:true,displ:true,em:true,sss:true},
+};
+const SEL={output_resolution:["original","512","1024","2048","4096"],
+           diff_format:["albedo","diffuse_ao"]};
+const BOOLS=["normal_flip_green","normalize_height","process_metallic",
+  "generate_missing_spec","generate_missing_emissive","generate_missing_sss","generate_sss_from_diffuse"];
+const NUMS={normal_from_height_strength:0.5,emissive_brightness:0.1,sss_intensity:0.1};
+
+/* ============ 狀態 ============ */
+let stage=1, src="tex", sortKey=null, sortDir=1, executed=false;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+
+/* CSS 漸層縮圖（依型別）*/
+const SWATCH={diffuse:"#7a6a52,#c9b48c",albedo:"#7a6a52,#c9b48c",normal:"#8090ff,#a0b0ff",
+  specular:"#555,#bbb",glossiness:"#333,#eee",roughness:"#eee,#333",displacement:"#222,#ddd",
+  height:"#222,#ddd",metallic:"#444,#c9c9d0",ao:"#888,#fff",alpha:"#000,#fff",
+  emissive:"#301500,#ff8a1e",sss:"#3a1a1a,#ffb0b0",arm:"#3a5a3a,#c0a060",unknown:"#a98,#c9cc55"};
+const swatch=t=>`linear-gradient(135deg,${SWATCH[t]||"#999,#ccc"})`;
+
+/* ============ 流程列 ============ */
+function renderStrip(){
+  const st=[[1,"掃描","source types / 規則來源"],[2,"檢核","dry-run 計畫 · 診斷"],[3,"執行","batch → 結果"]];
+  $("strip").innerHTML=st.map(s=>{
+    const cur=s[0]===stage, done=s[0]<stage||(s[0]<3&&executed);
+    return `<button class="stg ${cur?'on':''} ${done?'done':''}" onclick="goStage(${s[0]})">
+      <span class="n">${done?'✓':s[0]}</span><span>${s[1]}<br><small>${s[2]}</small></span></button>`;
+  }).join("");
+  if(src==="fbx") $("strip").style.opacity=.4; else $("strip").style.opacity=1;
+}
+function goStage(n){ if(src==="fbx")return; stage=n; renderStrip(); renderMain(); }
+
+/* ============ 設定表單 ============ */
+function renderForm(){
+  let h=`<h2 class="sec">settings（§7）</h2>`;
+  for(const k of ["output_resolution","diff_format"])
+    h+=`<div class="fld"><label>${k}</label><select onchange="setKey('${k}',this.value)">`+
+      SEL[k].map(v=>`<option ${settings[k]===v?'selected':''}>${v}</option>`).join("")+`</select></div>`;
+  for(const k of BOOLS)
+    h+=`<div class="fld"><label>${k}</label><input type="checkbox" ${settings[k]?'checked':''} onchange="setKey('${k}',this.checked)"></div>`;
+  for(const k in NUMS)
+    h+=`<div class="fld"><label>${k}</label><input type="number" step="${NUMS[k]}" value="${settings[k]}" onchange="setKey('${k}',parseFloat(this.value))"></div>`;
+  h+=`<div class="subhdr">texture_types{}</div><div class="tt">`+
+    Object.keys(settings.texture_types).map(k=>
+      `<label><input type="checkbox" ${settings.texture_types[k]?'checked':''} onchange="setTT('${k}',this.checked)">_${k}</label>`).join("")+`</div>`;
+  $("side").innerHTML=h;
+}
+function setKey(k,v){ settings[k]=v; syncJson(); if(stage===2)renderMain(); }
+function setTT(k,v){ settings.texture_types[k]=v; syncJson(); }
+
+/* ============ 雙向 JSON ============ */
+function syncJson(){ $("json").value=JSON.stringify(settings,null,2); $("json").classList.remove("bad"); $("json-msg").textContent=""; }
+function applyJson(){
+  const msg=$("json-msg"), ta=$("json");
+  try{
+    const o=JSON.parse(ta.value);
+    if(typeof o!=="object"||!o.texture_types) throw new Error("缺少 texture_types");
+    settings=Object.assign(settings,o); settings.texture_types=Object.assign({},o.texture_types);
+    ta.classList.remove("bad"); msg.className="msg ok"; msg.textContent="✓ 已套回表單";
+    renderForm(); if(stage===2)renderMain();
+  }catch(e){ ta.classList.add("bad"); msg.className="msg err"; msg.textContent="✗ JSON 無效："+e.message; }
+}
+
+/* ============ 資料來源切換 ============ */
+function setSrc(s){
+  src=s; $("tab-tex").classList.toggle("on",s==="tex"); $("tab-fbx").classList.toggle("on",s==="fbx");
+  $("json-title").textContent = s==="tex" ? "settings JSON（雙向）" : "RC import request（唯讀預覽）";
+  $("json-bar").style.display = s==="tex" ? "flex" : "none";
+  $("json").readOnly = s==="fbx";
+  if(s==="tex"){ syncJson(); } else { $("json").classList.remove("bad"); $("json").value=fbxRequestJson(); }
+  renderStrip(); renderMain();
+}
+
+/* ============ 主區 ============ */
+function renderMain(){
+  if(src==="fbx") return renderFbx();
+  if(stage===1) return renderTexTable();
+  if(stage===2) return renderPlan();
+  return renderResults();
+}
+
+/* ---- Stage 1：可排序表 + 內嵌指派 ---- */
+function sortBy(k){ if(sortKey===k)sortDir=-sortDir; else{sortKey=k;sortDir=1;}
+  rows.sort((a,b)=>(a[k]>b[k]?1:a[k]<b[k]?-1:0)*sortDir); renderTexTable(); }
+function assign(i,v){ rows[i].type=v; if(v!=="unknown"){rows[i].src="man"; rows[i].out="→ 待重算";} renderTexTable(); }
+
+function renderTexTable(){
+  const cols=[["file","檔案"],["type","判定型別"],["src","規則來源"],["base","base name"],["out","目標輸出"]];
+  const nUnk=rows.filter(r=>r.type==="unknown").length;
+  let h=`<div class="toolbar">
+    <b>掃描結果</b><span class="dim">${rows.length} 檔 · ${nUnk} 個 unknown 待指派</span>
+    <span class="sp"></span>
+    <button class="ghost" onclick="goStage(2)">下一步：檢核 →</button></div>`;
+  h+="<table><thead><tr>"+cols.map(c=>
+    `<th class="${sortKey===c[0]?'sorted':''}" onclick="sortBy('${c[0]}')">${c[1]}${sortKey===c[0]?`<span class="ar">${sortDir>0?'▲':'▼'}</span>`:''}</th>`).join("")+"</tr></thead><tbody>";
+  rows.forEach((r,i)=>{
+    const unk=r.type==="unknown";
+    const typeCell = unk
+      ? `<td class="m pick" onclick="openPick(${i},this)">${r.type}</td>`
+      : `<td class="m">${r.type}</td>`;
+    h+=`<tr class="${unk?'unk':''}">
+      <td class="m"><span class="fname">${esc(r.file)}<span class="sw" style="background:${swatch(r.type)}"><b>${r.type}</b></span></span></td>
+      ${typeCell}
+      <td><span class="tag ${r.src}">${SRC_LABEL[r.src]}</span></td>
+      <td class="m dim">${esc(r.base)}</td>
+      <td class="m dim">${esc(r.out)}</td></tr>`;
+  });
+  $("main").innerHTML=h+"</tbody></table>";
+}
+function openPick(i,td){
+  td.innerHTML=`<select onchange="assign(${i},this.value)" onblur="renderTexTable()">`+
+    TYPES.map(t=>`<option ${t===rows[i].type?'selected':''}>${t}</option>`).join("")+`</select>`;
+  td.querySelector("select").focus();
+}
+
+/* ---- Stage 2：dry-run 計畫 ---- */
+function toggleGrp(i){ plan[i].open=!plan[i].open; renderPlan(); }
+function renderPlan(){
+  const nOut=plan.reduce((a,g)=>a+g.outs.length,0);
+  const nWarn=plan.reduce((a,g)=>a+g.diags.length,0)+skipped.length;
+  let h=`<div class="plan-sum">
+    <span><b>${plan.length}</b> 可執行 group（掃描 ${plan.length+skipped.length}）</span>
+    <span><b>${nOut}</b> 輸出檔</span>
+    <span class="w"><b>${nWarn}</b> 診斷 / 警告</span></div>`;
+  h+=`<div class="skip">⚠ ${skipped.length} 個 group 僅含 unknown（refraction），無可處理來源，已略過：${skipped.join("、")}</div>`;
+  plan.forEach((g,i)=>{
+    const nErr=g.diags.filter(d=>d[0]==="err").length;
+    h+=`<div class="grp ${g.open?'open':''}"><div class="ghdr" onclick="toggleGrp(${i})">
+      <span class="tw">${g.open?'▼':'▶'}</span><span class="gn">${g.name}</span>
+      <span class="meta">${g.outs.length} 輸出 · ${g.diags.length} 診斷${nErr?` · <span style="color:var(--err)">${nErr} error</span>`:''}</span></div>
+      <div class="body">
+        <div class="chain">${g.chain.map(n=>`<span class="node">${n}</span>`).join('<span class="sep">→</span>')}
+          <span class="sep">⇒</span>${g.outs.map(o=>`<span class="node out">${o[0]}</span>`).join(" ")}</div>
+        <table class="otbl"><tbody>${g.outs.map(o=>
+          `<tr><td style="color:var(--ok)">${o[0]}</td><td>${o[1]}</td><td class="dim">${o[2]||""}</td></tr>`).join("")}</tbody></table>
+        ${g.diags.map(d=>`<div class="diag ${d[0]}"><b>${d[1]}</b> · ${esc(d[2])}</div>`).join("")}
+      </div></div>`;
+  });
+  h+=`<div class="toolbar" style="margin-top:14px">
+    <span class="dim">確認以上計畫後執行</span><span class="sp"></span>
+    <button class="ghost" onclick="goStage(1)">← 回掃描</button>
+    <button class="runbtn wide" onclick="execute()">執行批次 ▶</button></div>`;
+  $("main").innerHTML=h;
+}
+
+/* ---- Stage 3：執行 + 結果 ---- */
+const outList=()=>plan.flatMap(g=>g.outs.map(o=>o[1]));
+function execute(){ executed=true; stage=3; renderStrip(); renderResults(true); }
+function hash8(){ return Array.from({length:8},()=>"0123456789abcdef"[Math.floor(Math.random()*16)]).join(""); }
+function renderResults(fresh){
+  const files=outList();
+  const res=n=>settings.output_resolution==="original"?["2048×2048","1024×1024","4096×4096"][n%3]:settings.output_resolution+"×"+settings.output_resolution;
+  let h=`<div class="banner${fresh?'':' ok'}" id="rban">${fresh?'⏳ 批次執行中…':'✓ 批次完成 · '+files.length+' 檔輸出（8-bit TIFF / LZW）'}</div>`;
+  h+=`<div class="toolbar"><b>結果</b><span class="dim">${files.length} 輸出檔</span><span class="sp"></span>
+    <button class="ghost" onclick="stage=1;executed=false;renderStrip();renderMain()">重新掃描</button></div>`;
+  h+=`<table><thead><tr><th>輸出檔</th><th>尺寸</th><th>耗時</th><th>hash[0:8]</th><th>狀態</th></tr></thead><tbody>`;
+  files.forEach((f,i)=>{
+    h+=`<tr id="rr${i}" class="${fresh?'running':''}"><td class="m">${f}</td>
+      <td class="m dim">${fresh?'—':res(i)}</td><td class="m dim">${fresh?'—':(40+i*7)%90+18+' ms'}</td>
+      <td class="m dim">${fresh?'—':hash8()}</td>
+      <td class="m">${fresh?'<span class="spin"></span> <span class="st-run">running</span>':'<span class="st-ok">✓ ok</span>'}</td></tr>`;
+  });
+  $("main").innerHTML=h+"</tbody></table>";
+  if(fresh) files.forEach((f,i)=>setTimeout(()=>finishRow(i,res(i),(40+i*7)%90+18),260+i*180));
+}
+function finishRow(i,size,ms){
+  const tr=$("rr"+i); if(!tr)return; tr.classList.remove("running");
+  tr.children[1].textContent=size; tr.children[2].textContent=ms+" ms";
+  tr.children[3].textContent=hash8(); tr.children[4].innerHTML='<span class="st-ok">✓ ok</span>';
+  if(i===outList().length-1){ const b=$("rban"); if(b){b.className="banner ok"; b.textContent="✓ 批次完成 · "+outList().length+" 檔輸出（8-bit TIFF / LZW）";} renderStrip(); }
+}
+
+/* ---- FBX 材質表 ---- */
+function setPhys(i,v){ slots[i].phys=v; $("json").value=fbxRequestJson(); }
+function fbxRequestJson(){
+  return JSON.stringify({
+    request:"import_asset", asset:"car.fbx", format:"cgf",
+    max_sub_materials:128, sub_material_count:slots.length,
+    materials:slots.map(s=>({sub_index:s.name==="<unassigned>"?null:s.idx,
+      name:s.name, physicalize:s.phys, index_source:s.from}))
+  },null,2);
+}
+function renderFbx(){
+  let h=`<div class="toolbar"><b>car.fbx</b><span class="dim">${slots.length} 材質槽（16 + &lt;unassigned&gt;）· RC_MAX_SUB_MATERIALS=128</span>
+    <span class="sp"></span><button class="runbtn" id="fbtn" onclick="fbxExport()">輸出 .mtl + request ▶</button></div>`;
+  h+=`<div class="banner ok" id="fban" style="display:none">✓ 已輸出 car.mtl 與 rc import request（16 sub-material）</div>`;
+  h+=`<table><thead><tr><th>slot</th><th>name</th><th>physicalize</th><th>來源</th></tr></thead><tbody>`;
+  slots.forEach((s,i)=>{
+    const un=s.name==="<unassigned>";
+    h+=`<tr id="fr${i}" class="${un?'unk':''}"><td class="m dim">${un?'—':s.idx}</td>
+      <td class="m"><span class="fname">${esc(s.name)}<span class="sw" style="background:${swatch(un?'unknown':'metallic')}"><b>slot ${un?'∅':s.idx}</b></span></span></td>
+      <td class="m pick"><select onchange="setPhys(${i},this.value)">${PHYS.map(p=>`<option ${p===s.phys?'selected':''}>${p}</option>`).join("")}</select></td>
+      <td><span class="tag ${s.from==='explicit'?'ce':s.from==='first free'?'unk':'json'}">${s.from}</span></td></tr>`;
+  });
+  $("main").innerHTML=h+"</tbody></table>";
+}
+function fbxExport(){
+  const btn=$("fbtn"); btn.disabled=true; btn.textContent="輸出中…";
+  slots.forEach((s,i)=>setTimeout(()=>{ const tr=$("fr"+i); if(tr)tr.style.background="#eaf7ee"; },120+i*60));
+  setTimeout(()=>{ $("fban").style.display="block"; btn.textContent="✓ 完成"; },120+slots.length*60+200);
+}
+
+/* ============ 啟動 ============ */
+renderStrip(); renderForm(); syncJson(); renderMain();
+
+/* ---- 內建自我檢查（assert）---- */
+(function selfTest(){
+  console.assert(rows.length===25,"應為 25 列 texture");
+  console.assert(rows.filter(r=>r.type==="unknown").length===6,"6 個 unknown");
+  console.assert(slots.length===17,"17 個 slot（16+unassigned）");
+  console.assert(outList().length===13,"13 個輸出檔");
+  console.assert(plan.some(g=>g.diags.some(d=>d[1]==="DEF-19")),"含 DEF-19 衝突");
+  // JSON round-trip
+  const j=JSON.stringify(settings); JSON.parse(j);
+  console.assert(SEL.diff_format.length===2 && BOOLS.length===7,"§7 鍵齊全");
+  console.log("selfTest ok");
+})();
+</script>
+</body>
+</html>

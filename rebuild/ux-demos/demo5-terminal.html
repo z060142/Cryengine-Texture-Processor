@@ -1,0 +1,663 @@
+<meta charset="utf-8">
+<title>texproc — 案5 終端機</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#0d1017; --panel2:#11151f; --border:#1e2632;
+    --fg:#c9d1d9; --dim:#6b7684; --dimmer:#495261;
+    --green:#8fbf6f; --amber:#d7a86e; --red:#e06c75;
+    --blue:#61afef; --purple:#c678dd; --cyan:#56b6c2;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    font:13px/1.5 ui-monospace,"Cascadia Code","Consolas","SFMono-Regular",Menlo,"DejaVu Sans Mono",monospace;
+    min-width:1280px; overflow:hidden;
+  }
+  .app{display:flex; flex-direction:column; height:100vh}
+  .topbar{
+    display:flex; align-items:center; gap:14px; padding:6px 12px;
+    background:var(--panel2); border-bottom:1px solid var(--border); flex:0 0 auto;
+  }
+  .topbar .brand{color:var(--purple); font-weight:600}
+  .topbar .hint{color:var(--dim); margin-left:auto; font-size:12px}
+  .topbar kbd{
+    background:var(--panel); border:1px solid var(--border); border-radius:3px;
+    padding:0 5px; color:var(--cyan); font-size:11px;
+  }
+  .main{display:flex; flex:1 1 auto; min-height:0}
+  .pane{display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--border)}
+  .pane-hdr{
+    padding:5px 10px; color:var(--dim); font-size:11px; letter-spacing:.5px;
+    text-transform:uppercase; border-bottom:1px solid var(--border); background:var(--panel2);
+    flex:0 0 auto; display:flex; align-items:center; gap:8px;
+  }
+  .pane-body{overflow:auto; flex:1 1 auto; min-height:0}
+
+  /* left: job queue */
+  .left{flex:0 0 232px}
+  .job{
+    padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .job:hover{background:var(--panel2)}
+  .job.sel{background:#161b26; box-shadow:inset 3px 0 0 var(--blue)}
+  .job .row1{display:flex; align-items:center; gap:8px}
+  .job .glyph{width:14px; text-align:center}
+  .job .num{color:var(--dimmer)}
+  .job .jname{color:var(--fg)}
+  .job .badge{
+    margin-left:auto; background:#3a2a1c; color:var(--amber);
+    border:1px solid #5a3f28; border-radius:9px; padding:0 7px; font-size:11px;
+  }
+  .job .badge.zero{background:#1c3a24; color:var(--green); border-color:#2b5a38}
+  .job .sub{color:var(--dim); font-size:11px; padding-left:22px}
+  .g-idle{color:var(--dimmer)} .g-run{color:var(--amber)} .g-done{color:var(--green)}
+
+  /* center: DAG */
+  .center{flex:1 1 auto; min-width:0}
+  .dagwrap{padding:12px}
+  svg.dag{width:100%; height:auto; display:block}
+  .node rect{fill:var(--panel2); stroke:var(--border); stroke-width:1.5; cursor:pointer}
+  .node text{fill:var(--dim); font:11px ui-monospace,monospace; pointer-events:none}
+  .node.int rect{stroke:var(--cyan)}
+  .node.out rect{stroke:var(--purple)}
+  .node.active rect{fill:#2a2410; stroke:var(--amber); stroke-width:2}
+  .node.active text{fill:var(--amber)}
+  .node.done rect{fill:#122016; stroke:var(--green)}
+  .node.done text{fill:var(--green)}
+  .node.pick rect{stroke-dasharray:4 3}
+  .edge{stroke:var(--dimmer); stroke-width:1; fill:none}
+  .detail{
+    margin:0 12px 12px; border:1px solid var(--border); background:var(--panel2);
+    border-radius:4px; padding:10px 12px; font-size:12px;
+  }
+  .detail h4{margin:0 0 6px; color:var(--blue); font-size:12px; font-weight:600}
+  .detail .kv{display:grid; grid-template-columns:70px 1fr; gap:2px 10px}
+  .detail .k{color:var(--dim)}
+  .detail .v{color:var(--fg); white-space:pre-wrap; word-break:break-all}
+  .detail .muted{color:var(--dimmer)}
+  .summary{padding:12px; font-size:12px}
+  .summary .big{color:var(--green); font-size:15px}
+  .summary table{border-collapse:collapse; width:100%; margin-top:8px}
+  .summary td{padding:2px 8px; border-bottom:1px solid var(--border)}
+  .summary .t-unknown{color:var(--amber)}
+  .summary .t-ok{color:var(--dim)}
+  .empty{padding:24px; color:var(--dimmer)}
+
+  /* right: json editor */
+  .right{flex:0 0 380px; border-right:none}
+  .tabs{display:flex; gap:0}
+  .tab{
+    padding:4px 12px; cursor:pointer; color:var(--dim); border:1px solid transparent;
+    border-bottom:none; font-size:12px;
+  }
+  .tab.on{color:var(--fg); background:var(--panel2); border-color:var(--border); border-radius:3px 3px 0 0}
+  .jsonarea{
+    flex:1 1 auto; width:100%; resize:none; border:none; outline:none;
+    background:var(--panel); color:var(--fg); padding:10px; tab-size:2;
+    font:12px/1.5 ui-monospace,monospace; min-height:0;
+  }
+  .valbar{
+    flex:0 0 auto; padding:5px 10px; font-size:12px; border-top:1px solid var(--border);
+    background:var(--panel2);
+  }
+  .valbar.ok{color:var(--green)} .valbar.bad{color:var(--red)}
+
+  /* bottom: cli + log */
+  .clibar{
+    display:flex; align-items:center; gap:8px; padding:5px 12px;
+    background:#08131a; border-top:1px solid var(--border); flex:0 0 auto; font-size:12px;
+  }
+  .clibar .lbl{color:var(--dimmer)}
+  .clibar code{color:var(--cyan); flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .clibar button{
+    background:var(--panel2); color:var(--fg); border:1px solid var(--border);
+    border-radius:3px; padding:2px 10px; cursor:pointer; font-family:inherit; font-size:12px;
+  }
+  .clibar button:hover{border-color:var(--blue); color:var(--blue)}
+  .log{
+    flex:0 0 190px; overflow:auto; background:#070a0f; border-top:1px solid var(--border);
+    padding:6px 12px; font-size:12px;
+  }
+  .log .ln{white-space:pre-wrap; word-break:break-all}
+  .log .ts{color:var(--dimmer)}
+  .lv-info{color:var(--fg)} .lv-warn{color:var(--amber)} .lv-ok{color:var(--green)}
+  .lv-cmd{color:var(--cyan)} .lv-err{color:var(--red)} .lv-dim{color:var(--dim)}
+
+  /* command palette */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.5); display:none;
+    align-items:flex-start; justify-content:center; z-index:20;
+  }
+  .overlay.show{display:flex}
+  .palette{
+    margin-top:14vh; width:520px; background:var(--panel2);
+    border:1px solid var(--blue); border-radius:6px; overflow:hidden;
+    box-shadow:0 12px 40px rgba(0,0,0,.6);
+  }
+  .palette .pin{display:flex; align-items:center; padding:9px 12px; border-bottom:1px solid var(--border)}
+  .palette .pin .colon{color:var(--purple); margin-right:6px}
+  .palette input{
+    flex:1; background:transparent; border:none; outline:none; color:var(--fg);
+    font:14px ui-monospace,monospace;
+  }
+  .palette .pitem{padding:6px 14px; cursor:pointer; display:flex; gap:10px}
+  .palette .pitem.on{background:#161b26}
+  .palette .pitem .cmd{color:var(--cyan); width:80px}
+  .palette .pitem .desc{color:var(--dim)}
+  .palette .pnone{padding:8px 14px; color:var(--dimmer)}
+</style>
+
+<div class="app">
+  <div class="topbar">
+    <span class="brand">texproc</span>
+    <span class="g-done">tui</span>
+    <span class="hint">
+      <kbd>j</kbd>/<kbd>k</kbd> 選 job · <kbd>Enter</kbd> 執行 · <kbd>:</kbd> 命令面板 · <kbd>Esc</kbd> 關閉
+    </span>
+  </div>
+
+  <div class="main">
+    <div class="pane left">
+      <div class="pane-hdr">jobs</div>
+      <div class="pane-body" id="jobs"></div>
+    </div>
+
+    <div class="pane center">
+      <div class="pane-hdr"><span id="centerTitle">pipeline</span></div>
+      <div class="pane-body" id="center"></div>
+    </div>
+
+    <div class="pane right">
+      <div class="pane-hdr" style="padding:0 6px">
+        <div class="tabs">
+          <span class="tab on" data-tab="groups">groups.json</span>
+          <span class="tab" data-tab="settings">settings.json</span>
+        </div>
+      </div>
+      <textarea class="jsonarea" id="json" spellcheck="false"></textarea>
+      <div class="valbar ok" id="valbar">valid</div>
+    </div>
+  </div>
+
+  <div class="clibar">
+    <span class="lbl">$</span>
+    <code id="cli">texproc --help</code>
+    <button id="copyBtn">複製</button>
+  </div>
+  <div class="log" id="log"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="palette">
+    <div class="pin"><span class="colon">:</span><input id="palInput" autocomplete="off" placeholder="command…"></div>
+    <div id="palList"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+
+// ---------- fake data ----------
+const groupsInit = {
+  input: "./textures",
+  total: 132,
+  groups: [
+    { name: "KB3D_ConcreteWall_A", type: "standard", textures: 4 },
+    { name: "AtlasA",             type: "standard", textures: 7 },
+    { name: "GlassClean",         type: "glass",    textures: 6 },
+    { name: "def19_refraction_a", type: "unknown",  files: ["def19_refraction_a_refr.png"] },
+    { name: "def19_refraction_b", type: "unknown",  files: ["def19_refraction_b_refr.png"] },
+    { name: "def19_refraction_c", type: "unknown",  files: ["def19_refraction_c_refr.png"] },
+    { name: "GlassClean_ior",     type: "unknown",  files: ["GlassClean_refraction.png"] },
+    { name: "Puddle_wet",         type: "unknown",  files: ["Puddle_wet_refr.png"] }
+  ]
+};
+const settingsInit = {
+  out_dir: "./out",
+  output_format: "dds",
+  compression: "BC7",
+  gloss_from_roughness: true,
+  normal_flip_y: false,
+  ao_strength: 1.0
+};
+
+// DAG definitions per job. ids unique across jobs.
+const DAGS = {
+  process: {
+    view: [600, 400],
+    nodes: [
+      { id:"INT-ALBEDO", cls:"int", x:40,  y:24  },
+      { id:"INT-METAL",  cls:"int", x:40,  y:88  },
+      { id:"INT-ROUGH",  cls:"int", x:40,  y:152 },
+      { id:"INT-NORMAL", cls:"int", x:40,  y:216 },
+      { id:"INT-AO",     cls:"int", x:40,  y:280 },
+      { id:"INT-HEIGHT", cls:"int", x:40,  y:344 },
+      { id:"OUT-DIFF",   cls:"out", x:400, y:56  },
+      { id:"OUT-DDNA",   cls:"out", x:400, y:152 },
+      { id:"OUT-SPEC",   cls:"out", x:400, y:248 },
+      { id:"OUT-DISP",   cls:"out", x:400, y:344 }
+    ],
+    edges: [
+      ["INT-ALBEDO","OUT-DIFF"],["INT-METAL","OUT-DIFF"],["INT-AO","OUT-DIFF"],
+      ["INT-NORMAL","OUT-DDNA"],["INT-ROUGH","OUT-DDNA"],
+      ["INT-METAL","OUT-SPEC"],["INT-ROUGH","OUT-SPEC"],
+      ["INT-HEIGHT","OUT-DISP"]
+    ]
+  },
+  convert: {
+    view: [600, 200],
+    nodes: [
+      { id:"load",    cls:"int", x:24,  y:84 },
+      { id:"policy",  cls:"int", x:180, y:84 },
+      { id:"request", cls:"int", x:336, y:84 },
+      { id:"mtl",     cls:"out", x:492, y:84 }
+    ],
+    edges: [["load","policy"],["policy","request"],["request","mtl"]]
+  }
+};
+
+const NODE_INFO = {
+  "INT-ALBEDO":{in:["*_basecolor.png"],out:["albedo (linear)"],params:{colorspace:"sRGB→linear"}},
+  "INT-METAL":{in:["*_metallic.png"],out:["metal (gray)"],params:{range:"0..1"}},
+  "INT-ROUGH":{in:["*_roughness.png"],out:["gloss = 1-rough"],params:{invert:"true"}},
+  "INT-NORMAL":{in:["*_normal.png"],out:["normal (tangent)"],params:{flip_y:"false"}},
+  "INT-AO":{in:["*_ao.png"],out:["ao"],params:{strength:"1.0"}},
+  "INT-HEIGHT":{in:["*_height.png"],out:["height"],params:{scale:"auto"}},
+  "OUT-DIFF":{in:["albedo","metal","ao"],out:["*_diff.dds"],params:{fmt:"BC7"}},
+  "OUT-DDNA":{in:["normal","gloss"],out:["*_ddna.dds","*_ddna.a"],params:{fmt:"BC5+BC4"}},
+  "OUT-SPEC":{in:["metal","gloss"],out:["*_spec.dds"],params:{fmt:"BC7"}},
+  "OUT-DISP":{in:["height"],out:["*_displ.dds"],params:{fmt:"BC4"}},
+  "load":{in:["car.fbx"],out:["16 materials","1 <unassigned>"],params:{importer:"assimp"}},
+  "policy":{in:["16 materials"],out:["type per slot"],params:{policy:"strict"}},
+  "request":{in:["typed slots"],out:["texproc requests"],params:{dedupe:"true"}},
+  "mtl":{in:["requests"],out:["car.mtl"],params:{align:"16/16"}}
+};
+
+const CLI = {
+  scan:    "texproc scan --input ./textures",
+  process: "texproc process --groups groups.json --settings cfg.json --out ./out",
+  convert: "texproc convert car.fbx --policy strict --settings cfg.json --out ./out",
+  validate:"texproc validate groups.json"
+};
+
+// ---------- state ----------
+const state = {
+  jobs: [
+    { id:"scan",    num:1, label:"scan",    status:"idle", sub:"./textures" },
+    { id:"process", num:2, label:"process", status:"idle", sub:"132 groups", badge:5 },
+    { id:"convert", num:3, label:"convert", status:"idle", sub:"car.fbx" }
+  ],
+  sel: 0,
+  tab: "groups",
+  groupsText: JSON.stringify(groupsInit, null, 2),
+  settingsText: JSON.stringify(settingsInit, null, 2),
+  unknownCount: 5,
+  scanned: false,
+  detailNode: null,
+  nodeStatus: {},   // id -> active|done
+  running: false
+};
+
+// ---------- log ----------
+function ts(){ return new Date().toTimeString().slice(0,8); }
+function log(msg, lv="info"){
+  const el = $("#log");
+  const d = document.createElement("div");
+  d.className = "ln lv-" + lv;
+  d.innerHTML = `<span class="ts">${ts()}</span> ${escapeHtml(msg)}`;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+// ---------- cli bar ----------
+function setCli(cmd){ $("#cli").textContent = cmd; }
+$("#copyBtn").onclick = () => {
+  const t = $("#cli").textContent;
+  const done = () => log("copied to clipboard: " + t, "dim");
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(done, done);
+  else done();
+};
+
+// ---------- render: jobs ----------
+const GLYPH = { idle:["○","g-idle"], run:["●","g-run"], done:["✓","g-done"] };
+function renderJobs(){
+  const wrap = $("#jobs"); wrap.innerHTML = "";
+  state.jobs.forEach((j, i) => {
+    const [g, gc] = GLYPH[j.status];
+    const badge = j.badge != null
+      ? `<span class="badge ${j.badge===0?"zero":""}">${j.badge} unknown</span>` : "";
+    const el = document.createElement("div");
+    el.className = "job" + (i===state.sel ? " sel" : "");
+    el.innerHTML =
+      `<div class="row1"><span class="glyph ${gc}">${g}</span>` +
+      `<span class="num">#${j.num}</span><span class="jname">${j.label}</span>${badge}</div>` +
+      `<div class="sub">${escapeHtml(j.sub)}</div>`;
+    el.onclick = () => selectJob(i);
+    wrap.appendChild(el);
+  });
+}
+
+function selectJob(i){
+  state.sel = i;
+  state.detailNode = null;
+  const j = state.jobs[i];
+  setCli(CLI[j.id]);
+  renderJobs();
+  renderCenter();
+}
+
+// ---------- render: center ----------
+function renderCenter(){
+  const job = state.jobs[state.sel];
+  $("#centerTitle").textContent = job.id + " · " + (job.id==="scan" ? "groups summary" : "pipeline DAG");
+  const c = $("#center");
+  if (job.id === "scan"){ c.innerHTML = renderSummary(); return; }
+  const dag = DAGS[job.id];
+  c.innerHTML = `<div class="dagwrap">${renderDAG(dag)}</div>` +
+    `<div id="detailStrip">${renderDetail()}</div>`;
+  c.querySelector("svg").addEventListener("click", e => {
+    const g = e.target.closest("[data-node]");
+    if (!g) return;
+    const id = g.getAttribute("data-node");
+    state.detailNode = id;
+    setCli("texproc explain " + id);
+    $("#detailStrip").innerHTML = renderDetail();
+    c.querySelectorAll(".node").forEach(n =>
+      n.classList.toggle("pick", n.getAttribute("data-node")===id));
+  });
+}
+
+function renderSummary(){
+  if (!state.scanned)
+    return `<div class="empty">尚未掃描。按 <b>Enter</b> 執行 scan job，或 <b>:</b> → scan。</div>`;
+  const g = JSON.parse(state.groupsText);
+  const rows = g.groups.map(x =>
+    `<tr><td>${escapeHtml(x.name)}</td>` +
+    `<td class="${x.type==='unknown'?'t-unknown':'t-ok'}">${x.type}</td>` +
+    `<td class="t-ok">${x.textures ? x.textures+" tex" : (x.files?x.files.join(","):"")}</td></tr>`
+  ).join("");
+  return `<div class="summary">` +
+    `<span class="big">${g.total} groups</span> · ` +
+    `<span class="t-unknown">${state.unknownCount} unknown</span> · scanned ${escapeHtml(g.input)}` +
+    `<table>${rows}</table>` +
+    `<div class="t-ok" style="margin-top:8px">…共 ${g.total} 組，僅列出顯著項。unknown 於右欄 groups.json 指派型別。</div>` +
+    `</div>`;
+}
+
+function renderDAG(dag){
+  const [w, h] = dag.view;
+  const NW = 130, NH = 34;
+  const pos = {}; dag.nodes.forEach(n => pos[n.id] = n);
+  const edges = dag.edges.map(([a, b]) => {
+    const A = pos[a], B = pos[b];
+    const x1 = A.x + NW, y1 = A.y + NH/2, x2 = B.x, y2 = B.y + NH/2;
+    const mx = (x1 + x2) / 2;
+    return `<path class="edge" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+  }).join("");
+  const nodes = dag.nodes.map(n => {
+    const st = state.nodeStatus[n.id] || "";
+    const pk = state.detailNode===n.id ? " pick" : "";
+    return `<g class="node ${n.cls} ${st}${pk}" data-node="${n.id}" transform="translate(${n.x},${n.y})">` +
+      `<rect width="${NW}" height="${NH}" rx="3"/>` +
+      `<text x="${NW/2}" y="${NH/2+4}" text-anchor="middle">${n.id}</text></g>`;
+  }).join("");
+  return `<svg class="dag" viewBox="0 0 ${w} ${h}">${edges}${nodes}</svg>`;
+}
+
+function renderDetail(){
+  const id = state.detailNode;
+  if (!id) return `<div class="detail muted">點選節點檢視 inputs / outputs / params …</div>`;
+  const n = NODE_INFO[id];
+  return `<div class="detail"><h4>${id}</h4><div class="kv">` +
+    `<span class="k">inputs</span><span class="v">${n.in.join("\n")}</span>` +
+    `<span class="k">outputs</span><span class="v">${n.out.join("\n")}</span>` +
+    `<span class="k">params</span><span class="v">${escapeHtml(JSON.stringify(n.params))}</span>` +
+    `</div></div>`;
+}
+
+// ---------- json editor + validation ----------
+function currentText(){ return state.tab==="groups" ? state.groupsText : state.settingsText; }
+function loadEditor(){ $("#json").value = currentText(); validate(); }
+
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
+  t.classList.add("on");
+  state.tab = t.dataset.tab;
+  loadEditor();
+  setCli("texproc validate " + state.tab + ".json");
+});
+
+$("#json").addEventListener("input", e => {
+  if (state.tab==="groups") state.groupsText = e.target.value;
+  else state.settingsText = e.target.value;
+  validate();
+});
+
+const TYPES = ["standard","glass","unknown","decal","vegetation","emissive"];
+function validate(){
+  const bar = $("#valbar");
+  let obj;
+  try { obj = JSON.parse(currentText()); }
+  catch (err){ setBar(bar, false, "parse error: " + err.message.replace(/^JSON.parse:?/,"").trim()); return; }
+
+  if (state.tab === "groups"){
+    if (!Array.isArray(obj.groups)) return setBar(bar, false, "schema: `groups` must be an array");
+    for (const g of obj.groups){
+      if (typeof g.name !== "string") return setBar(bar, false, "schema: group missing `name`");
+      if (!TYPES.includes(g.type)) return setBar(bar, false, `schema: bad type "${g.type}" on ${g.name}`);
+    }
+    const nu = obj.groups.filter(g => g.type === "unknown").length;
+    setBar(bar, true, `valid · ${obj.groups.length} groups listed · ${nu} unknown`);
+    if (nu < state.unknownCount){
+      const resolved = state.unknownCount - nu;
+      log(`groups.json updated: ${resolved} unknown resolved`, "ok");
+      state.unknownCount = nu;
+      state.jobs[1].badge = nu;
+      renderJobs();
+      if (state.jobs[state.sel].id === "scan") renderCenter();
+    } else if (nu > state.unknownCount){
+      state.unknownCount = nu; state.jobs[1].badge = nu; renderJobs();
+    }
+  } else {
+    if (!["dds","tif","png"].includes(obj.output_format))
+      return setBar(bar, false, "schema: output_format ∈ {dds,tif,png}");
+    if (!["BC1","BC3","BC5","BC7"].includes(obj.compression))
+      return setBar(bar, false, "schema: compression ∈ {BC1,BC3,BC5,BC7}");
+    if (typeof obj.ao_strength !== "number" || obj.ao_strength < 0 || obj.ao_strength > 2)
+      return setBar(bar, false, "schema: ao_strength ∈ [0,2]");
+    setBar(bar, true, `valid · out=${obj.output_format}/${obj.compression} · ao=${obj.ao_strength}`);
+  }
+}
+function setBar(bar, ok, msg){
+  bar.className = "valbar " + (ok ? "ok" : "bad");
+  bar.textContent = (ok ? "✓ " : "✗ ") + msg;
+}
+
+// ---------- run jobs ----------
+function runSelected(){
+  if (state.running) { log("busy: a job is already running", "warn"); return; }
+  const job = state.jobs[state.sel];
+  setCli(CLI[job.id]);
+  if (job.id === "scan") runScan(job);
+  else if (job.id === "process") runProcess(job);
+  else runConvert(job);
+}
+
+function setJobStatus(job, s){ job.status = s; renderJobs(); }
+
+function runScan(job){
+  state.running = true; setJobStatus(job, "run");
+  log("$ " + CLI.scan, "cmd");
+  log("scanning ./textures …");
+  const steps = [
+    ["indexed 486 files across 132 base names", "info"],
+    ["assigned 127 groups by suffix rules", "info"],
+    ["WARN def19: refraction map has no CryEngine target (def19_refraction_a_refr.png)", "warn"],
+    ["WARN def19: refraction map has no CryEngine target (def19_refraction_b_refr.png)", "warn"],
+    ["WARN def19: refraction map has no CryEngine target (def19_refraction_c_refr.png)", "warn"],
+    ["WARN unknown: GlassClean_refraction.png (unmatched suffix)", "warn"],
+    ["WARN unknown: Puddle_wet_refr.png (unmatched suffix)", "warn"],
+    ["scan complete: 132 groups, 5 unknown → assign in groups.json", "ok"]
+  ];
+  seq(steps, 260, () => {
+    state.scanned = true;
+    setJobStatus(job, "done");
+    if (state.jobs[state.sel].id === "scan") renderCenter();
+    state.running = false;
+  });
+}
+
+function runProcess(job){
+  if (!state.scanned){ log("WARN process: run scan first (no groups indexed)", "warn"); }
+  if (state.unknownCount > 0)
+    log(`WARN process: ${state.unknownCount} unknown groups will be skipped`, "warn");
+  state.running = true; setJobStatus(job, "run");
+  state.nodeStatus = {}; state.detailNode = null;
+  selectJobSilent(1); renderCenter();
+  log("$ " + CLI.process, "cmd");
+  const order = DAGS.process.nodes.map(n => n.id);
+  const groupLog = [
+    "process KB3D_ConcreteWall_A → diff,ddna,spec ok",
+    "process AtlasA → diff,ddna,spec,displ ok",
+    "process GlassClean → diff,ddna ok"
+  ];
+  let gi = 0;
+  litSequence(order, i => {
+    const id = order[i];
+    log(`build ${id} …`, "dim");
+    if (id.startsWith("OUT") && gi < groupLog.length) log(groupLog[gi++], "info");
+  }, () => {
+    log(`process complete: ${127} groups → ./out (${state.unknownCount} skipped)`, "ok");
+    setJobStatus(job, "done");
+    state.running = false;
+  });
+}
+
+function runConvert(job){
+  state.running = true; setJobStatus(job, "run");
+  state.nodeStatus = {}; state.detailNode = null;
+  selectJobSilent(2); renderCenter();
+  log("$ " + CLI.convert, "cmd");
+  const order = DAGS.convert.nodes.map(n => n.id);
+  const perNode = {
+    load:    "load car.fbx: 16 materials + 1 <unassigned>",
+    policy:  "policy=strict: 16/16 slots typed, 1 unassigned → default",
+    request: "emit 16 texproc requests (0 duplicate)",
+    mtl:     "write car.mtl"
+  };
+  litSequence(order, i => {
+    const id = order[i];
+    log(perNode[id], id==="mtl" ? "info" : "dim");
+    if (id === "request"){
+      for (let m = 1; m <= 16; m++) log(`  align ${m}/16  slot_${String(m).padStart(2,"0")} ✓`, "dim");
+    }
+  }, () => {
+    log("convert complete: 16/16 materials aligned → car.mtl", "ok");
+    setJobStatus(job, "done");
+    state.running = false;
+  });
+}
+
+function selectJobSilent(i){ state.sel = i; renderJobs(); }
+
+// light up DAG nodes sequentially: active then done
+function litSequence(order, onStep, done){
+  let i = 0;
+  const tick = () => {
+    if (i > 0) state.nodeStatus[order[i-1]] = "done";
+    if (i >= order.length){ renderCenter(); done && done(); return; }
+    state.nodeStatus[order[i]] = "active";
+    renderCenter();
+    onStep && onStep(i);
+    i++;
+    setTimeout(tick, 320);
+  };
+  tick();
+}
+// sequential timed log steps
+function seq(steps, gap, done){
+  let i = 0;
+  const tick = () => {
+    if (i >= steps.length){ done && done(); return; }
+    log(steps[i][0], steps[i][1]); i++;
+    setTimeout(tick, gap);
+  };
+  tick();
+}
+
+// ---------- command palette ----------
+const COMMANDS = [
+  ["scan",    "掃描 ./textures 並分組"],
+  ["process", "執行貼圖管線 → ./out"],
+  ["convert", "轉換 car.fbx 材質 → car.mtl"],
+  ["validate","驗證目前 JSON 分頁"],
+  ["quit",    "關閉命令面板"]
+];
+let palIdx = 0, palFiltered = COMMANDS;
+function openPalette(){
+  $("#overlay").classList.add("show");
+  $("#palInput").value = ""; palIdx = 0; filterPalette("");
+  $("#palInput").focus();
+}
+function closePalette(){ $("#overlay").classList.remove("show"); $("#json").blur(); }
+function filterPalette(q){
+  q = q.toLowerCase();
+  palFiltered = COMMANDS.filter(c => c[0].includes(q) || c[1].includes(q));
+  if (palIdx >= palFiltered.length) palIdx = 0;
+  const list = $("#palList");
+  list.innerHTML = palFiltered.length
+    ? palFiltered.map((c, i) =>
+        `<div class="pitem ${i===palIdx?"on":""}" data-i="${i}"><span class="cmd">${c[0]}</span><span class="desc">${c[1]}</span></div>`
+      ).join("")
+    : `<div class="pnone">no match</div>`;
+  list.querySelectorAll(".pitem").forEach(el =>
+    el.onclick = () => { palIdx = +el.dataset.i; runPalette(); });
+}
+function runPalette(){
+  const c = palFiltered[palIdx]; if (!c) return;
+  closePalette();
+  const name = c[0];
+  if (name === "quit") { log("palette: closed", "dim"); return; }
+  if (name === "validate"){ setCli(CLI.validate); validate(); log("$ " + CLI.validate, "cmd"); return; }
+  const idx = { scan:0, process:1, convert:2 }[name];
+  selectJob(idx);
+  runSelected();
+}
+$("#palInput").addEventListener("input", e => filterPalette(e.target.value));
+$("#palInput").addEventListener("keydown", e => {
+  if (e.key === "ArrowDown"){ palIdx = Math.min(palIdx+1, palFiltered.length-1); filterPalette($("#palInput").value); e.preventDefault(); }
+  else if (e.key === "ArrowUp"){ palIdx = Math.max(palIdx-1, 0); filterPalette($("#palInput").value); e.preventDefault(); }
+  else if (e.key === "Enter"){ runPalette(); e.preventDefault(); }
+  else if (e.key === "Escape"){ closePalette(); e.preventDefault(); }
+});
+
+// ---------- global keyboard ----------
+document.addEventListener("keydown", e => {
+  const inField = /^(TEXTAREA|INPUT)$/.test(document.activeElement.tagName);
+  if ($("#overlay").classList.contains("show")) return;  // palette owns keys
+  if (e.key === "Escape"){ if (inField) document.activeElement.blur(); return; }
+  if (inField) return;  // don't hijack while editing JSON
+  if (e.key === ":"){ openPalette(); e.preventDefault(); }
+  else if (e.key === "j"){ selectJob(Math.min(state.sel+1, state.jobs.length-1)); }
+  else if (e.key === "k"){ selectJob(Math.max(state.sel-1, 0)); }
+  else if (e.key === "Enter"){ runSelected(); }
+});
+
+// ---------- boot ----------
+renderJobs();
+selectJob(0);
+loadEditor();
+log("texproc tui ready — press Enter to run scan#1, or : for command palette", "dim");
+
+// ---------- self-check (ponytail: minimal invariant guard) ----------
+(function selfCheck(){
+  const g = JSON.parse(state.groupsText);
+  console.assert(g.groups.filter(x => x.type==="unknown").length === 5, "expected 5 unknown seed groups");
+  console.assert(DAGS.process.nodes.length === 10 && DAGS.convert.nodes.length === 4, "DAG node counts");
+  console.assert(Object.keys(NODE_INFO).length >= DAGS.process.nodes.length + DAGS.convert.nodes.length, "every node has info");
+})();
+</script>

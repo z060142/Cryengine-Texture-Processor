@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作台 — CryEngine 貼圖處理器</title>
+<style>
+  :root{
+    --bg:#eef0f3; --panel:#ffffff; --panel2:#f7f8fa; --border:#d7dbe2;
+    --border-strong:#c2c8d2; --ink:#242832; --muted:#6b7280; --muted2:#9099a6;
+    --accent:#2563eb; --accent-weak:#e8f0fe; --ok:#16a34a; --ok-weak:#e7f6ec;
+    --warn:#d97706; --warn-weak:#fff7ea; --warn-line:#f0a838; --hazard:#dc2626;
+    --radius:8px;
+    font-family:"Segoe UI","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); font-size:13px; overflow:hidden; min-width:1280px}
+  button{font-family:inherit; cursor:pointer}
+  select,input{font-family:inherit; font-size:12.5px}
+
+  /* ---------- app frame ---------- */
+  #app{display:flex; flex-direction:column; height:100vh}
+  .titlebar{
+    height:40px; flex:0 0 40px; display:flex; align-items:center; gap:12px;
+    padding:0 16px; background:linear-gradient(180deg,#fbfcfd,#f1f3f6);
+    border-bottom:1px solid var(--border);
+  }
+  .titlebar .logo{width:20px;height:20px;border-radius:5px;
+    background:linear-gradient(135deg,var(--accent),#7c3aed)}
+  .titlebar b{font-size:13.5px; font-weight:600}
+  .titlebar .ver{color:var(--muted2); font-size:11.5px}
+  .titlebar .menu{margin-left:14px; display:flex; gap:2px}
+  .titlebar .menu span{padding:5px 10px; border-radius:6px; color:#4b5563; font-size:12.5px}
+  .titlebar .menu span:hover{background:#e7ebf1}
+
+  .workbench{flex:1; display:grid; grid-template-columns:308px 1fr 372px; min-height:0}
+  .col{min-height:0; display:flex; flex-direction:column; overflow:hidden}
+  .col.left{border-right:1px solid var(--border); background:var(--panel2)}
+  .col.right{border-left:1px solid var(--border); background:var(--panel2)}
+  .col.center{background:var(--bg)}
+
+  /* ---------- generic panel bits ---------- */
+  .ptitle{font-size:11px; font-weight:700; letter-spacing:.6px; color:var(--muted);
+    text-transform:uppercase; padding:11px 14px 7px}
+  .btn{
+    border:1px solid var(--border-strong); background:var(--panel); color:#333a45;
+    padding:7px 12px; border-radius:6px; font-size:12.5px; font-weight:500;
+    transition:background .12s, border-color .12s;
+  }
+  .btn:hover{background:#eef2f7; border-color:#a9b2bf}
+  .btn:active{background:#e3e8ef}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#1d54c9}
+  .btn:disabled{opacity:.5; cursor:default}
+
+  /* ---------- left column ---------- */
+  .tabs{display:flex; padding:8px 8px 0; gap:4px; background:var(--panel2)}
+  .tab{
+    flex:1; text-align:center; padding:9px 4px; font-size:13px; font-weight:600; color:var(--muted);
+    border:1px solid transparent; border-bottom:none; border-radius:7px 7px 0 0; background:transparent;
+  }
+  .tab:hover{color:var(--ink)}
+  .tab.on{background:var(--panel); color:var(--accent); border-color:var(--border);
+    box-shadow:0 -1px 0 var(--accent) inset}
+  .tabpane{flex:1; min-height:0; display:none; flex-direction:column;
+    background:var(--panel); border-top:1px solid var(--border)}
+  .tabpane.on{display:flex}
+
+  .toolrow{display:flex; gap:7px; padding:11px 12px; border-bottom:1px solid var(--border)}
+  .toolrow .btn{flex:1}
+  .filelist,.modellist{flex:1; overflow-y:auto; padding:6px}
+  .empty{color:var(--muted2); font-size:12.5px; text-align:center; padding:34px 16px; line-height:1.7}
+  .frow{display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:5px; font-size:12px}
+  .frow:hover{background:var(--panel2)}
+  .frow .ic{width:14px;height:14px;border-radius:3px;flex:0 0 14px}
+  .frow .fn{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#3a4048}
+  .frow .grp{margin-left:auto; color:var(--muted2); font-size:10.5px; flex:0 0 auto}
+  .listcount{padding:8px 12px; border-top:1px solid var(--border); color:var(--muted);
+    font-size:11.5px; background:var(--panel2)}
+
+  /* model material table */
+  .mtl-head{padding:10px 12px; border-bottom:1px solid var(--border)}
+  .mtl-head .fname{font-weight:600; font-size:12.5px}
+  .mtl-head .sub{color:var(--muted); font-size:11.5px; margin-top:2px}
+  .mtltbl{flex:1; overflow:auto}
+  table.mat{width:100%; border-collapse:collapse; font-size:11.5px}
+  table.mat th{position:sticky; top:0; background:var(--panel2); color:var(--muted);
+    font-weight:600; text-align:left; padding:6px 8px; border-bottom:1px solid var(--border); font-size:10.5px}
+  table.mat td{padding:5px 8px; border-bottom:1px solid #eef0f3; white-space:nowrap}
+  table.mat tr:hover td{background:var(--panel2)}
+  table.mat .unassigned td{color:var(--warn); background:var(--warn-weak); font-style:italic}
+  .pz{display:inline-block; padding:1px 6px; border-radius:9px; background:#eef1f5; color:#5a6472; font-size:10px}
+
+  /* ---------- center column ---------- */
+  .preview{flex:0 0 246px; margin:12px 12px 6px; background:var(--panel);
+    border:1px solid var(--border); border-radius:var(--radius); display:flex; overflow:hidden}
+  .pv-img{flex:0 0 300px; position:relative; background:
+    repeating-conic-gradient(#e9ecf0 0% 25%, #f6f7f9 0% 50%) 0/22px 22px}
+  .pv-grad{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:#ffffffcc; font-size:12px; letter-spacing:1px; text-shadow:0 1px 3px #0006}
+  .pv-info{flex:1; padding:16px 18px; display:flex; flex-direction:column; min-width:0}
+  .pv-info .gname{font-size:16px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .pv-info .gmeta{color:var(--muted); font-size:12px; margin-top:3px}
+  .pv-badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+  .badge{padding:3px 9px; border-radius:12px; font-size:11px; font-weight:500;
+    background:var(--accent-weak); color:#1d4ed8; border:1px solid #cfe0fc}
+  .pv-hint{margin-top:auto; color:var(--muted2); font-size:11.5px}
+  .pv-empty{flex:1; display:flex; align-items:center; justify-content:center; color:var(--muted2)}
+
+  .groups{flex:1; margin:6px 12px 12px; background:var(--panel); border:1px solid var(--border);
+    border-radius:var(--radius); display:flex; flex-direction:column; min-height:0; overflow:hidden}
+  .groups .ghead{display:flex; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border)}
+  .groups .ghead b{font-size:13px}
+  .groups .ghead .cnt{margin-left:auto; color:var(--muted); font-size:12px}
+  .groups .ghead .cnt em{font-style:normal; color:var(--warn); font-weight:600}
+  .gt-wrap{flex:1; overflow:auto}
+  table.grp{border-collapse:collapse; width:100%; font-size:12px}
+  table.grp th{position:sticky; top:0; z-index:1; background:var(--panel2); color:var(--muted);
+    font-weight:600; padding:8px 6px; border-bottom:1px solid var(--border); font-size:10.5px; text-align:center}
+  table.grp th.name-col{text-align:left; padding-left:14px}
+  table.grp td{border-bottom:1px solid #eef0f3; padding:0 6px; height:34px; text-align:center}
+  table.grp td.name-col{text-align:left; padding-left:14px; max-width:180px}
+  table.grp td.name-col .nm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500}
+  table.grp tr{cursor:pointer}
+  table.grp tr:hover td{background:var(--panel2)}
+  table.grp tr.sel td{background:var(--accent-weak)}
+  table.grp tr.unknown td{background:var(--warn-weak)}
+  table.grp tr.unknown.sel td{background:#fdeccf}
+  table.grp tr.unknown td.name-col{box-shadow:inset 3px 0 0 var(--warn-line)}
+  .cell{display:inline-block; width:15px; height:15px; border-radius:4px; vertical-align:middle}
+  .cell.on{background:var(--ok)}
+  .cell.off{background:#e4e7ec; box-shadow:inset 0 0 0 1px #d5d9e0}
+  td.uk select{width:118px; padding:3px 4px; border:1px solid var(--warn-line); border-radius:5px;
+    background:#fffdf7; color:#8a5a08; font-weight:600}
+  td.uk .done{color:var(--ok); font-weight:600; font-size:11.5px}
+  td.uk .dash{color:var(--muted2)}
+
+  /* ---------- right column ---------- */
+  .rscroll{flex:1; overflow-y:auto; padding:12px}
+  .field{margin-bottom:14px}
+  .field label{display:block; font-size:11.5px; font-weight:600; color:#4b5563; margin-bottom:5px}
+  .field .row{display:flex; gap:6px}
+  .field input[type=text]{flex:1; padding:7px 9px; border:1px solid var(--border-strong);
+    border-radius:6px; background:var(--panel)}
+  .field .status{font-size:11px; color:var(--muted2); margin-top:5px}
+  .field select{width:100%; padding:7px 9px; border:1px solid var(--border-strong);
+    border-radius:6px; background:var(--panel)}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px 12px}
+  .check{display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12.5px; color:#333a45}
+  .check input{width:15px;height:15px; accent-color:var(--accent)}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:13px 14px; margin-bottom:12px}
+  .card > .sec{font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--muted);
+    text-transform:uppercase; margin-bottom:11px}
+  details.adv{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px}
+  details.adv > summary{list-style:none; cursor:pointer; padding:11px 14px; font-size:12.5px; font-weight:600;
+    display:flex; align-items:center; gap:8px; color:#3a4048}
+  details.adv > summary::-webkit-details-marker{display:none}
+  details.adv > summary .chev{transition:transform .15s; color:var(--muted2)}
+  details.adv[open] > summary .chev{transform:rotate(90deg)}
+  details.adv .body{padding:2px 14px 14px}
+  .slider{display:flex; align-items:center; gap:10px; margin-bottom:9px}
+  .slider label{flex:0 0 92px; font-size:12px; color:#4b5563}
+  .slider input[type=range]{flex:1; accent-color:var(--accent)}
+  .slider .val{flex:0 0 34px; text-align:right; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .typegrid{display:grid; grid-template-columns:1fr 1fr; gap:2px 12px}
+  .actions{padding:12px; border-top:1px solid var(--border); background:var(--panel2);
+    display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .actions .btn{width:100%}
+  .actions .btn.wide{grid-column:1 / -1}
+
+  /* ---------- status bar ---------- */
+  .statusbar{flex:0 0 28px; height:28px; display:flex; align-items:center; gap:14px; padding:0 14px;
+    background:linear-gradient(180deg,#f4f6f8,#eaedf1); border-top:1px solid var(--border);
+    font-size:11.5px; color:#4b5563}
+  .statusbar .msg{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .statusbar .diag{display:flex; align-items:center; gap:6px; padding:2px 9px; border-radius:11px;
+    background:var(--warn-weak); color:var(--warn); border:1px solid #f3d9a8; font-weight:600}
+  .statusbar .diag:hover{background:#fdeecb}
+  .statusbar .diag.clean{background:var(--ok-weak); color:#15803d; border-color:#bfe6c9}
+  .statusbar .diag .dotw{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+  /* ---------- overlays ---------- */
+  .backdrop{position:fixed; inset:0; background:rgba(20,24,32,.34); z-index:50;
+    display:flex; align-items:center; justify-content:center; opacity:0; visibility:hidden; transition:opacity .18s}
+  .backdrop.show{opacity:1; visibility:visible}
+  .modal{width:520px; max-height:78vh; background:var(--panel); border-radius:12px; overflow:hidden;
+    box-shadow:0 24px 70px rgba(0,0,0,.35); display:flex; flex-direction:column}
+  .modal h3{padding:16px 20px 4px; font-size:15px}
+  .modal .msub{padding:0 20px 12px; color:var(--muted); font-size:12px}
+  .modal .obar{margin:0 20px 8px; height:8px; border-radius:5px; background:#eaecf0; overflow:hidden}
+  .modal .obar i{display:block; height:100%; width:0; border-radius:5px;
+    background:linear-gradient(90deg,var(--accent),#6d9bf5); transition:width .2s}
+  .modal .plist{margin:6px 20px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; flex:1}
+  .modal .pitem{display:flex; align-items:center; gap:10px; padding:7px 12px; font-size:12px; border-bottom:1px solid #f0f2f5}
+  .modal .pitem:last-child{border-bottom:none}
+  .modal .pitem .pn{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#3a4048}
+  .modal .pitem .st{font-size:11px; color:var(--muted2)}
+  .modal .pitem.done .st{color:var(--ok)}
+  .modal .pitem.run{background:var(--accent-weak)}
+  .modal .pitem.run .st{color:var(--accent); font-weight:600}
+  .modal .mfoot{padding:12px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px}
+  .spinner{width:12px;height:12px;border-radius:50%;border:2px solid #c7d2fe;border-top-color:var(--accent);
+    animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tick{color:var(--ok); font-weight:700}
+
+  .popover{position:fixed; z-index:60; width:430px; background:var(--panel); border:1px solid var(--border);
+    border-radius:10px; box-shadow:0 16px 44px rgba(0,0,0,.24); overflow:hidden;
+    opacity:0; visibility:hidden; transform:translateY(6px); transition:.15s}
+  .popover.show{opacity:1; visibility:visible; transform:none}
+  .popover .ph{padding:11px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:12.5px;
+    display:flex; align-items:center; gap:8px}
+  .popover .plist2{max-height:280px; overflow-y:auto}
+  .popover .dg{display:flex; gap:10px; padding:10px 14px; border-bottom:1px solid #f0f2f5; font-size:12px}
+  .popover .dg:last-child{border-bottom:none}
+  .popover .dg .sev{flex:0 0 auto; font-size:10px; font-weight:700; padding:2px 7px; border-radius:9px; height:fit-content}
+  .sev.warn{background:var(--warn-weak); color:var(--warn)}
+  .sev.info{background:#eef2fb; color:#3557b7}
+  .popover .dg .txt b{display:block; font-size:11px; color:var(--muted); font-weight:600; margin-bottom:2px}
+  .popover .dg .txt span{color:#3a4048; line-height:1.5}
+
+  .toast{position:fixed; right:22px; bottom:44px; z-index:70; display:flex; align-items:center; gap:13px;
+    padding:13px 16px; min-width:300px; background:var(--panel); border:1px solid var(--border);
+    border-left:4px solid var(--ok); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.22);
+    transform:translateX(140%); transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{transform:none}
+  .toast .tk{width:26px;height:26px;border-radius:50%;background:var(--ok-weak);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 26px}
+  .toast b{font-size:13px}
+  .toast span{display:block; color:var(--muted); font-size:11.5px; margin-top:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="titlebar">
+    <div class="logo"></div>
+    <b>CryEngine 貼圖處理器</b><span class="ver">工作台 · v0.2</span>
+    <div class="menu"><span>檔案</span><span>編輯</span><span>說明</span></div>
+  </div>
+
+  <div class="workbench">
+    <!-- ========== LEFT ========== -->
+    <aside class="col left">
+      <div class="tabs">
+        <button class="tab on" data-tab="tex">貼圖匯入</button>
+        <button class="tab" data-tab="mdl">模型匯入</button>
+      </div>
+
+      <!-- texture tab -->
+      <div class="tabpane on" id="pane-tex">
+        <div class="toolrow">
+          <button class="btn" id="addFiles">加入檔案…</button>
+          <button class="btn" id="addFolder">加入資料夾…</button>
+        </div>
+        <div class="filelist" id="fileList">
+          <div class="empty">尚未匯入貼圖<br>按「加入資料夾…」載入 KB3D 素材</div>
+        </div>
+        <div class="listcount" id="fileCount">0 個檔案</div>
+      </div>
+
+      <!-- model tab -->
+      <div class="tabpane" id="pane-mdl">
+        <div class="toolrow">
+          <button class="btn" id="addModel" style="flex:2">加入模型…</button>
+        </div>
+        <div class="modellist" id="modelList">
+          <div class="empty">尚未匯入模型<br>按「加入模型…」載入 car.fbx</div>
+        </div>
+        <div class="mtl-head" id="mtlHead" style="display:none">
+          <div class="fname">car.fbx</div>
+          <div class="sub">16 材質 + 1 未指派 · RC 材質表</div>
+        </div>
+        <div class="mtltbl" id="mtlTbl" style="display:none"></div>
+      </div>
+    </aside>
+
+    <!-- ========== CENTER ========== -->
+    <main class="col center">
+      <section class="preview" id="preview">
+        <div class="pv-empty" id="pvEmpty">選一個分組以檢視預覽</div>
+        <div class="pv-img" id="pvImg" style="display:none"><div class="pv-grad" id="pvGrad"></div></div>
+        <div class="pv-info" id="pvInfo" style="display:none">
+          <div class="gname" id="pvName"></div>
+          <div class="gmeta" id="pvMeta"></div>
+          <div class="pv-badges" id="pvBadges"></div>
+          <div class="pv-hint" id="pvHint"></div>
+        </div>
+      </section>
+
+      <section class="groups">
+        <div class="ghead">
+          <b>偵測到的貼圖分組</b>
+          <div class="cnt" id="grpCount">尚未匯入</div>
+        </div>
+        <div class="gt-wrap">
+          <table class="grp" id="grpTable"><thead id="grpHead"></thead><tbody id="grpBody"></tbody></table>
+        </div>
+      </section>
+    </main>
+
+    <!-- ========== RIGHT ========== -->
+    <aside class="col right">
+      <div class="ptitle">輸出設定</div>
+      <div class="rscroll">
+        <div class="field">
+          <label>貼圖輸出目錄</label>
+          <div class="row">
+            <input type="text" id="outDir" placeholder="尚未設定，輸出時會詢問" value="D:\Assets\KB3D\_cryengine">
+            <button class="btn" id="browseDir">瀏覽…</button>
+          </div>
+          <div class="status" id="dirStatus">目錄有效且可寫入。</div>
+        </div>
+
+        <div class="card">
+          <div class="sec">常用五項</div>
+          <div class="field" style="margin-bottom:10px">
+            <label>輸出解析度</label>
+            <select id="setRes">
+              <option value="original">原始</option><option>4096</option>
+              <option selected>2048</option><option>1024</option><option>512</option>
+            </select>
+          </div>
+          <div class="field" style="margin-bottom:6px">
+            <label>Diffuse 格式</label>
+            <select id="setDiff"><option value="albedo">albedo</option><option value="diffuse_ao">diffuse_ao</option></select>
+          </div>
+          <label class="check"><input type="checkbox" id="setFlip">翻轉法線 G 通道</label>
+          <label class="check"><input type="checkbox" id="setMetal" checked>處理金屬流程（Metallic → Albedo+Reflection）</label>
+          <label class="check"><input type="checkbox" id="setSpec" checked>補生成缺失的 Spec</label>
+        </div>
+
+        <details class="adv">
+          <summary><span class="chev">▶</span>進階</summary>
+          <div class="body">
+            <div class="field" style="margin-top:8px">
+              <label>ARM 通道順序</label>
+              <select id="advArm"><option>AO / Roughness / Metallic</option><option>Roughness / Metallic / AO</option><option>Metallic / AO / Roughness</option></select>
+            </div>
+            <div class="slider"><label>SSS 強度</label><input type="range" min="0" max="100" value="60" id="advSssS"><span class="val" id="vSssS">60</span></div>
+            <div class="slider"><label>SSS 對比</label><input type="range" min="0" max="100" value="45" id="advSssC"><span class="val" id="vSssC">45</span></div>
+            <div class="slider"><label>自發光亮度</label><input type="range" min="0" max="200" value="100" id="advEm"><span class="val" id="vEm">100</span></div>
+            <div class="field" style="margin-top:12px">
+              <label>輸出型別開關</label>
+              <div class="typegrid" id="typeGrid"></div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary wide" id="btnBatch">批次處理</button>
+        <button class="btn" id="btnTexOnly">僅輸出貼圖</button>
+        <button class="btn" id="btnMtl">輸出材質</button>
+        <button class="btn wide" id="btnSave">儲存設定</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="statusbar">
+    <div class="msg" id="statusMsg">就緒</div>
+    <div class="diag clean" id="diagChip"><span class="dotw"></span><span id="diagLabel">無診斷</span></div>
+  </div>
+</div>
+
+<!-- batch progress modal -->
+<div class="backdrop" id="batchBack">
+  <div class="modal">
+    <h3 id="batchTitle">批次處理中…</h3>
+    <div class="msub" id="batchSub">正在轉換貼圖分組</div>
+    <div class="obar"><i id="batchFill"></i></div>
+    <div class="plist" id="batchList"></div>
+    <div class="mfoot">
+      <button class="btn" id="batchCancel">取消</button>
+      <button class="btn primary" id="batchClose" style="display:none">完成</button>
+    </div>
+  </div>
+</div>
+
+<!-- diagnostics popover -->
+<div class="popover" id="diagPop">
+  <div class="ph">⚠ 處理診斷 <span id="diagPopCount" style="color:var(--muted);font-weight:400"></span></div>
+  <div class="plist2" id="diagPopList"></div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="tk">✓</div>
+  <div><b id="toastTitle">完成</b><span id="toastSub"></span></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+
+/* ---------- type columns (CryEngine-ish slots) ---------- */
+const TYPES=[
+  {k:'diff',label:'顏色'},{k:'normal',label:'法線'},{k:'spec',label:'高光'},
+  {k:'gloss',label:'光澤'},{k:'metal',label:'金屬'},{k:'height',label:'高度'},
+  {k:'ao',label:'AO'},{k:'emissive',label:'自發光'}
+];
+const SUFFIX={diff:'diff',normal:'ddna',spec:'spec',gloss:'gloss',metal:'metal',height:'displ',ao:'ao',emissive:'em'};
+// unknown assign options (mirrors PySide classify combo)
+const ASSIGN=[['diff','顏色 diffuse'],['normal','法線 normal'],['spec','高光 specular'],
+  ['gloss','光澤 gloss'],['metal','金屬 metallic'],['height','高度 displ'],['ao','ao'],
+  ['emissive','自發光 emissive'],['alpha','透明 alpha'],['sss','sss']];
+
+/* ---------- fake dataset: 14 shown of 132, 5 unknown=refraction ---------- */
+const P=(...k)=>{const o={}; k.forEach(x=>o[x]=true); return o;};
+const groups=[
+  {n:'KB3D_ENC_AtlasA',        c:['#8a6a4a','#3a2a1c'], t:P('diff','normal','spec','gloss','metal','height','ao')},
+  {n:'KB3D_ENC_GlassClean',    c:['#bfe6ea','#4a7d86'], t:P('diff','normal','gloss','spec'), uk:'refraction'},
+  {n:'KB3D_ENC_Water',         c:['#3f7fa8','#123246'], t:P('diff','normal','gloss'), uk:'refraction'},
+  {n:'KB3D_ENC_StainedGlassGreen',c:['#7fbf5a','#1e4a24'], t:P('diff','normal','emissive'), uk:'refraction'},
+  {n:'KB3D_ENC_StainedGlassMulti',c:['#c85a9a','#3a2a7a'], t:P('diff','normal','spec','emissive'), uk:'refraction'},
+  {n:'KB3D_ENC_GlassFrosted',  c:['#d4dbe0','#6a7076'], t:P('diff','normal','gloss'), uk:'refraction'},
+  {n:'KB3D_ENC_ConcreteWall',  c:['#9a938a','#3f3b36'], t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_MetalPanel',    c:['#b8bcc2','#43484f'], t:P('diff','normal','spec','gloss','metal','ao')},
+  {n:'KB3D_ENC_BrickWall',     c:['#b0563a','#3f1f16'], t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_WoodPlank',     c:['#a9743f','#4a2f18'], t:P('diff','normal','gloss','height')},
+  {n:'KB3D_ENC_RustedPipe',    c:['#a5623a','#3a251a'], t:P('diff','normal','spec','gloss','metal','ao')},
+  {n:'KB3D_ENC_NeonSign',      c:['#ff5ea8','#2a0f3a'], t:P('diff','normal','emissive')},
+  {n:'KB3D_ENC_Asphalt',       c:['#4b4d52','#232427'], t:P('diff','normal','gloss','height','ao')},
+  {n:'KB3D_ENC_MarbleFloor',   c:['#e7e2d8','#8a8578'], t:P('diff','normal','spec','gloss','height')},
+];
+const TOTAL=132; // 資料集共 132 組，此處顯示前 14
+
+let imported=false, selIdx=-1;
+
+/* ---------- import ---------- */
+function doImport(){
+  if(imported){ setStatus('已匯入，重新掃描分組…'); return; }
+  imported=true;
+  // file list
+  const fl=$("#fileList"); fl.innerHTML=""; let n=0;
+  groups.forEach((g,gi)=>{
+    Object.keys(g.t).forEach(k=>{
+      const r=el('div','frow'); n++;
+      r.innerHTML=`<span class="ic" style="background:linear-gradient(135deg,${g.c[0]},${g.c[1]})"></span>
+        <span class="fn">${g.n}_${SUFFIX[k]}.png</span><span class="grp">${g.n.replace('KB3D_ENC_','')}</span>`;
+      fl.appendChild(r);
+    });
+    if(g.uk){ const r=el('div','frow'); n++;
+      r.innerHTML=`<span class="ic" style="background:linear-gradient(135deg,${g.c[0]},${g.c[1]})"></span>
+        <span class="fn" style="color:#b5710a">${g.n}_${g.uk}.png</span><span class="grp">unknown</span>`;
+      fl.appendChild(r); }
+  });
+  $("#fileCount").textContent=`${n} 個檔案 · ${TOTAL} 組（顯示前 ${groups.length}）`;
+  buildTable();
+  setStatus(`已匯入 ${TOTAL} 組貼圖，自動分組完成`);
+  refreshUnknownCount();
+}
+$("#addFiles").onclick=$("#addFolder").onclick=doImport;
+
+/* ---------- groups table ---------- */
+function buildTable(){
+  const head=$("#grpHead"); head.innerHTML="";
+  const hr=el('tr'); hr.appendChild(el('th','name-col','分組'));
+  TYPES.forEach(t=>hr.appendChild(el('th',null,t.label)));
+  hr.appendChild(el('th',null,'未指派'));
+  head.appendChild(hr);
+
+  const body=$("#grpBody"); body.innerHTML="";
+  groups.forEach((g,i)=>{
+    const tr=el('tr'); tr.dataset.i=i; if(g.uk) tr.classList.add('unknown');
+    const nc=el('td','name-col'); nc.innerHTML=`<div class="nm" title="${g.n}">${g.n}</div>`; tr.appendChild(nc);
+    TYPES.forEach(t=>{
+      const td=el('td'); td.dataset.k=t.k;
+      td.innerHTML=`<span class="cell ${g.t[t.k]?'on':'off'}"></span>`;
+      tr.appendChild(td);
+    });
+    const uk=el('td','uk');
+    if(g.uk) uk.innerHTML=buildSelect(i);
+    else uk.innerHTML='<span class="dash">—</span>';
+    tr.appendChild(uk);
+    tr.onclick=e=>{ if(e.target.tagName==='SELECT') return; select(i); };
+    body.appendChild(tr);
+  });
+  $("#grpCount").textContent=`共 ${TOTAL} 組（顯示前 ${groups.length}）`;
+}
+function buildSelect(i){
+  const opts=ASSIGN.map(([k,l])=>`<option value="${k}">${l}</option>`).join("");
+  return `<select data-i="${i}" title="refraction 未知型別，請指派"><option value="">指派 refraction…</option>${opts}</select>`;
+}
+// assign unknown
+$("#grpBody").addEventListener('change',e=>{
+  const s=e.target; if(s.tagName!=='SELECT'||!s.value) return;
+  const i=+s.dataset.i, g=groups[i], k=s.value;
+  const tr=$(`#grpBody tr[data-i="${i}"]`);
+  if(g.t.hasOwnProperty(k) || TYPES.some(t=>t.k===k)){ // fillable column
+    g.t[k]=true; const cell=tr.querySelector(`td[data-k="${k}"] .cell`);
+    if(cell){cell.classList.remove('off'); cell.classList.add('on');}
+  }
+  delete g.uk;
+  tr.classList.remove('unknown');
+  tr.querySelector('td.uk').innerHTML='<span class="done">✓ 已指派</span>';
+  if(selIdx===i) select(i);
+  refreshUnknownCount();
+  setStatus(`已將 ${g.n} 的 refraction 指派為 ${k}`);
+});
+function refreshUnknownCount(){
+  const u=groups.filter(g=>g.uk).length;
+  const c=$("#grpCount");
+  c.innerHTML = u>0 ? `共 ${TOTAL} 組（顯示前 ${groups.length}）· <em>${u} 組待指派</em>` : `共 ${TOTAL} 組 · 全部已指派`;
+}
+
+/* ---------- preview ---------- */
+function select(i){
+  selIdx=i; const g=groups[i];
+  [...$("#grpBody").children].forEach(tr=>tr.classList.toggle('sel',+tr.dataset.i===i));
+  $("#pvEmpty").style.display='none';
+  $("#pvImg").style.display='block'; $("#pvInfo").style.display='flex';
+  $("#pvGrad").parentElement.style.background=
+    `repeating-conic-gradient(#e9ecf0 0% 25%, #f6f7f9 0% 50%) 0/22px 22px`;
+  $("#pvGrad").style.background=`linear-gradient(150deg,${g.c[0]},${g.c[1]})`;
+  $("#pvGrad").textContent='basecolor 預覽';
+  $("#pvName").textContent=g.n;
+  const cnt=Object.keys(g.t).length;
+  $("#pvMeta").textContent=`${cnt} 個貼圖通道`+(g.uk?` · 1 個未指派（${g.uk}）`:'');
+  const bg=$("#pvBadges"); bg.innerHTML="";
+  TYPES.forEach(t=>{ if(g.t[t.k]) bg.appendChild(el('span','badge',t.label)); });
+  if(g.uk){ const b=el('span','badge',g.uk+' ?'); b.style.cssText='background:var(--warn-weak);color:var(--warn);border-color:#f3d9a8'; bg.appendChild(b); }
+  $("#pvHint").textContent=g.uk?'此組含未知型別，請於下方表格指派。':'此組型別完整，可直接輸出。';
+}
+
+/* ---------- advanced sliders + type grid ---------- */
+[['advSssS','vSssS'],['advSssC','vSssC'],['advEm','vEm']].forEach(([r,v])=>{
+  $("#"+r).addEventListener('input',e=>$("#"+v).textContent=e.target.value);
+});
+const OUTTYPES=[['diff','Diffuse (_diff)'],['spec','Specular (_spec)'],['ddna','Normal & Gloss (_ddna)'],
+  ['displ','Displacement (_displ)'],['emissive','Emissive (_em)'],['sss','SSS (_sss)']];
+const tg=$("#typeGrid");
+OUTTYPES.forEach(([k,l])=>{
+  const lab=el('label','check',`<input type="checkbox" checked data-tk="${k}">${l}`);
+  lab.style.padding='4px 0'; tg.appendChild(lab);
+});
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); $("#pane-"+t.dataset.tab).classList.add('on');
+});
+
+/* ---------- model import (car.fbx) ---------- */
+const MATERIALS=[
+  'Body_Paint','Glass','Chrome_Trim','Tire_Rubber','Brake_Disc','Interior_Leather',
+  'Dashboard','Headlight','Taillight','Grille','License_Plate','Underbody',
+  'Engine_Block','Exhaust','Wheel_Rim','Seatbelt'];
+const PHYS=['ProxyNoDraw','Default','NoCollide','Obstruct'];
+let modelImported=false;
+$("#addModel").onclick=()=>{
+  if(modelImported){ setStatus('car.fbx 已載入'); return; }
+  modelImported=true;
+  const ml=$("#modelList"); ml.innerHTML="";
+  const r=el('div','frow'); r.innerHTML=`<span class="ic" style="background:linear-gradient(135deg,#3a63c0,#1b2a52)"></span>
+    <span class="fn">car.fbx</span><span class="grp">16 材質</span>`;
+  ml.appendChild(r);
+  $("#mtlHead").style.display='block';
+  const wrap=$("#mtlTbl"); wrap.style.display='block';
+  let rows=MATERIALS.map((m,i)=>`<tr><td>${i}</td><td>${m}</td><td>${i}</td><td><span class="pz">${PHYS[i%PHYS.length]}</span></td></tr>`).join("");
+  rows+=`<tr class="unassigned"><td>16</td><td>&lt;unassigned&gt;</td><td>—</td><td>—</td></tr>`;
+  wrap.innerHTML=`<table class="mat"><thead><tr><th>槽位</th><th>材質</th><th>sub_index</th><th>physicalize</th></tr></thead><tbody>${rows}</tbody></table>`;
+  setStatus('已載入 car.fbx：16 材質 + 1 未指派槽');
+};
+
+/* ---------- status + diagnostics ---------- */
+function setStatus(m){ $("#statusMsg").textContent=m; }
+const DIAGS=groups.filter(g=>g.uk).map(g=>({sev:'warn',code:'DEF-19',
+  title:`DEF-19 · ${g.n}`, msg:`型別「${g.uk}」在 CryEngine 無對應輸出通道，批次時將略過此貼圖。可於分組表指派為 alpha 或 diffuse。`}));
+DIAGS.push({sev:'info',code:'DEF-07',title:'DEF-07 · KB3D_ENC_NeonSign',
+  msg:'偵測到 emissive 但未偵測到 spec/gloss；補生成 Spec 已開啟，將產生預設高光貼圖。'});
+
+function activeDiags(){
+  if(!imported) return [];
+  return DIAGS.filter(d=>d.code!=='DEF-19' || groups.some(g=>g.uk&&d.title.includes(g.n)));
+}
+function renderDiagChip(){
+  const chip=$("#diagChip"), cnt=activeDiags().length;
+  if(cnt>0){ chip.classList.remove('clean'); $("#diagLabel").textContent=`${cnt} 項診斷`; }
+  else { chip.classList.add('clean'); $("#diagLabel").textContent='無診斷'; }
+}
+$("#diagChip").onclick=()=>{
+  const pop=$("#diagPop");
+  if(pop.classList.contains('show')){ pop.classList.remove('show'); return; }
+  const active=activeDiags();
+  $("#diagPopCount").textContent=`(${active.length})`;
+  const list=$("#diagPopList"); list.innerHTML="";
+  if(!active.length) list.innerHTML='<div class="dg"><div class="txt"><span>目前沒有診斷訊息。</span></div></div>';
+  active.forEach(d=>{
+    const g=el('div','dg'); g.innerHTML=`<span class="sev ${d.sev}">${d.sev==='warn'?'警告':'資訊'}</span>
+      <div class="txt"><b>${d.title}</b><span>${d.msg}</span></div>`;
+    list.appendChild(g);
+  });
+  const r=$("#diagChip").getBoundingClientRect();
+  pop.style.left=Math.min(r.left, window.innerWidth-450)+'px';
+  pop.style.top=(r.top-Math.min(active.length*66+56,340)-8)+'px';
+  pop.classList.add('show');
+};
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#diagPop')&&!e.target.closest('#diagChip')) $("#diagPop").classList.remove('show');
+});
+// keep diag count fresh whenever unknowns change
+const _refresh=refreshUnknownCount; refreshUnknownCount=function(){ _refresh(); renderDiagChip(); };
+
+/* ---------- batch processing modal ---------- */
+let batchTimer=null, batchCancelled=false;
+function openBatch(title,sub){
+  if(!imported){ setStatus('請先匯入貼圖'); return; }
+  batchCancelled=false;
+  $("#batchTitle").textContent=title; $("#batchSub").textContent=sub;
+  $("#batchClose").style.display='none'; $("#batchCancel").style.display='';
+  $("#batchCancel").textContent='取消';
+  const list=$("#batchList"); list.innerHTML="";
+  groups.forEach((g,i)=>{
+    const it=el('div','pitem'); it.dataset.i=i;
+    it.innerHTML=`<span class="pn">${g.n}</span><span class="st">等待中</span>`;
+    list.appendChild(it);
+  });
+  $("#batchFill").style.width='0%';
+  $("#batchBack").classList.add('show');
+  let i=0; const items=[...list.children];
+  const step=()=>{
+    if(batchCancelled) return;
+    if(i>0){ const p=items[i-1]; p.classList.remove('run'); p.classList.add('done');
+      p.querySelector('.st').innerHTML='<span class="tick">✓ 完成</span>'; }
+    if(i>=items.length){ finishBatch(); return; }
+    const it=items[i]; it.classList.add('run');
+    it.querySelector('.st').innerHTML='<span class="spinner" style="display:inline-block;vertical-align:middle"></span> 轉換中';
+    it.scrollIntoView({block:'nearest'});
+    $("#batchFill").style.width=Math.round((i+1)/items.length*100)+'%';
+    i++; batchTimer=setTimeout(step,260);
+  };
+  step();
+}
+function finishBatch(){
+  const skipped=groups.filter(g=>g.uk).length;
+  $("#batchTitle").textContent='批次處理完成';
+  $("#batchSub").textContent=`已處理 ${TOTAL} 組`+(skipped?` · ${skipped} 組含未指派貼圖被略過`:'');
+  $("#batchCancel").style.display='none'; $("#batchClose").style.display='';
+  setStatus(`完成：${TOTAL} 組貼圖已輸出，${skipped} 個 refraction 略過，0 錯誤`);
+}
+$("#batchCancel").onclick=()=>{ batchCancelled=true; clearTimeout(batchTimer);
+  $("#batchBack").classList.remove('show'); setStatus('批次處理已取消'); };
+$("#batchClose").onclick=()=>$("#batchBack").classList.remove('show');
+$("#btnBatch").onclick=()=>openBatch('批次處理中…','貼圖 + 模型材質');
+$("#btnTexOnly").onclick=()=>openBatch('僅輸出貼圖…','轉換貼圖分組');
+
+/* ---------- toast actions ---------- */
+function toast(title,sub){
+  $("#toastTitle").textContent=title; $("#toastSub").textContent=sub;
+  const t=$("#toast"); t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200);
+}
+$("#btnMtl").onclick=()=>{
+  if(!modelImported){ setStatus('請先於「模型匯入」載入 car.fbx'); toast('尚未載入模型','請切換到模型匯入分頁載入 car.fbx'); return; }
+  toast('材質輸出成功','已寫入 car.mtl（17 槽）與 RC request');
+  setStatus('已輸出 car.mtl 與 RC 材質 request');
+};
+$("#btnSave").onclick=()=>{ toast('設定已儲存','輸出設定已寫入 settings.json'); setStatus('輸出設定已儲存'); };
+$("#browseDir").onclick=()=>{ $("#outDir").value='D:\\Assets\\KB3D\\_cryengine'; setStatus('已選擇輸出目錄'); };
+$("#outDir").addEventListener('input',()=>{
+  $("#dirStatus").textContent=$("#outDir").value?'目錄有效且可寫入。':'未設定目錄，輸出時會詢問。';
+});
+
+renderDiagChip();
+</script>
+</body>
+</html>
