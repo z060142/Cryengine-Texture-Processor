@@ -335,7 +335,7 @@ converter validate <request.json>                      # schema gate
 
 **T2. INT-* 管線**
 - 讀：規格 §3.1、§4；DEF-03/04/05/06/08 修正方案照規格 §8。
-- 做：Stage 1 七條規則，全部在記憶體內（無暫存檔，DEF-02/06 自然消滅）。DEF-08 修正 = 真 lerp(gray62, diffuse, metallic)。DEF-05 修正 = 分支重排使 metallic 路徑可達（順序：albedo 專屬鍵 → diffuse+metallic → diffuse 裸圖）——**注意這是行為變更，實作前跟業主確認分支優先序**。DEF-03 修正 = gloss 先於 reflection 或 reflection 延後讀取。
+- 做：Stage 1 七條規則，全部在記憶體內（無暫存檔，DEF-02/06 自然消滅）。DEF-08 修正 = 真 lerp(gray62, diffuse, metallic)。DEF-05 修正 = 分支重排使 metallic 路徑可達（順序：albedo 專屬鍵 → diffuse+metallic（process_metallic 時 linear burn） → diffuse 裸圖）——**業主已於 2026-07-25 簽核此優先序**；屬錨點 2 同類的刻意不等價，需目視驗收。DEF-03 修正 = gloss 先於 reflection 或 reflection 延後讀取。
 - DoD：錨點 1 通過（roughness 進 → ddna.a == 255−r 逐像素）；INT-ARM 支援 `--arm-order`；DEF-08 的 linear island 有單元測試（純黑 metallic → 輸出 == gray62；純白 → == diffuse）。
 
 **T3. OUT-* 管線**
