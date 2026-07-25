@@ -1,6 +1,6 @@
 # T-010 (T2) — INT-* 中間層管線
 
-狀態：OPEN
+狀態：DONE（2026-07-25 審查通過：gate 全綠 33/33；linear island 邊界抽查精確——sRGB helper 全 crate 僅 INT-REFLECTION 消費，gray62 有 decode（pipeline.rs:401-418）；錨點 1 全 256 值零差異）
 上游文件：`texture-pipeline-spec.md` §3.1（順序）、§4（規則）、§8（DEF）；`rust-workspace-design.md` D-03（linear island）、D-06.7（簽核）、T2 節
 前置：T-009 核心；DEF-05 分支優先序已簽核（albedo 專屬鍵 → diffuse+metallic linear burn → 裸 diffuse）。
 
@@ -35,3 +35,79 @@
 
 - 上述測試全綠；`run_gates.ps1 -SkipRC` 全綠。
 - 回報：INT 規則 × 修正 DEF 對照表、錨點 1 實跑輸出。
+
+## 執行結果（2026-07-25）
+
+### 實作
+
+- 新增單一 `pipeline` module，公開 `TextureGroup`、完整 source/intermediate
+  slots、`IntermediateSettings`、固定順序 `process_stage1()` 與可檢查的
+  `Stage1Report`。source 影像一律是帶原始檔名 metadata 的 in-memory
+  `PlanarImage`；沒有 path resolver、暫存檔或輸出編碼。
+- `process_stage1()` 在工作副本完成七步後才一次替換 group intermediate，
+  中途 error 不留下半套結果；trace 固定為：
+  `ARM → ALBEDO → NORMAL → GLOSS → REFLECTION → HEIGHT → AO`。
+- source slots 依 §1.1 含 `unknown[]`，另保留規格 INT 分支實際要求的
+  `albedo` / `height` compatibility slots；intermediate 含 §1.2 六項與
+  ARM 實際產生的 `roughness` / `metallic`。
+- 設定只新增票面三鍵的 Rust 契約：`process_metallic=true`、
+  `normal_from_height_strength=10.0`、`arm_order=ARM`。沒有修改
+  Cargo manifest/lock，沒有新增依賴、CLI 或 OUT-*。
+
+### INT 規則 × DEF 對照
+
+| INT 規則 | 本票行為 | 修正 DEF |
+|---|---|---|
+| `INT-ARM` | ARM/ORM/RMA 拆 channel；`arm/orm/rma` terminal alias 覆蓋設定；`_rm/_ra` 報 diagnostic 後用設定 | DEF-04、DEF-16 |
+| `INT-ALBEDO` | dedicated albedo → diffuse+metallic `max(0,diffuse-metallic_gray)` → naked diffuse | DEF-05、DEF-06 |
+| `INT-NORMAL` | 只用第一層 `_` 邊界 DX/GL patterns；GL flip G；否則 DX；缺圖由 height/displacement Sobel 生成 | DEF-06、DEF-07 |
+| `INT-GLOSS` | gloss source → existing intermediate gloss → ARM roughness invert → source roughness invert；無 resize/IO | DEF-03、DEF-10 |
+| `INT-REFLECTION` | specular alias 或 metallic mask；gray62 與 diffuse 只在此規則做 decode → linear lerp → encode | DEF-03、DEF-08 |
+| `INT-HEIGHT` | displacement/height 真正灰階成 in-memory buffer | DEF-06 |
+| `INT-AO` | 保留 ARM AO，否則 source AO 真正灰階成 in-memory buffer | DEF-06 |
+
+`glass_normal`、`single_nrm`、`shingle_n` 均測得走預設 DX，不移植
+DEF-07 第二層的 `"gl" in filename`。reflection 的 specular 分支另由
+report 證明讀取時 intermediate glossiness 已存在。
+
+### 錨點 1 實跑
+
+```text
+input roughness u8:  0, 1, 2, ... 253, 254, 255
+output glossiness: 255,254,253, ...   2,   1,   0
+compared: 256 pixels
+mismatches: 0
+```
+
+同組測試另覆蓋：
+
+- DEF-08 metallic=0 → 量化後 `rgb(62,62,62)`；metallic=1 → diffuse；
+  metallic=0.5 與手算 linear-domain lerp 誤差 ≤ 1e-6，且明確不等於
+  encoded-domain lerp。
+- DEF-05 三分支優先序、ARM/ORM/RMA 三設定與 filename override、
+  ambiguous alias diagnostic、DX/GL/誤判名、height/AO 灰階。
+- 所有 source filename 指向專用 temp directory 路徑，整條 Stage 1
+  完成後該目錄檔案數為 0。
+
+### 驗證
+
+```text
+cargo test -p texproc --release --locked
+  33 passed, 0 failed
+
+cargo clippy --workspace --all-targets --release --locked -- -D warnings
+  PASS
+
+cargo fmt --all -- --check
+  PASS
+
+.\run_gates.ps1 -SkipRC
+  ce-schema:       5/5
+  converter:      38/38
+  CLI contract:    5/5
+  texproc:        33/33
+  asset_flow:     28 passed / 2 skipped
+  RC policy:       3/3
+  T-003/T-004/T-005 goldens: PASS
+  ALL GATES PASSED
+```
