@@ -27,6 +27,42 @@ def json_pointer(value, pointer):
     return value
 
 
+def parse_field_specs(specs):
+    fields = {}
+    for spec in specs:
+        if "=" not in spec:
+            raise ValueError(
+                f"field projection must use NAME=/json/pointer syntax: {spec!r}"
+            )
+        name, pointer = spec.split("=", 1)
+        if not name or not pointer.startswith("/"):
+            raise ValueError(
+                f"field projection must use NAME=/json/pointer syntax: {spec!r}"
+            )
+        if name in fields:
+            raise ValueError(f"duplicate projected field name: {name!r}")
+        fields[name] = pointer
+    return fields
+
+
+def project_list_rows(value, fields, side):
+    if not fields:
+        return value
+    if not isinstance(value, list):
+        raise ValueError(f"{side} field projection requires the selected value to be a list")
+    projected = []
+    for index, row in enumerate(value):
+        try:
+            projected.append(
+                {name: json_pointer(row, pointer) for name, pointer in fields.items()}
+            )
+        except (KeyError, IndexError, TypeError, ValueError) as error:
+            raise ValueError(
+                f"{side} field projection failed at row {index}: {error}"
+            ) from error
+    return projected
+
+
 def is_whitelisted(path, patterns):
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
@@ -127,6 +163,20 @@ def main(argv=None):
     parser.add_argument("--expected-pointer", default="")
     parser.add_argument("--actual-pointer", default="")
     parser.add_argument(
+        "--expected-field",
+        action="append",
+        default=[],
+        metavar="NAME=/POINTER",
+        help="Project each expected list row to a named field. Repeat per field.",
+    )
+    parser.add_argument(
+        "--actual-field",
+        action="append",
+        default=[],
+        metavar="NAME=/POINTER",
+        help="Project each actual list row to a named field. Repeat per field.",
+    )
+    parser.add_argument(
         "--ignore",
         action="append",
         default=[],
@@ -139,14 +189,30 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
 
-    expected = json_pointer(load_json(args.expected), args.expected_pointer)
-    actual = json_pointer(load_json(args.actual), args.actual_pointer)
+    expected_fields = parse_field_specs(args.expected_field)
+    actual_fields = parse_field_specs(args.actual_field)
+    if set(expected_fields) != set(actual_fields):
+        parser.error(
+            "--expected-field and --actual-field must define the same output names"
+        )
+    expected = project_list_rows(
+        json_pointer(load_json(args.expected), args.expected_pointer),
+        expected_fields,
+        "expected",
+    )
+    actual = project_list_rows(
+        json_pointer(load_json(args.actual), args.actual_pointer),
+        actual_fields,
+        "actual",
+    )
     result = {
         "ok": False,
         "expected": args.expected,
         "actual": args.actual,
         "expected_pointer": args.expected_pointer,
         "actual_pointer": args.actual_pointer,
+        "expected_fields": expected_fields,
+        "actual_fields": actual_fields,
         "whitelist_patterns": args.ignore,
         "whitelist_hits": [],
         "compared_value_count": 0,

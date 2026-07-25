@@ -153,6 +153,14 @@ mod tests {
     }
 
     #[test]
+    fn missing_explicit_physicalize_keeps_name_heuristic_behavior() {
+        let resolution = resolve_physicalize(None, "render_mesh");
+        assert_eq!(resolution.value, Physicalize::NoCollide);
+        assert_eq!(resolution.source, "name_heuristic");
+        assert!(resolution.valid);
+    }
+
+    #[test]
     fn unknown_explicit_physicalize_emits_warning() {
         let resolution = resolve_physicalize(Some(("physicalize", "wat")), "Body");
         assert_eq!(resolution.value, Physicalize::No);

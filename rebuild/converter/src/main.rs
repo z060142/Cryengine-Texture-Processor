@@ -23,6 +23,9 @@ enum Command {
     Report {
         /// Source FBX file.
         input: PathBuf,
+        /// Optional material manifest used as explicit policy-layer input.
+        #[arg(long)]
+        manifest: Option<PathBuf>,
         /// Destination JSON report.
         #[arg(long)]
         out: PathBuf,
@@ -44,7 +47,11 @@ fn main() -> ExitCode {
 fn run(cli: Cli) -> Result<(), String> {
     match cli.command {
         Command::Dump { input, out } => converter::dump_file(&input, &out),
-        Command::Report { input, out } => converter::report_file(&input, &out),
+        Command::Report {
+            input,
+            manifest,
+            out,
+        } => converter::report_file(&input, manifest.as_deref(), &out),
         Command::Convert | Command::Validate => Err("not implemented".to_owned()),
     }
 }

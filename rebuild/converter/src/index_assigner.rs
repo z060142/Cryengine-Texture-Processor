@@ -67,6 +67,7 @@ pub struct AssignmentInput {
     pub material_names: Vec<String>,
     pub mesh_names: Vec<String>,
     pub textures: BTreeMap<String, String>,
+    pub physicalize: Option<String>,
 }
 
 impl AssignmentInput {
@@ -87,6 +88,7 @@ impl AssignmentInput {
             material_names: Vec::new(),
             mesh_names: Vec::new(),
             textures: BTreeMap::new(),
+            physicalize: None,
         }
     }
 }
@@ -113,6 +115,7 @@ pub struct Assignment {
     pub material_names: Vec<String>,
     pub mesh_names: Vec<String>,
     pub textures: BTreeMap<String, String>,
+    pub physicalize: Option<String>,
     #[serde(skip)]
     explicit_sub_index: Option<i32>,
     #[serde(skip)]
@@ -147,6 +150,7 @@ impl Assignment {
             material_names: input.material_names,
             mesh_names: input.mesh_names,
             textures: input.textures,
+            physicalize: input.physicalize,
             explicit_sub_index: input.explicit_sub_index,
             auto_assigned: input.auto_assigned,
         }
@@ -178,6 +182,7 @@ pub fn inputs_from_model(model: &ConverterModel) -> Vec<AssignmentInput> {
             material_names: Vec::new(),
             mesh_names: Vec::new(),
             textures: BTreeMap::new(),
+            physicalize: None,
         })
         .collect()
 }

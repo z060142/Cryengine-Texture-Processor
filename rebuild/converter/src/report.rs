@@ -1,6 +1,7 @@
 use crate::diagnostic::Diagnostic;
 use crate::dump::write_pretty_json;
 use crate::index_assigner::{assign_sub_indices, inputs_from_model, Assignment};
+use crate::manifest::MaterialManifest;
 use crate::model::ConverterModel;
 use crate::rc_policy::{physicalize_diagnostics, resolve_physicalize, PhysicalizeResolution};
 use crate::slot_contract::build_slot_mapping_contract;
@@ -22,7 +23,7 @@ struct PolicyReport<'a> {
     material_slot_mapping: Value,
     material_slot_evidence: SlotEvidence,
     golden_policy_projection: GoldenPolicyProjection,
-    limitations: [&'static str; 2],
+    limitations: Vec<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -94,12 +95,27 @@ struct ProjectedRequestMaterial {
     physicalize: String,
 }
 
-pub fn write_report(model: &ConverterModel, out: &Path) -> Result<(), String> {
-    let inputs = inputs_from_model(model);
+pub fn write_report(
+    model: &ConverterModel,
+    manifest: Option<&MaterialManifest>,
+    out: &Path,
+) -> Result<(), String> {
+    let inputs = manifest.map_or_else(
+        || inputs_from_model(model),
+        |value| value.apply_to_model(model),
+    );
     let (assignments, mut diagnostics) = assign_sub_indices(&inputs, &[]);
     let physicalize: Vec<_> = assignments
         .iter()
-        .map(|assignment| resolve_physicalize(None, &assignment.name))
+        .map(|assignment| {
+            resolve_physicalize(
+                assignment
+                    .physicalize
+                    .as_deref()
+                    .map(|value| ("physicalize", value)),
+                &assignment.name,
+            )
+        })
         .collect();
     for (assignment, resolution) in assignments.iter().zip(&physicalize) {
         diagnostics.extend(physicalize_diagnostics(&assignment.name, resolution));
@@ -131,8 +147,12 @@ pub fn write_report(model: &ConverterModel, out: &Path) -> Result<(), String> {
         material_slot_mapping: build_slot_mapping_contract(&assignments),
         material_slot_evidence: slot_evidence,
         golden_policy_projection: GoldenPolicyProjection { request_materials },
-        limitations: [
-            "No manifest/request input is accepted by this temporary C2 command, so physicalize values without explicit metadata use the name heuristic.",
+        limitations: vec![
+            if manifest.is_some() {
+                "The optional material manifest is applied only as policy-layer input; no request or MTL serialization is performed."
+            } else {
+                "No material manifest was supplied, so physicalize values without explicit metadata use the name heuristic."
+            },
             "No RC, CGF, or MTL readback is performed; material_slot_evidence is a source-FBX policy projection, not engine-output evidence.",
         ],
     };
@@ -174,12 +194,18 @@ fn policy_materials(
         .iter()
         .zip(physicalize)
         .map(|(assignment, resolution)| {
-            let material = &model.materials[assignment.source_order];
+            let material = model
+                .materials
+                .iter()
+                .find(|material| material.name == assignment.name);
             PolicyMaterial {
                 order: assignment.source_order,
                 name: assignment.name.clone(),
-                element_id: material.element_id,
-                typed_id: material.typed_id,
+                element_id: material.map_or(0, |material| material.element_id),
+                typed_id: material.map_or_else(
+                    || assignment.fbx_slot.unwrap_or(0),
+                    |material| material.typed_id,
+                ),
                 fbx_material_id: assignment.fbx_material_id.unwrap_or(0),
                 raw_fbx_slot: assignment.fbx_slot.unwrap_or(0),
                 sub_index: assignment.sub_index,

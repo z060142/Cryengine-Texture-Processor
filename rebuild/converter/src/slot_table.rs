@@ -170,6 +170,42 @@ fn is_unassigned_name(name: &str) -> bool {
 mod tests {
     use super::*;
     use crate::index_assigner::{assign_sub_indices, AssignmentInput};
+    use crate::manifest::MaterialManifest;
+
+    #[test]
+    fn manifest_is_applied_before_assignment_and_pins_slot_order() {
+        let manifest = MaterialManifest::from_json_str(
+            r#"{
+                "manifest_kind": "blender-fbx-material-inspection",
+                "materials": [
+                    {"slot": 0, "name": "Stone", "physicalize": "no"},
+                    {"slot": 1, "name": "Stone.001", "physicalize": "no"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        let source = [
+            AssignmentInput::new("Stone.001", 0),
+            AssignmentInput::new("Stone", 1),
+        ];
+        let inputs = manifest.apply_to_inputs(source);
+        let (records, diagnostics) = assign_sub_indices(&inputs, &[]);
+
+        assert!(diagnostics.is_empty());
+        assert_eq!(records[0].physicalize.as_deref(), Some("no"));
+        assert_eq!(records[1].physicalize.as_deref(), Some("no"));
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| (
+                    record.name.as_str(),
+                    record.sub_index,
+                    record.assignment_reason.as_str()
+                ))
+                .collect::<Vec<_>>(),
+            [("Stone", 0, "explicit"), ("Stone.001", 1, "explicit")]
+        );
+    }
 
     #[test]
     fn gaps_are_filled_and_metadata_is_preserved() {

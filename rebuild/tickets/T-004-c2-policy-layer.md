@@ -1,6 +1,6 @@
 # T-004 (C1+C2) — converter 內部模型 + 政策層
 
-狀態：REOPENED（2026-07-25 審查裁決，見文末「審查裁決」節；剩餘工作為 manifest 注入 + 子樹 golden 重跑）
+狀態：DONE（2026-07-25 重開 DoD 已完成；manifest 注入 + 三份 C2 子樹 golden 全綠）
 上游文件：`fbx-converter-migration.md` §2.1（前四列）、§2.3、`rust-workspace-design.md` §4、T-003 結論
 前情：讀取層已由 T-003 的 dump 實質完成，C1 不另開票；本票把 dump 的即拋結構升級為內部模型，並在其上實作政策層。
 
@@ -195,3 +195,78 @@ python tools/compare_json_golden.py EXPECTED ACTUAL \
 - 無 manifest 跑維持 `no_collide`（政策正確性回歸測試固定此行為）。
 - slot_table 的 manifest case 測試補上。
 - 其餘 DoD（測試綠、dump 無 regression）不變。
+
+## 重開 DoD 執行結果（2026-07-25）
+
+### Manifest 政策輸入
+
+- 新增 typed manifest loader；`report` 現接受
+  `--manifest fixtures/car/car.fbx_material_manifest.json`。
+- 合併順序與 `material_manifest_materials()` 一致：manifest material 先依 slot
+  排序、以 name 合併 source material、將 `slot` 同時注入 one-based
+  `fbx_material_id` 與 explicit `sub_index`，並注入 `physicalize`、polygon count
+  fallback 與 mesh names。
+- manifest 沒有列出的 source material 不會自行補回，與 Python 行為一致。
+- 補上 `material_manifest_info` 的 Stone/Stone.001 反序輸入 case：輸出順序為
+  Stone slot 0、Stone.001 slot 1，兩者 assignment reason 都是 `explicit`。
+- 補上無 explicit physicalize 的固定回歸：一般 render material 維持
+  `no_collide`、source 為 `name_heuristic`。
+
+Car 實跑：
+
+- 帶 manifest：16/16 source materials 的 `physicalize == no`；第 17 筆
+  trailing `<unassigned>` 也是 `no`；0 diagnostics。
+- 不帶 manifest：16/16 source materials 維持 `physicalize == no_collide`；
+  trailing `<unassigned>` 為 `no`；0 diagnostics。
+
+### 三份 C2 子樹 golden
+
+兩份 request 子樹指令：
+
+```text
+python ..\tools\compare_json_golden.py EXPECTED %TEMP%\t004-with-manifest.json \
+  --expected-pointer /request_materials \
+  --actual-pointer /golden_policy_projection/request_materials
+```
+
+- `car_direct_rc_export_material_report.json`：17 rows、68 scalar values 相等、
+  0 mismatches、0 whitelist hits。
+- `phase104_car_trailing_unassigned_material_report.json`：17 rows、
+  68 scalar values 相等、0 mismatches、0 whitelist hits。
+
+Slot evidence 使用 comparator 的明示 field projection，比對
+slot/name/used/placeholder：
+
+```text
+python ..\tools\compare_json_golden.py \
+  ..\docs\current_car_user_flow_material_slot_evidence.json \
+  %TEMP%\t004-with-manifest.json \
+  --expected-pointer /material_slot_evidence/rows \
+  --actual-pointer /material_slot_evidence/rows \
+  --expected-field slot=/slot \
+  --expected-field name=/request_names/0 \
+  --expected-field used=/used_by_cgf \
+  --expected-field placeholder=/is_unassigned_placeholder \
+  --actual-field slot=/slot \
+  --actual-field name=/name \
+  --actual-field used=/used_by_source \
+  --actual-field placeholder=/is_unassigned_placeholder
+```
+
+結果：17 rows、68 scalar values 相等、0 mismatches、0 whitelist hits。
+輸出仍標示 `source_fbx_policy_projection_not_cgf_readback`，沒有冒充 CGF
+readback。
+
+### 最終重驗
+
+- `cargo test --workspace --release --locked`：通過，`ce-schema` 5/5、
+  `converter` 24/24，合計 29/29。
+- `cargo test -p converter --locked`：以既有 Windows debug build-script
+  workaround（隔離 `CARGO_TARGET_DIR` +
+  `CARGO_PROFILE_DEV_BUILD_OVERRIDE_OPT_LEVEL=3`）通過 24/24。
+- `cargo clippy --workspace --release --locked -- -D warnings`：通過。
+- `cargo fmt --all -- --check`：通過。
+- Python comparator AST parse：通過。
+- T-003 dump 與 `docs/ufbx_alignment_report.json` byte hash 相同：
+  `332F2A2ADB5DB0210797321C6F8F7ADB92AD9E94E1BC8C8543CD717049BB8FC0`。
+- `git diff --check`：通過（僅 Git 的 Windows LF/CRLF checkout 提示）。
