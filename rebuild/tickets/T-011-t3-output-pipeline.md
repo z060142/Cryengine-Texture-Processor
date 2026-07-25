@@ -1,6 +1,6 @@
 # T-011 (T3) — OUT-* 輸出層管線
 
-狀態：DONE（2026-07-25 審查通過：gate 全綠含 4K 錨點 7 fixture 實測（max diff 全 0）；island 生產碼唯二（INT-REFLECTION、output.rs:414 AO multiply）。審查備註 R1：AO multiply 中 AO 值以 raw（視為 linear 資料圖）參與、未過 decode——語意上合理但為實作選擇，由錨點 2 目視仲裁。審查備註 R2：Fox 發現舊 _displ 實為 GrayA 而非規格宣稱的 RGBA（DEF-11 no-op 之證據），規格 §5 該句應視為 erratum，Rust 維持真 RGBA 正確。錨點 2 樣本已轉 PNG 交業主，Q5 簽核 T5 前完成即可）
+狀態：DONE（2026-07-25 審查通過：gate 全綠含 4K 錨點 7 fixture 實測（max diff 全 0）；island 生產碼唯二（INT-REFLECTION、output.rs:414 AO multiply）。審查備註 R1：AO multiply 中 AO 值以 raw（視為 linear 資料圖）參與、未過 decode——語意上合理但為實作選擇，由錨點 2 目視仲裁。審查備註 R2：Fox 發現舊 _displ 實為 GrayA 而非規格宣稱的 RGBA（DEF-11 no-op 之證據），規格 §5 該句應視為 erratum，Rust 維持真 RGBA 正確。錨點 2 樣本已轉 PNG 交業主，Q5 已於 2026-07-25 目視簽核通過）
 上游文件：`texture-pipeline-spec.md` §5（六個 exporter）、§10（錨點 2–7）；`rust-workspace-design.md` D-03/D-04/D-05、T3 節
 前置：T-010 中間層。**開工前先確認舊 Python 版可跑批次**（錨點 7 需要對照組；uv 環境 + ImageMagick 均在，`core/batch_processor.py` 可程式化呼叫）。
 

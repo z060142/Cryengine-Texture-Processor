@@ -296,7 +296,7 @@ converter validate <request.json>                      # schema gate
 | Q2 | D-05 dither 預設 off | 依 D-05 執行 |
 | Q3 | fixtures 是否進 LFS | 先本機路徑，不進 git |
 | Q4 | M0 ufbx 對齊若發現材質順序/id 與 contract 不一致 | 以 ufbx 原始檔案語意為準，差異記入政策層；重大分歧回報業主 |
-| Q5 | 錨點 2（DEF-09 修正後 _diff 不等價）的目視驗收 | 業主親自確認 |
+| ~~Q5~~ | ~~錨點 2 目視驗收~~ | 已簽核（2026-07-25）：DEF-09 Multiply 與 DEF-05 金屬路徑對照樣本業主目視通過 |
 
 ---
 
