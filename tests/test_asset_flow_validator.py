@@ -1,6 +1,8 @@
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from tools import asset_flow_validator
 
 
@@ -212,6 +214,12 @@ def test_main_prints_check_coverage(monkeypatch, tmp_path, capsys):
     assert "material_texture_ok: pass=1 fail=0 na=2" in text
 
 
+@pytest.mark.skip(
+    reason=(
+        "Legacy bpy/RC.exe harness is outside C4; converter coverage moved to "
+        "test_asset_flow_rust_converter.py::test_rust_converter_asset_flow"
+    )
+)
 def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     fbx = tmp_path / "asset.fbx"
     fbx.write_text("fake")
@@ -285,6 +293,12 @@ def test_rc_case_collects_acceptance_checks(monkeypatch, tmp_path):
     assert report["cases"][0]["checks"]["mtl_format_ok"] is True
 
 
+@pytest.mark.skip(
+    reason=(
+        "Legacy bpy manifest generation is replaced by the T-004 Rust manifest-injection "
+        "tests and test_asset_flow_rust_converter.py::test_rust_converter_asset_flow"
+    )
+)
 def test_rc_case_defaults_manifest_to_work_dir_and_passes_it_to_rc(monkeypatch, tmp_path):
     fbx = tmp_path / "asset.fbx"
     fbx.write_text("fbx", encoding="utf-8")
