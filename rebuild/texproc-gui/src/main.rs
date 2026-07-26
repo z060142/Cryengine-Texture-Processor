@@ -25,8 +25,8 @@ use file_dialog::{
 };
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
-    load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, OutputResolution,
-    ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
+    load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, FailedGroup,
+    OutputResolution, ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
 };
 use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
 use worker::{
@@ -61,6 +61,12 @@ const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
 const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
 
 fn main() -> eframe::Result {
+    install_crash_logger();
+    // Synthetic-panic trigger: a GUI has no console, so this lets us verify the
+    // crash.log mechanism end to end (set TEXPROC_GUI_TEST_PANIC=1 and launch).
+    if std::env::var_os("TEXPROC_GUI_TEST_PANIC").is_some() {
+        panic!("synthetic crash-log test panic");
+    }
     let initial_path = std::env::args_os().nth(1).map(PathBuf::from);
     let options = eframe::NativeOptions {
         viewport: ViewportBuilder::default()
@@ -73,6 +79,47 @@ fn main() -> eframe::Result {
         options,
         Box::new(move |_creation| Ok(Box::new(WorkflowApp::new(initial_path)))),
     )
+}
+
+/// crash.log lives next to the executable so a windowed build (no console) still
+/// leaves a trace when it aborts or panics.
+fn crash_log_path() -> Option<PathBuf> {
+    std::env::current_exe()
+        .ok()
+        .map(|exe| exe.with_file_name("crash.log"))
+}
+
+/// Install a panic hook that appends a timestamped panic message + backtrace to
+/// crash.log, then chains to the default hook. Caught batch panics are logged
+/// too; an outright abort (e.g. OOM) is not a Rust panic and cannot be hooked —
+/// the batch memory budget is what keeps that from happening.
+fn install_crash_logger() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        append_crash_log(&format!("{info}\n{backtrace}"));
+        previous(info);
+    }));
+}
+
+/// Append one timestamped record to crash.log. Kept separate from the hook so it
+/// can be unit-tested without triggering a real panic.
+fn append_crash_log(message: &str) {
+    if let Some(path) = crash_log_path() {
+        append_crash_log_to(&path, message);
+    }
+}
+
+fn append_crash_log_to(path: &Path, message: &str) {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or(0);
+    let record = format!("[epoch {seconds}] {message}\n\n");
+    use std::io::Write;
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = file.write_all(record.as_bytes());
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -140,6 +187,8 @@ struct ProcessSummary {
     elapsed_seconds: f64,
     output_directory: PathBuf,
     dds: Option<DdsSummary>,
+    /// Groups that errored or panicked during the batch (batch continued).
+    failed: Vec<FailedGroup>,
 }
 
 /// One line in the status-bar diagnostics popover.
@@ -770,12 +819,21 @@ impl WorkflowApp {
                 let dds_note = dds.as_ref().map_or_else(String::new, |dds| {
                     format!(" · DDS {}/{}", dds.succeeded, dds.total)
                 });
+                let failed = report.failed.clone();
+                let failed_note = if failed.is_empty() {
+                    String::new()
+                } else {
+                    format!(" · {} failed — see diagnostics", failed.len())
+                };
+                let budget_mb = report.memory_budget_bytes / (1024 * 1024);
                 self.status = if report.cancelled {
                     format!("Processing cancelled after {} groups.", report.groups.len())
                 } else {
                     format!(
-                        "Processing complete: {} groups, {written} output files{dds_note}.",
-                        report.groups.len()
+                        "Processing complete: {} groups, {written} output files{dds_note}{failed_note} \
+                         (budget {budget_mb} MB, {} wave(s)).",
+                        report.groups.len(),
+                        report.waves
                     )
                 };
                 self.process_summary = Some(ProcessSummary {
@@ -785,6 +843,7 @@ impl WorkflowApp {
                     elapsed_seconds: report.elapsed_seconds,
                     output_directory: output,
                     dds,
+                    failed,
                 });
             }
             Err(error) => {
@@ -1060,13 +1119,22 @@ impl WorkflowApp {
                 });
             }
         }
-        if let Some(dds) = self.process_summary.as_ref().and_then(|s| s.dds.as_ref()) {
-            for failure in &dds.failures {
+        if let Some(summary) = self.process_summary.as_ref() {
+            for failed in &summary.failed {
                 items.push(DiagItem {
                     severity: "Error",
-                    title: "DDS conversion failed".to_owned(),
-                    message: failure.clone(),
+                    title: format!("Group failed · {}", failed.base_name),
+                    message: failed.message.clone(),
                 });
+            }
+            if let Some(dds) = summary.dds.as_ref() {
+                for failure in &dds.failures {
+                    items.push(DiagItem {
+                        severity: "Error",
+                        title: "DDS conversion failed".to_owned(),
+                        message: failure.clone(),
+                    });
+                }
             }
         }
         items
@@ -1174,6 +1242,15 @@ impl WorkflowApp {
                     "{} groups · {} output files · {:.2} s",
                     summary.groups, summary.written, summary.elapsed_seconds
                 ));
+                if !summary.failed.is_empty() {
+                    ui.colored_label(
+                        Color32::from_rgb(210, 70, 65),
+                        format!(
+                            "{} group(s) failed — see diagnostics.",
+                            summary.failed.len()
+                        ),
+                    );
+                }
                 if let Some(dds) = &summary.dds {
                     let color = if dds.failures.is_empty() {
                         Color32::from_rgb(70, 165, 95)
@@ -2780,5 +2857,26 @@ mod rc_path_tests {
         assert!(resolution.path.is_none());
         assert_eq!(resolution.source, "");
         assert!(resolution.configured_invalid);
+    }
+
+    #[test]
+    fn crash_log_appends_timestamped_records() {
+        let path = std::env::temp_dir().join(format!(
+            "texproc-gui-crashlog-{}-{}.log",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        append_crash_log_to(&path, "first panic");
+        append_crash_log_to(&path, "second panic");
+        let contents = fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("first panic"));
+        assert!(contents.contains("second panic"));
+        assert!(contents.contains("[epoch "));
+        // Two records appended, not overwritten.
+        assert_eq!(contents.matches("[epoch ").count(), 2);
+        let _ = fs::remove_file(&path);
     }
 }

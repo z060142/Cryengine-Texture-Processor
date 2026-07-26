@@ -209,6 +209,56 @@ pub fn write_stage2_outputs(
     Ok(written)
 }
 
+/// Streaming variant of `process_stage2` + `write_stage2_outputs` for the batch
+/// path: each output is generated, written to disk, and its buffer dropped
+/// immediately instead of accumulating all six in an `OutputTextures` before
+/// writing. Bytes are identical to the two-step path (same export functions,
+/// same order, same `write_tiff_lzw`); only the peak working set differs.
+pub fn process_and_write_stage2(
+    group: &TextureGroup,
+    settings: &TextureSettings,
+    output_directory: impl AsRef<Path>,
+) -> Result<Vec<PathBuf>> {
+    validate_settings(settings)?;
+    let directory = output_directory.as_ref();
+    fs::create_dir_all(directory)?;
+    let mut written = Vec::new();
+    let types = settings.texture_types;
+    if types.diff {
+        write_optional(directory, export_diff(group, settings)?, &mut written)?;
+    }
+    if types.spec {
+        write_optional(directory, export_spec(group, settings)?, &mut written)?;
+    }
+    if types.ddna {
+        write_optional(directory, export_ddna(group, settings)?, &mut written)?;
+    }
+    if types.displ {
+        write_optional(directory, export_displ(group, settings)?, &mut written)?;
+    }
+    if types.emissive {
+        write_optional(directory, export_emissive(group, settings)?, &mut written)?;
+    }
+    if types.sss {
+        write_optional(directory, export_sss(group, settings)?, &mut written)?;
+    }
+    Ok(written)
+}
+
+fn write_optional(
+    directory: &Path,
+    image: Option<OutputImage>,
+    written: &mut Vec<PathBuf>,
+) -> Result<()> {
+    if let Some(image) = image {
+        let path = directory.join(&image.filename);
+        write_tiff_lzw(&path, &image.image)?;
+        written.push(path);
+        // `image` is dropped here, before the next output is generated.
+    }
+    Ok(())
+}
+
 fn validate_settings(settings: &TextureSettings) -> Result<()> {
     if matches!(settings.output_resolution, OutputResolution::Max(0)) {
         return Err(TexprocError::new(

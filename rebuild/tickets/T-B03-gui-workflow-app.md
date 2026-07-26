@@ -781,3 +781,78 @@ GUI 無 console，abort 訊息不可見 → 靜默消失。CLI 同病，只是�
   修復後同批次完跑，峰值記憶體 ≤ 額度 + 合理餘裕，數字貼票。
 - 注入 panic 的測試證明單組失敗不殺批次、crash.log 有內容。
 - 錨點/golden/gate 全綠不退步（額度制不得改變輸出內容，只改排程）。
+
+## R6 實作紀錄（2026-07-26，Miss Fox）
+
+動 `texproc`（`batch.rs` / `output.rs` / `lib.rs` / CLI `main.rs`）與
+`texproc-gui`（`main.rs` / `worker.rs`）；無新依賴；**不改輸出位元組，只改排程與
+可見性**。
+
+### 1. 記憶體額度制的組進場（texproc lib，CLI/GUI 同惠）
+
+- `estimate_group_bytes`：對每組「必要」來源（沿用既有 `source_is_required`）求
+  Σ(w×h×ch×4B)，再 ×3（來源解碼 + 中間層 + 輸出的在途工作集）。尺寸優先取 scan
+  期已存的 `ScanEntry.header`，缺則即時 `probe_header`（免解碼），再缺則保守預設
+  4096²×4ch×4B。
+- 額度 `memory_budget_bytes`：`TEXPROC_MEM_BUDGET_MB` 環境變數優先（純函式
+  `budget_override_bytes` 解析，空/非數/0 皆退回）；否則 Windows 以
+  `GlobalMemoryStatusEx` 手搓 `extern "system"` FFI（無新依賴）取實體 RAM 的 50%；
+  非 Windows fallback 8GB。
+- `plan_waves`：依輸入順序貪婪填一波至額度上限，超過即封波換下一波；單組估算大於
+  整個額度時自成一波（獨跑）。每波 `par_iter` 平行、波間序列化。rayon 併發本就
+  ≤ 執行緒數、波總估算 ≤ 額度，故在途工作集 ≤ 額度。組順序、每組結果與事件不變。
+- budget 與波數進 `BatchProcessReport`（新欄 `memory_budget_bytes` / `waves`），
+  CLI stderr 與 GUI 狀態列各印一行（status line material）。
+
+### 2. Stage 2 串流寫出
+
+- 新 `process_and_write_stage2`：逐一產生 diff/spec/ddna/displ/emissive/sss，每張
+  生成即 `write_tiff_lzw` 寫檔並就地 drop，不再六張全堆 `OutputTextures` 才寫。與舊
+  「process_stage2 + write_stage2_outputs」逐位元相同（同 export 函式、同順序、同
+  編碼），只降峰值。`process_stage2` / `write_stage2_outputs` 保留供單元測試與 golden
+  路徑（t011 直用）。`process_scan_group` 改走串流版。
+
+### 3. 崩潰可見性
+
+- GUI：`main` 啟動即 `install_crash_logger`——panic hook 把時間戳 + 訊息 + backtrace
+  append 到 exe 旁 `crash.log`，再串回預設 hook（OOM abort 非 panic、攔不到，靠額度
+  制不發生）。`TEXPROC_GUI_TEST_PANIC` 合成 panic 供端到端驗證。
+- 批次：每組 `catch_unwind` 圈住，panic 或 Stage 1/2 error 都記為
+  `FailedGroup{ base_name, message }`，批次續跑不中止。CLI 印出失敗組並以既有 exit
+  code 1 退出；GUI 於完成模態與 Diagnostics popover 顯示失敗組清單、狀態列帶失敗計數。
+
+### 驗證
+
+- `cargo fmt --all -- --check`、`cargo clippy -p texproc -p texproc-gui
+  --all-targets --release --locked -- -D warnings`：PASS。
+- `cargo test -p texproc --release --locked`：53 lib（+5 新：估算數學、波打包/單組
+  獨跑、env 覆蓋解析、panic+error 失敗組續跑）、t011 anchor7（Python 基準逐像素
+  ≤±1/255）、t012 CLI 契約 4：PASS。
+- `cargo test -p texproc-gui --release --locked`：7 model + 10 main（+1 crash.log
+  append 測試）PASS（2 ignored 為真 RC 整合測試）。
+- `run_gates.ps1`（完整含 RC）：**ALL GATES PASSED**；converter RC 16/16、texproc
+  RC/DDS 8/8、ddna 2/2、MTL schema／cryasset whitelist／Python asset-flow 全綠，
+  核心零退步。
+
+### 記憶體實測（release CLI `texproc process`，Original 解析度）
+
+- 資料：`Z:\enchanted\KB3DTextures\4k`，793 張 4K、132 組（`--allow-unknown`）。
+- 修復前：R6 診斷已在 Windows Application Log 取得兩筆 Event 1000／例外碼
+  `0xc0000409`（alloc-failure abort）＝ 20 執行緒 × 每組 3-5GB planar-f32 → 峰值
+  60-100GB 超過 98GB 實體 RAM。重跑會再度打爆整機，**依票面略過重現、引用診斷**。
+- 修復後：**完跑 exit 0**，132 組 / 516 TIFF；**峰值 commit 37,586 MB（working set
+  37,020 MB）≤ 額度 49,010 MB（實體 RAM 98,020 MB 的 50%）**；6 波、20 rayon 執行緒；
+  牆鐘 229.7s。峰值遠低於實體 RAM，不再 abort。
+- crash.log：`TEXPROC_GUI_TEST_PANIC=1` 啟動 GUI → 立即寫出
+  `[epoch 1785080680] panicked at …main.rs:68:9: synthetic crash-log test panic`
+  + 完整 backtrace 於 `target\release\crash.log`（exit 101）。
+
+### 偏離
+
+- 牆鐘由過往 GUI 的 ~75-85s 升到 CLI 229.7s：本次為 CLI 冷跑、預設輸出全 6 型別
+  （516 vs 昔 391 檔）、且波間序列化屏障所致；換得的是不再 abort。可用
+  `TEXPROC_MEM_BUDGET_MB` 調高額度以增併發（本機 98GB 可設更大）。
+- 來源圖「不再被引用即釋放」未做細粒度提前釋放（export 鏈全程需 `group.sources`）；
+  串流輸出已把峰值壓進額度內，額外提前 drop 風險高於效益，未做。
+- 每組 error（非 panic）亦改為「記失敗、續跑」（原本首錯即中止整批）；CLI 仍以
+  exit 1 表失敗、退出碼契約不變，但一顆壞檔不再殺掉整批（更貼近票面「批次繼續」）。

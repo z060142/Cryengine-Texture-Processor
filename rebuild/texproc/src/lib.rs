@@ -9,7 +9,9 @@ pub mod pipeline;
 pub mod planar;
 pub mod settings;
 
-pub use batch::{process_scan_group, process_scan_parallel, BatchProcessReport, ProcessedGroup};
+pub use batch::{
+    process_scan_group, process_scan_parallel, BatchProcessReport, FailedGroup, ProcessedGroup,
+};
 pub use error::{Result, TexprocError};
 pub use grouping::{
     parse_base_name, scan_inputs, Diagnostic, ScanEntry, ScanGroup, ScanResult, Severity,
@@ -17,8 +19,9 @@ pub use grouping::{
 };
 pub use io::{decode_image, probe_header, write_tiff_lzw, HeaderInfo};
 pub use output::{
-    process_stage2, write_stage2_outputs, DiffFormat, OutputImage, OutputResolution,
-    OutputTextures, Stage2Report, Stage2Step, TextureSettings, TextureTypeSettings,
+    process_and_write_stage2, process_stage2, write_stage2_outputs, DiffFormat, OutputImage,
+    OutputResolution, OutputTextures, Stage2Report, Stage2Step, TextureSettings,
+    TextureTypeSettings,
 };
 pub use pipeline::{
     process_stage1, ArmOrder, IntermediateSettings, IntermediateTextures, SourceImage,

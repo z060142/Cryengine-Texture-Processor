@@ -741,9 +741,12 @@ mod tests {
                 written: written.into_iter().map(PathBuf::from).collect(),
                 elapsed_seconds: 0.0,
             }],
+            failed: Vec::new(),
             cancelled: false,
             elapsed_seconds: 0.0,
             rayon_threads: 1,
+            memory_budget_bytes: 0,
+            waves: 1,
         }
     }
 

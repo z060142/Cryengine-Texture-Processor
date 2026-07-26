@@ -159,12 +159,24 @@ fn run_process(args: ProcessArgs) -> ExitCode {
             group.elapsed_seconds
         );
     }
+    for failed in &report.failed {
+        eprintln!("FAILED group `{}`: {}", failed.base_name, failed.message);
+    }
+    eprintln!(
+        "memory budget {} MB across {} admission wave(s)",
+        report.memory_budget_bytes / (1024 * 1024),
+        report.waves
+    );
     eprintln!(
         "processed {} group(s) in {:.3}s with {} rayon thread(s)",
         report.groups.len(),
         report.elapsed_seconds,
         report.rayon_threads
     );
+    if !report.failed.is_empty() {
+        eprintln!("error: {} group(s) failed", report.failed.len());
+        return ExitCode::from(1);
+    }
     ExitCode::SUCCESS
 }
 
