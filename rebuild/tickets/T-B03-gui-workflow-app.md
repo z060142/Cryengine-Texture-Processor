@@ -962,3 +962,24 @@ GUI 無 console，abort 訊息不可見 → 靜默消失。CLI 同病，只是�
   帶 RC stderr 明細（避免 pool 讀 pipe 阻塞）；RC 失敗罕見，權衡取穩健。
 - GUI 即時互動（進度模態的 worker 數、狀態列 `RC workers: x → y`）本環境合成
   點擊無效無法擷圖（沿 R3–R6 既有限制），改以上述真 RC 整合測試證明程式路徑。
+
+## R8（2026-07-27 業主裁決）
+
+1. **Physicalize 預設 `no` + 批量編輯**：
+   - GUI 材質表的 physicalize 預設顯示/送出值改為 `no`（作為 GUI 層 explicit
+     metadata 種子；政策層與 CLI 不變——實務 golden 流程本來就是全 `no`）。
+   - 材質列支援多選（Ctrl/Shift，與貼圖清單同慣例），新增批量設定
+     physicalize 的控件（選中列一次改）。
+2. **FBX 軸向偵測寫入 request**：
+   - 引擎慣例（業主明示）：**+Y 前、+Z 上**。`forward_up_axes` 描述來源 FBX
+     軸向供 RC 轉換；目前寫死 `-Y+Z`（`request.rs:304`），Y-up 模型導出即錯。
+   - 改由 ufbx `scene.settings.axes`（up/front/right 枚舉）推導 RC 字串
+     `<forward><up>`；推導表寫成純函式 + 全枚舉單元測試。
+   - **錨定約束**：car.fbx 推導結果必須 == `-Y+Z`（request golden 不得破）；
+     先 dump car 的 ufbx axes 確認對應，再定表。
+   - FBX 未宣告軸向 → 沿用預設 `-Y+Z` + 診斷提示。
+   - GUI Model 摘要顯示偵測結果（如 `Axes: up +Y, forward +Z → -Y+Z`…實際
+     格式照推導）；request/convert 全鏈（CLI 同）使用推導值。
+   - 驗收：找/做一個 Y-up FBX 實測（Z:\enchanted\output 的 KB3D FBX 或
+     ImageMagick 之外用 ufbx 測資），request 內值正確、RC 出 CGF 成功；
+     car golden 迴歸綠。
