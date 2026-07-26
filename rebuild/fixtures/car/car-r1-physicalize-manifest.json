@@ -1,0 +1,103 @@
+{
+  "fbx": "car.fbx",
+  "materials": [
+    {
+      "slot": 0,
+      "name": "KB3D_CEV_UndercarriageTrim",
+      "physicalize": "default"
+    },
+    {
+      "slot": 1,
+      "name": "KB3D_CEV_SeatsDriverATrim",
+      "physicalize": "no"
+    },
+    {
+      "slot": 2,
+      "name": "KB3D_CEV_TiresSedans",
+      "physicalize": "no"
+    },
+    {
+      "slot": 3,
+      "name": "KB3D_CEV_WheelRimsA",
+      "physicalize": "no"
+    },
+    {
+      "slot": 4,
+      "name": "KB3D_CEV_RubberTrim",
+      "physicalize": "no"
+    },
+    {
+      "slot": 5,
+      "name": "KB3D_CEV_PlasticTileableA",
+      "physicalize": "no"
+    },
+    {
+      "slot": 6,
+      "name": "KB3D_CEV_PlasticTrimA",
+      "physicalize": "no"
+    },
+    {
+      "slot": 7,
+      "name": "KB3D_CEV_SedanExteriorBody",
+      "physicalize": "no"
+    },
+    {
+      "slot": 8,
+      "name": "KB3D_CEV_CarAtlas",
+      "physicalize": "no"
+    },
+    {
+      "slot": 9,
+      "name": "KB3D_CEV_CarsLicensePlates",
+      "physicalize": "no"
+    },
+    {
+      "slot": 10,
+      "name": "KB3D_CEV_TapesTrimA",
+      "physicalize": "no"
+    },
+    {
+      "slot": 11,
+      "name": "KB3D_CEV_WindowFritsTrim",
+      "physicalize": "no"
+    },
+    {
+      "slot": 12,
+      "name": "KB3D_CEV_FeltA",
+      "physicalize": "no"
+    },
+    {
+      "slot": 13,
+      "name": "KB3D_CEV_FeltB",
+      "physicalize": "no"
+    },
+    {
+      "slot": 14,
+      "name": "KB3D_CEV_GlassMirror",
+      "physicalize": "no"
+    },
+    {
+      "slot": 15,
+      "name": "KB3D_CEV_TranslElemSedans",
+      "physicalize": "no"
+    }
+  ],
+  "expect_cgf_material_ids": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+  ]
+}

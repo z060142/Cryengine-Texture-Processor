@@ -141,3 +141,14 @@ impl MaterialManifest {
         (counts, mesh_names)
     }
 }
+
+pub fn apply_physicalize_overrides(
+    inputs: &mut [AssignmentInput],
+    overrides: &BTreeMap<String, String>,
+) {
+    for input in inputs {
+        if let Some(value) = overrides.get(&input.name) {
+            input.physicalize = Some(value.clone());
+        }
+    }
+}

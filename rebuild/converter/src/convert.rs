@@ -1,8 +1,9 @@
 use crate::manifest::MaterialManifest;
 use crate::model::ConverterModel;
 use crate::mtl::{write_mtl, MaterialOverridePayload, MaterialTextureDiagnostic};
-use crate::request::{build_import_request, write_request};
+use crate::request::{build_import_request_with_physicalize_overrides, write_request};
 use serde::Serialize;
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -21,10 +22,34 @@ pub fn convert_file(
     preserve_mtl_textures: Option<&Path>,
     out_dir: &Path,
 ) -> Result<ConvertOutputs, String> {
+    convert_file_with_physicalize(
+        input,
+        manifest,
+        overrides,
+        texture_dir,
+        preserve_mtl_textures,
+        out_dir,
+        &BTreeMap::new(),
+    )
+}
+
+pub fn convert_file_with_physicalize(
+    input: &Path,
+    manifest: Option<&Path>,
+    overrides: Option<&Path>,
+    texture_dir: Option<&Path>,
+    preserve_mtl_textures: Option<&Path>,
+    out_dir: &Path,
+    physicalize_overrides: &BTreeMap<String, String>,
+) -> Result<ConvertOutputs, String> {
     let model = ConverterModel::load(input)?;
     let manifest = manifest.map(MaterialManifest::load).transpose()?;
     let overrides = overrides.map(MaterialOverridePayload::load).transpose()?;
-    let request = build_import_request(&model, manifest.as_ref());
+    let request = build_import_request_with_physicalize_overrides(
+        &model,
+        manifest.as_ref(),
+        physicalize_overrides,
+    );
     let base_name = Path::new(&request.source_filename)
         .file_stem()
         .and_then(|name| name.to_str())

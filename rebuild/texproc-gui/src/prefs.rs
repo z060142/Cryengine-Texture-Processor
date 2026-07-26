@@ -14,6 +14,7 @@ pub struct AppPreferences {
     pub model_path: String,
     pub manifest_path: String,
     pub overrides_path: String,
+    pub rc_path: String,
 }
 
 impl Default for AppPreferences {
@@ -26,6 +27,7 @@ impl Default for AppPreferences {
             model_path: String::new(),
             manifest_path: String::new(),
             overrides_path: String::new(),
+            rc_path: String::new(),
         }
     }
 }
@@ -48,6 +50,7 @@ impl AppPreferences {
         preferences.model_path = string(&value, "model_path");
         preferences.manifest_path = string(&value, "manifest_path");
         preferences.overrides_path = string(&value, "overrides_path");
+        preferences.rc_path = string(&value, "rc_path");
         preferences
     }
 
@@ -65,6 +68,7 @@ impl AppPreferences {
             "model_path": self.model_path,
             "manifest_path": self.manifest_path,
             "overrides_path": self.overrides_path,
+            "rc_path": self.rc_path,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");

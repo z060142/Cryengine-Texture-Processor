@@ -5,8 +5,7 @@ use crate::rc_policy::{resolve_physicalize, Physicalize, RC_MAX_SUB_MATERIALS};
 use crate::slot_table::build_expanded_slot_table;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::fs;
-use std::path::Path;
+use std::{collections::BTreeMap, fs, path::Path};
 
 const OUTPUT_EXTENSIONS: &[&str] = &["caf", "cgf", "chr", "i_caf", "skin"];
 
@@ -240,6 +239,14 @@ pub fn build_import_request(
     model: &ConverterModel,
     manifest: Option<&MaterialManifest>,
 ) -> ImportRequest {
+    build_import_request_with_physicalize_overrides(model, manifest, &BTreeMap::new())
+}
+
+pub fn build_import_request_with_physicalize_overrides(
+    model: &ConverterModel,
+    manifest: Option<&MaterialManifest>,
+    physicalize_overrides: &BTreeMap<String, String>,
+) -> ImportRequest {
     let source_filename = manifest
         .and_then(MaterialManifest::source_filename)
         .map(str::to_owned)
@@ -256,10 +263,11 @@ pub fn build_import_request(
         .unwrap_or(&source_filename)
         .to_owned();
 
-    let inputs = manifest.map_or_else(
+    let mut inputs = manifest.map_or_else(
         || inputs_from_model(model),
         |manifest| manifest.apply_to_model(model),
     );
+    crate::manifest::apply_physicalize_overrides(&mut inputs, physicalize_overrides);
     let (assignments, _) = assign_sub_indices(&inputs, &[]);
     let slots = build_expanded_slot_table(&assignments, false, true, true);
     let materials = slots
@@ -510,6 +518,7 @@ pub fn validate_file(input: &Path, out: &Path) -> Result<bool, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{ConverterModel, MaterialRecord, NodeRecord};
 
     fn minimal_request() -> ImportRequest {
         ImportRequest {
@@ -627,5 +636,53 @@ mod tests {
         .unwrap();
         assert_eq!(request.scale, Some(1.0));
         assert_eq!(request.materials[0].sub_index, 0);
+    }
+
+    #[test]
+    fn ui_physicalize_override_matches_same_value_manifest_projection() {
+        let model = ConverterModel {
+            source_fbx: "chair.fbx".to_owned(),
+            materials: vec![
+                MaterialRecord {
+                    name: "Seat".to_owned(),
+                    typed_id: 0,
+                    element_id: 0,
+                    textures: Vec::new(),
+                },
+                MaterialRecord {
+                    name: "Chair_proxy".to_owned(),
+                    typed_id: 1,
+                    element_id: 1,
+                    textures: Vec::new(),
+                },
+            ],
+            meshes: Vec::new(),
+            scene_tree: NodeRecord {
+                name: "Root".to_owned(),
+                element_id: 0,
+                typed_id: 0,
+                children: Vec::new(),
+            },
+            node_count: 1,
+        };
+        let manifest = MaterialManifest::from_json_str(
+            r#"{
+                "fbx":"chair.fbx",
+                "materials":[
+                    {"slot":0,"name":"Seat","physicalize":"obstruct"},
+                    {"slot":1,"name":"Chair_proxy"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        let mut overrides = BTreeMap::new();
+        overrides.insert("Seat".to_owned(), "obstruct".to_owned());
+
+        let ui_request = build_import_request_with_physicalize_overrides(&model, None, &overrides);
+        let manifest_request = build_import_request(&model, Some(&manifest));
+
+        assert_eq!(ui_request, manifest_request);
+        assert_eq!(ui_request.materials[0].physicalize, "obstruct");
+        assert_eq!(ui_request.materials[1].physicalize, "proxy_only");
     }
 }

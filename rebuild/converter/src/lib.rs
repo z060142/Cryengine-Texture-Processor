@@ -12,7 +12,7 @@ pub mod slot_contract;
 pub mod slot_table;
 pub mod texture_resolver;
 
-use std::path::Path;
+use std::{collections::BTreeMap, path::Path};
 
 pub fn dump_file(input: &Path, out: &Path) -> Result<(), String> {
     let model = model::ConverterModel::load(input)?;
@@ -40,6 +40,26 @@ pub fn convert_file(
         texture_dir,
         preserve_mtl_textures,
         out_dir,
+    )
+}
+
+pub fn convert_file_with_physicalize(
+    input: &Path,
+    manifest: Option<&Path>,
+    overrides: Option<&Path>,
+    texture_dir: Option<&Path>,
+    preserve_mtl_textures: Option<&Path>,
+    out_dir: &Path,
+    physicalize_overrides: &BTreeMap<String, String>,
+) -> Result<convert::ConvertOutputs, String> {
+    convert::convert_file_with_physicalize(
+        input,
+        manifest,
+        overrides,
+        texture_dir,
+        preserve_mtl_textures,
+        out_dir,
+        physicalize_overrides,
     )
 }
 

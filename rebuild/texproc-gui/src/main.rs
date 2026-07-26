@@ -1,10 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod file_dialog;
 mod prefs;
 mod worker;
 
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
     sync::{
@@ -14,10 +15,12 @@ use std::{
     time::Duration,
 };
 
+use converter::rc_policy::resolve_physicalize;
 use eframe::egui::{
-    self, Color32, ComboBox, FontData, FontDefinitions, FontFamily, Grid, ProgressBar, RichText,
-    ScrollArea, TextEdit, TextureHandle, ViewportBuilder,
+    self, Color32, ComboBox, Grid, ProgressBar, RichText, ScrollArea, Stroke, TextEdit,
+    TextureHandle, ViewportBuilder,
 };
+use file_dialog::choose_rc_executable;
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
     load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, OutputResolution,
@@ -25,10 +28,13 @@ use texproc::{
 };
 use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
 use worker::{
-    ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob, ScanEvent,
+    ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob,
+    RcExportOutcome, ScanEvent,
 };
 
-const APP_TITLE: &str = "CryEngine 貼圖處理器";
+const APP_TITLE: &str = "CryEngine Texture Processor";
+const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
+const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
 
 fn main() -> eframe::Result {
     let initial_path = std::env::args_os().nth(1).map(PathBuf::from);
@@ -41,10 +47,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         APP_TITLE,
         options,
-        Box::new(move |creation| {
-            install_zh_tw_font(&creation.egui_ctx);
-            Ok(Box::new(WorkflowApp::new(initial_path)))
-        }),
+        Box::new(move |_creation| Ok(Box::new(WorkflowApp::new(initial_path)))),
     )
 }
 
@@ -118,6 +121,8 @@ struct ModelState {
     selected_material: Option<usize>,
     export_receiver: Option<Receiver<ModelExportEvent>>,
     export_summary: Option<String>,
+    physicalize_overrides: BTreeMap<String, String>,
+    rc_missing_warning: bool,
 }
 
 struct WorkflowApp {
@@ -146,7 +151,7 @@ impl WorkflowApp {
             process: None,
             process_summary: None,
             model: ModelState::default(),
-            status: "就緒。拖放貼圖、資料夾或 FBX 到視窗即可開始。".to_owned(),
+            status: "Ready. Drop textures, folders, or an FBX file to begin.".to_owned(),
         };
         if let Some(path) = initial_path {
             app.receive_paths(vec![path]);
@@ -185,24 +190,24 @@ impl WorkflowApp {
             }
         }
         if self.texture.roots.is_empty() {
-            self.status = "找不到可加入的貼圖檔案或資料夾。".to_owned();
+            self.status = "No texture files or folders were found.".to_owned();
             return;
         }
         self.tab = WorkflowTab::Textures;
         self.texture.scan_receiver = Some(worker::start_scan(self.texture.roots.clone()));
-        self.status = "正在掃描與分組貼圖…".to_owned();
+        self.status = "Scanning and grouping textures…".to_owned();
     }
 
     fn clear_textures(&mut self) {
         self.texture = TextureState::default();
         self.preview = PreviewState::default();
         self.process_summary = None;
-        self.status = "已清除所有暫態貼圖與分組。".to_owned();
+        self.status = "Cleared imported textures and transient groups.".to_owned();
     }
 
     fn start_model_load(&mut self, path: PathBuf) {
         if !path.is_file() {
-            self.status = format!("FBX 不存在：{}", path.display());
+            self.status = format!("FBX does not exist: {}", path.display());
             return;
         }
         self.preferences.model_path = path.to_string_lossy().into_owned();
@@ -210,8 +215,10 @@ impl WorkflowApp {
         self.model.review = None;
         self.model.selected_material = None;
         self.model.export_summary = None;
+        self.model.physicalize_overrides.clear();
+        self.model.rc_missing_warning = false;
         self.tab = WorkflowTab::Model;
-        self.status = "正在讀取 FBX 材質與貼圖參照…".to_owned();
+        self.status = "Loading FBX materials and texture references…".to_owned();
         self.save_preferences();
     }
 
@@ -231,7 +238,7 @@ impl WorkflowApp {
 
     fn start_texture_process(&mut self) {
         let Some(document) = &self.texture.document else {
-            self.status = "尚未加入可處理的貼圖。".to_owned();
+            self.status = "No textures are ready for processing.".to_owned();
             return;
         };
         if let Some((index, blocked)) = document
@@ -245,18 +252,18 @@ impl WorkflowApp {
             self.texture.selected_unknown = Some(0);
             self.texture.review_only = true;
             self.status = format!(
-                "請先為 `{}` 的 unknown 貼圖指定型別，再開始處理。",
+                "Assign a type to the unknown texture in `{}` before processing.",
                 blocked.base_name
             );
             return;
         }
         let output = PathBuf::from(self.preferences.texture_output_directory.trim());
         if output.as_os_str().is_empty() {
-            self.status = "請先設定貼圖輸出目錄。".to_owned();
+            self.status = "Set a texture output directory first.".to_owned();
             return;
         }
         if let Err(error) = fs::create_dir_all(&output) {
-            self.status = format!("無法建立貼圖輸出目錄：{error}");
+            self.status = format!("Could not create texture output directory: {error}");
             return;
         }
 
@@ -266,50 +273,59 @@ impl WorkflowApp {
             job: worker::start_process(scan, self.settings, output),
             completed: 0,
             total,
-            current_group: "準備中".to_owned(),
+            current_group: "Preparing".to_owned(),
             written: 0,
         });
         self.process_summary = None;
-        self.status = format!("正在處理 {total} 個貼圖群組…");
+        self.status = format!("Processing {total} texture groups…");
     }
 
     fn start_model_export(&mut self) {
         let Some(review) = &self.model.review else {
-            self.status = "請先載入 FBX。".to_owned();
+            self.status = "Load an FBX file first.".to_owned();
             return;
         };
         let output = PathBuf::from(self.preferences.model_output_directory.trim());
         if output.as_os_str().is_empty() {
-            self.status = "請先設定模型輸出目錄。".to_owned();
+            self.status = "Set a model output directory first.".to_owned();
+            return;
+        }
+        if let Err(error) = fs::create_dir_all(&output) {
+            self.status = format!("Could not create model output directory: {error}");
             return;
         }
         let manifest = optional_path(&self.preferences.manifest_path);
         let overrides = optional_path(&self.preferences.overrides_path);
         let texture_dir = optional_path(&self.preferences.texture_output_directory);
+        let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
+        self.model.rc_missing_warning = rc_resolution.path.is_none();
         self.model.export_receiver = Some(worker::start_model_export(
             review.path.clone(),
             manifest,
             overrides,
             texture_dir,
             output,
+            self.model.physicalize_overrides.clone(),
+            rc_resolution.path,
         ));
         self.model.export_summary = None;
-        self.status = "正在輸出 CryEngine .mtl 與 request JSON…".to_owned();
+        self.status = "Exporting CryEngine intermediates and CE model…".to_owned();
     }
 
     fn send_model_textures_to_processing(&mut self) {
         let Some(review) = &self.model.review else {
-            self.status = "請先載入 FBX。".to_owned();
+            self.status = "Load an FBX file first.".to_owned();
             return;
         };
         match extract_model_texture_paths(review) {
             Ok(paths) if paths.is_empty() => {
-                self.status = "FBX 沒有可送入處理的外部或內嵌貼圖。".to_owned();
+                self.status = "The FBX has no external or embedded textures to process.".to_owned();
             }
             Ok(paths) => {
                 let count = paths.len();
                 self.add_texture_roots(paths);
-                self.status = format!("已從 FBX 送入 {count} 個貼圖參照並開始分組。");
+                self.status =
+                    format!("Sent {count} FBX texture references to the texture workflow.");
             }
             Err(error) => {
                 self.status = error;
@@ -323,7 +339,7 @@ impl WorkflowApp {
             self.texture.selected_unknown,
             &mut self.texture.document,
         ) else {
-            self.status = "請先選擇 unknown 貼圖。".to_owned();
+            self.status = "Select an unknown texture first.".to_owned();
             return;
         };
         self.status = match document.assign_unknown(
@@ -351,7 +367,10 @@ impl WorkflowApp {
                     self.texture.selected_unknown =
                         (remaining > 0).then_some(unknown_index.min(remaining - 1));
                 }
-                format!("已將貼圖指派為 `{}`。", self.texture.assignment_type)
+                format!(
+                    "Assigned the texture as `{}`.",
+                    self.texture.assignment_type
+                )
             }
             Err(error) => error,
         };
@@ -381,9 +400,9 @@ impl WorkflowApp {
                 .and_then(|receiver| match receiver.try_recv() {
                     Ok(event) => Some(event),
                     Err(TryRecvError::Empty) => None,
-                    Err(TryRecvError::Disconnected) => {
-                        Some(ScanEvent::Failed("貼圖掃描背景工作意外中止。".to_owned()))
-                    }
+                    Err(TryRecvError::Disconnected) => Some(ScanEvent::Failed(
+                        "The texture scan worker stopped unexpectedly.".to_owned(),
+                    )),
                 });
         let Some(event) = event else {
             return;
@@ -419,7 +438,7 @@ impl WorkflowApp {
                         Some,
                     );
                 self.status = format!(
-                    "已加入 {} 個貼圖，辨識 {groups} 組，{unknown} 個 unknown。",
+                    "Imported {} textures: {groups} groups, {unknown} unknown.",
                     self.texture.files.len()
                 );
                 if let Some((path, source_type)) = preview_request {
@@ -427,7 +446,7 @@ impl WorkflowApp {
                 }
             }
             ScanEvent::Failed(error) => {
-                self.status = format!("貼圖掃描失敗：{error}");
+                self.status = format!("Texture scan failed: {error}");
             }
         }
     }
@@ -489,7 +508,9 @@ impl WorkflowApp {
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    finished = Some(Err("貼圖處理背景工作意外中止。".to_owned()));
+                    finished = Some(Err(
+                        "The texture processing worker stopped unexpectedly.".to_owned()
+                    ));
                     break;
                 }
             }
@@ -502,10 +523,10 @@ impl WorkflowApp {
             Ok(report) => {
                 let written = report.groups.iter().map(|group| group.written.len()).sum();
                 self.status = if report.cancelled {
-                    format!("處理已取消；完成 {} 個群組。", report.groups.len())
+                    format!("Processing cancelled after {} groups.", report.groups.len())
                 } else {
                     format!(
-                        "處理完成：{} 個群組，{written} 個輸出檔。",
+                        "Processing complete: {} groups, {written} output files.",
                         report.groups.len()
                     )
                 };
@@ -518,7 +539,7 @@ impl WorkflowApp {
                 });
             }
             Err(error) => {
-                self.status = format!("貼圖處理失敗：{error}");
+                self.status = format!("Texture processing failed: {error}");
             }
         }
         self.process = None;
@@ -545,11 +566,12 @@ impl WorkflowApp {
                     .sum::<usize>();
                 self.model.review = Some(*review);
                 self.model.selected_material = (materials > 0).then_some(0);
-                self.status =
-                    format!("FBX 載入完成：{materials} 個材質槽，{references} 個貼圖參照。");
+                self.status = format!(
+                    "FBX loaded: {materials} material slots, {references} texture references."
+                );
             }
             ModelEvent::Failed(error) => {
-                self.status = format!("FBX 載入失敗：{error}");
+                self.status = format!("FBX load failed: {error}");
             }
         }
     }
@@ -565,18 +587,38 @@ impl WorkflowApp {
         };
         self.model.export_receiver = None;
         match event {
-            ModelExportEvent::Completed(outputs) => {
+            ModelExportEvent::Completed(report) => {
+                let rc_summary = match &report.rc {
+                    RcExportOutcome::NotConfigured => {
+                        self.model.rc_missing_warning = true;
+                        self.status = "RC not configured — intermediate files exported".to_owned();
+                        "CGF: not exported (RC not configured)".to_owned()
+                    }
+                    RcExportOutcome::Succeeded { cgf, return_code } => {
+                        self.model.rc_missing_warning = false;
+                        self.status = format!("CE model export completed: {}", cgf.display());
+                        format!("CGF: {} (RC exit {return_code})", cgf.display())
+                    }
+                    RcExportOutcome::Failed { error, return_code } => {
+                        self.model.rc_missing_warning = false;
+                        self.status =
+                            format!("RC export failed — intermediate files exported: {error}");
+                        return_code.map_or_else(
+                            || format!("CGF: export failed ({error})"),
+                            |code| format!("CGF: export failed (RC exit {code}; {error})"),
+                        )
+                    }
+                };
                 let summary = format!(
-                    "{}\n{}\n{} diagnostic(s)",
-                    outputs.mtl.display(),
-                    outputs.request.display(),
-                    outputs.material_diagnostics.len()
+                    "MTL: {}\nRequest: {}\n{rc_summary}\n{} diagnostic(s)",
+                    report.outputs.mtl.display(),
+                    report.outputs.request.display(),
+                    report.outputs.material_diagnostics.len()
                 );
                 self.model.export_summary = Some(summary);
-                self.status = "模型材質輸出完成。".to_owned();
             }
             ModelExportEvent::Failed(error) => {
-                self.status = format!("模型材質輸出失敗：{error}");
+                self.status = format!("CE model export failed: {error}");
             }
         }
     }
@@ -592,7 +634,7 @@ impl WorkflowApp {
         match save_texture_settings(&path, &self.settings) {
             Ok(()) => {
                 self.save_preferences();
-                self.status = format!("設定已儲存：{}", path.display());
+                self.status = format!("Settings saved: {}", path.display());
             }
             Err(error) => self.status = error.to_string(),
         }
@@ -604,7 +646,7 @@ impl WorkflowApp {
             Ok(settings) => {
                 self.settings = settings;
                 self.save_preferences();
-                self.status = format!("設定已載入：{}", path.display());
+                self.status = format!("Settings loaded: {}", path.display());
             }
             Err(error) => self.status = error.to_string(),
         }
@@ -616,13 +658,13 @@ impl WorkflowApp {
             ui.horizontal(|ui| {
                 ui.heading(APP_TITLE);
                 ui.separator();
-                ui.label("貼圖轉換主流程");
+                ui.label("Texture conversion workflow");
                 if self.model.review.is_some() {
                     ui.separator();
-                    ui.weak("FBX 材質工具已就緒");
+                    ui.weak("FBX material tool ready");
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.weak("可直接拖放檔案或資料夾");
+                    ui.weak("Drop files or folders anywhere");
                 });
             });
             ui.add_space(6.0);
@@ -651,8 +693,8 @@ impl WorkflowApp {
             .max_width(430.0)
             .show(context, |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.tab, WorkflowTab::Textures, "貼圖導入");
-                    ui.selectable_value(&mut self.tab, WorkflowTab::Model, "模型導入");
+                    ui.selectable_value(&mut self.tab, WorkflowTab::Textures, "Texture Import");
+                    ui.selectable_value(&mut self.tab, WorkflowTab::Model, "Model Import");
                 });
                 ui.separator();
                 match self.tab {
@@ -663,39 +705,39 @@ impl WorkflowApp {
     }
 
     fn texture_import_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("貼圖導入");
-        ui.label("加入單張貼圖、整個資料夾，或直接拖放。");
+        ui.heading("Texture Import");
+        ui.label("Add individual textures, a folder, or drop them here.");
         ui.add_space(6.0);
         ui.add(
             TextEdit::singleline(&mut self.preferences.import_path)
-                .hint_text("貼圖檔案或資料夾路徑"),
+                .hint_text("Texture file or folder path"),
         );
         ui.horizontal_wrapped(|ui| {
-            if ui.button("加入檔案").clicked() {
+            if ui.button("Add Files").clicked() {
                 let paths = split_paths(&self.preferences.import_path)
                     .into_iter()
                     .filter(|path| path.is_file())
                     .collect::<Vec<_>>();
                 self.add_texture_roots(paths);
             }
-            if ui.button("加入資料夾").clicked() {
+            if ui.button("Add Folder").clicked() {
                 let path = PathBuf::from(self.preferences.import_path.trim());
                 self.add_texture_roots((path.is_dir()).then_some(path).into_iter().collect());
             }
-            if ui.button("清除全部").clicked() {
+            if ui.button("Clear All").clicked() {
                 self.clear_textures();
             }
         });
         if self.texture.scan_receiver.is_some() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("掃描中…");
+                ui.label("Scanning…");
             });
         }
         ui.add_space(8.0);
         ui.group(|ui| {
             ui.set_width(ui.available_width());
-            ui.strong(format!("已導入貼圖 ({})", self.texture.files.len()));
+            ui.strong(format!("Imported Textures ({})", self.texture.files.len()));
             ui.separator();
             let mut preview_request = None;
             ScrollArea::vertical()
@@ -725,12 +767,12 @@ impl WorkflowApp {
     }
 
     fn model_import_panel(&mut self, ui: &mut egui::Ui) {
-        ui.heading("模型導入");
-        ui.label("FBX 材質轉換是獨立的選配流程。");
+        ui.heading("Model Import");
+        ui.label("FBX conversion is an independent optional workflow.");
         ui.add_space(6.0);
-        ui.add(TextEdit::singleline(&mut self.preferences.model_path).hint_text("FBX 檔案路徑"));
+        ui.add(TextEdit::singleline(&mut self.preferences.model_path).hint_text("FBX file path"));
         if ui
-            .add_enabled(self.model.receiver.is_none(), egui::Button::new("載入 FBX"))
+            .add_enabled(self.model.receiver.is_none(), egui::Button::new("Load FBX"))
             .clicked()
         {
             self.start_model_load(PathBuf::from(self.preferences.model_path.trim()));
@@ -738,7 +780,7 @@ impl WorkflowApp {
         if self.model.receiver.is_some() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("讀取模型中…");
+                ui.label("Loading model…");
             });
         }
         ui.add_space(8.0);
@@ -752,17 +794,20 @@ impl WorkflowApp {
                         .and_then(|name| name.to_str())
                         .unwrap_or("FBX"),
                 );
-                ui.label(format!("材質槽：{}", review.material_slots.len()));
-                ui.label(format!("Meshes：{}", review.model.meshes.len()));
-                ui.label(format!("Nodes：{}", review.model.node_count));
-                ui.label(format!("診斷：{}", review.diagnostics.len()));
+                ui.label(format!("Material slots: {}", review.material_slots.len()));
+                ui.label(format!("Meshes: {}", review.model.meshes.len()));
+                ui.label(format!("Nodes: {}", review.model.node_count));
+                ui.label(format!("Diagnostics: {}", review.diagnostics.len()));
             });
             ui.add_space(8.0);
-            if ui.button("將引用／內嵌貼圖送入貼圖轉換").clicked() {
+            if ui
+                .button("Send Referenced / Embedded Textures to Texture Conversion")
+                .clicked()
+            {
                 self.send_model_textures_to_processing();
             }
         } else {
-            ui.weak("尚未載入模型。也可以直接將 car.fbx 拖入視窗。");
+            ui.weak("No model loaded. You can also drop car.fbx into the window.");
         }
     }
 
@@ -774,7 +819,7 @@ impl WorkflowApp {
             .max_width(470.0)
             .show(context, |ui| {
                 ScrollArea::vertical().show(ui, |ui| {
-                    ui.heading("輸出設定");
+                    ui.heading("Export Settings");
                     ui.add_space(5.0);
                     self.output_directory_fields(ui);
                     ui.separator();
@@ -791,7 +836,7 @@ impl WorkflowApp {
     }
 
     fn output_directory_fields(&mut self, ui: &mut egui::Ui) {
-        ui.strong("貼圖輸出目錄");
+        ui.strong("Texture Output Directory");
         if ui
             .add(
                 TextEdit::singleline(&mut self.preferences.texture_output_directory)
@@ -802,7 +847,7 @@ impl WorkflowApp {
             self.save_preferences();
         }
         ui.add_space(5.0);
-        ui.strong("模型輸出目錄");
+        ui.strong("Model Output Directory");
         if ui
             .add(
                 TextEdit::singleline(&mut self.preferences.model_output_directory)
@@ -815,28 +860,28 @@ impl WorkflowApp {
     }
 
     fn texture_settings_panel(&mut self, ui: &mut egui::Ui) {
-        ui.strong("貼圖輸出設定");
+        ui.strong("Texture Output Settings");
         Grid::new("primary_texture_settings")
             .num_columns(2)
             .spacing([12.0, 6.0])
             .show(ui, |ui| {
-                ui.label("輸出解析度");
+                ui.label("Output Resolution");
                 ComboBox::from_id_salt("resolution")
                     .selected_text(resolution_label(self.settings.output_resolution))
                     .show_ui(ui, |ui| {
                         for (label, value) in [
-                            ("原始", OutputResolution::Original),
+                            ("Original", OutputResolution::Original),
                             ("4096", OutputResolution::Max(4096)),
                             ("2048", OutputResolution::Max(2048)),
                             ("1024", OutputResolution::Max(1024)),
                             ("512", OutputResolution::Max(512)),
-                            ("64（驗證）", OutputResolution::Max(64)),
+                            ("64 (validation)", OutputResolution::Max(64)),
                         ] {
                             ui.selectable_value(&mut self.settings.output_resolution, value, label);
                         }
                     });
                 ui.end_row();
-                ui.label("漫反射格式");
+                ui.label("Diffuse Format");
                 ComboBox::from_id_salt("diff_format")
                     .selected_text(match self.settings.diff_format {
                         DiffFormat::Albedo => "albedo",
@@ -856,18 +901,21 @@ impl WorkflowApp {
                     });
                 ui.end_row();
             });
-        ui.checkbox(&mut self.settings.normal_flip_green, "翻轉法線圖綠色通道");
+        ui.checkbox(
+            &mut self.settings.normal_flip_green,
+            "Flip Normal Map Green Channel",
+        );
         ui.checkbox(
             &mut self.settings.process_metallic,
-            "轉換 Metallic 為 Albedo + Reflection",
+            "Convert Metallic to Albedo + Reflection",
         );
         ui.checkbox(
             &mut self.settings.generate_missing_spec,
-            "產生缺少的 Specular",
+            "Generate Missing Specular",
         );
 
         ui.add_space(5.0);
-        ui.strong("輸出貼圖類型");
+        ui.strong("Output Texture Types");
         Grid::new("texture_type_toggles")
             .num_columns(2)
             .show(ui, |ui| {
@@ -888,22 +936,25 @@ impl WorkflowApp {
                 ui.end_row();
             });
 
-        ui.collapsing("進階設定", |ui| {
-            ui.checkbox(&mut self.settings.normalize_height, "正規化高度圖");
+        ui.collapsing("Advanced Settings", |ui| {
+            ui.checkbox(&mut self.settings.normalize_height, "Normalize Height Map");
             ui.checkbox(&mut self.settings.dither, "Dither");
             ui.checkbox(
                 &mut self.settings.generate_missing_emissive,
-                "產生缺少的 Emissive",
+                "Generate Missing Emissive",
             );
-            ui.checkbox(&mut self.settings.generate_missing_sss, "產生缺少的 SSS");
+            ui.checkbox(
+                &mut self.settings.generate_missing_sss,
+                "Generate Missing SSS",
+            );
             ui.checkbox(
                 &mut self.settings.generate_sss_from_diffuse,
-                "由 Diffuse 產生 SSS",
+                "Generate SSS from Diffuse",
             );
             Grid::new("advanced_texture_settings")
                 .num_columns(2)
                 .show(ui, |ui| {
-                    ui.label("ARM 順序");
+                    ui.label("ARM Order");
                     ComboBox::from_id_salt("arm_order")
                         .selected_text(match self.settings.arm_order {
                             ArmOrder::Arm => "ARM",
@@ -916,28 +967,28 @@ impl WorkflowApp {
                             ui.selectable_value(&mut self.settings.arm_order, ArmOrder::Rma, "RMA");
                         });
                     ui.end_row();
-                    ui.label("Height → Normal 強度");
+                    ui.label("Height → Normal Strength");
                     ui.add(
                         egui::DragValue::new(&mut self.settings.normal_from_height_strength)
                             .speed(0.1)
                             .range(0.0..=100.0),
                     );
                     ui.end_row();
-                    ui.label("Emissive 亮度");
+                    ui.label("Emissive Brightness");
                     ui.add(
                         egui::DragValue::new(&mut self.settings.emissive_brightness)
                             .speed(0.05)
                             .range(0.0..=20.0),
                     );
                     ui.end_row();
-                    ui.label("SSS 強度");
+                    ui.label("SSS Intensity");
                     ui.add(
                         egui::DragValue::new(&mut self.settings.sss_intensity)
                             .speed(0.05)
                             .range(0.0..=20.0),
                     );
                     ui.end_row();
-                    ui.label("SSS 對比");
+                    ui.label("SSS Contrast");
                     ui.add(
                         egui::DragValue::new(&mut self.settings.sss_contrast)
                             .speed(0.05)
@@ -949,16 +1000,16 @@ impl WorkflowApp {
     }
 
     fn settings_file_panel(&mut self, ui: &mut egui::Ui) {
-        ui.strong("設定檔（與 CLI --settings 相容）");
+        ui.strong("Settings File (CLI --settings compatible)");
         ui.add(
             TextEdit::singleline(&mut self.preferences.settings_path)
                 .hint_text("texproc-settings.json"),
         );
         ui.horizontal(|ui| {
-            if ui.button("載入設定").clicked() {
+            if ui.button("Load Settings").clicked() {
                 self.load_settings();
             }
-            if ui.button("儲存設定").clicked() {
+            if ui.button("Save Settings").clicked() {
                 self.save_settings();
             }
         });
@@ -975,12 +1026,12 @@ impl WorkflowApp {
             .document
             .as_ref()
             .map_or(0, ReviewDocument::unresolved_unknown_count);
-        ui.label(format!("{group_count} 個群組／{unknown} 個 unknown"));
+        ui.label(format!("{group_count} groups / {unknown} unknown"));
         let processing = self.process.is_some();
         if ui
             .add_enabled(
                 !processing && group_count > 0,
-                egui::Button::new(RichText::new("處理貼圖").strong().size(18.0))
+                egui::Button::new(RichText::new("Process Textures").strong().size(18.0))
                     .min_size([ui.available_width(), 42.0].into()),
             )
             .clicked()
@@ -997,43 +1048,45 @@ impl WorkflowApp {
                 "{} / {} · {}",
                 process.completed, process.total, process.current_group
             )));
-            if ui.button("取消").clicked() {
+            if ui.button("Cancel").clicked() {
                 process.job.cancel.store(true, Ordering::Relaxed);
-                self.status = "正在取消；已開始的群組會先安全完成。".to_owned();
+                self.status =
+                    "Cancelling; groups already in progress will finish safely.".to_owned();
             }
         }
         if let Some(summary) = &self.process_summary {
             ui.group(|ui| {
                 ui.strong(if summary.cancelled {
-                    "處理已取消"
+                    "Processing Cancelled"
                 } else {
-                    "處理完成"
+                    "Processing Complete"
                 });
                 ui.label(format!(
-                    "{} 個群組／{} 個檔案／{:.2} 秒",
+                    "{} groups / {} files / {:.2} seconds",
                     summary.groups, summary.written, summary.elapsed_seconds
                 ));
-                ui.hyperlink_to("開啟輸出目錄", file_url(&summary.output_directory));
+                ui.hyperlink_to("Open Output Directory", file_url(&summary.output_directory));
             });
         }
     }
 
     fn model_actions(&mut self, ui: &mut egui::Ui) {
-        ui.strong("FBX 材質輸出");
-        ui.label("選配 manifest");
+        ui.strong("CE Model Export");
+        ui.label("Optional Manifest");
         ui.add(
             TextEdit::singleline(&mut self.preferences.manifest_path)
-                .hint_text("material_manifest.json（可留空）"),
+                .hint_text("material_manifest.json (optional)"),
         );
-        ui.label("選配 overrides");
+        ui.label("Optional Overrides");
         ui.add(
             TextEdit::singleline(&mut self.preferences.overrides_path)
-                .hint_text("overrides.json（可留空）"),
+                .hint_text("overrides.json (optional)"),
         );
+        self.rc_path_field(ui);
         if ui
             .add_enabled(
                 self.model.review.is_some() && self.model.export_receiver.is_none(),
-                egui::Button::new(RichText::new("輸出 Material (.mtl + request)").strong())
+                egui::Button::new(RichText::new("Export CE Model").strong().size(18.0))
                     .min_size([ui.available_width(), 40.0].into()),
             )
             .clicked()
@@ -1044,14 +1097,83 @@ impl WorkflowApp {
         if self.model.export_receiver.is_some() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("輸出中…");
+                ui.label("Exporting…");
             });
         }
         if let Some(summary) = &self.model.export_summary {
             ui.label(summary);
             ui.hyperlink_to(
-                "開啟模型輸出目錄",
+                "Open Model Output Directory",
                 file_url(Path::new(&self.preferences.model_output_directory)),
+            );
+        }
+    }
+
+    fn rc_path_field(&mut self, ui: &mut egui::Ui) {
+        ui.label("RC Path");
+        let resolution = resolve_rc_path(&self.preferences.rc_path);
+        let invalid = resolution.configured_invalid || resolution.path.is_none();
+        let stroke = if invalid {
+            Stroke::new(1.5, Color32::from_rgb(210, 70, 65))
+        } else {
+            ui.visuals().widgets.inactive.bg_stroke
+        };
+        let mut changed = false;
+        let mut browse = false;
+        ui.horizontal(|ui| {
+            egui::Frame::new()
+                .stroke(stroke)
+                .inner_margin(egui::Margin::same(2))
+                .show(ui, |ui| {
+                    changed = ui
+                        .add(
+                            TextEdit::singleline(&mut self.preferences.rc_path)
+                                .desired_width((ui.available_width() - 74.0).max(120.0))
+                                .hint_text(r"C:\CryEngine\Tools\rc\rc.exe"),
+                        )
+                        .changed();
+                });
+            browse = ui.button("Browse…").clicked();
+        });
+        if browse {
+            match choose_rc_executable(&self.preferences.rc_path) {
+                Ok(Some(path)) => {
+                    self.preferences.rc_path = path.to_string_lossy().into_owned();
+                    changed = true;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.status = error;
+                }
+            }
+        }
+        if changed {
+            self.save_preferences();
+        }
+
+        let resolution = resolve_rc_path(&self.preferences.rc_path);
+        if resolution.configured_invalid {
+            ui.label(
+                RichText::new(match (&resolution.path, resolution.source) {
+                    (Some(path), source) => format!(
+                        "Configured RC Path is invalid. Using {source}: {}",
+                        path.display()
+                    ),
+                    (None, _) => {
+                        "RC not configured — Export CE Model will keep intermediate files only."
+                            .to_owned()
+                    }
+                })
+                .color(Color32::from_rgb(210, 70, 65)),
+            );
+        } else if let Some(path) = &resolution.path {
+            ui.weak(format!("Using {}: {}", resolution.source, path.display()));
+        } else {
+            ui.label(
+                RichText::new(
+                    "RC not configured — Export CE Model will keep intermediate files only.",
+                )
+                .color(Color32::from_rgb(210, 70, 65)),
             );
         }
     }
@@ -1073,7 +1195,7 @@ impl WorkflowApp {
         ui.group(|ui| {
             ui.set_width(ui.available_width());
             ui.horizontal(|ui| {
-                ui.strong("貼圖預覽");
+                ui.strong("Texture Preview");
                 if let Some(path) = self
                     .preview
                     .loaded_path
@@ -1119,7 +1241,7 @@ impl WorkflowApp {
                     egui::Layout::centered_and_justified(egui::Direction::TopDown),
                     |ui| {
                         ui.label(
-                            RichText::new(format!("無法預覽：{error}"))
+                            RichText::new(format!("Preview unavailable: {error}"))
                                 .color(Color32::from_rgb(210, 90, 75)),
                         );
                     },
@@ -1129,7 +1251,7 @@ impl WorkflowApp {
                     available,
                     egui::Layout::centered_and_justified(egui::Direction::TopDown),
                     |ui| {
-                        ui.weak("從左側貼圖清單或下方群組選擇貼圖");
+                        ui.weak("Select a texture from the import list or a group below");
                     },
                 );
             }
@@ -1139,22 +1261,22 @@ impl WorkflowApp {
     fn groups_panel(&mut self, ui: &mut egui::Ui) {
         let Some(document) = &self.texture.document else {
             ui.centered_and_justified(|ui| {
-                ui.weak("加入貼圖後，偵測群組會顯示在這裡。");
+                ui.weak("Detected groups will appear here after textures are imported.");
             });
             return;
         };
         let groups = document.scan().groups.clone();
         let query = self.texture.group_search.trim().to_lowercase();
         ui.horizontal(|ui| {
-            ui.heading("偵測到的貼圖組");
+            ui.heading("Detected Texture Groups");
             ui.weak(format!("({})", groups.len()));
             ui.separator();
             ui.add(
                 TextEdit::singleline(&mut self.texture.group_search)
                     .desired_width(180.0)
-                    .hint_text("搜尋群組"),
+                    .hint_text("Search groups"),
             );
-            ui.checkbox(&mut self.texture.review_only, "只看待處理");
+            ui.checkbox(&mut self.texture.review_only, "Review only");
         });
         ui.add_space(4.0);
 
@@ -1165,8 +1287,8 @@ impl WorkflowApp {
                 Grid::new("group_list_headers")
                     .num_columns(3)
                     .show(ui, |ui| {
-                        ui.strong("基本名稱");
-                        ui.strong("已識別");
+                        ui.strong("Base Name");
+                        ui.strong("Detected");
                         ui.strong("Unknown");
                         ui.end_row();
                     });
@@ -1226,11 +1348,11 @@ impl WorkflowApp {
                     .selected_group
                     .and_then(|index| groups.get(index));
                 let Some(group) = group else {
-                    ui.weak("選擇群組以檢視詳情。");
+                    ui.weak("Select a group to inspect its contents.");
                     return;
                 };
-                ui.strong(format!("組詳情 · {}", group.base_name));
-                ui.label(format!("貼圖類型：{}", detected_type_summary(group)));
+                ui.strong(format!("Group Details · {}", group.base_name));
+                ui.label(format!("Texture types: {}", detected_type_summary(group)));
                 ScrollArea::vertical()
                     .id_salt("group_detail")
                     .max_height(105.0)
@@ -1250,9 +1372,9 @@ impl WorkflowApp {
                                 }
                             }
                         }
-                    });
+                });
                 ui.separator();
-                ui.strong("Unknown 貼圖");
+                ui.strong("Unknown Textures");
                 for (index, entry) in group.unknown.iter().enumerate() {
                     if ui
                         .selectable_label(
@@ -1272,7 +1394,7 @@ impl WorkflowApp {
                         .get(self.texture.assignment_type.as_str())
                         .map(|entry| entry.filename.as_str());
                     ui.horizontal(|ui| {
-                        ui.label("指定型別");
+                        ui.label("Assign Type");
                         ComboBox::from_id_salt("unknown_assignment")
                             .selected_text(&self.texture.assignment_type)
                             .show_ui(ui, |ui| {
@@ -1287,7 +1409,7 @@ impl WorkflowApp {
                         if ui
                             .add_enabled(
                                 self.texture.selected_unknown.is_some() && occupant.is_none(),
-                                egui::Button::new("套用"),
+                                egui::Button::new("Apply"),
                             )
                             .clicked()
                         {
@@ -1296,13 +1418,16 @@ impl WorkflowApp {
                     });
                     if let Some(filename) = occupant {
                         ui.label(
-                            RichText::new(format!("DEF-19：目標型別已有 {filename}，請選空槽。"))
-                                .color(Color32::from_rgb(210, 80, 70)),
+                            RichText::new(format!(
+                                "DEF-19: {filename} already occupies that type. Choose an empty slot."
+                            ))
+                            .color(Color32::from_rgb(210, 80, 70)),
                         );
                     }
                 } else {
                     ui.label(
-                        RichText::new("此群組已完成分類。").color(Color32::from_rgb(70, 165, 95)),
+                        RichText::new("This group is fully classified.")
+                            .color(Color32::from_rgb(70, 165, 95)),
                     );
                 }
             });
@@ -1319,8 +1444,8 @@ impl WorkflowApp {
         let Some(review) = &self.model.review else {
             ui.centered_and_justified(|ui| {
                 ui.vertical_centered(|ui| {
-                    ui.heading("FBX 材質檢視");
-                    ui.label("從左側輸入 FBX 路徑，或將 FBX 拖入視窗。");
+                    ui.heading("FBX Material Review");
+                    ui.label("Enter an FBX path on the left, or drop an FBX into the window.");
                 });
             });
             return;
@@ -1334,25 +1459,26 @@ impl WorkflowApp {
                     .unwrap_or("FBX"),
             );
             ui.separator();
-            ui.label(format!("{} 個材質槽", review.material_slots.len()));
+            ui.label(format!("{} material slots", review.material_slots.len()));
             ui.separator();
-            ui.label(format!("{} 個診斷", review.diagnostics.len()));
+            ui.label(format!("{} diagnostics", review.diagnostics.len()));
         });
         ui.separator();
         ScrollArea::vertical().show(ui, |ui| {
             ui.group(|ui| {
                 ui.set_width(ui.available_width());
-                ui.strong("RC 材質槽");
+                ui.strong("RC Material Slots");
                 Grid::new("model_materials")
-                    .num_columns(5)
+                    .num_columns(6)
                     .striped(true)
                     .spacing([12.0, 5.0])
                     .show(ui, |ui| {
                         ui.strong("FBX");
                         ui.strong("Sub");
-                        ui.strong("材質");
+                        ui.strong("Material");
+                        ui.strong("Physicalize");
                         ui.strong("Polygons");
-                        ui.strong("貼圖");
+                        ui.strong("Textures");
                         ui.end_row();
                         for (index, slot) in review.material_slots.iter().enumerate() {
                             let selected = self.model.selected_material == Some(index);
@@ -1369,6 +1495,39 @@ impl WorkflowApp {
                             }
                             ui.label(slot.sub_index.to_string());
                             ui.label(&slot.name);
+                            let inferred = resolve_physicalize(
+                                slot.physicalize
+                                    .as_deref()
+                                    .map(|value| ("physicalize", value)),
+                                &slot.name,
+                            )
+                            .value
+                            .as_str()
+                            .to_owned();
+                            let mut physicalize = self
+                                .model
+                                .physicalize_overrides
+                                .get(&slot.name)
+                                .cloned()
+                                .unwrap_or_else(|| inferred.clone());
+                            ComboBox::from_id_salt(("physicalize", index))
+                                .selected_text(&physicalize)
+                                .show_ui(ui, |ui| {
+                                    for value in PHYSICALIZE_VALUES {
+                                        ui.selectable_value(
+                                            &mut physicalize,
+                                            value.to_owned(),
+                                            value,
+                                        );
+                                    }
+                                });
+                            if physicalize == inferred {
+                                self.model.physicalize_overrides.remove(&slot.name);
+                            } else {
+                                self.model
+                                    .physicalize_overrides
+                                    .insert(slot.name.clone(), physicalize);
+                            }
                             let assignment = slot.source_order.and_then(|source_order| {
                                 review
                                     .assignments
@@ -1395,9 +1554,9 @@ impl WorkflowApp {
                 if let Some(slot) = review.material_slots.get(index) {
                     ui.group(|ui| {
                         ui.set_width(ui.available_width());
-                        ui.strong(format!("材質詳情 · {}", slot.name));
+                        ui.strong(format!("Material Details · {}", slot.name));
                         ui.label(format!(
-                            "指派依據：{}",
+                            "Assignment source: {}",
                             slot.assignment_reason
                                 .as_deref()
                                 .unwrap_or("slot projection")
@@ -1407,14 +1566,14 @@ impl WorkflowApp {
                             .and_then(|source_order| review.model.materials.get(source_order))
                         {
                             if material.textures.is_empty() {
-                                ui.weak("沒有貼圖參照");
+                                ui.weak("No texture references");
                             }
                             for texture in &material.textures {
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label(RichText::new(&texture.shader_prop).strong());
                                     ui.label(if texture.embedded {
                                         format!(
-                                            "{}（內嵌，{} bytes）",
+                                            "{} (embedded, {} bytes)",
                                             texture.filename, texture.content_size
                                         )
                                     } else {
@@ -1429,10 +1588,10 @@ impl WorkflowApp {
             ui.add_space(8.0);
             ui.group(|ui| {
                 ui.set_width(ui.available_width());
-                ui.strong("材質槽診斷");
+                ui.strong("Material Slot Diagnostics");
                 if review.diagnostics.is_empty() {
                     ui.label(
-                        RichText::new("沒有需要處理的材質槽診斷。")
+                        RichText::new("No material slot diagnostics require attention.")
                             .color(Color32::from_rgb(70, 165, 95)),
                     );
                 }
@@ -1468,28 +1627,6 @@ impl eframe::App for WorkflowApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let _ = self.preferences.save();
     }
-}
-
-fn install_zh_tw_font(context: &egui::Context) {
-    let candidates = [
-        Path::new(r"C:\Windows\Fonts\msjh.ttc"),
-        Path::new(r"C:\Windows\Fonts\mingliu.ttc"),
-    ];
-    let Some(bytes) = candidates.iter().find_map(|path| fs::read(path).ok()) else {
-        return;
-    };
-    let mut fonts = FontDefinitions::default();
-    fonts
-        .font_data
-        .insert("zh_tw".to_owned(), FontData::from_owned(bytes).into());
-    for family in [FontFamily::Proportional, FontFamily::Monospace] {
-        fonts
-            .families
-            .entry(family)
-            .or_default()
-            .insert(0, "zh_tw".to_owned());
-    }
-    context.set_fonts(fonts);
 }
 
 fn split_paths(text: &str) -> Vec<PathBuf> {
@@ -1538,7 +1675,7 @@ fn detected_type_summary(group: &ScanGroup) -> String {
 
 fn resolution_label(value: OutputResolution) -> String {
     match value {
-        OutputResolution::Original => "原始".to_owned(),
+        OutputResolution::Original => "Original".to_owned(),
         OutputResolution::Max(maximum) => maximum.to_string(),
     }
 }
@@ -1571,7 +1708,7 @@ fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, Str
         } else if texture.embedded && !texture.content.is_empty() {
             fs::create_dir_all(&embedded_directory).map_err(|error| {
                 format!(
-                    "無法建立內嵌貼圖暫存目錄 {}：{error}",
+                    "Could not create embedded texture cache {}: {error}",
                     embedded_directory.display()
                 )
             })?;
@@ -1581,8 +1718,12 @@ fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, Str
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(format!("embedded_{index}.png")));
             let path = embedded_directory.join(filename);
-            fs::write(&path, &texture.content)
-                .map_err(|error| format!("無法寫出內嵌貼圖 {}：{error}", path.display()))?;
+            fs::write(&path, &texture.content).map_err(|error| {
+                format!(
+                    "Could not write embedded texture {}: {error}",
+                    path.display()
+                )
+            })?;
             path
         } else {
             continue;
@@ -1593,4 +1734,106 @@ fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, Str
         }
     }
     Ok(paths)
+}
+
+struct RcPathResolution {
+    path: Option<PathBuf>,
+    source: &'static str,
+    configured_invalid: bool,
+}
+
+fn resolve_rc_path(configured: &str) -> RcPathResolution {
+    let environment = std::env::var_os("CE_RC_EXE").map(PathBuf::from);
+    resolve_rc_path_candidates(
+        configured,
+        environment.as_deref(),
+        Path::new(DEFAULT_RC_EXE),
+    )
+}
+
+fn resolve_rc_path_candidates(
+    configured: &str,
+    environment: Option<&Path>,
+    default: &Path,
+) -> RcPathResolution {
+    let configured = configured.trim();
+    if !configured.is_empty() {
+        let path = PathBuf::from(configured);
+        if path.is_file() {
+            return RcPathResolution {
+                path: Some(path),
+                source: "RC Path",
+                configured_invalid: false,
+            };
+        }
+    }
+    let configured_invalid = !configured.is_empty();
+    if let Some(path) = environment {
+        if path.is_file() {
+            return RcPathResolution {
+                path: Some(path.to_owned()),
+                source: "CE_RC_EXE",
+                configured_invalid,
+            };
+        }
+    }
+    if default.is_file() {
+        return RcPathResolution {
+            path: Some(default.to_owned()),
+            source: "default RC",
+            configured_invalid,
+        };
+    }
+    RcPathResolution {
+        path: None,
+        source: "",
+        configured_invalid,
+    }
+}
+
+#[cfg(test)]
+mod rc_path_tests {
+    use super::*;
+
+    fn existing_file() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml")
+    }
+
+    #[test]
+    fn configured_rc_path_has_highest_priority() {
+        let configured = existing_file();
+        let environment = existing_file();
+        let default = existing_file();
+        let resolution =
+            resolve_rc_path_candidates(&configured.to_string_lossy(), Some(&environment), &default);
+
+        assert_eq!(resolution.path.as_deref(), Some(configured.as_path()));
+        assert_eq!(resolution.source, "RC Path");
+        assert!(!resolution.configured_invalid);
+    }
+
+    #[test]
+    fn invalid_configured_path_falls_back_to_environment() {
+        let environment = existing_file();
+        let default = existing_file();
+        let resolution =
+            resolve_rc_path_candidates("missing-configured-rc.exe", Some(&environment), &default);
+
+        assert_eq!(resolution.path.as_deref(), Some(environment.as_path()));
+        assert_eq!(resolution.source, "CE_RC_EXE");
+        assert!(resolution.configured_invalid);
+    }
+
+    #[test]
+    fn missing_all_rc_candidates_is_explicit() {
+        let resolution = resolve_rc_path_candidates(
+            "missing-configured-rc.exe",
+            Some(Path::new("missing-environment-rc.exe")),
+            Path::new("missing-default-rc.exe"),
+        );
+
+        assert!(resolution.path.is_none());
+        assert_eq!(resolution.source, "");
+        assert!(resolution.configured_invalid);
+    }
 }

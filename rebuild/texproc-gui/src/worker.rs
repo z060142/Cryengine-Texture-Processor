@@ -1,6 +1,8 @@
 use std::{
     collections::BTreeMap,
+    fs,
     path::{Path, PathBuf},
+    process::Command,
     sync::{
         atomic::{AtomicBool, AtomicUsize, Ordering},
         mpsc::{self, Receiver},
@@ -217,8 +219,25 @@ pub fn start_model_load(path: PathBuf) -> Receiver<ModelEvent> {
 }
 
 pub enum ModelExportEvent {
-    Completed(ConvertOutputs),
+    Completed(ModelExportReport),
     Failed(String),
+}
+
+pub struct ModelExportReport {
+    pub outputs: ConvertOutputs,
+    pub rc: RcExportOutcome,
+}
+
+pub enum RcExportOutcome {
+    NotConfigured,
+    Succeeded {
+        cgf: PathBuf,
+        return_code: i32,
+    },
+    Failed {
+        error: String,
+        return_code: Option<i32>,
+    },
 }
 
 pub fn start_model_export(
@@ -227,24 +246,109 @@ pub fn start_model_export(
     overrides: Option<PathBuf>,
     texture_dir: Option<PathBuf>,
     output_dir: PathBuf,
+    physicalize_overrides: BTreeMap<String, String>,
+    rc_exe: Option<PathBuf>,
 ) -> Receiver<ModelExportEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
-        let result = converter::convert_file(
+        let result = converter::convert_file_with_physicalize(
             &input,
             existing_optional(&manifest),
             existing_optional(&overrides),
             texture_dir.as_deref(),
             None,
             &output_dir,
+            &physicalize_overrides,
         );
         let event = match result {
-            Ok(outputs) => ModelExportEvent::Completed(outputs),
+            Ok(outputs) => {
+                let rc = rc_exe.map_or(RcExportOutcome::NotConfigured, |rc_exe| {
+                    run_resource_compiler(&rc_exe, &input, &outputs, &output_dir)
+                });
+                ModelExportEvent::Completed(ModelExportReport { outputs, rc })
+            }
             Err(error) => ModelExportEvent::Failed(error),
         };
         let _ = sender.send(event);
     });
     receiver
+}
+
+fn run_resource_compiler(
+    rc_exe: &Path,
+    input: &Path,
+    outputs: &ConvertOutputs,
+    output_dir: &Path,
+) -> RcExportOutcome {
+    let request = match fs::read_to_string(&outputs.request)
+        .map_err(|error| error.to_string())
+        .and_then(|text| {
+            serde_json::from_str::<converter::request::ImportRequest>(&text)
+                .map_err(|error| error.to_string())
+        }) {
+        Ok(request) => request,
+        Err(error) => {
+            return RcExportOutcome::Failed {
+                error: format!("failed to read generated request: {error}"),
+                return_code: None,
+            };
+        }
+    };
+    let cgf = outputs
+        .request
+        .with_extension(request.output_ext.trim_start_matches('.'));
+    if cgf.is_file() {
+        if let Err(error) = fs::remove_file(&cgf) {
+            return RcExportOutcome::Failed {
+                error: format!("failed to replace {}: {error}", cgf.display()),
+                return_code: None,
+            };
+        }
+    }
+    let Some(cgf_name) = cgf.file_name() else {
+        return RcExportOutcome::Failed {
+            error: format!("could not derive CGF name from {}", cgf.display()),
+            return_code: None,
+        };
+    };
+
+    let mut command = Command::new(rc_exe);
+    command
+        .arg(&outputs.request)
+        .arg("/overwriteextension=fbx")
+        .arg(format!("/overwritesourcefile={}", input.display()))
+        .arg(format!("/overwritefilename={}", cgf_name.to_string_lossy()))
+        .current_dir(output_dir);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    let output = match command.output() {
+        Ok(output) => output,
+        Err(error) => {
+            return RcExportOutcome::Failed {
+                error: format!("failed to start {}: {error}", rc_exe.display()),
+                return_code: None,
+            };
+        }
+    };
+    let return_code = output.status.code().unwrap_or(-1);
+    if output.status.success() && cgf.is_file() {
+        RcExportOutcome::Succeeded { cgf, return_code }
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        let detail = if !stderr.is_empty() { stderr } else { stdout };
+        RcExportOutcome::Failed {
+            error: if detail.is_empty() {
+                format!("RC exited with {return_code}, CGF was not produced")
+            } else {
+                format!("RC exited with {return_code}: {detail}")
+            },
+            return_code: Some(return_code),
+        }
+    }
 }
 
 fn existing_optional(path: &Option<PathBuf>) -> Option<&Path> {
