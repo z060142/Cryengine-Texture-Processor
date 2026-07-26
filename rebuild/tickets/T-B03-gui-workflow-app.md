@@ -494,3 +494,46 @@ gate 全綠不退步。
   `r3-groups-grid-unknowns.png` 補足。
 - **embedded 案例**：car/axe 皆無 embedded 貼圖，embedded 抽取+計數路徑由
   `collect_dedups_references_and_counts_embedded` 單元測試覆蓋（合成 embedded blob）。
+
+## R3 修正：分組表未對齊（業主標註截圖否決）
+
+僅動 `texproc-gui/src/main.rs`；未動 texproc/converter/凍結契約；無新依賴。
+
+### 根因
+
+R3 的分組表雖已用 `fixed_cell`，但（a）`fixed_cell` 走
+`allocate_ui_with_layout` 只設最小尺寸、未夾住最大寬，長組名不 truncate 反而
+把該格撐寬，逐列把後面的指示燈往右推——不同名稱長度→燈的 x 不同；（b）表頭在
+ScrollArea 外的 `ui.horizontal`，資料列各自包在 `Frame.inner_margin(4,1)` 內，
+造成表頭與列固定差 4px、標題也不落在燈欄正上方。先前截圖因名稱都截到同寬而掩蓋。
+
+### 修正
+
+- 依業主裁示改為**單一 `egui::Grid`**：表頭列與所有資料列同屬一個 Grid，欄 x
+  由 Grid 構造保證一致（欄 0 組名、欄 1..12 各型別窄欄、欄 13 Unassigned）。
+- `fixed_cell` 加 `set_min_width==set_max_width`（回傳格 rect）：組名欄夾在
+  ~150–232px 動態寬並 `truncate` + hover 全名，長名只截字、**永不撐開後面欄**。
+- 選取藍底 / 琥珀待指派底色改為「整列一張 rect 畫在該列背後」（先
+  `painter().add(Shape::Noop)` 佔位，量到整列 union rect 後 `painter().set`
+  回填），非逐格上色，滿版覆蓋整列。
+- 型別燈仍為綠（已填）／灰（空）、已填可點預覽；Unassigned 三態（`Assign(N)…`
+  下拉 / `✓ Assigned` / `—`）、搜尋、Unknown only、就地指派、DEF-19 佔用停用
+  全數不變。model 材質表本即真正的 `Grid`（`model_materials`），未受影響、未改。
+
+### 偏離
+
+- **表頭隨列捲動**：為滿足「單一 Grid」硬需求，表頭做成 Grid 首列、置於
+  ScrollArea 內（票面預先核可的 fallback），故長列捲動時表頭一起捲走，非黏頂。
+- 12 欄 + 組名 + Unassigned 較寬，視窗窄時由 `ScrollArea::both` 提供水平捲動。
+
+### 驗證
+
+- `cargo fmt --all -- --check`、`cargo clippy -p texproc-gui --all-targets
+  --release --locked -- -D warnings`：PASS。
+- `cargo test -p texproc-gui --release --locked`：5 model + 9 main PASS（1 ignored）。
+- **對抗性資料集截圖** `ux-demos/r3-groups-grid-fixed.png`：以 CLI 引數載入一組
+  名稱長度差異明顯的 5 組（`KB3D_ENC_Ivy` 12、`AtlasA` 15、`BoulderWall` 20、
+  `WoodOldWornBrownBDamaged` 33、`PlasterDamagedYellowDirtGrad` 37 字元）。短名
+  完整顯示、長名截字帶「…」，**所有型別燈仍精準對齊各自表頭欄**，AtlasA 選取
+  列藍底滿版整列——證明長名不再推移欄位。截圖後終止 texproc-gui/texproc 程序，
+  確認無殘留；臨時對抗資料夾已刪。

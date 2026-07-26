@@ -1,0 +1,14 @@
+<AssetMetadata version="0" type="Mesh" guid="44ed7fdd-ccb7-7b29-037a-181c6fae84ee" source="KB3D_ENC_PropAxe_A_grp.fbx">
+ <Files>
+  <File path="KB3D_ENC_PropAxe_A_grp.cgf"/>
+ </Files>
+ <Details>
+  <Detail name="materialCount">3</Detail>
+  <Detail name="triangleCount">146</Detail>
+  <Detail name="vertexCount">157</Detail>
+  <Detail name="16BitPrecision">false</Detail>
+ </Details>
+ <Dependencies>
+  <Path usageCount="1">./KB3D_ENC_PropAxe_A_grp.mtl</Path>
+ </Dependencies>
+</AssetMetadata>

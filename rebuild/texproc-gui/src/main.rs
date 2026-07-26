@@ -1767,55 +1767,65 @@ impl WorkflowApp {
             .map(|(index, _)| index)
             .collect::<Vec<_>>();
 
-        // Aligned three-zone table (demo3 blueprint): a fixed Group-name column,
-        // one narrow indicator column per map type under a fixed header row, and
-        // an Unassigned column (assign dropdown / "✓ Assigned" / "—").
-        let cells_w = GROUP_CELL_W * GROUP_COLUMNS.len() as f32;
-        let name_w = (ui.available_width() - cells_w - GROUP_UNKNOWN_W - 28.0).max(140.0);
-        let row_w = name_w + cells_w + GROUP_UNKNOWN_W;
-
-        // Fixed header, column-aligned with the scrolling rows below.
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 4.0;
-            fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
-                ui.strong("Group");
-            });
-            for (_, label) in GROUP_COLUMNS {
-                fixed_cell(ui, GROUP_CELL_W, GROUP_ROW_H, egui::Align::Center, |ui| {
-                    ui.label(RichText::new(label).small().weak());
-                });
-            }
-            fixed_cell(ui, GROUP_UNKNOWN_W, GROUP_ROW_H, egui::Align::LEFT, |ui| {
-                ui.strong("Unassigned");
-            });
-        });
-        ui.separator();
+        // One egui::Grid holds the header row AND every group row, so all
+        // columns share identical x positions regardless of name length. The
+        // name column is width-clamped + truncated so a long stem can never
+        // push the indicator columns out of alignment. Full-row selection /
+        // amber highlights are painted as a single rect behind each row.
+        let type_total = GROUP_CELL_W * GROUP_COLUMNS.len() as f32;
+        let name_w =
+            (ui.available_width() - type_total - GROUP_UNKNOWN_W - 30.0).clamp(150.0, 232.0);
 
         let mut preview_request = None;
         let mut assign = None;
-        ScrollArea::vertical()
+        ScrollArea::both()
             .id_salt("group_table")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for &index in &visible {
-                    let group = &groups[index];
-                    let selected = self.texture.selected_group == Some(index);
-                    let has_unknown = !group.unknown.is_empty();
-                    let was_unknown = self.texture.ever_unknown.contains(&group.key);
-                    let fill = match (selected, has_unknown) {
-                        (true, true) => Color32::from_rgba_unmultiplied(225, 155, 45, 70),
-                        (false, true) => Color32::from_rgba_unmultiplied(220, 150, 40, 38),
-                        (true, false) => Color32::from_rgba_unmultiplied(90, 140, 230, 55),
-                        (false, false) => Color32::TRANSPARENT,
-                    };
-                    egui::Frame::new()
-                        .fill(fill)
-                        .inner_margin(egui::Margin::symmetric(4, 1))
-                        .show(ui, |ui| {
-                            ui.set_width(row_w);
-                            ui.horizontal(|ui| {
-                                ui.spacing_mut().item_spacing.x = 4.0;
-                                fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                Grid::new("groups_grid")
+                    .num_columns(GROUP_COLUMNS.len() + 2)
+                    .spacing([2.0, 3.0])
+                    .min_row_height(GROUP_ROW_H)
+                    .show(ui, |ui| {
+                        // Header as the grid's first row → columns are aligned
+                        // with the rows by construction (deviation: the header
+                        // scrolls with the rows — the pre-approved fallback).
+                        fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                            ui.strong("Group");
+                        });
+                        for (_, label) in GROUP_COLUMNS {
+                            fixed_cell(ui, GROUP_CELL_W, GROUP_ROW_H, egui::Align::Center, |ui| {
+                                ui.label(RichText::new(label).small().strong());
+                            });
+                        }
+                        fixed_cell(ui, GROUP_UNKNOWN_W, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                            ui.strong("Unassigned");
+                        });
+                        ui.end_row();
+
+                        for &index in &visible {
+                            let group = &groups[index];
+                            let selected = self.texture.selected_group == Some(index);
+                            let has_unknown = !group.unknown.is_empty();
+                            let was_unknown = self.texture.ever_unknown.contains(&group.key);
+                            let fill = match (selected, has_unknown) {
+                                (true, true) => Color32::from_rgba_unmultiplied(225, 155, 45, 90),
+                                (false, true) => Color32::from_rgba_unmultiplied(220, 150, 40, 45),
+                                (true, false) => Color32::from_rgba_unmultiplied(90, 140, 230, 65),
+                                (false, false) => Color32::TRANSPARENT,
+                            };
+                            // Reserve a shape slot before the cells so the row
+                            // background paints behind them; fill it once the
+                            // full-row rect is known (paints the row, not cells).
+                            let bg = ui.painter().add(egui::Shape::Noop);
+                            let mut row_rect = egui::Rect::NOTHING;
+
+                            row_rect = row_rect.union(fixed_cell(
+                                ui,
+                                name_w,
+                                GROUP_ROW_H,
+                                egui::Align::LEFT,
+                                |ui| {
                                     let label =
                                         egui::Label::new(RichText::new(&group.base_name).strong())
                                             .truncate()
@@ -1826,89 +1836,97 @@ impl WorkflowApp {
                                             (PathBuf::from(&entry.path), entry.source_type.clone())
                                         });
                                     }
-                                });
-                                for (source_type, _) in GROUP_COLUMNS {
-                                    fixed_cell(
-                                        ui,
-                                        GROUP_CELL_W,
-                                        GROUP_ROW_H,
-                                        egui::Align::Center,
-                                        |ui| {
-                                            let entry = group.slots.get(source_type);
-                                            let sense = if entry.is_some() {
-                                                Sense::click()
-                                            } else {
-                                                Sense::hover()
-                                            };
-                                            let (rect, response) =
-                                                ui.allocate_exact_size([14.0, 14.0].into(), sense);
-                                            let color = if entry.is_some() {
-                                                Color32::from_rgb(80, 170, 100)
-                                            } else {
-                                                Color32::from_rgba_unmultiplied(130, 130, 135, 70)
-                                            };
-                                            ui.painter().rect_filled(rect, 3.0, color);
-                                            if let Some(entry) = entry {
-                                                if response.on_hover_text(source_type).clicked() {
-                                                    self.texture.selected_group = Some(index);
-                                                    preview_request = Some((
-                                                        PathBuf::from(&entry.path),
-                                                        source_type.to_owned(),
-                                                    ));
-                                                }
-                                            }
-                                        },
-                                    );
-                                }
-                                fixed_cell(
+                                },
+                            ));
+                            for (source_type, _) in GROUP_COLUMNS {
+                                row_rect = row_rect.union(fixed_cell(
                                     ui,
-                                    GROUP_UNKNOWN_W,
+                                    GROUP_CELL_W,
                                     GROUP_ROW_H,
-                                    egui::Align::LEFT,
+                                    egui::Align::Center,
                                     |ui| {
-                                        if has_unknown {
-                                            let mut pick = String::new();
-                                            ComboBox::from_id_salt(("assign", index))
-                                                .width(GROUP_UNKNOWN_W - 10.0)
-                                                .selected_text(
-                                                    RichText::new(format!(
-                                                        "Assign ({})…",
-                                                        group.unknown.len()
-                                                    ))
-                                                    .color(Color32::from_rgb(200, 130, 40)),
-                                                )
-                                                .show_ui(ui, |ui| {
-                                                    for source_type in ASSIGNABLE_SOURCE_TYPES {
-                                                        let occupied =
-                                                            group.slots.contains_key(source_type);
-                                                        ui.add_enabled_ui(!occupied, |ui| {
-                                                            ui.selectable_value(
-                                                                &mut pick,
-                                                                source_type.to_owned(),
-                                                                source_type,
-                                                            )
-                                                            .on_disabled_hover_text(
-                                                                "DEF-19: type already filled",
-                                                            );
-                                                        });
-                                                    }
-                                                });
-                                            if !pick.is_empty() {
-                                                assign = Some((index, pick));
-                                            }
-                                        } else if was_unknown {
-                                            ui.colored_label(
-                                                Color32::from_rgb(70, 165, 95),
-                                                "✓ Assigned",
-                                            );
+                                        let entry = group.slots.get(source_type);
+                                        let sense = if entry.is_some() {
+                                            Sense::click()
                                         } else {
-                                            ui.weak("—");
+                                            Sense::hover()
+                                        };
+                                        let (rect, response) =
+                                            ui.allocate_exact_size([14.0, 14.0].into(), sense);
+                                        let color = if entry.is_some() {
+                                            Color32::from_rgb(80, 170, 100)
+                                        } else {
+                                            Color32::from_rgba_unmultiplied(130, 130, 135, 70)
+                                        };
+                                        ui.painter().rect_filled(rect, 3.0, color);
+                                        if let Some(entry) = entry {
+                                            if response.on_hover_text(source_type).clicked() {
+                                                self.texture.selected_group = Some(index);
+                                                preview_request = Some((
+                                                    PathBuf::from(&entry.path),
+                                                    source_type.to_owned(),
+                                                ));
+                                            }
                                         }
                                     },
-                                );
-                            });
-                        });
-                }
+                                ));
+                            }
+                            row_rect = row_rect.union(fixed_cell(
+                                ui,
+                                GROUP_UNKNOWN_W,
+                                GROUP_ROW_H,
+                                egui::Align::LEFT,
+                                |ui| {
+                                    if has_unknown {
+                                        let mut pick = String::new();
+                                        ComboBox::from_id_salt(("assign", index))
+                                            .width(GROUP_UNKNOWN_W - 10.0)
+                                            .selected_text(
+                                                RichText::new(format!(
+                                                    "Assign ({})…",
+                                                    group.unknown.len()
+                                                ))
+                                                .color(Color32::from_rgb(200, 130, 40)),
+                                            )
+                                            .show_ui(ui, |ui| {
+                                                for source_type in ASSIGNABLE_SOURCE_TYPES {
+                                                    let occupied =
+                                                        group.slots.contains_key(source_type);
+                                                    ui.add_enabled_ui(!occupied, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut pick,
+                                                            source_type.to_owned(),
+                                                            source_type,
+                                                        )
+                                                        .on_disabled_hover_text(
+                                                            "DEF-19: type already filled",
+                                                        );
+                                                    });
+                                                }
+                                            });
+                                        if !pick.is_empty() {
+                                            assign = Some((index, pick));
+                                        }
+                                    } else if was_unknown {
+                                        ui.colored_label(
+                                            Color32::from_rgb(70, 165, 95),
+                                            "✓ Assigned",
+                                        );
+                                    } else {
+                                        ui.weak("—");
+                                    }
+                                },
+                            ));
+
+                            ui.end_row();
+
+                            if fill != Color32::TRANSPARENT && row_rect.is_finite() {
+                                let rect = row_rect.expand2(egui::vec2(2.0, 2.0));
+                                ui.painter()
+                                    .set(bg, egui::Shape::rect_filled(rect, 3.0, fill));
+                            }
+                        }
+                    });
             });
         if let Some((path, source_type)) = preview_request {
             self.request_preview(path, source_type);
@@ -2150,20 +2168,27 @@ fn path_row(ui: &mut egui::Ui, salt: &str, value: &mut String, hint: &str) -> (b
     (changed, browse)
 }
 
-/// A fixed-width, vertically centred table cell so the groups-table header and
-/// rows line up column-for-column regardless of content.
+/// A fixed-width, vertically centred grid cell so the groups-table header and
+/// rows line up column-for-column regardless of content. Width is clamped
+/// (min == max) so a long label truncates instead of expanding the cell and
+/// pushing later columns out of alignment. Returns the allocated cell rect so
+/// the caller can paint a full-row background behind the whole row.
 fn fixed_cell(
     ui: &mut egui::Ui,
     width: f32,
     height: f32,
     main_align: egui::Align,
     add: impl FnOnce(&mut egui::Ui),
-) {
+) -> egui::Rect {
     let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align);
     ui.allocate_ui_with_layout(egui::vec2(width, height), layout, |ui| {
+        ui.set_min_width(width);
+        ui.set_max_width(width);
         ui.set_min_height(height);
         add(ui);
-    });
+    })
+    .response
+    .rect
 }
 
 fn split_paths(text: &str) -> Vec<PathBuf> {

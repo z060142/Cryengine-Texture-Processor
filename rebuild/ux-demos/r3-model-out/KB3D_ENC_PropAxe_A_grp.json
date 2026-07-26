@@ -1,0 +1,54 @@
+{
+  "source_filename": "KB3D_ENC_PropAxe_A_grp.fbx",
+  "output_ext": "cgf",
+  "material_filename": "KB3D_ENC_PropAxe_A_grp",
+  "forward_up_axes": "-Y+Z",
+  "unit_size": "cm",
+  "scale": 1.0,
+  "merge_all_nodes": false,
+  "scene_origin": false,
+  "ignore_custom_normals": false,
+  "ignore_uv": false,
+  "materials": [
+    {
+      "name": "KB3D_ENC_MetalForgedGrayA",
+      "physicalize": "no_collide",
+      "sub_index": 0
+    },
+    {
+      "name": "KB3D_ENC_WoodOldWornGrayA",
+      "physicalize": "no_collide",
+      "sub_index": 1
+    },
+    {
+      "name": "<unassigned>",
+      "physicalize": "no",
+      "sub_index": 2
+    }
+  ],
+  "nodes": [
+    {
+      "name": "KB3D_ENC_PropAxe_A_grp",
+      "path": [
+        "KB3D_ENC_PropAxe_A_grp"
+      ],
+      "mass": -1.0,
+      "density": -1.0,
+      "nodes": [
+        {
+          "name": "KB3D_ENC_PropAxe_A_Main",
+          "path": [
+            "KB3D_ENC_PropAxe_A_grp",
+            "KB3D_ENC_PropAxe_A_Main"
+          ],
+          "mass": -1.0,
+          "density": -1.0
+        }
+      ]
+    }
+  ],
+  "autolodsettings": {
+    "GenerateAutomaticLODs": false
+  },
+  "jointPhysicsData": []
+}
