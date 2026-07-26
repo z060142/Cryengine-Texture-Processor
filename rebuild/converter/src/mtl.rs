@@ -635,6 +635,7 @@ mod tests {
                 children: Vec::new(),
             },
             node_count: 1,
+            axes: crate::model::AxisDetection::fallback(),
         }
     }
 

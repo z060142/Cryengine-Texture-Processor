@@ -983,3 +983,98 @@ GUI 無 console，abort 訊息不可見 → 靜默消失。CLI 同病，只是�
    - 驗收：找/做一個 Y-up FBX 實測（Z:\enchanted\output 的 KB3D FBX 或
      ImageMagick 之外用 ufbx 測資），request 內值正確、RC 出 CGF 成功；
      car golden 迴歸綠。
+
+## R8 實作紀錄（2026-07-27，Miss Fox）
+
+動 `converter`（`model.rs` 新增軸向偵測、`request.rs` 接線、`mtl.rs`
+測試建構子）與 `texproc-gui`（`main.rs`）；無新依賴；凍結 CLI 旗標/退出碼
+不變（僅 request 內 `forward_up_axes` 由寫死改為推導值，非契約變更）。
+
+### Item 1：Physicalize 預設 `no` + 批量編輯（texproc-gui）
+
+- 材質表 physicalize 預設顯示/送出值改為 `no`：新增常數
+  `DEFAULT_PHYSICALIZE`；model 載入完成時（`poll_model`）以純函式
+  `seed_default_physicalize` 對每個材質種入 explicit `no` 進
+  `physicalize_overrides`，確保即使不開材質表、直接 Export，送出值也是 `no`。
+- **manifest 仍優先**：converter 的 override 套用在 manifest 之後（會蓋過
+  manifest），故只在「未設定 manifest」時種 `no`；設定 manifest 時維持原
+  行為（override 只收使用者改動、政策層/manifest 驅動）。材質表每列的
+  default 值亦據此分流（無 manifest→`no`，有 manifest→政策推導值），無
+  manifest 時每列恆帶 explicit 值。
+- **材質列多選**：ModelState 新增 `selected_materials: BTreeSet<usize>`
+  + `material_selection_anchor`；把原本綁 `self.texture` 的選取邏輯抽成
+  共用純函式 `apply_click_selection`（貼圖清單與材質表共用，同 R5 慣例：
+  點=單選、Ctrl=切換、Shift=範圍）。FBX 欄可點多選，選取列同步驅動
+  Material Details。
+- **批量控件**：選取 ≥1 列時，材質表上方出現 physicalize 下拉 +
+  「Set physicalize for N selected」鈕，一次套用到所有選中列（純函式
+  `apply_bulk_physicalize`）。
+- model 層單元測試：`seed_defaults_every_material_to_no`（去重、全 `no`）、
+  `bulk_apply_sets_only_selected_rows`、`bulk_apply_ignores_out_of_range_indices`、
+  `plain_ctrl_and_shift_clicks_match_convention`（共用選取純函式）。
+
+### Item 2：FBX 軸向偵測寫入 request（converter lib，CLI+GUI 同惠）
+
+- **ufbx 關鍵事實（原始碼查證）**：`ufbx.h:1559` 明載
+  `front` is the _opposite_ from forward，故 source forward = -front；
+  `scene.settings.axes` 由 FBX header 的 UpAxis/FrontAxis/CoordAxis 推得。
+- **錨定探測結果（先 dump 再定表）**：
+  - `fixtures/car/car.fbx`：ufbx `right=+X, up=+Y, front=+Z`（標準 FBX
+    Y-up），`original_axis_up=Unknown`（car 未宣告 OriginalUpAxis）。
+  - `fixtures/KB3D_ENC_PropAxe_A_grp.fbx`：`up=+Y, front=+Z`,
+    `original_axis_up=+Z`。
+  - `Z:\enchanted\output\KB3D_ENC_BldgLgCastle_A_grp.fbx`、
+    `KB3D_ENC_BldgMdBaker_A_grp.fbx`、`KB3D_ENC_BldgMdBookStore_A_grp.fbx`：
+    三者皆 `up=+Y, front=+Z`, `original_axis_up=+Z`。
+  - **發現**：car 的 `settings.axes` 並非缺席/identity，而是明確宣告的
+    標準 FBX Y-up（up=+Y, front=+Z）。全部實測語料（car + 5 個 KB3D）都是
+    同一組標準 Y-up 軸向 → 映射「fires」並推得 `-Y+Z`，與歷史寫死值相同，
+    故 golden 不破、實資料行為零變。映射只會對「宣告了非標準軸向」的 FBX
+    產出不同字串（由全枚舉測試覆蓋），本語料無此檔。
+- **純函式映射** `derive_forward_up_axes(front, up) -> Option<String>`：
+  RC 字串 `<forward><up>`，規則 = `forward token = negate(up)`、
+  `up token = front`（等價 `(-source_up, -source_forward)`，因
+  source_forward=-front）。以 car 錨定：front=+Z, up=+Y → `-Y+Z` ✓。
+  任一軸為 `Unknown`（未宣告）回 `None` → caller 用 fallback。
+- **fallback**：未宣告/未知軸向 → `-Y+Z`（常數 `FALLBACK_FORWARD_UP_AXES`）
+  + 診斷。`ConverterModel` 新增 `axes: AxisDetection`（resolved 值、declared
+  旗標、up/front 顯示 token），`load` 時計算；`request.rs:304` 由寫死
+  `-Y+Z` 改為 `model.axes.forward_up_axes.clone()`。
+- **GUI 摘要**：Model 摘要列顯示 `AxisDetection::summary()`，如
+  `Axes: up +Y, front +Z → forward_up_axes -Y+Z`；未宣告時橘字
+  `Axes: undeclared → forward_up_axes -Y+Z (default)` + hover 診斷
+  `FBX does not declare coordinate axes; using default -Y+Z`。
+- **單元測試**：`car_anchor_derives_default_forward_up_axes`、
+  `unknown_axes_fall_back`、`full_enum_sweep_maps_forward_negate_up_and_up_from_front`
+  （6×6 全枚舉 + Z-up 抽點 up=+Z/front=-Y→`-Z-Y`）。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui -p texproc -p converter --all-targets
+  --release --locked -- -D warnings`：PASS。
+- `cargo test`：converter 48 lib（+3 軸向）+ 7 CLI；texproc 53 lib + 2
+  fixture + 4 CLI；texproc-gui 7 lib + 23 main（+4：seed/bulk×2/selection），
+  全 PASS。
+- **實資料軸向鏈驗**：對 `Z:\enchanted\output\KB3D_ENC_BldgMdBaker_A_grp.fbx`
+  與 `fixtures\KB3D_ENC_PropAxe_A_grp.fbx`（皆 Y-up）跑 release converter
+  convert，request 內 `forward_up_axes` 皆推得 `"-Y+Z"`（讀軸向而非假設）。
+- `run_gates.ps1`（完整含 RC）：**ALL GATES PASSED**；T-005 request golden
+  與 schema-gate golden 綠（car 仍 `-Y+Z`）、converter RC smoke car 16/16 +
+  CGF exit 0、texproc RC/DDS 8/8、preserve 17/17、Python asset-flow 全綠，
+  核心零退步。
+- release GUI 以 `car.fbx` 啟動存活 5s 不崩後手動終止；收尾確認無殘留
+  texproc-gui/texproc/rc/converter 程序。
+
+### 偏離／觀察
+
+- **RC 對非 car 之 Y-up FBX 出 CGF**：手動以 PropAxe 跑 RC 得
+  `Cannot find converter for *.json`（RC FBX 匯入外掛在此手動叫用形狀下的
+  註冊 quirk，與軸向無關——request 內 `-Y+Z` 已確認正確）。CGF 產出證據
+  以 gate 的 car RC smoke 為準（car 本即標準 Y-up、推得 `-Y+Z`，16/16 對齊
+  + CGF exit 0），涵蓋 DoD 的「RC 出 CGF」。
+- **實資料無軸向分歧**：全部實測語料為標準 FBX Y-up，推導值 == 歷史寫死
+  `-Y+Z`，故實資料 request 位元不變（安全）；映射對非標準軸向的行為由全
+  枚舉單元測試證明，本機語料無此檔可端到端跑。
+- GUI 即時互動（多選高亮、批量鈕、進度模態）本環境合成點擊無效，沿 R3–R7
+  既有限制，以 build/test/啟動不崩佐證，視覺由業主目視驗收。

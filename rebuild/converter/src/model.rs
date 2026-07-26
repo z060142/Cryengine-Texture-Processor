@@ -9,6 +9,107 @@ pub struct ConverterModel {
     pub meshes: Vec<MeshRecord>,
     pub scene_tree: NodeRecord,
     pub node_count: usize,
+    pub axes: AxisDetection,
+}
+
+/// RC `forward_up_axes` derived from the source FBX's ufbx coordinate axes.
+#[derive(Debug, Clone)]
+pub struct AxisDetection {
+    /// Value written into the RC import request.
+    pub forward_up_axes: String,
+    /// `true` when derived from declared axes, `false` when the default fallback
+    /// was used (undeclared / unknown axes).
+    pub declared: bool,
+    /// Display token of the source up axis (e.g. `+Y`), if declared.
+    pub up_token: Option<&'static str>,
+    /// Display token of the source front axis (e.g. `+Z`), if declared.
+    pub front_token: Option<&'static str>,
+}
+
+/// RC default source axes for a standard FBX; used when a file does not declare
+/// its coordinate axes. Also the historical hardcoded value.
+pub const FALLBACK_FORWARD_UP_AXES: &str = "-Y+Z";
+
+impl AxisDetection {
+    /// Fallback for undeclared axes (and the value used by hand-built test models).
+    pub fn fallback() -> Self {
+        Self {
+            forward_up_axes: FALLBACK_FORWARD_UP_AXES.to_owned(),
+            declared: false,
+            up_token: None,
+            front_token: None,
+        }
+    }
+
+    fn from_axes(front: ufbx::CoordinateAxis, up: ufbx::CoordinateAxis) -> Self {
+        match derive_forward_up_axes(front, up) {
+            Some(forward_up_axes) => Self {
+                forward_up_axes,
+                declared: true,
+                up_token: axis_token(up),
+                front_token: axis_token(front),
+            },
+            None => Self::fallback(),
+        }
+    }
+
+    /// One-line detection summary for the GUI model panel.
+    pub fn summary(&self) -> String {
+        match (self.front_token, self.up_token) {
+            (Some(front), Some(up)) => format!(
+                "Axes: up {up}, front {front} → forward_up_axes {}",
+                self.forward_up_axes
+            ),
+            _ => format!(
+                "Axes: undeclared → forward_up_axes {} (default)",
+                self.forward_up_axes
+            ),
+        }
+    }
+}
+
+fn axis_token(axis: ufbx::CoordinateAxis) -> Option<&'static str> {
+    use ufbx::CoordinateAxis::*;
+    Some(match axis {
+        PositiveX => "+X",
+        NegativeX => "-X",
+        PositiveY => "+Y",
+        NegativeY => "-Y",
+        PositiveZ => "+Z",
+        NegativeZ => "-Z",
+        Unknown => return None,
+    })
+}
+
+fn negated_axis_token(axis: ufbx::CoordinateAxis) -> Option<&'static str> {
+    use ufbx::CoordinateAxis::*;
+    Some(match axis {
+        PositiveX => "-X",
+        NegativeX => "+X",
+        PositiveY => "-Y",
+        NegativeY => "+Y",
+        PositiveZ => "-Z",
+        NegativeZ => "+Z",
+        Unknown => return None,
+    })
+}
+
+/// Map the source FBX's ufbx coordinate axes to the RC `forward_up_axes` string
+/// (`<forward><up>`).
+///
+/// ufbx defines `front` as the _opposite_ of forward (ufbx.h: "front is the
+/// _opposite_ from forward"), so source forward = -front. Empirically anchored
+/// to car.fbx (ufbx up=+Y, front=+Z) which must derive `-Y+Z`, the rule is:
+///   forward token = negate(up), up token = front
+/// (equivalently `(-source_up, -source_forward)`).
+///
+/// Returns `None` when either axis is `Unknown` (undeclared) so the caller can
+/// fall back to [`FALLBACK_FORWARD_UP_AXES`].
+pub fn derive_forward_up_axes(
+    front: ufbx::CoordinateAxis,
+    up: ufbx::CoordinateAxis,
+) -> Option<String> {
+    Some(format!("{}{}", negated_axis_token(up)?, axis_token(front)?))
 }
 
 #[derive(Debug, Clone)]
@@ -139,12 +240,15 @@ impl ConverterModel {
             })
             .collect();
 
+        let axes = AxisDetection::from_axes(scene.settings.axes.front, scene.settings.axes.up);
+
         Ok(Self {
             source_fbx: input.display().to_string(),
             materials,
             meshes,
             scene_tree: node_record(&scene.root_node),
             node_count: scene.nodes.count,
+            axes,
         })
     }
 
@@ -172,5 +276,56 @@ fn node_record(node: &ufbx::Node) -> NodeRecord {
             .iter()
             .map(|child| node_record(child))
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ufbx::CoordinateAxis::*;
+
+    #[test]
+    fn car_anchor_derives_default_forward_up_axes() {
+        // car.fbx declares standard FBX Y-up axes (ufbx up=+Y, front=+Z),
+        // verified by probing the fixture. The T-005 request golden pins "-Y+Z".
+        assert_eq!(
+            derive_forward_up_axes(PositiveZ, PositiveY).as_deref(),
+            Some("-Y+Z")
+        );
+    }
+
+    #[test]
+    fn unknown_axes_fall_back() {
+        assert_eq!(derive_forward_up_axes(Unknown, PositiveY), None);
+        assert_eq!(derive_forward_up_axes(PositiveZ, Unknown), None);
+        let detection = AxisDetection::from_axes(Unknown, PositiveY);
+        assert!(!detection.declared);
+        assert_eq!(detection.forward_up_axes, FALLBACK_FORWARD_UP_AXES);
+    }
+
+    #[test]
+    fn full_enum_sweep_maps_forward_negate_up_and_up_from_front() {
+        let axes = [
+            PositiveX, NegativeX, PositiveY, NegativeY, PositiveZ, NegativeZ,
+        ];
+        for &front in &axes {
+            for &up in &axes {
+                let derived = derive_forward_up_axes(front, up).unwrap();
+                // forward token = negate(up), up token = front.
+                let expected = format!(
+                    "{}{}",
+                    negated_axis_token(up).unwrap(),
+                    axis_token(front).unwrap()
+                );
+                assert_eq!(derived, expected, "front={front:?} up={up:?}");
+                // Structure: 2 signed axis tokens, forward flips the up axis' sign.
+                assert_eq!(derived.len(), 4);
+            }
+        }
+        // Spot-check a genuinely Z-up source (up=+Z, front=-Y → forward=+Y).
+        assert_eq!(
+            derive_forward_up_axes(NegativeY, PositiveZ).as_deref(),
+            Some("-Z-Y")
+        );
     }
 }

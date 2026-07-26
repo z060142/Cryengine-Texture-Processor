@@ -301,7 +301,7 @@ pub fn build_import_request_with_physicalize_overrides(
         source_filename,
         output_ext: "cgf".to_owned(),
         material_filename: Some(material_filename),
-        forward_up_axes: Some("-Y+Z".to_owned()),
+        forward_up_axes: Some(model.axes.forward_up_axes.clone()),
         unit_size: Some("cm".to_owned()),
         scale: Some(1.0),
         physics_primitive: None,
@@ -664,6 +664,7 @@ mod tests {
                 children: Vec::new(),
             },
             node_count: 1,
+            axes: crate::model::AxisDetection::fallback(),
         };
         let manifest = MaterialManifest::from_json_str(
             r#"{

@@ -37,6 +37,62 @@ use worker::{
 const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
 const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
+/// GUI default physicalize seed for every material (the practical golden flow is
+/// all `no`). Seeded as explicit metadata; a loaded manifest still wins.
+const DEFAULT_PHYSICALIZE: &str = "no";
+
+/// Apply a click to a row-index multi-selection (shared by the texture list and
+/// the material table): plain = select only, Ctrl = toggle, Shift = range from
+/// the anchor.
+fn apply_click_selection(
+    selected: &mut BTreeSet<usize>,
+    anchor: &mut Option<usize>,
+    index: usize,
+    ctrl: bool,
+    shift: bool,
+) {
+    if shift {
+        if let Some(start) = *anchor {
+            let (low, high) = (start.min(index), start.max(index));
+            *selected = (low..=high).collect();
+            return;
+        }
+    } else if ctrl {
+        if !selected.remove(&index) {
+            selected.insert(index);
+        }
+        *anchor = Some(index);
+        return;
+    }
+    *selected = BTreeSet::from([index]);
+    *anchor = Some(index);
+}
+
+/// Seed explicit `no` physicalize for every material name (item 1 default). Used
+/// on model load so an export sends `no` even if the material table is never
+/// opened.
+fn seed_default_physicalize<'a>(
+    names: impl IntoIterator<Item = &'a str>,
+) -> BTreeMap<String, String> {
+    names
+        .into_iter()
+        .map(|name| (name.to_owned(), DEFAULT_PHYSICALIZE.to_owned()))
+        .collect()
+}
+
+/// Bulk-set physicalize for the selected material rows in one action.
+fn apply_bulk_physicalize(
+    overrides: &mut BTreeMap<String, String>,
+    names: &[&str],
+    selected: &BTreeSet<usize>,
+    value: &str,
+) {
+    for &index in selected {
+        if let Some(name) = names.get(index) {
+            overrides.insert((*name).to_owned(), value.to_owned());
+        }
+    }
+}
 /// Map-type columns shown in the groups table (source type, header). Ordered to
 /// match the demo3 blueprint's primary columns, then the remaining tracked types.
 const GROUP_COLUMNS: [(&str, &str); 12] = [
@@ -204,6 +260,9 @@ struct ModelState {
     receiver: Option<Receiver<ModelEvent>>,
     review: Option<ModelReview>,
     selected_material: Option<usize>,
+    selected_materials: BTreeSet<usize>,
+    material_selection_anchor: Option<usize>,
+    bulk_physicalize: String,
     export_receiver: Option<Receiver<ModelExportEvent>>,
     export_summary: Option<String>,
     export_modal_open: bool,
@@ -308,6 +367,8 @@ impl WorkflowApp {
         self.model.receiver = Some(worker::start_model_load(path));
         self.model.review = None;
         self.model.selected_material = None;
+        self.model.selected_materials.clear();
+        self.model.material_selection_anchor = None;
         self.model.export_summary = None;
         self.model.physicalize_overrides.clear();
         self.model.rc_missing_warning = false;
@@ -506,24 +567,15 @@ impl WorkflowApp {
         }))
     }
 
-    /// Apply a click on an imported-texture row to the multi-selection:
-    /// plain = select only, Ctrl = toggle, Shift = range from the anchor.
+    /// Apply a click on an imported-texture row to the multi-selection.
     fn apply_selection_click(&mut self, index: usize, ctrl: bool, shift: bool) {
-        if shift {
-            if let Some(anchor) = self.texture.selection_anchor {
-                let (low, high) = (anchor.min(index), anchor.max(index));
-                self.texture.selected_files = (low..=high).collect();
-                return;
-            }
-        } else if ctrl {
-            if !self.texture.selected_files.remove(&index) {
-                self.texture.selected_files.insert(index);
-            }
-            self.texture.selection_anchor = Some(index);
-            return;
-        }
-        self.texture.selected_files = BTreeSet::from([index]);
-        self.texture.selection_anchor = Some(index);
+        apply_click_selection(
+            &mut self.texture.selected_files,
+            &mut self.texture.selection_anchor,
+            index,
+            ctrl,
+            shift,
+        );
     }
 
     /// Multi-select: remove the selected imported textures and regroup. Roots are
@@ -893,6 +945,18 @@ impl WorkflowApp {
                     .iter()
                     .map(|material| material.textures.len())
                     .sum::<usize>();
+                // Seed explicit "no" physicalize for every material (item 1
+                // default). A configured manifest still wins, so only seed when
+                // no manifest is loaded — the converter applies overrides after
+                // the manifest, and unconditional seeding would beat it.
+                if self.preferences.manifest_path.trim().is_empty() {
+                    self.model.physicalize_overrides = seed_default_physicalize(
+                        review.material_slots.iter().map(|s| s.name.as_str()),
+                    );
+                }
+                self.model.selected_materials.clear();
+                self.model.material_selection_anchor = None;
+                self.model.bulk_physicalize = DEFAULT_PHYSICALIZE.to_owned();
                 self.model.review = Some(*review);
                 self.model.selected_material = (materials > 0).then_some(0);
                 self.status = format!(
@@ -1513,6 +1577,13 @@ impl WorkflowApp {
                 ui.label(format!("Meshes: {}", review.model.meshes.len()));
                 ui.label(format!("Nodes: {}", review.model.node_count));
                 ui.label(format!("Diagnostics: {}", review.diagnostics.len()));
+                let axes = &review.model.axes;
+                if axes.declared {
+                    ui.label(axes.summary());
+                } else {
+                    ui.colored_label(egui::Color32::from_rgb(0xE0, 0xA0, 0x30), axes.summary())
+                        .on_hover_text("FBX does not declare coordinate axes; using default -Y+Z");
+                }
             });
             ui.add_space(8.0);
             if ui
@@ -2374,10 +2445,46 @@ impl WorkflowApp {
             ui.label(format!("{} diagnostics", review.diagnostics.len()));
         });
         ui.separator();
+        let manifest_configured = !self.preferences.manifest_path.trim().is_empty();
+        let modifiers = ui.input(|input| input.modifiers);
         ScrollArea::vertical().show(ui, |ui| {
             ui.group(|ui| {
                 ui.set_width(ui.available_width());
                 ui.strong("RC Material Slots");
+                ui.weak("Click, Ctrl+click, Shift+click the FBX column to multi-select rows.");
+                let selected_count = self.model.selected_materials.len();
+                if selected_count > 0 {
+                    ui.horizontal(|ui| {
+                        ComboBox::from_id_salt("bulk_physicalize")
+                            .selected_text(&self.model.bulk_physicalize)
+                            .show_ui(ui, |ui| {
+                                for value in PHYSICALIZE_VALUES {
+                                    ui.selectable_value(
+                                        &mut self.model.bulk_physicalize,
+                                        value.to_owned(),
+                                        value,
+                                    );
+                                }
+                            });
+                        if ui
+                            .button(format!("Set physicalize for {selected_count} selected"))
+                            .clicked()
+                        {
+                            let names: Vec<&str> = review
+                                .material_slots
+                                .iter()
+                                .map(|slot| slot.name.as_str())
+                                .collect();
+                            let value = self.model.bulk_physicalize.clone();
+                            apply_bulk_physicalize(
+                                &mut self.model.physicalize_overrides,
+                                &names,
+                                &self.model.selected_materials,
+                                &value,
+                            );
+                        }
+                    });
+                }
                 Grid::new("model_materials")
                     .num_columns(6)
                     .striped(true)
@@ -2391,7 +2498,7 @@ impl WorkflowApp {
                         ui.strong("Textures");
                         ui.end_row();
                         for (index, slot) in review.material_slots.iter().enumerate() {
-                            let selected = self.model.selected_material == Some(index);
+                            let selected = self.model.selected_materials.contains(&index);
                             if ui
                                 .selectable_label(
                                     selected,
@@ -2401,25 +2508,41 @@ impl WorkflowApp {
                                 )
                                 .clicked()
                             {
+                                apply_click_selection(
+                                    &mut self.model.selected_materials,
+                                    &mut self.model.material_selection_anchor,
+                                    index,
+                                    modifiers.ctrl,
+                                    modifiers.shift,
+                                );
                                 self.model.selected_material = Some(index);
                             }
                             ui.label(slot.sub_index.to_string());
                             ui.label(&slot.name);
-                            let inferred = resolve_physicalize(
-                                slot.physicalize
-                                    .as_deref()
-                                    .map(|value| ("physicalize", value)),
-                                &slot.name,
-                            )
-                            .value
-                            .as_str()
-                            .to_owned();
+                            // Default physicalize is "no" (item 1). A configured
+                            // manifest still wins, so with a manifest the default
+                            // is the policy-inferred value and only user changes
+                            // become overrides; without a manifest every material
+                            // carries an explicit seeded value.
+                            let default_value = if manifest_configured {
+                                resolve_physicalize(
+                                    slot.physicalize
+                                        .as_deref()
+                                        .map(|value| ("physicalize", value)),
+                                    &slot.name,
+                                )
+                                .value
+                                .as_str()
+                                .to_owned()
+                            } else {
+                                DEFAULT_PHYSICALIZE.to_owned()
+                            };
                             let mut physicalize = self
                                 .model
                                 .physicalize_overrides
                                 .get(&slot.name)
                                 .cloned()
-                                .unwrap_or_else(|| inferred.clone());
+                                .unwrap_or_else(|| default_value.clone());
                             ComboBox::from_id_salt(("physicalize", index))
                                 .selected_text(&physicalize)
                                 .show_ui(ui, |ui| {
@@ -2431,7 +2554,7 @@ impl WorkflowApp {
                                         );
                                     }
                                 });
-                            if physicalize == inferred {
+                            if manifest_configured && physicalize == default_value {
                                 self.model.physicalize_overrides.remove(&slot.name);
                             } else {
                                 self.model
@@ -2834,6 +2957,73 @@ mod ingest_tests {
         assert!(embedded_dir.join("emb_spec.png").is_file());
 
         fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod physicalize_tests {
+    use super::*;
+
+    #[test]
+    fn seed_defaults_every_material_to_no() {
+        let seeded = seed_default_physicalize(["Body", "Glass", "Body"]);
+        assert_eq!(seeded.len(), 2, "deduped by name");
+        assert_eq!(seeded.get("Body").map(String::as_str), Some("no"));
+        assert_eq!(seeded.get("Glass").map(String::as_str), Some("no"));
+    }
+
+    #[test]
+    fn bulk_apply_sets_only_selected_rows() {
+        let mut overrides = seed_default_physicalize(["A", "B", "C"]);
+        let names = ["A", "B", "C"];
+        let selected = BTreeSet::from([0usize, 2]);
+        apply_bulk_physicalize(&mut overrides, &names, &selected, "proxy_only");
+        assert_eq!(overrides.get("A").map(String::as_str), Some("proxy_only"));
+        assert_eq!(
+            overrides.get("B").map(String::as_str),
+            Some("no"),
+            "unselected untouched"
+        );
+        assert_eq!(overrides.get("C").map(String::as_str), Some("proxy_only"));
+    }
+
+    #[test]
+    fn bulk_apply_ignores_out_of_range_indices() {
+        let mut overrides = BTreeMap::new();
+        let names = ["A"];
+        apply_bulk_physicalize(
+            &mut overrides,
+            &names,
+            &BTreeSet::from([0usize, 5]),
+            "obstruct",
+        );
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides.get("A").map(String::as_str), Some("obstruct"));
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+
+    #[test]
+    fn plain_ctrl_and_shift_clicks_match_convention() {
+        let mut selected = BTreeSet::new();
+        let mut anchor = None;
+        // Plain click selects only.
+        apply_click_selection(&mut selected, &mut anchor, 2, false, false);
+        assert_eq!(selected, BTreeSet::from([2]));
+        assert_eq!(anchor, Some(2));
+        // Ctrl+click toggles additional rows.
+        apply_click_selection(&mut selected, &mut anchor, 4, true, false);
+        assert_eq!(selected, BTreeSet::from([2, 4]));
+        // Ctrl+click again toggles off.
+        apply_click_selection(&mut selected, &mut anchor, 2, true, false);
+        assert_eq!(selected, BTreeSet::from([4]));
+        // Shift+click selects the range from the anchor (last was 2).
+        apply_click_selection(&mut selected, &mut anchor, 0, false, false);
+        apply_click_selection(&mut selected, &mut anchor, 3, false, true);
+        assert_eq!(selected, BTreeSet::from([0, 1, 2, 3]));
     }
 }
 
