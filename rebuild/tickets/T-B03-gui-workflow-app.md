@@ -84,6 +84,14 @@
 - `run_gates.ps1 -SkipRC`：ALL GATES PASSED。
 - `run_gates.ps1`：ALL GATES PASSED；converter RC smoke 與 texproc RC/DDS smoke 均 PASS。
 
+### R1 審查（2026-07-26）
+
+審查者獨立驗證：gate 全模式全綠（converter 40 lib、GUI 4 model + 3 RC path 測試）；
+GUI 原始碼 grep 零 CJK 字元（英文化屬實）；physicalize 通道等價由
+GUI/CLI 逐位元 hash 證明（同值 manifest 基準）；CLI 凍結契約與全部 golden
+無退步。環境備註：gate 失敗兩次均為殘留 texproc.exe 檔案鎖，
+清除即復原，非程式問題。
+
 尚待：業主目視簽核後改為 DONE。
 
 
@@ -168,5 +176,13 @@ DoD 追加：
 - `run_gates.ps1 -SkipRC`：ALL GATES PASSED。
 - `run_gates.ps1`：ALL GATES PASSED；converter RC material alignment
   16/16，texproc RC/DDS 8/8、ddna alpha 2/2。
+
+### R1 審查（2026-07-26）
+
+審查者獨立驗證：gate 全模式全綠（converter 40 lib、GUI 4 model + 3 RC path 測試）；
+GUI 原始碼 grep 零 CJK 字元（英文化屬實）；physicalize 通道等價由
+GUI/CLI 逐位元 hash 證明（同值 manifest 基準）；CLI 凍結契約與全部 golden
+無退步。環境備註：gate 失敗兩次均為殘留 texproc.exe 檔案鎖，
+清除即復原，非程式問題。
 
 尚待：業主目視簽核後改為 DONE。
