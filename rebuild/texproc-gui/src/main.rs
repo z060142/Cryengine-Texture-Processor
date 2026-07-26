@@ -695,11 +695,41 @@ impl WorkflowApp {
                 if self.texture.scan_receiver.is_some()
                     || self.model.receiver.is_some()
                     || self.model.export_receiver.is_some()
+                    || self.process.is_some()
                 {
                     ui.spinner();
                 }
+                // Right-aligned diagnostics count. S3 turns this into a popover.
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    let count = self.diagnostics_count();
+                    let (color, text) = if count > 0 {
+                        (
+                            Color32::from_rgb(200, 130, 40),
+                            format!("{count} diagnostics"),
+                        )
+                    } else {
+                        (Color32::from_rgb(70, 165, 95), "No diagnostics".to_owned())
+                    };
+                    ui.colored_label(color, text);
+                });
             });
         });
+    }
+
+    /// Combined transient-diagnostic count for the status bar: unresolved
+    /// texture unknowns plus material-slot diagnostics from a loaded FBX.
+    fn diagnostics_count(&self) -> usize {
+        let textures = self
+            .texture
+            .document
+            .as_ref()
+            .map_or(0, ReviewDocument::unresolved_unknown_count);
+        let model = self
+            .model
+            .review
+            .as_ref()
+            .map_or(0, |review| review.diagnostics.len());
+        textures + model
     }
 
     fn left_panel(&mut self, context: &egui::Context) {
@@ -856,25 +886,47 @@ impl WorkflowApp {
     fn right_panel(&mut self, context: &egui::Context) {
         egui::SidePanel::right("export_settings")
             .resizable(true)
-            .default_width(370.0)
-            .min_width(330.0)
-            .max_width(470.0)
+            .default_width(380.0)
+            .min_width(340.0)
+            .max_width(480.0)
             .show(context, |ui| {
-                ScrollArea::vertical().show(ui, |ui| {
-                    ui.heading("Export Settings");
-                    ui.add_space(5.0);
-                    self.output_directory_fields(ui);
-                    ui.separator();
-                    self.texture_settings_panel(ui);
-                    ui.separator();
-                    self.settings_file_panel(ui);
-                    ui.separator();
-                    match self.tab {
-                        WorkflowTab::Textures => self.texture_actions(ui),
-                        WorkflowTab::Model => self.model_actions(ui),
-                    }
+                // Action buttons stay pinned at the bottom; settings scroll above.
+                egui::TopBottomPanel::bottom("right_actions").show_inside(ui, |ui| {
+                    ui.add_space(6.0);
+                    self.right_actions(ui);
+                    ui.add_space(2.0);
+                });
+                egui::CentralPanel::default().show_inside(ui, |ui| {
+                    ui.add_space(4.0);
+                    ui.heading("Output Settings");
+                    ui.add_space(2.0);
+                    ScrollArea::vertical().show(ui, |ui| {
+                        self.output_directory_fields(ui);
+                        ui.separator();
+                        self.common_settings(ui);
+                        self.advanced_settings(ui);
+                        ui.separator();
+                        self.model_export_inputs(ui);
+                        ui.separator();
+                        self.settings_file_inputs(ui);
+                    });
                 });
             });
+    }
+
+    fn right_actions(&mut self, ui: &mut egui::Ui) {
+        self.texture_actions(ui);
+        ui.add_space(6.0);
+        self.model_export_action(ui);
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.button("Save Settings").clicked() {
+                self.save_settings();
+            }
+            if ui.button("Load Settings").clicked() {
+                self.load_settings();
+            }
+        });
     }
 
     fn output_directory_fields(&mut self, ui: &mut egui::Ui) {
@@ -919,8 +971,7 @@ impl WorkflowApp {
         }
     }
 
-    fn texture_settings_panel(&mut self, ui: &mut egui::Ui) {
-        ui.strong("Texture Output Settings");
+    fn common_settings(&mut self, ui: &mut egui::Ui) {
         Grid::new("primary_texture_settings")
             .num_columns(2)
             .spacing([12.0, 6.0])
@@ -973,30 +1024,31 @@ impl WorkflowApp {
             &mut self.settings.generate_missing_spec,
             "Generate Missing Specular",
         );
+    }
 
-        ui.add_space(5.0);
-        ui.strong("Output Texture Types");
-        Grid::new("texture_type_toggles")
-            .num_columns(2)
-            .show(ui, |ui| {
-                ui.checkbox(&mut self.settings.texture_types.diff, "Diffuse (_diff)");
-                ui.checkbox(&mut self.settings.texture_types.spec, "Specular (_spec)");
-                ui.end_row();
-                ui.checkbox(
-                    &mut self.settings.texture_types.ddna,
-                    "Normal + Gloss (_ddna)",
-                );
-                ui.checkbox(
-                    &mut self.settings.texture_types.displ,
-                    "Displacement (_displ)",
-                );
-                ui.end_row();
-                ui.checkbox(&mut self.settings.texture_types.emissive, "Emissive (_em)");
-                ui.checkbox(&mut self.settings.texture_types.sss, "SSS (_sss)");
-                ui.end_row();
-            });
-
-        ui.collapsing("Advanced Settings", |ui| {
+    fn advanced_settings(&mut self, ui: &mut egui::Ui) {
+        ui.collapsing("Advanced", |ui| {
+            ui.strong("Output Texture Types");
+            Grid::new("texture_type_toggles")
+                .num_columns(2)
+                .show(ui, |ui| {
+                    ui.checkbox(&mut self.settings.texture_types.diff, "Diffuse (_diff)");
+                    ui.checkbox(&mut self.settings.texture_types.spec, "Specular (_spec)");
+                    ui.end_row();
+                    ui.checkbox(
+                        &mut self.settings.texture_types.ddna,
+                        "Normal + Gloss (_ddna)",
+                    );
+                    ui.checkbox(
+                        &mut self.settings.texture_types.displ,
+                        "Displacement (_displ)",
+                    );
+                    ui.end_row();
+                    ui.checkbox(&mut self.settings.texture_types.emissive, "Emissive (_em)");
+                    ui.checkbox(&mut self.settings.texture_types.sss, "SSS (_sss)");
+                    ui.end_row();
+                });
+            ui.add_space(6.0);
             ui.checkbox(&mut self.settings.normalize_height, "Normalize Height Map");
             ui.checkbox(&mut self.settings.dither, "Dither");
             ui.checkbox(
@@ -1059,7 +1111,7 @@ impl WorkflowApp {
         });
     }
 
-    fn settings_file_panel(&mut self, ui: &mut egui::Ui) {
+    fn settings_file_inputs(&mut self, ui: &mut egui::Ui) {
         ui.strong("Settings File (CLI --settings compatible)");
         let (_, browse) = path_row(
             ui,
@@ -1078,29 +1130,21 @@ impl WorkflowApp {
                 self.load_settings();
             }
         }
-        ui.horizontal(|ui| {
-            if ui.button("Load Settings").clicked() {
-                self.load_settings();
-            }
-            if ui.button("Save Settings").clicked() {
+        if ui.button("Save As…").clicked() {
+            let default_name = Path::new(self.preferences.settings_path.trim())
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("texproc-settings.json")
+                .to_owned();
+            if let Some(path) = self.dialog_result(choose_file_save(
+                "Save Settings As",
+                JSON_FILTER,
+                &default_name,
+            )) {
+                self.preferences.settings_path = path.to_string_lossy().into_owned();
                 self.save_settings();
             }
-            if ui.button("Save As…").clicked() {
-                let default_name = Path::new(self.preferences.settings_path.trim())
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("texproc-settings.json")
-                    .to_owned();
-                if let Some(path) = self.dialog_result(choose_file_save(
-                    "Save Settings As",
-                    JSON_FILTER,
-                    &default_name,
-                )) {
-                    self.preferences.settings_path = path.to_string_lossy().into_owned();
-                    self.save_settings();
-                }
-            }
-        });
+        }
     }
 
     fn texture_actions(&mut self, ui: &mut egui::Ui) {
@@ -1158,7 +1202,7 @@ impl WorkflowApp {
         }
     }
 
-    fn model_actions(&mut self, ui: &mut egui::Ui) {
+    fn model_export_inputs(&mut self, ui: &mut egui::Ui) {
         ui.strong("CE Model Export");
         ui.label("Optional Manifest");
         let (mut changed, browse) = path_row(
@@ -1201,11 +1245,14 @@ impl WorkflowApp {
             self.save_preferences();
         }
         self.rc_path_field(ui);
+    }
+
+    fn model_export_action(&mut self, ui: &mut egui::Ui) {
         if ui
             .add_enabled(
                 self.model.review.is_some() && self.model.export_receiver.is_none(),
-                egui::Button::new(RichText::new("Export CE Model").strong().size(18.0))
-                    .min_size([ui.available_width(), 40.0].into()),
+                egui::Button::new(RichText::new("Export CE Model").strong().size(16.0))
+                    .min_size([ui.available_width(), 36.0].into()),
             )
             .clicked()
         {
@@ -1297,83 +1344,85 @@ impl WorkflowApp {
     }
 
     fn central_panel(&mut self, context: &egui::Context) {
-        egui::CentralPanel::default().show(context, |ui| match self.tab {
-            WorkflowTab::Textures => self.texture_workspace(ui),
-            WorkflowTab::Model => self.model_workspace(ui),
+        egui::CentralPanel::default().show(context, |ui| {
+            egui::TopBottomPanel::top("preview_pane")
+                .resizable(true)
+                .default_height(300.0)
+                .min_height(150.0)
+                .show_inside(ui, |ui| self.preview_panel(ui));
+            egui::CentralPanel::default().show_inside(ui, |ui| match self.tab {
+                WorkflowTab::Textures => self.groups_panel(ui),
+                WorkflowTab::Model => self.model_workspace(ui),
+            });
         });
-    }
-
-    fn texture_workspace(&mut self, ui: &mut egui::Ui) {
-        self.preview_panel(ui);
-        ui.separator();
-        self.groups_panel(ui);
     }
 
     fn preview_panel(&mut self, ui: &mut egui::Ui) {
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.horizontal(|ui| {
-                ui.strong("Texture Preview");
-                if let Some(path) = self
-                    .preview
-                    .loaded_path
-                    .as_ref()
-                    .or(self.preview.requested_path.as_ref())
-                {
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.strong("Preview");
+            if let Some(path) = self
+                .preview
+                .loaded_path
+                .as_ref()
+                .or(self.preview.requested_path.as_ref())
+            {
+                ui.separator();
+                ui.label(
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or_default(),
+                );
+                if !self.preview.source_type.is_empty() {
                     ui.separator();
-                    ui.label(
-                        path.file_name()
-                            .and_then(|name| name.to_str())
-                            .unwrap_or_default(),
-                    );
-                    if !self.preview.source_type.is_empty() {
-                        ui.separator();
-                        ui.weak(&self.preview.source_type);
-                    }
-                    if let Some((width, height)) = self.preview.dimensions {
-                        ui.separator();
-                        ui.weak(format!("{width} × {height}"));
-                    }
+                    ui.weak(&self.preview.source_type);
                 }
-                if self.preview.receiver.is_some() {
-                    ui.spinner();
+                if let Some((width, height)) = self.preview.dimensions {
+                    ui.separator();
+                    ui.weak(format!("{width} × {height}"));
                 }
-            });
-            ui.add_space(4.0);
-            let available = egui::vec2(ui.available_width(), 285.0);
-            if let Some(texture) = &self.preview.texture {
-                let source = texture.size_vec2();
-                let scale = (available.x / source.x)
-                    .min(available.y / source.y)
-                    .min(1.0);
-                ui.allocate_ui_with_layout(
-                    available,
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        ui.add(egui::Image::new(texture).fit_to_exact_size(source * scale));
-                    },
-                );
-            } else if let Some(error) = &self.preview.error {
-                ui.allocate_ui_with_layout(
-                    available,
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        ui.label(
-                            RichText::new(format!("Preview unavailable: {error}"))
-                                .color(Color32::from_rgb(210, 90, 75)),
-                        );
-                    },
-                );
-            } else {
-                ui.allocate_ui_with_layout(
-                    available,
-                    egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                    |ui| {
-                        ui.weak("Select a texture from the import list or a group below");
-                    },
-                );
+            }
+            if self.preview.receiver.is_some() {
+                ui.spinner();
             }
         });
+        ui.add_space(4.0);
+        let available = egui::vec2(
+            ui.available_width(),
+            (ui.available_height() - 6.0).max(120.0),
+        );
+        if let Some(texture) = &self.preview.texture {
+            let source = texture.size_vec2();
+            let scale = (available.x / source.x)
+                .min(available.y / source.y)
+                .min(1.0);
+            ui.allocate_ui_with_layout(
+                available,
+                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                |ui| {
+                    ui.add(egui::Image::new(texture).fit_to_exact_size(source * scale));
+                },
+            );
+        } else if let Some(error) = &self.preview.error {
+            ui.allocate_ui_with_layout(
+                available,
+                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                |ui| {
+                    ui.label(
+                        RichText::new(format!("Preview unavailable: {error}"))
+                            .color(Color32::from_rgb(210, 90, 75)),
+                    );
+                },
+            );
+        } else {
+            ui.allocate_ui_with_layout(
+                available,
+                egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                |ui| {
+                    ui.weak("Select a group to preview");
+                },
+            );
+        }
     }
 
     fn groups_panel(&mut self, ui: &mut egui::Ui) {
@@ -1413,7 +1462,7 @@ impl WorkflowApp {
                 ui.separator();
                 ScrollArea::vertical()
                     .id_salt("group_list")
-                    .max_height(245.0)
+                    .max_height((ui.available_height() - 8.0).max(160.0))
                     .show(ui, |ui| {
                         Grid::new("group_list_rows")
                             .num_columns(3)

@@ -248,3 +248,58 @@ GUI/CLI 逐位元 hash 證明（同值 manifest 基準）；CLI 凍結契約與�
 - `Start-Process target\release\texproc-gui.exe`：正常開啟、持續執行（未
   提早崩潰），手動終止；確認無殘留 texproc-gui.exe / texproc.exe。對話框
   互動由業主逐項目視驗收（headless 無法點擊）。
+
+## R2-S2 實作紀錄（2026-07-26）
+
+### 實作
+
+以 `demo3-workbench.html` 為藍本，將 texproc-gui 視窗重構成三欄工作台
++ 底部狀態列；純佈局/資訊架構搬移，不動表格互動（留給 S3）、不加功能、
+不移除任何既有能力。全程沿用 S1 的原生對話框，未新增依賴，未動
+texproc/converter crate。
+
+- **中欄改為垂直分割**：以 `TopBottomPanel::top("preview_pane")
+  .resizable().show_inside` 放預覽區（可拉高度），下方 `CentralPanel
+  ::show_inside` 依 tab 顯示 groups 表（貼圖模式）或材質表（模型模式）。
+  預覽區的固定 285px 改為填滿可用高度；空狀態文案改為藍本的
+  `Select a group to preview`。groups 清單去掉硬編 245px 高，改填滿。
+- **右欄改為統一面板**（不再依 tab 切換動作）：
+  - 上半 `CentralPanel::show_inside` + `ScrollArea`：輸出目錄 ×2 →
+    常用五項（Output Resolution、Diffuse Format、Flip Normal Green、
+    Process Metallic、Generate Missing Spec）→ 摺疊「Advanced」（輸出型別
+    開關 + normalize/dither/generate 諸旗標 + ARM order/height strength/
+    emissive/sss 的 DragValue）→ CE Model Export（Manifest/Overrides/
+    RC Path）→ Settings File（路徑 + Save As…）。輸出型別開關由原本常駐
+    改收進 Advanced，符合藍本常用五項的取捨。
+  - 下半 `TopBottomPanel::bottom("right_actions").show_inside` 釘在底部：
+    `Process Textures`、`Export CE Model`、`Save Settings` / `Load
+    Settings`。兩個主動作皆常駐（依狀態 enable），不再隨左欄 tab 消失。
+  - 既有 manifest/overrides/RC Path/Save As/進度列/取消/輸出摘要/送貼圖
+    等能力全部保留，只是換位置。
+- **狀態列**加右對齊診斷計數（unresolved unknown + 材質診斷數）：0 時綠色
+  `No diagnostics`，>0 時橘色 `N diagnostics`。S3 再做可點 popover，本步
+  先靜態計數。
+- 左欄 tabs（Texture Import / Model Import）、匯入清單、Model 摘要維持
+  S1 現況；面板寬度左 380（~22%）、右 380（~26%），未新增持久化。
+
+程式仍集中於 `main.rs`（拆檔會產生大量搬移 diff、反而不利審查，故不拆）。
+
+### 驗證
+
+- `cargo build -p texproc-gui --release --locked`：PASS。
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui --all-targets --release --locked -- -D warnings`：
+  PASS。
+- `cargo test -p texproc-gui --release --locked`：PASS（4 model + 7 main，
+  含 S1 的 multiselect parser 與 RC path 測試，無退步）。
+- release exe 置頂截圖 `ux-demos/r2-s2-screenshot.png`：三欄 + 狀態列佈局
+  正確顯示（左 tabs+清單、中 Preview 分割+groups 佔位、右 Output Settings
+  五項+Advanced 摺疊+CE Model Export+RC Path+底部動作鈕、狀態列
+  `No diagnostics`）；截圖後終止程序，確認無殘留 texproc-gui.exe /
+  texproc.exe。互動流程仍由業主目視驗收。
+
+### 偏離
+
+- 藍本把材質表放左欄 Model tab；本票 TARGET LAYOUT 指定材質表在中欄下半、
+  左欄只留 Model 摘要——依票面（非藍本）實作。
+- 藍本標題列有「檔案/編輯/說明」選單，未做（非本票範圍，且無對應功能）。
