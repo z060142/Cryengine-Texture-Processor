@@ -392,3 +392,105 @@ DoD：三項各有實測證據（截圖/狀態列文字）；car.fbx 載入後�
 （含 embedded 案例——car 無 embedded，另用小型含嵌入貼圖之 FBX 或以
 referenced 案例 + 單元測試覆蓋 embedded 路徑）；DDS 勾選實跑產出 .dds；
 gate 全綠不退步。
+
+## R3 實作紀錄（2026-07-26，Miss Fox）
+
+只動 `texproc-gui`（`main.rs` / `worker.rs` / `prefs.rs`）；未動
+`texproc` / `converter` / `ce-schema` 與凍結 CLI 契約；無新依賴。R2-S1..S3
+能力全數保留。
+
+### 1. 分組區三欄對齊表格（依業主標註截圖裁決 = demo3 對齊表格）
+
+- 先按初版指示做了卡片式 3 欄 grid，收到業主更正後**整段捨棄**，改回
+  demo3 藍本的對齊表格。以既有 `fixed_cell()`（固定寬、垂直置中）搭配
+  ScrollArea 外的固定表頭 + 分隔線達成「表頭固定、列捲動」。
+- 三個對齊欄區：
+  - **Group**：固定寬左欄，組名 `truncate` + hover 全名 tooltip，點名選取→預覽。
+  - **型別指示欄**：每追蹤型別一窄欄（`GROUP_CELL_W=38`），欄標題採 demo3
+    英文（Color / Normal / Spec / Gloss / Rough / Metal / Height / AO /
+    Alpha / Emiss / SSS / ARM——demo3 主 8 欄 + 我們額外追蹤的
+    Rough/Alpha/SSS/ARM，避免隱藏已填槽）；綠（已填）／灰（空）方塊上下對齊，
+    已填格可點→預覽該張。
+  - **Unassigned**：含 unknown→就地 `Assign (N)…` 下拉（走既有
+    `assign_unknown`，DEF-19 佔用型別停用）；曾有 unknown 現已清空→綠色
+    `✓ Assigned`；從無 unknown→`—`。三態靠新欄位
+    `TextureState.ever_unknown`（掃描完成時記下含 unknown 的 group key）區分。
+- 琥珀列（含 unknown）／藍色選取底色語意不變；搜尋框與「Unknown only」
+  過濾照舊；132（實測 KB3D 127 無 unknown 版）列捲動順暢。
+
+### 2. Load FBX 自動全拉入貼圖
+
+- `extract_model_texture_paths` 重構為可測純函式
+  `collect_model_textures(&[MaterialRecord], model_dir, embedded_dir)`，回傳
+  `TextureIngest { paths, embedded }`（referenced 存在於磁碟者 + embedded
+  解出到快取，依絕對路徑去重、計 embedded 數）。
+- `poll_model` 於 `ModelEvent::Completed` **自動**呼叫
+  `ingest_model_textures()`（不需按鈕、不需切頁；保留當前 tab），把貼圖送入
+  分組；掃描完成後狀態列回報
+  `N textures imported from FBX (M embedded): G groups, U unknown.`
+  （新增 `TextureState.pending_fbx_import` 讓 `poll_scan` 據實回報）。零貼圖時
+  回報 `No textures found in the FBX to import (references not on disk).`
+- 原按鈕改名 `Re-send Referenced / Embedded Textures…` 作手動重送；去重沿用
+  `add_texture_roots`（以小寫絕對路徑），重載同一 FBX 不重複列項。
+
+### 3. 可選 RC→DDS
+
+- `prefs` 新增持久化 `generate_dds`（bool）。Output Settings 常用區加
+  checkbox「Generate CryEngine DDS (via RC)」；RC 解析（UI→env→預設）無效時
+  checkbox 停用並附 hint `RC not configured`。
+- `worker::start_process` 加 `rc_exe: Option<PathBuf>`：TIFF 全部寫完且未取消
+  時，逐張以 `RC.exe <tif> /refresh /userdialog=0`（cwd=輸出目錄，沿用 T-013
+  smoke 形狀）序列產 DDS；新增 `ProcessEvent::DdsProgress` 供進度模態顯示
+  「Compiling DDS via RC: n/total · name」第二進度條；`Finished` 改帶
+  `ProcessComplete { report, dds: Option<DdsSummary> }`。每檔失敗收進
+  `DdsSummary.failures` 進診斷 popover，不中止整批；DDS 落在 TIFF 旁。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui --all-targets --release --locked -- -D warnings`：
+  PASS。
+- `cargo test -p texproc-gui --release --locked`：5 model + 9 main PASS（1 ignored）。
+  新增 model 層測試：
+  - `ingest_tests::collect_dedups_references_and_counts_embedded`：一 referenced
+    + 一 embedded + 重複引用 + 缺檔引用 → paths=2、embedded=1、快取寫出，證明
+    去重與 embedded 計數。
+  - `worker::tests::dds_jobs_selects_only_tiff_outputs`：DDS job 清單只挑 .tif。
+- **真 RC 端到端（GUI worker 程式路徑）**：
+  `worker::tests::dds_pass_produces_dds_next_to_tiffs`（`#[ignore]`，需
+  `CE_RC_EXE`）——以 `start_process(..., Some(rc))` 跑 `fixtures/textures`，
+  斷言每張 TIFF 旁都產出 .dds、`dds.succeeded==dds.total`；`set CE_RC_EXE=…\rc.exe`
+  下 `cargo test -p texproc-gui -- --ignored dds_pass` **PASS**（8/8、51.7s）。
+- `run_gates.ps1`（完整含 RC）：ALL GATES PASSED；converter RC 16/16、
+  texproc RC/DDS 8/8、ddna 2/2、preserved 17/17，核心零退步。
+
+### 真實資料截圖（rebuild/ux-demos/）
+
+- `r3-groups-grid.png`：`Z:\enchanted\KB3DTextures\4k`（去 refraction 之 127 組
+  全已指派版）→ 三欄對齊表格滿版多列，型別燈上下對齊、Unassigned 顯 `—`、
+  選取列預覽 + map badges。
+- `r3-groups-grid-unknowns.png`：同資料原始 5 unknown 版（Unknown only）→ 琥珀列
+  + 就地 `Assign (1)…` 下拉，示範 Unassigned 下拉態與對齊。
+- `r3-fbx-ingest.png`：Load `KB3D_ENC_PropAxe_A_grp.fbx` → 狀態列
+  `6 textures imported from FBX (0 embedded): 2 groups, 0 unknown.`；右欄
+  `✓ Generate CryEngine DDS (via RC)` 勾選+啟用、RC Path 已解析；預覽自動載入
+  FBX 引用貼圖，證明載入即自動拉入。
+- `r3-dds-summary.png`：DDS 產物資料夾——8 張 .tif 旁各有對應 .dds（+ cryasset），
+  即「DDS 落在 TIFF 旁」。
+
+### 偏離
+
+- **分組表**：初版依指示做卡片 grid，業主更正後改回 demo3 對齊表格（已捨棄
+  卡片碼）。型別欄顯示全部 12 追蹤型別（demo3 只列 8），以免隱藏
+  Rough/Alpha/SSS/ARM 已填槽。
+- **DDS 完成模態截圖**：本自動化環境對 egui 視窗的**合成滑鼠點擊全數無效**
+  （SetCursorPos/mouse_event、SendInput 絕對座標、PostMessage、DPI-aware 皆試
+  過；截圖可、點擊不可，已確認視窗為前景+焦點且座標對齊），故無法驅動
+  Process Textures 按鈕擷取即時 DDS 完成模態。改以（a）上述 `#[ignore]` 真 RC
+  整合測試證明 GUI worker 的 DDS 程式路徑實跑產出 8/8 .dds，（b）
+  `r3-dds-summary.png` 產物資料夾截圖，共同覆蓋 DoD 的「DDS 勾選實跑產出 .dds」。
+- **滿版分組表截圖**：因無法點擊切換「Unknown only」，改載入去除 refraction
+  的 KB3D 版（127 組全已指派）讓表格預設展開全列；unknown/下拉態另以
+  `r3-groups-grid-unknowns.png` 補足。
+- **embedded 案例**：car/axe 皆無 embedded 貼圖，embedded 抽取+計數路徑由
+  `collect_dedups_references_and_counts_embedded` 單元測試覆蓋（合成 embedded blob）。

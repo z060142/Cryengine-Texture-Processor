@@ -30,31 +30,32 @@ use texproc::{
 };
 use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
 use worker::{
-    ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob,
+    DdsSummary, ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob,
     RcExportOutcome, ScanEvent,
 };
 
 const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
 const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
-/// Compact map-type columns shown in the groups table (source type, header).
+/// Map-type columns shown in the groups table (source type, header). Ordered to
+/// match the demo3 blueprint's primary columns, then the remaining tracked types.
 const GROUP_COLUMNS: [(&str, &str); 12] = [
-    ("diffuse", "Dif"),
-    ("normal", "Nrm"),
-    ("specular", "Spc"),
-    ("glossiness", "Gls"),
-    ("roughness", "Rgh"),
-    ("displacement", "Hgt"),
-    ("metallic", "Met"),
+    ("diffuse", "Color"),
+    ("normal", "Normal"),
+    ("specular", "Spec"),
+    ("glossiness", "Gloss"),
+    ("roughness", "Rough"),
+    ("metallic", "Metal"),
+    ("displacement", "Height"),
     ("ao", "AO"),
-    ("alpha", "Alp"),
-    ("emissive", "Emi"),
+    ("alpha", "Alpha"),
+    ("emissive", "Emiss"),
     ("sss", "SSS"),
     ("arm", "ARM"),
 ];
-const GROUP_CELL_W: f32 = 26.0;
-const GROUP_UNKNOWN_W: f32 = 150.0;
-const GROUP_ROW_H: f32 = 24.0;
+const GROUP_CELL_W: f32 = 38.0;
+const GROUP_UNKNOWN_W: f32 = 134.0;
+const GROUP_ROW_H: f32 = 26.0;
 const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr\0All files (*.*)\0*.*\0";
 const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
 const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
@@ -90,6 +91,12 @@ struct TextureState {
     selected_group: Option<usize>,
     group_search: String,
     review_only: bool,
+    /// Set when a scan was triggered by auto-ingesting an FBX's textures, so the
+    /// scan-complete status can honestly report the FBX import.
+    pending_fbx_import: Option<(usize, usize)>,
+    /// Group keys that had unknowns at scan time — lets the Unassigned column
+    /// show "✓ Assigned" (all resolved) versus "—" (never had unknowns).
+    ever_unknown: BTreeSet<String>,
 }
 
 #[derive(Default)]
@@ -111,6 +118,10 @@ struct ProcessState {
     written: usize,
     group_names: Vec<String>,
     completed_groups: BTreeSet<String>,
+    dds_active: bool,
+    dds_completed: usize,
+    dds_total: usize,
+    dds_current: String,
 }
 
 struct ProcessSummary {
@@ -119,6 +130,7 @@ struct ProcessSummary {
     cancelled: bool,
     elapsed_seconds: f64,
     output_directory: PathBuf,
+    dds: Option<DdsSummary>,
 }
 
 /// One line in the status-bar diagnostics popover.
@@ -294,14 +306,23 @@ impl WorkflowApp {
             .iter()
             .map(|group| group.base_name.clone())
             .collect();
+        let rc_exe = self
+            .preferences
+            .generate_dds
+            .then(|| resolve_rc_path(&self.preferences.rc_path).path)
+            .flatten();
         self.process = Some(ProcessState {
-            job: worker::start_process(scan, self.settings, output),
+            job: worker::start_process(scan, self.settings, output, rc_exe),
             completed: 0,
             total,
             current_group: "Preparing".to_owned(),
             written: 0,
             group_names,
             completed_groups: BTreeSet::new(),
+            dds_active: false,
+            dds_completed: 0,
+            dds_total: 0,
+            dds_current: String::new(),
         });
         self.process_summary = None;
         self.process_modal_open = true;
@@ -343,20 +364,25 @@ impl WorkflowApp {
         self.status = "Exporting CryEngine intermediates and CE model…".to_owned();
     }
 
-    fn send_model_textures_to_processing(&mut self) {
+    /// Pull referenced + embedded textures out of the loaded FBX and feed them
+    /// into the texture groups. Shared by automatic ingestion on FBX load and
+    /// the manual re-send button. Keeps the caller's tab; the scan-complete
+    /// status honestly reports the FBX import via `pending_fbx_import`.
+    fn ingest_model_textures(&mut self) {
         let Some(review) = &self.model.review else {
             self.status = "Load an FBX file first.".to_owned();
             return;
         };
         match extract_model_texture_paths(review) {
-            Ok(paths) if paths.is_empty() => {
-                self.status = "The FBX has no external or embedded textures to process.".to_owned();
-            }
-            Ok(paths) => {
-                let count = paths.len();
-                self.add_texture_roots(paths);
+            Ok(ingest) if ingest.paths.is_empty() => {
                 self.status =
-                    format!("Sent {count} FBX texture references to the texture workflow.");
+                    "No textures found in the FBX to import (references not on disk).".to_owned();
+            }
+            Ok(ingest) => {
+                let tab = self.tab;
+                self.texture.pending_fbx_import = Some((ingest.paths.len(), ingest.embedded));
+                self.add_texture_roots(ingest.paths);
+                self.tab = tab;
             }
             Err(error) => {
                 self.status = error;
@@ -405,6 +431,12 @@ impl WorkflowApp {
                     .map(|group| group.unknown.len())
                     .sum::<usize>();
                 self.texture.files = input_files;
+                self.texture.ever_unknown = scan
+                    .groups
+                    .iter()
+                    .filter(|group| !group.unknown.is_empty())
+                    .map(|group| group.key.clone())
+                    .collect();
                 let selected_group = scan
                     .groups
                     .iter()
@@ -423,10 +455,15 @@ impl WorkflowApp {
                         },
                         Some,
                     );
-                self.status = format!(
-                    "Imported {} textures: {groups} groups, {unknown} unknown.",
-                    self.texture.files.len()
-                );
+                self.status = match self.texture.pending_fbx_import.take() {
+                    Some((count, embedded)) => format!(
+                        "{count} textures imported from FBX ({embedded} embedded): {groups} groups, {unknown} unknown."
+                    ),
+                    None => format!(
+                        "Imported {} textures: {groups} groups, {unknown} unknown.",
+                        self.texture.files.len()
+                    ),
+                };
                 if let Some((path, source_type)) = preview_request {
                     self.request_preview(path, source_type);
                 }
@@ -489,6 +526,16 @@ impl WorkflowApp {
                     process.current_group = group;
                     process.written += written;
                 }
+                Ok(ProcessEvent::DdsProgress {
+                    completed,
+                    total,
+                    name,
+                }) => {
+                    process.dds_active = true;
+                    process.dds_completed = completed;
+                    process.dds_total = total;
+                    process.dds_current = name;
+                }
                 Ok(ProcessEvent::Finished(result)) => {
                     finished = Some(result);
                     break;
@@ -507,13 +554,18 @@ impl WorkflowApp {
         };
         let output = PathBuf::from(&self.preferences.texture_output_directory);
         match result {
-            Ok(report) => {
+            Ok(complete) => {
+                let report = complete.report;
+                let dds = complete.dds;
                 let written = report.groups.iter().map(|group| group.written.len()).sum();
+                let dds_note = dds.as_ref().map_or_else(String::new, |dds| {
+                    format!(" · DDS {}/{}", dds.succeeded, dds.total)
+                });
                 self.status = if report.cancelled {
                     format!("Processing cancelled after {} groups.", report.groups.len())
                 } else {
                     format!(
-                        "Processing complete: {} groups, {written} output files.",
+                        "Processing complete: {} groups, {written} output files{dds_note}.",
                         report.groups.len()
                     )
                 };
@@ -523,6 +575,7 @@ impl WorkflowApp {
                     cancelled: report.cancelled,
                     elapsed_seconds: report.elapsed_seconds,
                     output_directory: output,
+                    dds,
                 });
             }
             Err(error) => {
@@ -556,6 +609,9 @@ impl WorkflowApp {
                 self.status = format!(
                     "FBX loaded: {materials} material slots, {references} texture references."
                 );
+                // Automatically ingest the FBX's referenced + embedded textures
+                // into the texture groups (Python-original model-import behavior).
+                self.ingest_model_textures();
             }
             ModelEvent::Failed(error) => {
                 self.status = format!("FBX load failed: {error}");
@@ -768,6 +824,15 @@ impl WorkflowApp {
                 });
             }
         }
+        if let Some(dds) = self.process_summary.as_ref().and_then(|s| s.dds.as_ref()) {
+            for failure in &dds.failures {
+                items.push(DiagItem {
+                    severity: "Error",
+                    title: "DDS conversion failed".to_owned(),
+                    message: failure.clone(),
+                });
+            }
+        }
         items
     }
 
@@ -829,6 +894,19 @@ impl WorkflowApp {
                     process.completed as f32 / process.total as f32
                 };
                 ui.add(ProgressBar::new(progress).show_percentage());
+                if process.dds_active {
+                    ui.add_space(6.0);
+                    ui.label(format!(
+                        "Compiling DDS via RC: {} of {} · {}",
+                        process.dds_completed, process.dds_total, process.dds_current
+                    ));
+                    let dds_progress = if process.dds_total == 0 {
+                        0.0
+                    } else {
+                        process.dds_completed as f32 / process.dds_total as f32
+                    };
+                    ui.add(ProgressBar::new(dds_progress).show_percentage());
+                }
                 ui.add_space(6.0);
                 ScrollArea::vertical()
                     .max_height(280.0)
@@ -860,6 +938,20 @@ impl WorkflowApp {
                     "{} groups · {} output files · {:.2} s",
                     summary.groups, summary.written, summary.elapsed_seconds
                 ));
+                if let Some(dds) = &summary.dds {
+                    let color = if dds.failures.is_empty() {
+                        Color32::from_rgb(70, 165, 95)
+                    } else {
+                        Color32::from_rgb(200, 130, 40)
+                    };
+                    ui.colored_label(
+                        color,
+                        format!("CryEngine DDS: {} of {} compiled", dds.succeeded, dds.total),
+                    );
+                    if !dds.failures.is_empty() {
+                        ui.label(format!("{} failed — see diagnostics.", dds.failures.len()));
+                    }
+                }
                 ui.add_space(6.0);
                 ui.hyperlink_to("Open output folder", file_url(&summary.output_directory));
                 ui.add_space(8.0);
@@ -1063,10 +1155,10 @@ impl WorkflowApp {
             });
             ui.add_space(8.0);
             if ui
-                .button("Send Referenced / Embedded Textures to Texture Conversion")
+                .button("Re-send Referenced / Embedded Textures to Texture Conversion")
                 .clicked()
             {
-                self.send_model_textures_to_processing();
+                self.ingest_model_textures();
             }
         } else {
             ui.weak("No model loaded. You can also drop car.fbx into the window.");
@@ -1214,6 +1306,26 @@ impl WorkflowApp {
             &mut self.settings.generate_missing_spec,
             "Generate Missing Specular",
         );
+        let rc_available = resolve_rc_path(&self.preferences.rc_path).path.is_some();
+        if rc_available {
+            if ui
+                .checkbox(
+                    &mut self.preferences.generate_dds,
+                    "Generate CryEngine DDS (via RC)",
+                )
+                .changed()
+            {
+                self.save_preferences();
+            }
+        } else {
+            self.preferences.generate_dds = false;
+            ui.add_enabled_ui(false, |ui| {
+                let mut off = false;
+                ui.checkbox(&mut off, "Generate CryEngine DDS (via RC)");
+            })
+            .response
+            .on_hover_text("RC not configured");
+        }
     }
 
     fn advanced_settings(&mut self, ui: &mut egui::Ui) {
@@ -1645,11 +1757,24 @@ impl WorkflowApp {
         });
         ui.add_space(4.0);
 
+        let visible = groups
+            .iter()
+            .enumerate()
+            .filter(|(_, group)| !(self.texture.review_only && group.unknown.is_empty()))
+            .filter(|(_, group)| {
+                query.is_empty() || group.base_name.to_lowercase().contains(&query)
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
+        // Aligned three-zone table (demo3 blueprint): a fixed Group-name column,
+        // one narrow indicator column per map type under a fixed header row, and
+        // an Unassigned column (assign dropdown / "✓ Assigned" / "—").
         let cells_w = GROUP_CELL_W * GROUP_COLUMNS.len() as f32;
-        let name_w = (ui.available_width() - cells_w - GROUP_UNKNOWN_W - 32.0).max(120.0);
+        let name_w = (ui.available_width() - cells_w - GROUP_UNKNOWN_W - 28.0).max(140.0);
         let row_w = name_w + cells_w + GROUP_UNKNOWN_W;
 
-        // Fixed header aligned with the scrollable rows below.
+        // Fixed header, column-aligned with the scrolling rows below.
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 4.0;
             fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
@@ -1661,20 +1786,10 @@ impl WorkflowApp {
                 });
             }
             fixed_cell(ui, GROUP_UNKNOWN_W, GROUP_ROW_H, egui::Align::LEFT, |ui| {
-                ui.strong("Unknown");
+                ui.strong("Unassigned");
             });
         });
         ui.separator();
-
-        let visible = groups
-            .iter()
-            .enumerate()
-            .filter(|(_, group)| !(self.texture.review_only && group.unknown.is_empty()))
-            .filter(|(_, group)| {
-                query.is_empty() || group.base_name.to_lowercase().contains(&query)
-            })
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
 
         let mut preview_request = None;
         let mut assign = None;
@@ -1686,6 +1801,7 @@ impl WorkflowApp {
                     let group = &groups[index];
                     let selected = self.texture.selected_group == Some(index);
                     let has_unknown = !group.unknown.is_empty();
+                    let was_unknown = self.texture.ever_unknown.contains(&group.key);
                     let fill = match (selected, has_unknown) {
                         (true, true) => Color32::from_rgba_unmultiplied(225, 155, 45, 70),
                         (false, true) => Color32::from_rgba_unmultiplied(220, 150, 40, 38),
@@ -1725,7 +1841,7 @@ impl WorkflowApp {
                                                 Sense::hover()
                                             };
                                             let (rect, response) =
-                                                ui.allocate_exact_size([13.0, 13.0].into(), sense);
+                                                ui.allocate_exact_size([14.0, 14.0].into(), sense);
                                             let color = if entry.is_some() {
                                                 Color32::from_rgb(80, 170, 100)
                                             } else {
@@ -1750,38 +1866,43 @@ impl WorkflowApp {
                                     GROUP_ROW_H,
                                     egui::Align::LEFT,
                                     |ui| {
-                                        if !has_unknown {
+                                        if has_unknown {
+                                            let mut pick = String::new();
+                                            ComboBox::from_id_salt(("assign", index))
+                                                .width(GROUP_UNKNOWN_W - 10.0)
+                                                .selected_text(
+                                                    RichText::new(format!(
+                                                        "Assign ({})…",
+                                                        group.unknown.len()
+                                                    ))
+                                                    .color(Color32::from_rgb(200, 130, 40)),
+                                                )
+                                                .show_ui(ui, |ui| {
+                                                    for source_type in ASSIGNABLE_SOURCE_TYPES {
+                                                        let occupied =
+                                                            group.slots.contains_key(source_type);
+                                                        ui.add_enabled_ui(!occupied, |ui| {
+                                                            ui.selectable_value(
+                                                                &mut pick,
+                                                                source_type.to_owned(),
+                                                                source_type,
+                                                            )
+                                                            .on_disabled_hover_text(
+                                                                "DEF-19: type already filled",
+                                                            );
+                                                        });
+                                                    }
+                                                });
+                                            if !pick.is_empty() {
+                                                assign = Some((index, pick));
+                                            }
+                                        } else if was_unknown {
+                                            ui.colored_label(
+                                                Color32::from_rgb(70, 165, 95),
+                                                "✓ Assigned",
+                                            );
+                                        } else {
                                             ui.weak("—");
-                                            return;
-                                        }
-                                        let mut pick = String::new();
-                                        ComboBox::from_id_salt(("assign", index))
-                                            .width(GROUP_UNKNOWN_W - 12.0)
-                                            .selected_text(
-                                                RichText::new(format!(
-                                                    "Assign ({})…",
-                                                    group.unknown.len()
-                                                ))
-                                                .color(Color32::from_rgb(200, 130, 40)),
-                                            )
-                                            .show_ui(ui, |ui| {
-                                                for source_type in ASSIGNABLE_SOURCE_TYPES {
-                                                    let occupied =
-                                                        group.slots.contains_key(source_type);
-                                                    ui.add_enabled_ui(!occupied, |ui| {
-                                                        ui.selectable_value(
-                                                            &mut pick,
-                                                            source_type.to_owned(),
-                                                            source_type,
-                                                        )
-                                                        .on_disabled_hover_text(
-                                                            "DEF-19: type already filled",
-                                                        );
-                                                    });
-                                                }
-                                            });
-                                        if !pick.is_empty() {
-                                            assign = Some((index, pick));
                                         }
                                     },
                                 );
@@ -2094,14 +2215,32 @@ fn file_url(path: &Path) -> String {
     format!("file:///{}", path.to_string_lossy().replace('\\', "/"))
 }
 
-fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, String> {
+/// Referenced (on-disk) + embedded (extracted to a cache dir) textures pulled
+/// from a loaded FBX, deduplicated by absolute path.
+struct TextureIngest {
+    paths: Vec<PathBuf>,
+    embedded: usize,
+}
+
+fn extract_model_texture_paths(review: &ModelReview) -> Result<TextureIngest, String> {
     let model_directory = review.path.parent().unwrap_or_else(|| Path::new("."));
     let embedded_directory = embedded_texture_directory(&review.path);
+    collect_model_textures(
+        &review.model.materials,
+        model_directory,
+        &embedded_directory,
+    )
+}
+
+fn collect_model_textures(
+    materials: &[converter::model::MaterialRecord],
+    model_directory: &Path,
+    embedded_directory: &Path,
+) -> Result<TextureIngest, String> {
     let mut seen = BTreeSet::new();
     let mut paths = Vec::new();
-    for (index, texture) in review
-        .model
-        .materials
+    let mut embedded = 0;
+    for (index, texture) in materials
         .iter()
         .flat_map(|material| material.textures.iter())
         .enumerate()
@@ -2113,10 +2252,10 @@ fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, Str
         ]
         .into_iter()
         .find(|path| path.is_file());
-        let path = if let Some(path) = external {
-            path
+        let (path, is_embedded) = if let Some(path) = external {
+            (path, false)
         } else if texture.embedded && !texture.content.is_empty() {
-            fs::create_dir_all(&embedded_directory).map_err(|error| {
+            fs::create_dir_all(embedded_directory).map_err(|error| {
                 format!(
                     "Could not create embedded texture cache {}: {error}",
                     embedded_directory.display()
@@ -2134,16 +2273,19 @@ fn extract_model_texture_paths(review: &ModelReview) -> Result<Vec<PathBuf>, Str
                     path.display()
                 )
             })?;
-            path
+            (path, true)
         } else {
             continue;
         };
         let key = path.to_string_lossy().to_lowercase();
         if seen.insert(key) {
+            if is_embedded {
+                embedded += 1;
+            }
             paths.push(path);
         }
     }
-    Ok(paths)
+    Ok(TextureIngest { paths, embedded })
 }
 
 struct RcPathResolution {
@@ -2198,6 +2340,71 @@ fn resolve_rc_path_candidates(
         path: None,
         source: "",
         configured_invalid,
+    }
+}
+
+#[cfg(test)]
+mod ingest_tests {
+    use super::*;
+    use converter::model::{MaterialRecord, TextureRef};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn texture(filename: &str, absolute: &str, embedded: bool, content: &[u8]) -> TextureRef {
+        TextureRef {
+            material_prop: "prop".to_owned(),
+            shader_prop: "Diffuse".to_owned(),
+            filename: filename.to_owned(),
+            absolute_filename: absolute.to_owned(),
+            relative_filename: filename.to_owned(),
+            embedded,
+            content_size: content.len(),
+            content: content.to_vec(),
+        }
+    }
+
+    fn material(textures: Vec<TextureRef>) -> MaterialRecord {
+        MaterialRecord {
+            name: "Mat".to_owned(),
+            typed_id: 0,
+            element_id: 0,
+            textures,
+        }
+    }
+
+    #[test]
+    fn collect_dedups_references_and_counts_embedded() {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir =
+            std::env::temp_dir().join(format!("texproc-gui-ingest-{}-{nonce}", std::process::id()));
+        let embedded_dir = dir.join("embedded");
+        fs::create_dir_all(&dir).unwrap();
+        let on_disk = dir.join("wood_diffuse.png");
+        fs::write(&on_disk, b"png").unwrap();
+        let on_disk_str = on_disk.to_string_lossy().into_owned();
+
+        let materials = vec![
+            material(vec![
+                texture("wood_diffuse.png", &on_disk_str, false, b""),
+                // Duplicate reference to the same file → deduped.
+                texture("wood_diffuse.png", &on_disk_str, false, b""),
+                // Missing on disk, not embedded → skipped entirely.
+                texture("gone_normal.png", r"D:\missing\gone_normal.png", false, b""),
+            ]),
+            material(vec![
+                // Embedded blob → extracted to the cache dir, counted.
+                texture("emb_spec.png", "", true, b"embedded-bytes"),
+            ]),
+        ];
+
+        let ingest = collect_model_textures(&materials, &dir, &embedded_dir).unwrap();
+        assert_eq!(ingest.paths.len(), 2, "one referenced + one embedded");
+        assert_eq!(ingest.embedded, 1);
+        assert!(embedded_dir.join("emb_spec.png").is_file());
+
+        fs::remove_dir_all(&dir).unwrap();
     }
 }
 

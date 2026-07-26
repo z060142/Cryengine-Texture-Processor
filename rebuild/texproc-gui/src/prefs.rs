@@ -15,6 +15,7 @@ pub struct AppPreferences {
     pub manifest_path: String,
     pub overrides_path: String,
     pub rc_path: String,
+    pub generate_dds: bool,
 }
 
 impl Default for AppPreferences {
@@ -28,6 +29,7 @@ impl Default for AppPreferences {
             manifest_path: String::new(),
             overrides_path: String::new(),
             rc_path: String::new(),
+            generate_dds: false,
         }
     }
 }
@@ -51,6 +53,10 @@ impl AppPreferences {
         preferences.manifest_path = string(&value, "manifest_path");
         preferences.overrides_path = string(&value, "overrides_path");
         preferences.rc_path = string(&value, "rc_path");
+        preferences.generate_dds = value
+            .get("generate_dds")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         preferences
     }
 
@@ -69,6 +75,7 @@ impl AppPreferences {
             "manifest_path": self.manifest_path,
             "overrides_path": self.overrides_path,
             "rc_path": self.rc_path,
+            "generate_dds": self.generate_dds,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");

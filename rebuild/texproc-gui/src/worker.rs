@@ -148,7 +148,25 @@ pub enum ProcessEvent {
         group: String,
         written: usize,
     },
-    Finished(Result<BatchProcessReport, String>),
+    DdsProgress {
+        completed: usize,
+        total: usize,
+        name: String,
+    },
+    Finished(Result<ProcessComplete, String>),
+}
+
+pub struct ProcessComplete {
+    pub report: BatchProcessReport,
+    pub dds: Option<DdsSummary>,
+}
+
+/// Outcome of the optional RC → DDS pass that runs after the TIFFs are written.
+pub struct DdsSummary {
+    pub total: usize,
+    pub succeeded: usize,
+    /// One `"<file>: <error>"` line per failed conversion (batch is not aborted).
+    pub failures: Vec<String>,
 }
 
 pub struct ProcessJob {
@@ -160,6 +178,7 @@ pub fn start_process(
     scan: ScanResult,
     settings: TextureSettings,
     output_root: PathBuf,
+    rc_exe: Option<PathBuf>,
 ) -> ProcessJob {
     let (sender, receiver) = mpsc::channel();
     let cancel = Arc::new(AtomicBool::new(false));
@@ -178,9 +197,99 @@ pub fn start_process(
                 });
             })
             .map_err(|error| error.to_string());
-        let _ = sender.send(ProcessEvent::Finished(report));
+        let complete = report.map(|report| {
+            let dds = match &rc_exe {
+                Some(rc_exe) if !report.cancelled => {
+                    Some(run_dds_pass(rc_exe, &report, &output_root, &sender))
+                }
+                _ => None,
+            };
+            ProcessComplete { report, dds }
+        });
+        let _ = sender.send(ProcessEvent::Finished(complete));
     });
     ProcessJob { receiver, cancel }
+}
+
+/// Collect the TIFF outputs from a batch report — one RC → DDS job each.
+pub fn dds_jobs(report: &BatchProcessReport) -> Vec<PathBuf> {
+    report
+        .groups
+        .iter()
+        .flat_map(|group| group.written.iter())
+        .filter(|path| {
+            path.extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("tif"))
+        })
+        .cloned()
+        .collect()
+}
+
+/// Feed each produced TIFF to RC.exe sequentially: `RC.exe <tif> /refresh
+/// /userdialog=0`, cwd = output dir. Per-file failures are collected, never
+/// aborting the batch. DDS files land next to the TIFFs.
+fn run_dds_pass(
+    rc_exe: &Path,
+    report: &BatchProcessReport,
+    output_root: &Path,
+    sender: &mpsc::Sender<ProcessEvent>,
+) -> DdsSummary {
+    let jobs = dds_jobs(report);
+    let total = jobs.len();
+    let mut succeeded = 0;
+    let mut failures = Vec::new();
+    for (index, tif) in jobs.iter().enumerate() {
+        let name = tif
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default()
+            .to_owned();
+        let _ = sender.send(ProcessEvent::DdsProgress {
+            completed: index + 1,
+            total,
+            name: name.clone(),
+        });
+        match run_rc_dds(rc_exe, tif, output_root) {
+            Ok(()) => succeeded += 1,
+            Err(error) => failures.push(format!("{name}: {error}")),
+        }
+    }
+    DdsSummary {
+        total,
+        succeeded,
+        failures,
+    }
+}
+
+fn run_rc_dds(rc_exe: &Path, tif: &Path, output_root: &Path) -> Result<(), String> {
+    let mut command = Command::new(rc_exe);
+    command
+        .arg(tif)
+        .arg("/refresh")
+        .arg("/userdialog=0")
+        .current_dir(output_root);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x0800_0000);
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("failed to start {}: {error}", rc_exe.display()))?;
+    let dds = tif.with_extension("dds");
+    if output.status.success() && dds.is_file() {
+        return Ok(());
+    }
+    let return_code = output.status.code().unwrap_or(-1);
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    let detail = if !stderr.is_empty() { stderr } else { stdout };
+    Err(if detail.is_empty() {
+        format!("RC exited with {return_code}, DDS was not produced")
+    } else {
+        format!("RC exited with {return_code}: {detail}")
+    })
 }
 
 pub struct ModelReview {
@@ -364,4 +473,103 @@ fn run_resource_compiler(
 fn existing_optional(path: &Option<PathBuf>) -> Option<&Path> {
     path.as_deref()
         .filter(|path| !path.as_os_str().is_empty() && path.is_file())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use texproc::batch::ProcessedGroup;
+
+    fn report(written: Vec<&str>) -> BatchProcessReport {
+        BatchProcessReport {
+            groups: vec![ProcessedGroup {
+                base_name: "Group".to_owned(),
+                written: written.into_iter().map(PathBuf::from).collect(),
+                elapsed_seconds: 0.0,
+            }],
+            cancelled: false,
+            elapsed_seconds: 0.0,
+            rayon_threads: 1,
+        }
+    }
+
+    #[test]
+    fn dds_jobs_selects_only_tiff_outputs() {
+        let report = report(vec![
+            r"C:\out\Stone_diff.tif",
+            r"C:\out\Stone_ddna.TIF",
+            r"C:\out\Stone_diff.dds",
+            r"C:\out\notes.txt",
+        ]);
+        let jobs = dds_jobs(&report);
+        assert_eq!(jobs.len(), 2);
+        assert!(jobs.iter().all(|path| path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("tif"))));
+    }
+
+    /// Real end-to-end check of the GUI's DDS pipeline: process the repo texture
+    /// fixtures and run each TIFF through a real RC. Ignored by default (needs
+    /// RC on disk); run with:
+    ///   set CE_RC_EXE=...\rc.exe && cargo test -p texproc-gui -- --ignored dds_pass
+    #[test]
+    #[ignore = "requires a real RC.exe (CE_RC_EXE or the default S: path)"]
+    fn dds_pass_produces_dds_next_to_tiffs() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let rc = std::env::var_os("CE_RC_EXE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe")
+            });
+        assert!(rc.is_file(), "RC not found at {}", rc.display());
+
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("fixtures")
+            .join("textures");
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = texproc::scan_inputs(&[fixtures], &suffixes).unwrap();
+        assert!(!scan.groups.is_empty());
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let out =
+            std::env::temp_dir().join(format!("texproc-gui-dds-{}-{nonce}", std::process::id()));
+        fs::create_dir_all(&out).unwrap();
+
+        let job = start_process(scan, TextureSettings::default(), out.clone(), Some(rc));
+        let mut complete = None;
+        let mut dds_progress = 0;
+        while let Ok(event) = job.receiver.recv() {
+            match event {
+                ProcessEvent::DdsProgress { completed, .. } => {
+                    dds_progress = dds_progress.max(completed)
+                }
+                ProcessEvent::Finished(result) => {
+                    complete = Some(result.expect("processing succeeded"));
+                    break;
+                }
+                ProcessEvent::Progress { .. } => {}
+            }
+        }
+        let complete = complete.expect("worker finished");
+        let dds = complete.dds.expect("DDS pass ran");
+        let tifs = dds_jobs(&complete.report);
+        assert!(!tifs.is_empty());
+        assert_eq!(dds.total, tifs.len());
+        assert!(dds_progress >= 1);
+        assert_eq!(dds.succeeded, dds.total, "failures: {:?}", dds.failures);
+        for tif in &tifs {
+            assert!(
+                tif.with_extension("dds").is_file(),
+                "missing dds for {}",
+                tif.display()
+            );
+        }
+        fs::remove_dir_all(&out).ok();
+    }
 }
