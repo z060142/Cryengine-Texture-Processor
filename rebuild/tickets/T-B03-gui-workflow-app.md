@@ -33,7 +33,7 @@
 ### 全域
 - `Save Settings`：settings JSON（與 CLI 的 `--settings` 同形狀）存/載。
 - 視窗關閉不需確認（沒有未存檔概念——設定即時生效，分組是暫態）。
-- 語系：v1 直接沿用原版 `language/` 的 zh-TW 文案為預設（en 其次）；不做語系切換 UI。
+- ~~語系：zh-TW 預設~~ **R1 裁決推翻：UI 全英文**；不做語系切換 UI。
 
 ## 架構約束
 
@@ -85,3 +85,27 @@
 - `run_gates.ps1`：ALL GATES PASSED；converter RC smoke 與 texproc RC/DDS smoke 均 PASS。
 
 尚待：業主目視簽核後改為 DONE。
+
+
+## R1 修訂（2026-07-26 業主裁決，檢視五方案 demo 後）
+
+裁決基調：以案 3「工作台」為 UX 基準（= 本票現況方向正確），加入下列三項：
+
+1. **Physicalize 編輯（取自案 4）**：Model tab 材質表每列加 physicalize
+   下拉（no / default / obstruct / no_collide / proxy_only）。語意 =
+   explicit metadata 注入（與 manifest explicit 同位階，走既有政策層通道，
+   不繞過 `resolve_rc_physicalize` 的優先序）；編輯過的值進 request。
+2. **「Export CE Model」單一動作**：對使用者而言 Model tab 的主動作是
+   「導出 CE 模型」，不是「輸出 .mtl+request 中間產物」。按鈕改名
+   `Export CE Model`，行為 = convert（.mtl + request）→ RC.exe → CGF
+   一氣呵成（RC 路徑：`CE_RC_EXE` → 預設 S: 路徑 → 皆無時降級為只出
+   .mtl+request 並明示「RC 不可用，已輸出中間產物」）。本程式不輸出 FBX
+   檔——來源 FBX 原樣即是 RC 輸入。
+3. **UI 全英文**：所有文案改英文（推翻原票 zh-TW 決定）。
+
+DoD 追加：
+- physicalize 編輯後的 request 與「同值 manifest 注入」的 CLI 產物逐鍵相等
+  （證明走的是同一政策通道）。
+- Export CE Model 在有 RC 環境對 car.fbx 產出 CGF，材質對齊 16/16
+  （複用 rc_smoke_rust 的驗法）；無 RC 環境降級路徑有明確 UI 提示。
+- 其餘首版 DoD（hash 一致、KB3D 劇本）在修訂後重驗不退步。
