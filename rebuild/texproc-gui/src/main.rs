@@ -178,6 +178,7 @@ struct ProcessState {
     dds_completed: usize,
     dds_total: usize,
     dds_current: String,
+    dds_workers: usize,
 }
 
 struct ProcessSummary {
@@ -389,6 +390,7 @@ impl WorkflowApp {
             dds_completed: 0,
             dds_total: 0,
             dds_current: String::new(),
+            dds_workers: 0,
         });
         self.process_summary = None;
         self.process_modal_open = true;
@@ -770,6 +772,7 @@ impl WorkflowApp {
             return;
         };
         let mut finished = None;
+        let mut worker_note = None;
         loop {
             match process.job.receiver.try_recv() {
                 Ok(ProcessEvent::Progress {
@@ -794,6 +797,12 @@ impl WorkflowApp {
                     process.dds_total = total;
                     process.dds_current = name;
                 }
+                Ok(ProcessEvent::DdsWorkers { from, to }) => {
+                    process.dds_workers = to;
+                    if from > 0 {
+                        worker_note = Some(format!("RC workers: {from} → {to}"));
+                    }
+                }
                 Ok(ProcessEvent::Finished(result)) => {
                     finished = Some(result);
                     break;
@@ -807,6 +816,9 @@ impl WorkflowApp {
                 }
             }
         }
+        if let Some(note) = worker_note {
+            self.status = note;
+        }
         let Some(result) = finished else {
             return;
         };
@@ -817,7 +829,16 @@ impl WorkflowApp {
                 let dds = complete.dds;
                 let written = report.groups.iter().map(|group| group.written.len()).sum();
                 let dds_note = dds.as_ref().map_or_else(String::new, |dds| {
-                    format!(" · DDS {}/{}", dds.succeeded, dds.total)
+                    let trajectory = dds
+                        .n_trajectory
+                        .iter()
+                        .map(usize::to_string)
+                        .collect::<Vec<_>>()
+                        .join("→");
+                    format!(
+                        " · DDS {}/{} (RC workers {trajectory})",
+                        dds.succeeded, dds.total
+                    )
                 });
                 let failed = report.failed.clone();
                 let failed_note = if failed.is_empty() {
@@ -1201,8 +1222,11 @@ impl WorkflowApp {
                 if process.dds_active {
                     ui.add_space(6.0);
                     ui.label(format!(
-                        "Compiling DDS via RC: {} of {} · {}",
-                        process.dds_completed, process.dds_total, process.dds_current
+                        "Compiling DDS via RC: {} of {} · {} ({} RC workers)",
+                        process.dds_completed,
+                        process.dds_total,
+                        process.dds_current,
+                        process.dds_workers
                     ));
                     let dds_progress = if process.dds_total == 0 {
                         0.0

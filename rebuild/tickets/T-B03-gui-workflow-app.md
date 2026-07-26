@@ -883,3 +883,82 @@ GUI 無 console，abort 訊息不可見 → 靜默消失。CLI 同病，只是�
 - 單元測試：調節決策函式（純函式：cpu/ram/N → 增減）含遲滯與邊界。
 - 取消實測：批次中按 Cancel，RC 子程序不殘留（過程列表證明）。
 - gate 全綠不退步。
+
+## R7 實作紀錄（2026-07-27，Miss Fox）
+
+只動 `texproc-gui`（`worker.rs` 為主、`main.rs` 事件接線）；未動 `texproc` /
+`converter` / 凍結 CLI 契約；無新依賴。R1–R6 能力全數保留。
+
+### 設計實作（完全依 R7 授權設計）
+
+- **自適應多 RC pool** `run_dds_pool`：取代舊 `run_dds_pass` 的序列迴圈。
+  **DDS 階段（`start_process`）與 R5 model-export 鏈（`start_model_export`）共用
+  同一 pool**——兩處各傳自己的 `on_progress` / `on_workers` 回呼與 cancel 旗標。
+- **目標併發 N**：起始 = `clamp(logical_cores / 6, 1, 4)`；6 = 實測 RC 內部有效
+  執行緒，以常數 `RC_INTERNAL_THREADS` + 註解表示、不做 config。20 核 → 起始 3。
+- **回饋調節**：抽成純函式 `adjust_decision(cpu_pct, avail_ram, current_n, nmax,
+  since_last_adjust) -> Decision {Grow, Shrink, Hold}`：
+  - 遲滯：距上次調節 < 1s 一律 Hold。
+  - 退壓優先（安全）：CPU > 92% 或可用 RAM < 4GB 保留區 → Shrink（下限 1，
+    N=1 時 Hold）。
+  - 成長：CPU < 70% 且可用 RAM > (N+1)×2GB 且 N < Nmax → Grow。
+  - Nmax 預設常數 8，`TEXPROC_RC_MAX` 環境變數覆蓋（純函式 `rc_max_from` 解析，
+    空/非數/0 皆退回預設；設 1 = 強制序列）。
+  - pool 只在「有檔完成且距上次調節 ≥1s」才取樣＋評估，取得乾淨的 ≥1s CPU 窗。
+- **量測 FFI（無新依賴）**：CPU 用手搓 `GetSystemTimes` `extern "system"`
+  （`CpuSampler` 滾動取樣，utilization = 1 − Δidle/(Δkernel+Δuser)，Windows
+  kernel time 本含 idle）；可用 RAM 用 `GlobalMemoryStatusEx` 的 `avail_phys`
+  （鏡射 batch.rs 既有 FFI 形狀）。非 Windows fallback（CPU 0 / RAM u64::MAX）
+  保持可編譯。
+- **佇列語意不變**：逐檔一個 RC 程序（`RC.exe <tif> /refresh /userdialog=0`，
+  cwd=輸出目錄）、單檔失敗記診斷不中斷、progress n/total 事件照舊（沿用既有
+  `DdsProgress`）。子程序改 `spawn`（stdio 全 null，GUI 無 console，避免 pipe
+  緩衝阻塞），完成後以 `try_wait` 非阻塞回收。
+- **N 變化寫入進度/狀態流**：新增 `ProcessEvent::DdsWorkers { from, to }`，DDS
+  階段 GUI 狀態列印 `RC workers: 3 → 4`、進度模態顯示目前 worker 數；完成摘要
+  附完整軌跡 `DDS 25/25 (RC workers 3→4→5→6→7→8)`。model-export 鏈把 N 變化
+  轉為 `ModelExportEvent::Stage("RC workers: …")`。軌跡另存入 `DdsSummary
+  .n_trajectory` 供報告/測試讀取。
+- **取消（選擇並註明）**：cancel 旗標一設，pool 停止啟動新 RC **並終止在跑的
+  子程序**——`std::process::Child::kill()`（Windows = TerminateProcess）逐一
+  kill + wait 回收，保證無殘留 rc.exe。選 TerminateProcess 而非「等自然結束」，
+  因大批 4K DDS 每檔數秒，等待會讓 Cancel 反應遲鈍（實測 kill 後 0.27s 返回）。
+- **clippy 附帶修**：`n_trajectory`（+24B）把 `ModelExportReport` 撐過
+  `large_enum_variant` 門檻，依 clippy 建議把 `ModelExportEvent::Completed`
+  改 `Box<ModelExportReport>`（呼叫端 auto-deref，零語意變更）。
+
+### 驗證
+
+- `cargo build/clippy(-D warnings)/fmt -p texproc-gui`：PASS。
+- `cargo test -p texproc-gui --release --locked`：19 主 + 7 lib PASS（4 ignored
+  為真 RC/真資料整合測試）。新增純函式單元測試：`hold_within_one_second_
+  hysteresis`、`grow_on_spare_cpu_and_ram`、`shrink_on_saturated_cpu`、
+  `shrink_on_thin_ram_reserve`、`floor_at_one_worker`、`cap_at_nmax`、
+  `grow_blocked_when_ram_below_next_worker_need`（(N+1)×2GB 保留邊界 7GB Hold /
+  9GB Grow）、`rc_max_override_parsing`、`initial_target_clamps_cores_over_six`。
+- **真資料基準**（`#[ignore]` `benchmark_adaptive_vs_sequential_dds`，走
+  worker 程式路徑）：以 texproc batch library 對 KB3D 4K 前 6 組產出 **25 張 4K
+  TIFF** 語料，再對同一語料跑兩次 DDS 階段：
+  - 序列（`TEXPROC_RC_MAX=1`）：**152.3s**，25/25 DDS，N 軌跡 `[1]`。
+  - 自適應：**65.6s**，25/25 DDS，N 軌跡 `[3, 4, 5, 6, 7, 8]`。
+  - **加速 2.32×**（≥1.5× 達標）；至少一次調節（實際 5 次成長）；dds 數 = tif 數。
+- **取消實測**（`#[ignore]` `cancel_terminates_inflight_rc`，34 檔語料）：跑 3s
+  後設 cancel → **0.27s 內返回**、0/34 完成即中止；隨後 `Get-Process rc` 證明
+  **無殘留 rc.exe**。
+- `run_gates.ps1`（完整含 RC）：**ALL GATES PASSED**；converter RC 16/16、
+  texproc RC/DDS 8/8、ddna 2/2、preserve 17/17、T-005 MTL/schema/Python
+  asset-flow 全綠，核心零退步。
+- 收尾終止所有 spawned 程序（texproc-gui / texproc / rc / converter），確認歸零。
+
+### 偏離／觀察
+
+- **自適應在本機（20 核 / 96GB）一路成長到 Nmax=8**，未觸發 Shrink：整個
+  DDS 階段 CPU < 70%、RAM 充裕，回饋規則據實成長。審查者實測甜蜜點 3-4、8 路
+  微退（27.8 vs 26.6s），但本次語料/機況下 8 路仍遠優於序列（65.6 vs 152.3s），
+  規則行為正確——這正是「靜態大併發無益、需自適應」的反面：閒置大機會用滿
+  Nmax。要更保守可調降 `TEXPROC_RC_MAX`。Shrink 路徑由純函式單元測試覆蓋
+  （CPU>92% / RAM<4GB 皆 → Shrink）。
+- 子程序 stdio 設 null，失敗診斷只帶 exit code +「DDS was not produced」，不再
+  帶 RC stderr 明細（避免 pool 讀 pipe 阻塞）；RC 失敗罕見，權衡取穩健。
+- GUI 即時互動（進度模態的 worker 數、狀態列 `RC workers: x → y`）本環境合成
+  點擊無效無法擷圖（沿 R3–R6 既有限制），改以上述真 RC 整合測試證明程式路徑。
