@@ -631,3 +631,31 @@ ScrollArea 外的 `ui.horizontal`，資料列各自包在 `Frame.inner_margin(4,
   佐證，視覺由業主確認。
 - `choose_folder` 的 `initial` 參數仍不接（現代對話框自記上次位置，SetFolder
   需另建 IShellItem，不划算）——已 ponytail 註記，行為與 R2-S1 相同。
+
+## R5（2026-07-26 業主裁決）
+
+1. **刪除選中貼圖**：Imported Textures 清單支援多選（Ctrl/Shift 慣例），
+   新增 Remove Selected 鈕（+右鍵選單可選作）；移除後分組即時重算。
+2. **加入關聯貼圖**：新增 Add Related 鈕——對選中貼圖，按其命名規則
+   （base name）與所在目錄，把同組其他貼圖自動加入。動機：FBX 常常
+   只關聯部分貼圖種類。**效能紅線（業主明令）**：嚴禁每張選中圖各自
+   遍歷／嚴禁對候選檔開像素。正解：選中集合先歸納出唯一
+   `(目錄, base_name)` 對，每個唯一目錄**只列舉一次**，候選檔用
+   **純檔名解析**（既有 suffix parser）比對 base；只有真正加入清單的檔
+   才走既有 add 流程（其中歧義後綴的 header probe 照舊，那是 O(加入數)
+   不是 O(候選數)）。
+3. **補 Python 版既有選項**（`export_settings.py` 的 delete 核取框）：
+   - `Delete request JSON after model export`（導出後刪 json；.mtl/.cryasset 不刪）。
+   - `Delete TIF after DDS export`（DDS 成功後刪對應 tif；單檔 DDS 失敗
+     則保留該 tif 並記診斷）。
+   均入 prefs 持久化，預設 off。
+4. **導出模型順帶導出關聯貼圖組**：新 checkbox
+   `Export associated textures with model`——Export CE Model 時，先把
+   「來自該 FBX 拉入的貼圖組」跑貼圖處理（輸出到 Texture Output Directory），
+   並以該目錄作 texture-dir 參與 MTL 貼圖解析（產出的 MTL 直接指向處理後
+   貼圖）；與 DDS 選項組合時 TIF→DDS 照常（含選項 3 的刪 tif 邏輯）。
+   進度統一進既有模態（階段：Textures → Convert → RC → DDS）。
+
+DoD：四項各有實測證據；效能證據 = 對 Z:\enchanted\KB3DTextures\4k
+（793 檔目錄）做一次 Add Related 的耗時（應為列舉一次目錄的量級，
+毫秒級～百毫秒級）；gate 全綠不退步。
