@@ -219,6 +219,7 @@ pub fn start_model_load(path: PathBuf) -> Receiver<ModelEvent> {
 }
 
 pub enum ModelExportEvent {
+    Stage(String),
     Completed(ModelExportReport),
     Failed(String),
 }
@@ -251,6 +252,9 @@ pub fn start_model_export(
 ) -> Receiver<ModelExportEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
+        let _ = sender.send(ModelExportEvent::Stage(
+            "Converting materials (.mtl + request)…".to_owned(),
+        ));
         let result = converter::convert_file_with_physicalize(
             &input,
             existing_optional(&manifest),
@@ -262,9 +266,15 @@ pub fn start_model_export(
         );
         let event = match result {
             Ok(outputs) => {
-                let rc = rc_exe.map_or(RcExportOutcome::NotConfigured, |rc_exe| {
-                    run_resource_compiler(&rc_exe, &input, &outputs, &output_dir)
-                });
+                let rc = match rc_exe {
+                    Some(rc_exe) => {
+                        let _ = sender.send(ModelExportEvent::Stage(
+                            "Running Resource Compiler (CGF)…".to_owned(),
+                        ));
+                        run_resource_compiler(&rc_exe, &input, &outputs, &output_dir)
+                    }
+                    None => RcExportOutcome::NotConfigured,
+                };
                 ModelExportEvent::Completed(ModelExportReport { outputs, rc })
             }
             Err(error) => ModelExportEvent::Failed(error),

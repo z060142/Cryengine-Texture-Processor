@@ -303,3 +303,71 @@ texproc/converter crate。
 - 藍本把材質表放左欄 Model tab；本票 TARGET LAYOUT 指定材質表在中欄下半、
   左欄只留 Model 摘要——依票面（非藍本）實作。
 - 藍本標題列有「檔案/編輯/說明」選單，未做（非本票範圍，且無對應功能）。
+
+## R2-S3 實作紀錄（2026-07-26）
+
+### 實作
+
+以 `demo3-workbench.html` 為互動藍本，完成分組表、進度模態、診斷 popover
+與 Model 收尾；全程沿用 S1 原生對話框與 S2 三欄佈局，未新增依賴，未動
+texproc/converter crate 與凍結 CLI 契約。
+
+- **分組表（貼圖模式）**：中欄下半改為 demo3 風格表格。欄位＝
+  `Group | 12 個型別格（Dif Nrm Spc Gls Rgh Hgt Met AO Alp Emi SSS ARM）|
+  Unknown`。型別格為綠（已填）／灰（空）小方塊，已填格可點選預覽該張貼圖；
+  含 unknown 的列整列琥珀底色（選取時加深），指派後底色自動清除。Unknown
+  欄為就地下拉（`Assign (N)…`），選型別即指派該組第一張 unknown，走既有
+  `ReviewDocument::assign_unknown`；下拉中已被占用的型別停用（DEF-19 防呆）。
+  表頭固定、列以 `ScrollArea` 捲動，132 組順暢。點列名選取群組→預覽窗顯示
+  縮圖＋群組名＋map badges（已填型別藍徽章＋unknown 琥珀徽章）。保留搜尋框
+  與「Unknown only」過濾。
+- **進度模態**：`Process Textures` 開啟 `egui::Modal` 遮罩，顯示整體進度條、
+  `完成/總數 · 當前組`、逐組清單（依完成事件標記 ✓／待處理）、Cancel 接既有
+  取消旗標；完成後同一模態轉為「Processing Complete」摘要＋可點「Open output
+  folder」＋Close。右欄僅留 `Process Textures` 與（處理中）`Show progress`
+  重開鈕，行內進度條移除，改由模態統一呈現。
+- **診斷 popover**：狀態列診斷計數改為可點按鈕，開合右下角錨定的
+  `Diagnostics` 視窗，逐條列出（unknown 未指派、群組 DEF-19、RC 未設定／
+  無效、FBX 材質診斷），空狀態顯示綠色 `No diagnostics`。計數與清單同源。
+- **Model 模式收尾**：材質表列點選→下方 Material Details（名稱、指派來源、
+  貼圖引用清單）；physicalize 下拉沿用（只送改過的值進 explicit 通道）。
+  `Export CE Model` 改走同款模態：worker 新增 `Stage` 事件，模態顯示
+  Convert（.mtl + request）→ Resource Compiler（CGF）兩階段 spinner；成功
+  顯示 CGF 路徑＋「Open output folder」＋Close，失敗亦於模態顯示訊息。
+- **總審／polish**：視窗標題 `CryEngine Texture Processor`；文案全英文；
+  Output Resolution 下拉移除遺留的 `64 (validation)` smoke 值、改列 256
+  （`TextureSettings::default` 本即 `Original`）；移除改版後失去用途的
+  `selected_unknown`／`assignment_type` 欄位、舊 `assign_unknown` 導航法與
+  `detected_type_summary`，無死碼、無死鈕。
+
+### 驗證
+
+- `cargo build -p texproc-gui --release --locked`：PASS。
+- `cargo clippy -p texproc-gui --all-targets --release --locked -- -D warnings`：
+  PASS。
+- `cargo fmt --all -- --check`：PASS。
+- `cargo test -p texproc-gui --release --locked`：PASS（5 model + 7 main）。
+  model 層新增測試 `assigning_every_unknown_clears_the_diagnostics_count`：
+  逐張指派 unknown 後 `unresolved_unknown_count` 由 2→1→0，證明指派更新
+  診斷計數來源。
+- `run_gates.ps1`（完整、含 RC）：ALL GATES PASSED，核心無退步。
+- release GUI 實測截圖（各以 CLI 引數載入資料後擷取）：
+  - `ux-demos/r2-s3-texture.png`：`Z:\enchanted\KB3DTextures\4k` 載入，
+    793 張／132 groups／5 unknown；分組表、型別格、琥珀 unknown 列、就地
+    `Assign (1)…`、預覽 badge、右欄設定與 RC Path 解析皆正常。
+  - `ux-demos/r2-s3-model.png`：`fixtures/car/car.fbx` 載入，17 材質槽、
+    physicalize 下拉、選取列 Material Details、右欄設定正常。
+  - 擷圖後終止程序，確認無殘留 texproc-gui.exe／texproc.exe。
+
+### 偏離
+
+- 分組表顯示全部 12 個 source-type 欄（藍本只列 8），以免隱藏 alpha/sss/arm
+  等已填槽；預覽 badges 亦列完整已填集合。
+- 選取點擊目標為「列名＋已填型別格」而非整列，以避開 egui 中整列 click 與
+  行內下拉的點擊衝突；列琥珀／選取底色仍整列滿版。
+- 行內指派針對該組第一張 unknown（藍本假設每組單一 unknown）；多張時列維持
+  琥珀直到該組 unknown 全數指派。
+- Model 匯出模態為不定量 spinner＋Convert→RC 階段文字（RC 無細粒度進度）。
+- 模態／popover 未另附截圖（需驅動執行中程序），以 build/test 佐證。
+- 截圖取視窗原生 1440 邏輯尺寸；右欄設定面板最右數 px 因顯示 DPI 有輕微裁切，
+  內容仍全可辨識。

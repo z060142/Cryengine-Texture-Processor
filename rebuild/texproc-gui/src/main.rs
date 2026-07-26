@@ -17,8 +17,8 @@ use std::{
 
 use converter::rc_policy::resolve_physicalize;
 use eframe::egui::{
-    self, Color32, ComboBox, Grid, ProgressBar, RichText, ScrollArea, Stroke, TextEdit,
-    TextureHandle, ViewportBuilder,
+    self, Align2, Color32, ComboBox, Grid, Id, Modal, ProgressBar, RichText, ScrollArea, Sense,
+    Stroke, TextEdit, TextureHandle, ViewportBuilder,
 };
 use file_dialog::{
     choose_file_open, choose_file_save, choose_files_multi, choose_folder, choose_rc_executable,
@@ -26,7 +26,7 @@ use file_dialog::{
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
     load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, OutputResolution,
-    ScanEntry, ScanGroup, TextureSettings,
+    ScanEntry, ScanGroup, Severity, TextureSettings,
 };
 use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
 use worker::{
@@ -37,6 +37,24 @@ use worker::{
 const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
 const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
+/// Compact map-type columns shown in the groups table (source type, header).
+const GROUP_COLUMNS: [(&str, &str); 12] = [
+    ("diffuse", "Dif"),
+    ("normal", "Nrm"),
+    ("specular", "Spc"),
+    ("glossiness", "Gls"),
+    ("roughness", "Rgh"),
+    ("displacement", "Hgt"),
+    ("metallic", "Met"),
+    ("ao", "AO"),
+    ("alpha", "Alp"),
+    ("emissive", "Emi"),
+    ("sss", "SSS"),
+    ("arm", "ARM"),
+];
+const GROUP_CELL_W: f32 = 26.0;
+const GROUP_UNKNOWN_W: f32 = 150.0;
+const GROUP_ROW_H: f32 = 24.0;
 const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr\0All files (*.*)\0*.*\0";
 const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
 const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
@@ -62,6 +80,7 @@ enum WorkflowTab {
     Model,
 }
 
+#[derive(Default)]
 struct TextureState {
     roots: Vec<PathBuf>,
     files: Vec<PathBuf>,
@@ -69,27 +88,8 @@ struct TextureState {
     scan_receiver: Option<Receiver<ScanEvent>>,
     selected_file: Option<usize>,
     selected_group: Option<usize>,
-    selected_unknown: Option<usize>,
-    assignment_type: String,
     group_search: String,
     review_only: bool,
-}
-
-impl Default for TextureState {
-    fn default() -> Self {
-        Self {
-            roots: Vec::new(),
-            files: Vec::new(),
-            document: None,
-            scan_receiver: None,
-            selected_file: None,
-            selected_group: None,
-            selected_unknown: None,
-            assignment_type: ASSIGNABLE_SOURCE_TYPES[0].to_owned(),
-            group_search: String::new(),
-            review_only: false,
-        }
-    }
 }
 
 #[derive(Default)]
@@ -109,6 +109,8 @@ struct ProcessState {
     total: usize,
     current_group: String,
     written: usize,
+    group_names: Vec<String>,
+    completed_groups: BTreeSet<String>,
 }
 
 struct ProcessSummary {
@@ -119,6 +121,13 @@ struct ProcessSummary {
     output_directory: PathBuf,
 }
 
+/// One line in the status-bar diagnostics popover.
+struct DiagItem {
+    severity: &'static str,
+    title: String,
+    message: String,
+}
+
 #[derive(Default)]
 struct ModelState {
     receiver: Option<Receiver<ModelEvent>>,
@@ -126,6 +135,9 @@ struct ModelState {
     selected_material: Option<usize>,
     export_receiver: Option<Receiver<ModelExportEvent>>,
     export_summary: Option<String>,
+    export_modal_open: bool,
+    export_stage: String,
+    export_cgf: Option<PathBuf>,
     physicalize_overrides: BTreeMap<String, String>,
     rc_missing_warning: bool,
 }
@@ -138,6 +150,8 @@ struct WorkflowApp {
     preview: PreviewState,
     process: Option<ProcessState>,
     process_summary: Option<ProcessSummary>,
+    process_modal_open: bool,
+    show_diagnostics: bool,
     model: ModelState,
     status: String,
 }
@@ -155,6 +169,8 @@ impl WorkflowApp {
             preview: PreviewState::default(),
             process: None,
             process_summary: None,
+            process_modal_open: false,
+            show_diagnostics: false,
             model: ModelState::default(),
             status: "Ready. Drop textures, folders, or an FBX file to begin.".to_owned(),
         };
@@ -254,7 +270,6 @@ impl WorkflowApp {
             .find(|(_, group)| group.slots.is_empty() && !group.unknown.is_empty())
         {
             self.texture.selected_group = Some(index);
-            self.texture.selected_unknown = Some(0);
             self.texture.review_only = true;
             self.status = format!(
                 "Assign a type to the unknown texture in `{}` before processing.",
@@ -274,14 +289,22 @@ impl WorkflowApp {
 
         let scan = document.scan().clone();
         let total = scan.groups.len();
+        let group_names = scan
+            .groups
+            .iter()
+            .map(|group| group.base_name.clone())
+            .collect();
         self.process = Some(ProcessState {
             job: worker::start_process(scan, self.settings, output),
             completed: 0,
             total,
             current_group: "Preparing".to_owned(),
             written: 0,
+            group_names,
+            completed_groups: BTreeSet::new(),
         });
         self.process_summary = None;
+        self.process_modal_open = true;
         self.status = format!("Processing {total} texture groups…");
     }
 
@@ -314,6 +337,9 @@ impl WorkflowApp {
             rc_resolution.path,
         ));
         self.model.export_summary = None;
+        self.model.export_cgf = None;
+        self.model.export_modal_open = true;
+        self.model.export_stage = "Preparing export…".to_owned();
         self.status = "Exporting CryEngine intermediates and CE model…".to_owned();
     }
 
@@ -336,49 +362,6 @@ impl WorkflowApp {
                 self.status = error;
             }
         }
-    }
-
-    fn assign_unknown(&mut self) {
-        let (Some(group_index), Some(unknown_index), Some(document)) = (
-            self.texture.selected_group,
-            self.texture.selected_unknown,
-            &mut self.texture.document,
-        ) else {
-            self.status = "Select an unknown texture first.".to_owned();
-            return;
-        };
-        self.status = match document.assign_unknown(
-            group_index,
-            unknown_index,
-            &self.texture.assignment_type,
-        ) {
-            Ok(()) => {
-                let remaining = document.scan().groups[group_index].unknown.len();
-                if remaining == 0 && self.texture.review_only {
-                    let next_group = document
-                        .scan()
-                        .groups
-                        .iter()
-                        .position(|group| !group.unknown.is_empty());
-                    if let Some(next_group) = next_group {
-                        self.texture.selected_group = Some(next_group);
-                        self.texture.selected_unknown = Some(0);
-                    } else {
-                        self.texture.review_only = false;
-                        self.texture.selected_group = Some(0);
-                        self.texture.selected_unknown = None;
-                    }
-                } else {
-                    self.texture.selected_unknown =
-                        (remaining > 0).then_some(unknown_index.min(remaining - 1));
-                }
-                format!(
-                    "Assigned the texture as `{}`.",
-                    self.texture.assignment_type
-                )
-            }
-            Err(error) => error,
-        };
     }
 
     fn poll_workers(&mut self, context: &egui::Context) {
@@ -428,8 +411,6 @@ impl WorkflowApp {
                     .position(|group| !group.unknown.is_empty())
                     .or((groups > 0).then_some(0));
                 self.texture.selected_group = selected_group;
-                self.texture.selected_unknown = selected_group
-                    .and_then(|index| (!scan.groups[index].unknown.is_empty()).then_some(0));
                 let preview_request = selected_group
                     .and_then(|index| first_group_entry(&scan.groups[index]))
                     .map(|entry| (PathBuf::from(&entry.path), entry.source_type.clone()));
@@ -504,6 +485,7 @@ impl WorkflowApp {
                 }) => {
                     process.completed = completed;
                     process.total = total;
+                    process.completed_groups.insert(group.clone());
                     process.current_group = group;
                     process.written += written;
                 }
@@ -582,17 +564,23 @@ impl WorkflowApp {
     }
 
     fn poll_model_export(&mut self) {
-        let event = self
-            .model
-            .export_receiver
-            .as_ref()
-            .and_then(|receiver| receiver.try_recv().ok());
-        let Some(event) = event else {
+        let Some(receiver) = self.model.export_receiver.as_ref() else {
             return;
         };
-        self.model.export_receiver = None;
+        let event = match receiver.try_recv() {
+            Ok(event) => event,
+            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Disconnected) => {
+                self.model.export_receiver = None;
+                return;
+            }
+        };
         match event {
+            ModelExportEvent::Stage(stage) => {
+                self.model.export_stage = stage;
+            }
             ModelExportEvent::Completed(report) => {
+                self.model.export_receiver = None;
                 let rc_summary = match &report.rc {
                     RcExportOutcome::NotConfigured => {
                         self.model.rc_missing_warning = true;
@@ -601,6 +589,7 @@ impl WorkflowApp {
                     }
                     RcExportOutcome::Succeeded { cgf, return_code } => {
                         self.model.rc_missing_warning = false;
+                        self.model.export_cgf = Some(cgf.clone());
                         self.status = format!("CE model export completed: {}", cgf.display());
                         format!("CGF: {} (RC exit {return_code})", cgf.display())
                     }
@@ -623,6 +612,8 @@ impl WorkflowApp {
                 self.model.export_summary = Some(summary);
             }
             ModelExportEvent::Failed(error) => {
+                self.model.export_receiver = None;
+                self.model.export_summary = Some(format!("Export failed: {error}"));
                 self.status = format!("CE model export failed: {error}");
             }
         }
@@ -699,37 +690,236 @@ impl WorkflowApp {
                 {
                     ui.spinner();
                 }
-                // Right-aligned diagnostics count. S3 turns this into a popover.
+                // Right-aligned clickable diagnostics chip → popover.
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let count = self.diagnostics_count();
+                    let count = self.diagnostics().len();
                     let (color, text) = if count > 0 {
                         (
                             Color32::from_rgb(200, 130, 40),
-                            format!("{count} diagnostics"),
+                            format!("● {count} diagnostics"),
                         )
                     } else {
-                        (Color32::from_rgb(70, 165, 95), "No diagnostics".to_owned())
+                        (
+                            Color32::from_rgb(70, 165, 95),
+                            "● No diagnostics".to_owned(),
+                        )
                     };
-                    ui.colored_label(color, text);
+                    if ui
+                        .add(egui::Button::new(RichText::new(text).color(color)).frame(false))
+                        .on_hover_text("Show diagnostics")
+                        .clicked()
+                    {
+                        self.show_diagnostics = !self.show_diagnostics;
+                    }
                 });
             });
         });
     }
 
-    /// Combined transient-diagnostic count for the status bar: unresolved
-    /// texture unknowns plus material-slot diagnostics from a loaded FBX.
-    fn diagnostics_count(&self) -> usize {
-        let textures = self
-            .texture
-            .document
-            .as_ref()
-            .map_or(0, ReviewDocument::unresolved_unknown_count);
-        let model = self
-            .model
-            .review
-            .as_ref()
-            .map_or(0, |review| review.diagnostics.len());
-        textures + model
+    /// Transient diagnostics surfaced in the status-bar popover: unresolved
+    /// texture unknowns, group conflict notes (DEF-19), RC fallback state, and
+    /// FBX material-slot diagnostics.
+    fn diagnostics(&self) -> Vec<DiagItem> {
+        let mut items = Vec::new();
+        if let Some(document) = &self.texture.document {
+            for group in &document.scan().groups {
+                for entry in &group.unknown {
+                    items.push(DiagItem {
+                        severity: "Warning",
+                        title: format!("Unknown map · {}", group.base_name),
+                        message: format!(
+                            "`{}` has no recognized suffix; assign a type in the groups table.",
+                            entry.filename
+                        ),
+                    });
+                }
+                for diagnostic in &group.diagnostics {
+                    items.push(DiagItem {
+                        severity: severity_label(diagnostic.severity),
+                        title: format!("{} · {}", diagnostic.code, group.base_name),
+                        message: diagnostic.message.clone(),
+                    });
+                }
+            }
+        }
+        if let Some(review) = &self.model.review {
+            let resolution = resolve_rc_path(&self.preferences.rc_path);
+            if resolution.path.is_none() {
+                items.push(DiagItem {
+                    severity: "Warning",
+                    title: "RC not configured".to_owned(),
+                    message: "Export CE Model will keep intermediate files only.".to_owned(),
+                });
+            } else if resolution.configured_invalid {
+                items.push(DiagItem {
+                    severity: "Warning",
+                    title: "RC Path invalid".to_owned(),
+                    message: format!(
+                        "Configured RC Path is invalid; using {}.",
+                        resolution.source
+                    ),
+                });
+            }
+            for diagnostic in &review.diagnostics {
+                items.push(DiagItem {
+                    severity: "Info",
+                    title: format!("{} material", diagnostic.material),
+                    message: diagnostic.message.clone(),
+                });
+            }
+        }
+        items
+    }
+
+    fn diagnostics_popover(&mut self, context: &egui::Context) {
+        if !self.show_diagnostics {
+            return;
+        }
+        let items = self.diagnostics();
+        let mut open = true;
+        egui::Window::new("Diagnostics")
+            .anchor(Align2::RIGHT_BOTTOM, [-8.0, -34.0])
+            .resizable(false)
+            .collapsible(false)
+            .open(&mut open)
+            .default_width(420.0)
+            .show(context, |ui| {
+                if items.is_empty() {
+                    ui.colored_label(Color32::from_rgb(70, 165, 95), "No diagnostics");
+                    return;
+                }
+                ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                    for item in &items {
+                        ui.horizontal_top(|ui| {
+                            let color = match item.severity {
+                                "Error" => Color32::from_rgb(210, 70, 65),
+                                "Warning" => Color32::from_rgb(200, 130, 40),
+                                _ => Color32::from_rgb(53, 87, 183),
+                            };
+                            ui.label(RichText::new(item.severity).small().strong().color(color));
+                            ui.vertical(|ui| {
+                                ui.strong(&item.title);
+                                ui.label(&item.message);
+                            });
+                        });
+                        ui.separator();
+                    }
+                });
+            });
+        self.show_diagnostics = open;
+    }
+
+    fn process_modal(&mut self, context: &egui::Context) {
+        if !self.process_modal_open {
+            return;
+        }
+        let mut cancel = false;
+        let mut close = false;
+        Modal::new(Id::new("process_modal")).show(context, |ui| {
+            ui.set_width(520.0);
+            if let Some(process) = &self.process {
+                ui.heading("Processing Textures…");
+                ui.label(format!(
+                    "{} of {} groups · {}",
+                    process.completed, process.total, process.current_group
+                ));
+                let progress = if process.total == 0 {
+                    0.0
+                } else {
+                    process.completed as f32 / process.total as f32
+                };
+                ui.add(ProgressBar::new(progress).show_percentage());
+                ui.add_space(6.0);
+                ScrollArea::vertical()
+                    .max_height(280.0)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        for name in &process.group_names {
+                            ui.horizontal(|ui| {
+                                if process.completed_groups.contains(name) {
+                                    ui.colored_label(Color32::from_rgb(70, 165, 95), "✓");
+                                    ui.label(name);
+                                } else {
+                                    ui.weak("•");
+                                    ui.weak(name);
+                                }
+                            });
+                        }
+                    });
+                ui.add_space(8.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    cancel = ui.button("Cancel").clicked();
+                });
+            } else if let Some(summary) = &self.process_summary {
+                ui.heading(if summary.cancelled {
+                    "Processing Cancelled"
+                } else {
+                    "Processing Complete"
+                });
+                ui.label(format!(
+                    "{} groups · {} output files · {:.2} s",
+                    summary.groups, summary.written, summary.elapsed_seconds
+                ));
+                ui.add_space(6.0);
+                ui.hyperlink_to("Open output folder", file_url(&summary.output_directory));
+                ui.add_space(8.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.button("Close").clicked();
+                });
+            } else {
+                close = true;
+            }
+        });
+        if cancel {
+            if let Some(process) = &self.process {
+                process.job.cancel.store(true, Ordering::Relaxed);
+                self.status =
+                    "Cancelling; groups already in progress will finish safely.".to_owned();
+            }
+        }
+        if close {
+            self.process_modal_open = false;
+        }
+    }
+
+    fn export_modal(&mut self, context: &egui::Context) {
+        if !self.model.export_modal_open {
+            return;
+        }
+        let running = self.model.export_receiver.is_some();
+        let mut close = false;
+        Modal::new(Id::new("export_modal")).show(context, |ui| {
+            ui.set_width(520.0);
+            if running {
+                ui.heading("Exporting CE Model…");
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label(&self.model.export_stage);
+                });
+                ui.add_space(6.0);
+                ui.weak("Convert (.mtl + request) → Resource Compiler (CGF)");
+            } else if let Some(summary) = &self.model.export_summary {
+                ui.heading("CE Model Export");
+                ui.label(summary);
+                ui.add_space(6.0);
+                if let Some(cgf) = &self.model.export_cgf {
+                    ui.label(format!("CGF: {}", cgf.display()));
+                }
+                ui.hyperlink_to(
+                    "Open output folder",
+                    file_url(Path::new(&self.preferences.model_output_directory)),
+                );
+                ui.add_space(8.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.button("Close").clicked();
+                });
+            } else {
+                close = true;
+            }
+        });
+        if close {
+            self.model.export_modal_open = false;
+        }
     }
 
     fn left_panel(&mut self, context: &egui::Context) {
@@ -986,7 +1176,7 @@ impl WorkflowApp {
                             ("2048", OutputResolution::Max(2048)),
                             ("1024", OutputResolution::Max(1024)),
                             ("512", OutputResolution::Max(512)),
-                            ("64 (validation)", OutputResolution::Max(64)),
+                            ("256", OutputResolution::Max(256)),
                         ] {
                             ui.selectable_value(&mut self.settings.output_resolution, value, label);
                         }
@@ -1170,35 +1360,13 @@ impl WorkflowApp {
         {
             self.start_texture_process();
         }
-        if let Some(process) = &mut self.process {
-            let progress = if process.total == 0 {
-                0.0
-            } else {
-                process.completed as f32 / process.total as f32
-            };
-            ui.add(ProgressBar::new(progress).show_percentage().text(format!(
-                "{} / {} · {}",
-                process.completed, process.total, process.current_group
-            )));
-            if ui.button("Cancel").clicked() {
-                process.job.cancel.store(true, Ordering::Relaxed);
-                self.status =
-                    "Cancelling; groups already in progress will finish safely.".to_owned();
-            }
+        if processing && ui.button("Show progress").clicked() {
+            self.process_modal_open = true;
         }
         if let Some(summary) = &self.process_summary {
-            ui.group(|ui| {
-                ui.strong(if summary.cancelled {
-                    "Processing Cancelled"
-                } else {
-                    "Processing Complete"
-                });
-                ui.label(format!(
-                    "{} groups / {} files / {:.2} seconds",
-                    summary.groups, summary.written, summary.elapsed_seconds
-                ));
-                ui.hyperlink_to("Open Output Directory", file_url(&summary.output_directory));
-            });
+            if !self.process_modal_open {
+                ui.hyperlink_to("Open output folder", file_url(&summary.output_directory));
+            }
         }
     }
 
@@ -1259,18 +1427,8 @@ impl WorkflowApp {
             self.save_preferences();
             self.start_model_export();
         }
-        if self.model.export_receiver.is_some() {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label("Exporting…");
-            });
-        }
-        if let Some(summary) = &self.model.export_summary {
-            ui.label(summary);
-            ui.hyperlink_to(
-                "Open Model Output Directory",
-                file_url(Path::new(&self.preferences.model_output_directory)),
-            );
+        if self.model.export_receiver.is_some() && ui.button("Show export progress").clicked() {
+            self.model.export_modal_open = true;
         }
     }
 
@@ -1386,6 +1544,38 @@ impl WorkflowApp {
                 ui.spinner();
             }
         });
+        // Map badges for the selected group (which slots are filled).
+        if self.tab == WorkflowTab::Textures {
+            if let Some(group) = self
+                .texture
+                .selected_group
+                .zip(self.texture.document.as_ref())
+                .and_then(|(index, document)| document.scan().groups.get(index))
+            {
+                ui.horizontal_wrapped(|ui| {
+                    ui.strong(&group.base_name);
+                    for source_type in ASSIGNABLE_SOURCE_TYPES {
+                        if group.slots.contains_key(source_type) {
+                            ui.label(
+                                RichText::new(source_type)
+                                    .small()
+                                    .color(Color32::WHITE)
+                                    .background_color(Color32::from_rgb(70, 110, 190)),
+                            );
+                        }
+                    }
+                    if !group.unknown.is_empty() {
+                        ui.label(
+                            RichText::new(format!("{} unknown", group.unknown.len()))
+                                .small()
+                                .strong()
+                                .color(Color32::WHITE)
+                                .background_color(Color32::from_rgb(200, 130, 40)),
+                        );
+                    }
+                });
+            }
+        }
         ui.add_space(4.0);
         let available = egui::vec2(
             ui.available_width(),
@@ -1434,177 +1624,197 @@ impl WorkflowApp {
         };
         let groups = document.scan().groups.clone();
         let query = self.texture.group_search.trim().to_lowercase();
+        let unknown_groups = groups.iter().filter(|g| !g.unknown.is_empty()).count();
         ui.horizontal(|ui| {
             ui.heading("Detected Texture Groups");
-            ui.weak(format!("({})", groups.len()));
-            ui.separator();
-            ui.add(
-                TextEdit::singleline(&mut self.texture.group_search)
-                    .desired_width(180.0)
-                    .hint_text("Search groups"),
-            );
-            ui.checkbox(&mut self.texture.review_only, "Review only");
+            ui.weak(format!("({} groups)", groups.len()));
+            if unknown_groups > 0 {
+                ui.colored_label(
+                    Color32::from_rgb(200, 130, 40),
+                    format!("· {unknown_groups} to assign"),
+                );
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.checkbox(&mut self.texture.review_only, "Unknown only");
+                ui.add(
+                    TextEdit::singleline(&mut self.texture.group_search)
+                        .desired_width(160.0)
+                        .hint_text("Search groups"),
+                );
+            });
         });
         ui.add_space(4.0);
 
+        let cells_w = GROUP_CELL_W * GROUP_COLUMNS.len() as f32;
+        let name_w = (ui.available_width() - cells_w - GROUP_UNKNOWN_W - 32.0).max(120.0);
+        let row_w = name_w + cells_w + GROUP_UNKNOWN_W;
+
+        // Fixed header aligned with the scrollable rows below.
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 4.0;
+            fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                ui.strong("Group");
+            });
+            for (_, label) in GROUP_COLUMNS {
+                fixed_cell(ui, GROUP_CELL_W, GROUP_ROW_H, egui::Align::Center, |ui| {
+                    ui.label(RichText::new(label).small().weak());
+                });
+            }
+            fixed_cell(ui, GROUP_UNKNOWN_W, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                ui.strong("Unknown");
+            });
+        });
+        ui.separator();
+
+        let visible = groups
+            .iter()
+            .enumerate()
+            .filter(|(_, group)| !(self.texture.review_only && group.unknown.is_empty()))
+            .filter(|(_, group)| {
+                query.is_empty() || group.base_name.to_lowercase().contains(&query)
+            })
+            .map(|(index, _)| index)
+            .collect::<Vec<_>>();
+
         let mut preview_request = None;
-        let mut assign_requested = false;
-        ui.columns(2, |columns| {
-            columns[0].vertical(|ui| {
-                Grid::new("group_list_headers")
-                    .num_columns(3)
-                    .show(ui, |ui| {
-                        ui.strong("Base Name");
-                        ui.strong("Detected");
-                        ui.strong("Unknown");
-                        ui.end_row();
-                    });
-                ui.separator();
-                ScrollArea::vertical()
-                    .id_salt("group_list")
-                    .max_height((ui.available_height() - 8.0).max(160.0))
-                    .show(ui, |ui| {
-                        Grid::new("group_list_rows")
-                            .num_columns(3)
-                            .striped(true)
-                            .spacing([8.0, 4.0])
-                            .show(ui, |ui| {
-                                for (index, group) in groups.iter().enumerate() {
-                                    if self.texture.review_only && group.unknown.is_empty() {
-                                        continue;
-                                    }
-                                    if !query.is_empty()
-                                        && !group.base_name.to_lowercase().contains(&query)
-                                    {
-                                        continue;
-                                    }
-                                    if ui
-                                        .selectable_label(
-                                            self.texture.selected_group == Some(index),
-                                            &group.base_name,
-                                        )
-                                        .clicked()
-                                    {
+        let mut assign = None;
+        ScrollArea::vertical()
+            .id_salt("group_table")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for &index in &visible {
+                    let group = &groups[index];
+                    let selected = self.texture.selected_group == Some(index);
+                    let has_unknown = !group.unknown.is_empty();
+                    let fill = match (selected, has_unknown) {
+                        (true, true) => Color32::from_rgba_unmultiplied(225, 155, 45, 70),
+                        (false, true) => Color32::from_rgba_unmultiplied(220, 150, 40, 38),
+                        (true, false) => Color32::from_rgba_unmultiplied(90, 140, 230, 55),
+                        (false, false) => Color32::TRANSPARENT,
+                    };
+                    egui::Frame::new()
+                        .fill(fill)
+                        .inner_margin(egui::Margin::symmetric(4, 1))
+                        .show(ui, |ui| {
+                            ui.set_width(row_w);
+                            ui.horizontal(|ui| {
+                                ui.spacing_mut().item_spacing.x = 4.0;
+                                fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
+                                    let label =
+                                        egui::Label::new(RichText::new(&group.base_name).strong())
+                                            .truncate()
+                                            .sense(Sense::click());
+                                    if ui.add(label).on_hover_text(&group.base_name).clicked() {
                                         self.texture.selected_group = Some(index);
-                                        self.texture.selected_unknown =
-                                            (!group.unknown.is_empty()).then_some(0);
-                                        self.texture.assignment_type =
-                                            ASSIGNABLE_SOURCE_TYPES[0].to_owned();
                                         preview_request = first_group_entry(group).map(|entry| {
                                             (PathBuf::from(&entry.path), entry.source_type.clone())
                                         });
                                     }
-                                    ui.label(group.slots.len().to_string());
-                                    let unknown = group.unknown.len();
-                                    ui.label(if unknown == 0 {
-                                        RichText::new("—").weak()
-                                    } else {
-                                        RichText::new(unknown.to_string())
-                                            .strong()
-                                            .color(Color32::from_rgb(220, 160, 55))
-                                    });
-                                    ui.end_row();
-                                }
-                            });
-                    });
-            });
-
-            columns[1].vertical(|ui| {
-                let group = self
-                    .texture
-                    .selected_group
-                    .and_then(|index| groups.get(index));
-                let Some(group) = group else {
-                    ui.weak("Select a group to inspect its contents.");
-                    return;
-                };
-                ui.strong(format!("Group Details · {}", group.base_name));
-                ui.label(format!("Texture types: {}", detected_type_summary(group)));
-                ScrollArea::vertical()
-                    .id_salt("group_detail")
-                    .max_height(105.0)
-                    .show(ui, |ui| {
-                        for source_type in ASSIGNABLE_SOURCE_TYPES {
-                            if let Some(entry) = group.slots.get(source_type) {
-                                if ui
-                                    .selectable_label(
-                                        false,
-                                        format!("{source_type}: {}", entry.filename),
-                                    )
-                                    .on_hover_text(&entry.path)
-                                    .clicked()
-                                {
-                                    preview_request =
-                                        Some((PathBuf::from(&entry.path), source_type.to_owned()));
-                                }
-                            }
-                        }
-                });
-                ui.separator();
-                ui.strong("Unknown Textures");
-                for (index, entry) in group.unknown.iter().enumerate() {
-                    if ui
-                        .selectable_label(
-                            self.texture.selected_unknown == Some(index),
-                            &entry.filename,
-                        )
-                        .on_hover_text(&entry.path)
-                        .clicked()
-                    {
-                        self.texture.selected_unknown = Some(index);
-                        preview_request = Some((PathBuf::from(&entry.path), "unknown".to_owned()));
-                    }
-                }
-                if !group.unknown.is_empty() {
-                    let occupant = group
-                        .slots
-                        .get(self.texture.assignment_type.as_str())
-                        .map(|entry| entry.filename.as_str());
-                    ui.horizontal(|ui| {
-                        ui.label("Assign Type");
-                        ComboBox::from_id_salt("unknown_assignment")
-                            .selected_text(&self.texture.assignment_type)
-                            .show_ui(ui, |ui| {
-                                for source_type in ASSIGNABLE_SOURCE_TYPES {
-                                    ui.selectable_value(
-                                        &mut self.texture.assignment_type,
-                                        source_type.to_owned(),
-                                        source_type,
+                                });
+                                for (source_type, _) in GROUP_COLUMNS {
+                                    fixed_cell(
+                                        ui,
+                                        GROUP_CELL_W,
+                                        GROUP_ROW_H,
+                                        egui::Align::Center,
+                                        |ui| {
+                                            let entry = group.slots.get(source_type);
+                                            let sense = if entry.is_some() {
+                                                Sense::click()
+                                            } else {
+                                                Sense::hover()
+                                            };
+                                            let (rect, response) =
+                                                ui.allocate_exact_size([13.0, 13.0].into(), sense);
+                                            let color = if entry.is_some() {
+                                                Color32::from_rgb(80, 170, 100)
+                                            } else {
+                                                Color32::from_rgba_unmultiplied(130, 130, 135, 70)
+                                            };
+                                            ui.painter().rect_filled(rect, 3.0, color);
+                                            if let Some(entry) = entry {
+                                                if response.on_hover_text(source_type).clicked() {
+                                                    self.texture.selected_group = Some(index);
+                                                    preview_request = Some((
+                                                        PathBuf::from(&entry.path),
+                                                        source_type.to_owned(),
+                                                    ));
+                                                }
+                                            }
+                                        },
                                     );
                                 }
+                                fixed_cell(
+                                    ui,
+                                    GROUP_UNKNOWN_W,
+                                    GROUP_ROW_H,
+                                    egui::Align::LEFT,
+                                    |ui| {
+                                        if !has_unknown {
+                                            ui.weak("—");
+                                            return;
+                                        }
+                                        let mut pick = String::new();
+                                        ComboBox::from_id_salt(("assign", index))
+                                            .width(GROUP_UNKNOWN_W - 12.0)
+                                            .selected_text(
+                                                RichText::new(format!(
+                                                    "Assign ({})…",
+                                                    group.unknown.len()
+                                                ))
+                                                .color(Color32::from_rgb(200, 130, 40)),
+                                            )
+                                            .show_ui(ui, |ui| {
+                                                for source_type in ASSIGNABLE_SOURCE_TYPES {
+                                                    let occupied =
+                                                        group.slots.contains_key(source_type);
+                                                    ui.add_enabled_ui(!occupied, |ui| {
+                                                        ui.selectable_value(
+                                                            &mut pick,
+                                                            source_type.to_owned(),
+                                                            source_type,
+                                                        )
+                                                        .on_disabled_hover_text(
+                                                            "DEF-19: type already filled",
+                                                        );
+                                                    });
+                                                }
+                                            });
+                                        if !pick.is_empty() {
+                                            assign = Some((index, pick));
+                                        }
+                                    },
+                                );
                             });
-                        if ui
-                            .add_enabled(
-                                self.texture.selected_unknown.is_some() && occupant.is_none(),
-                                egui::Button::new("Apply"),
-                            )
-                            .clicked()
-                        {
-                            assign_requested = true;
-                        }
-                    });
-                    if let Some(filename) = occupant {
-                        ui.label(
-                            RichText::new(format!(
-                                "DEF-19: {filename} already occupies that type. Choose an empty slot."
-                            ))
-                            .color(Color32::from_rgb(210, 80, 70)),
-                        );
-                    }
-                } else {
-                    ui.label(
-                        RichText::new("This group is fully classified.")
-                            .color(Color32::from_rgb(70, 165, 95)),
-                    );
+                        });
                 }
             });
-        });
         if let Some((path, source_type)) = preview_request {
             self.request_preview(path, source_type);
         }
-        if assign_requested {
-            self.assign_unknown();
+        if let Some((index, source_type)) = assign {
+            self.assign_group_unknown(index, &source_type);
         }
+    }
+
+    /// Inline assignment from the groups table: assign the group's first
+    /// unknown to `source_type`, updating the transient diagnostics count.
+    fn assign_group_unknown(&mut self, group_index: usize, source_type: &str) {
+        let Some(document) = &mut self.texture.document else {
+            return;
+        };
+        let base_name = document
+            .scan()
+            .groups
+            .get(group_index)
+            .map_or_else(String::new, |group| group.base_name.clone());
+        self.status = match document.assign_unknown(group_index, 0, source_type) {
+            Ok(()) => {
+                self.texture.selected_group = Some(group_index);
+                format!("Assigned `{source_type}` in `{base_name}`.")
+            }
+            Err(error) => error,
+        };
     }
 
     fn model_workspace(&mut self, ui: &mut egui::Ui) {
@@ -1789,6 +1999,9 @@ impl eframe::App for WorkflowApp {
         self.left_panel(context);
         self.right_panel(context);
         self.central_panel(context);
+        self.diagnostics_popover(context);
+        self.process_modal(context);
+        self.export_modal(context);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -1814,6 +2027,22 @@ fn path_row(ui: &mut egui::Ui, salt: &str, value: &mut String, hint: &str) -> (b
         });
     });
     (changed, browse)
+}
+
+/// A fixed-width, vertically centred table cell so the groups-table header and
+/// rows line up column-for-column regardless of content.
+fn fixed_cell(
+    ui: &mut egui::Ui,
+    width: f32,
+    height: f32,
+    main_align: egui::Align,
+    add: impl FnOnce(&mut egui::Ui),
+) {
+    let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align);
+    ui.allocate_ui_with_layout(egui::vec2(width, height), layout, |ui| {
+        ui.set_min_height(height);
+        add(ui);
+    });
 }
 
 fn split_paths(text: &str) -> Vec<PathBuf> {
@@ -1847,16 +2076,10 @@ fn first_group_entry(group: &ScanGroup) -> Option<&ScanEntry> {
         .or_else(|| group.unknown.first())
 }
 
-fn detected_type_summary(group: &ScanGroup) -> String {
-    let values = ASSIGNABLE_SOURCE_TYPES
-        .iter()
-        .filter(|source_type| group.slots.contains_key(**source_type))
-        .copied()
-        .collect::<Vec<_>>();
-    if values.is_empty() {
-        "—".to_owned()
-    } else {
-        values.join(", ")
+fn severity_label(severity: Severity) -> &'static str {
+    match severity {
+        Severity::Warning => "Warning",
+        Severity::Error => "Error",
     }
 }
 

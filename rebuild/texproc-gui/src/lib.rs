@@ -212,6 +212,17 @@ mod tests {
     }
 
     #[test]
+    fn assigning_every_unknown_clears_the_diagnostics_count() {
+        let mut document = ReviewDocument::from_scan(PathBuf::from("groups.json"), scan()).unwrap();
+        assert_eq!(document.unresolved_unknown_count(), 2);
+
+        document.assign_unknown(0, 0, "glossiness").unwrap();
+        assert_eq!(document.unresolved_unknown_count(), 1);
+        document.assign_unknown(0, 0, "roughness").unwrap();
+        assert_eq!(document.unresolved_unknown_count(), 0);
+    }
+
+    #[test]
     fn occupied_target_reports_def19_without_mutating_the_group() {
         let mut document = ReviewDocument::from_scan(PathBuf::from("groups.json"), scan()).unwrap();
         let error = document.assign_unknown(0, 0, "normal").unwrap_err();
