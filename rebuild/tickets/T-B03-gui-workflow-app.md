@@ -371,3 +371,22 @@ texproc/converter crate 與凍結 CLI 契約。
 - 模態／popover 未另附截圖（需驅動執行中程序），以 build/test 佐證。
 - 截圖取視窗原生 1440 邏輯尺寸；右欄設定面板最右數 px 因顯示 DPI 有輕微裁切，
   內容仍全可辨識。
+
+## R3（2026-07-26 業主裁決，R2 目視回饋）
+
+1. **分組區三欄式**：Detected Texture Groups 從單欄長列改為三欄 grid，
+   解決檔名長短不齊的凌亂感；每格 = 一組（組名、型別格、unknown 指派），
+   選取/琥珀態語意不變。
+2. **FBX 貼圖自動全拉入**（原版行為，R2 做成了隱藏按鈕）：Load FBX 成功
+   即自動把 referenced（存在於磁碟者）+ embedded（解出到快取目錄）貼圖
+   全部送入貼圖分組，狀態列回報「N textures imported from FBX（M embedded）」；
+   原按鈕可留作重送。這是「模型連貼圖完整導出」工作流的核心，不是選配。
+3. **可選 RC 轉 DDS**（原版 `Generate CryEngine DDS` 核取框，被漏掉）：
+   Output Settings 加 checkbox「Generate CryEngine DDS (via RC)」，勾選時
+   Process Textures 在 TIFF 完成後逐張餵 RC（沿用 T-013 smoke 的呼叫形狀與
+   RC Path 解析）；進度模態顯示 DDS 階段；RC 不可用時 checkbox 停用附提示。
+
+DoD：三項各有實測證據（截圖/狀態列文字）；car.fbx 載入後貼圖組自動出現
+（含 embedded 案例——car 無 embedded，另用小型含嵌入貼圖之 FBX 或以
+referenced 案例 + 單元測試覆蓋 embedded 路徑）；DDS 勾選實跑產出 .dds；
+gate 全綠不退步。
