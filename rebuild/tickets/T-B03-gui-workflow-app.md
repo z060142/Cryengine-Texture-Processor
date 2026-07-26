@@ -201,3 +201,50 @@ GUI/CLI 逐位元 hash 證明（同值 manifest 基準）；CLI 凍結契約與�
 - **R2-S3 demo3 互動細節 + Model tab 收尾 + QA**：分組表列選取→預覽、
   unknown 內嵌下拉、進度模態+取消、狀態列診斷 popover；材質表
   physicalize、Export CE Model 動線復驗；英文文案總審；gate + 截圖交業主。
+
+## R2-S1 實作紀錄（2026-07-26）
+
+### 實作
+
+- `file_dialog.rs` 擴充（沿用零新依賴的 Win32 FFI 路線，`cfg(windows)`
+  實作 + 非 Windows stub）：
+  - `parse_multi_select(&[u16])`：純函式，解析 `GetOpenFileNameW` 的
+    double-null 緩衝；單選=整條路徑，多選=首段目錄 + 後續檔名 join。
+    抽成純函式以便無 UI 單元測試。
+  - `choose_files_multi(title, filter)`：`OFN_ALLOWMULTISELECT|OFN_EXPLORER`
+    多選影像檔，經 `parse_multi_select` 還原完整路徑清單。
+  - `choose_folder(title, initial)`：資料夾選擇。採 `SHBrowseForFolderW`
+    （`BIF_NEWDIALOGSTYLE` 新式對話框）+ `SHGetPathFromIDListW` +
+    `CoTaskMemFree`；票面已核可為 COM FFI 過重時的合法替代。initial 因
+    無 callback 不支援（已 ponytail 註記）。
+  - `choose_file_open` / `choose_file_save`：泛用單檔開啟／儲存，共用一支
+    `run_dialog(mode)` 內部函式（`GetOpenFileNameW` / `GetSaveFileNameW`）。
+  - `choose_rc_executable` 重構為 `choose_file_open` 的薄包裝，簽章不變。
+- `main.rs` 八個路徑入口全數接上原生對話框：
+  - Texture Import：`Add Files…` → 多選影像對話框（png/jpg/jpeg/tif/tiff/
+    exr 過濾）直接進匯入清單；`Add Folder…` → 資料夾對話框；保留手 key
+    的 `Add Path`（同 typing+add 路徑）與 TextEdit 手動覆寫。
+  - FBX（model_path）：`Browse…`（*.fbx），填欄並持久化。
+  - 貼圖／模型輸出目錄 ×2：各配資料夾 `Browse…`。
+  - manifest / overrides：各配 `Browse…`（*.json）。
+  - settings：`Browse…`（*.json，選檔即載入）+ 動作列新增 `Save As…`
+    （另存新路徑，走儲存對話框，預設檔名取自現有路徑）。
+  - RC Path 既有 `Browse…` 沿用（現改走重構後的共用 helper）。
+  - 抽出 `path_row()` helper（TextEdit + Browse，`push_id` 隔離 id）減少
+    重複；對話框結果回填欄位並觸發與手動輸入相同的 prefs 持久化；使用者
+    取消為靜默 no-op，API 錯誤進既有狀態列。
+- 無新依賴；未動佈局（S2 負責）；未動 texproc/converter/ce-schema；CLI
+  凍結契約未動。
+
+### 驗證
+
+- `cargo build -p texproc-gui --release --locked`：PASS。
+- `cargo test -p texproc-gui --release --locked`：PASS；4 model + 7 main
+  （含新增 4 個 multiselect double-null parser 測試：單選／多選 join／
+  空緩衝／double-null 後殘尾忽略）。
+- `cargo clippy -p texproc-gui --all-targets --release --locked -- -D warnings`：
+  PASS。
+- `cargo fmt --all -- --check`：PASS。
+- `Start-Process target\release\texproc-gui.exe`：正常開啟、持續執行（未
+  提早崩潰），手動終止；確認無殘留 texproc-gui.exe / texproc.exe。對話框
+  互動由業主逐項目視驗收（headless 無法點擊）。

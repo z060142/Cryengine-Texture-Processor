@@ -20,7 +20,9 @@ use eframe::egui::{
     self, Color32, ComboBox, Grid, ProgressBar, RichText, ScrollArea, Stroke, TextEdit,
     TextureHandle, ViewportBuilder,
 };
-use file_dialog::choose_rc_executable;
+use file_dialog::{
+    choose_file_open, choose_file_save, choose_files_multi, choose_folder, choose_rc_executable,
+};
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
     load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, OutputResolution,
@@ -35,6 +37,9 @@ use worker::{
 const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
 const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
+const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr\0All files (*.*)\0*.*\0";
+const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
+const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
 
 fn main() -> eframe::Result {
     let initial_path = std::env::args_os().nth(1).map(PathBuf::from);
@@ -629,6 +634,18 @@ impl WorkflowApp {
         }
     }
 
+    /// Unwrap a single-selection dialog result, surfacing API errors in the
+    /// status area. User cancel (`Ok(None)`) is a silent no-op.
+    fn dialog_result(&mut self, result: Result<Option<PathBuf>, String>) -> Option<PathBuf> {
+        match result {
+            Ok(value) => value,
+            Err(error) => {
+                self.status = error;
+                None
+            }
+        }
+    }
+
     fn save_settings(&mut self) {
         let path = PathBuf::from(self.preferences.settings_path.trim());
         match save_texture_settings(&path, &self.settings) {
@@ -713,16 +730,27 @@ impl WorkflowApp {
                 .hint_text("Texture file or folder path"),
         );
         ui.horizontal_wrapped(|ui| {
-            if ui.button("Add Files").clicked() {
+            if ui.button("Add Files…").clicked() {
+                match choose_files_multi("Select Texture Files", IMAGE_FILTER) {
+                    Ok(files) if !files.is_empty() => self.add_texture_roots(files),
+                    Ok(_) => {}
+                    Err(error) => self.status = error,
+                }
+            }
+            if ui.button("Add Folder…").clicked() {
+                let initial = self.preferences.import_path.clone();
+                if let Some(folder) =
+                    self.dialog_result(choose_folder("Select Texture Folder", &initial))
+                {
+                    self.add_texture_roots(vec![folder]);
+                }
+            }
+            if ui.button("Add Path").clicked() {
                 let paths = split_paths(&self.preferences.import_path)
                     .into_iter()
-                    .filter(|path| path.is_file())
+                    .filter(|path| path.exists())
                     .collect::<Vec<_>>();
                 self.add_texture_roots(paths);
-            }
-            if ui.button("Add Folder").clicked() {
-                let path = PathBuf::from(self.preferences.import_path.trim());
-                self.add_texture_roots((path.is_dir()).then_some(path).into_iter().collect());
             }
             if ui.button("Clear All").clicked() {
                 self.clear_textures();
@@ -770,7 +798,21 @@ impl WorkflowApp {
         ui.heading("Model Import");
         ui.label("FBX conversion is an independent optional workflow.");
         ui.add_space(6.0);
-        ui.add(TextEdit::singleline(&mut self.preferences.model_path).hint_text("FBX file path"));
+        let (_, browse) = path_row(
+            ui,
+            "model_path",
+            &mut self.preferences.model_path,
+            "FBX file path",
+        );
+        if browse {
+            let initial = self.preferences.model_path.clone();
+            if let Some(path) =
+                self.dialog_result(choose_file_open("Select FBX File", FBX_FILTER, &initial))
+            {
+                self.preferences.model_path = path.to_string_lossy().into_owned();
+                self.save_preferences();
+            }
+        }
         if ui
             .add_enabled(self.model.receiver.is_none(), egui::Button::new("Load FBX"))
             .clicked()
@@ -837,24 +879,42 @@ impl WorkflowApp {
 
     fn output_directory_fields(&mut self, ui: &mut egui::Ui) {
         ui.strong("Texture Output Directory");
-        if ui
-            .add(
-                TextEdit::singleline(&mut self.preferences.texture_output_directory)
-                    .hint_text(r"C:\output\textures"),
-            )
-            .changed()
-        {
+        let (mut changed, browse) = path_row(
+            ui,
+            "texture_output",
+            &mut self.preferences.texture_output_directory,
+            r"C:\output\textures",
+        );
+        if browse {
+            let initial = self.preferences.texture_output_directory.clone();
+            if let Some(folder) =
+                self.dialog_result(choose_folder("Select Texture Output Directory", &initial))
+            {
+                self.preferences.texture_output_directory = folder.to_string_lossy().into_owned();
+                changed = true;
+            }
+        }
+        if changed {
             self.save_preferences();
         }
         ui.add_space(5.0);
         ui.strong("Model Output Directory");
-        if ui
-            .add(
-                TextEdit::singleline(&mut self.preferences.model_output_directory)
-                    .hint_text(r"C:\output\model"),
-            )
-            .changed()
-        {
+        let (mut changed, browse) = path_row(
+            ui,
+            "model_output",
+            &mut self.preferences.model_output_directory,
+            r"C:\output\model",
+        );
+        if browse {
+            let initial = self.preferences.model_output_directory.clone();
+            if let Some(folder) =
+                self.dialog_result(choose_folder("Select Model Output Directory", &initial))
+            {
+                self.preferences.model_output_directory = folder.to_string_lossy().into_owned();
+                changed = true;
+            }
+        }
+        if changed {
             self.save_preferences();
         }
     }
@@ -1001,16 +1061,44 @@ impl WorkflowApp {
 
     fn settings_file_panel(&mut self, ui: &mut egui::Ui) {
         ui.strong("Settings File (CLI --settings compatible)");
-        ui.add(
-            TextEdit::singleline(&mut self.preferences.settings_path)
-                .hint_text("texproc-settings.json"),
+        let (_, browse) = path_row(
+            ui,
+            "settings_path",
+            &mut self.preferences.settings_path,
+            "texproc-settings.json",
         );
+        if browse {
+            let initial = self.preferences.settings_path.clone();
+            if let Some(path) = self.dialog_result(choose_file_open(
+                "Select Settings File",
+                JSON_FILTER,
+                &initial,
+            )) {
+                self.preferences.settings_path = path.to_string_lossy().into_owned();
+                self.load_settings();
+            }
+        }
         ui.horizontal(|ui| {
             if ui.button("Load Settings").clicked() {
                 self.load_settings();
             }
             if ui.button("Save Settings").clicked() {
                 self.save_settings();
+            }
+            if ui.button("Save As…").clicked() {
+                let default_name = Path::new(self.preferences.settings_path.trim())
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("texproc-settings.json")
+                    .to_owned();
+                if let Some(path) = self.dialog_result(choose_file_save(
+                    "Save Settings As",
+                    JSON_FILTER,
+                    &default_name,
+                )) {
+                    self.preferences.settings_path = path.to_string_lossy().into_owned();
+                    self.save_settings();
+                }
             }
         });
     }
@@ -1073,15 +1161,45 @@ impl WorkflowApp {
     fn model_actions(&mut self, ui: &mut egui::Ui) {
         ui.strong("CE Model Export");
         ui.label("Optional Manifest");
-        ui.add(
-            TextEdit::singleline(&mut self.preferences.manifest_path)
-                .hint_text("material_manifest.json (optional)"),
+        let (mut changed, browse) = path_row(
+            ui,
+            "manifest_path",
+            &mut self.preferences.manifest_path,
+            "material_manifest.json (optional)",
         );
+        if browse {
+            let initial = self.preferences.manifest_path.clone();
+            if let Some(path) = self.dialog_result(choose_file_open(
+                "Select Material Manifest",
+                JSON_FILTER,
+                &initial,
+            )) {
+                self.preferences.manifest_path = path.to_string_lossy().into_owned();
+                changed = true;
+            }
+        }
         ui.label("Optional Overrides");
-        ui.add(
-            TextEdit::singleline(&mut self.preferences.overrides_path)
-                .hint_text("overrides.json (optional)"),
+        let (overrides_changed, overrides_browse) = path_row(
+            ui,
+            "overrides_path",
+            &mut self.preferences.overrides_path,
+            "overrides.json (optional)",
         );
+        changed |= overrides_changed;
+        if overrides_browse {
+            let initial = self.preferences.overrides_path.clone();
+            if let Some(path) = self.dialog_result(choose_file_open(
+                "Select Overrides File",
+                JSON_FILTER,
+                &initial,
+            )) {
+                self.preferences.overrides_path = path.to_string_lossy().into_owned();
+                changed = true;
+            }
+        }
+        if changed {
+            self.save_preferences();
+        }
         self.rc_path_field(ui);
         if ui
             .add_enabled(
@@ -1627,6 +1745,26 @@ impl eframe::App for WorkflowApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         let _ = self.preferences.save();
     }
+}
+
+/// A single-line path field with a trailing `Browse…` button.
+/// Returns `(text_changed, browse_clicked)`.
+fn path_row(ui: &mut egui::Ui, salt: &str, value: &mut String, hint: &str) -> (bool, bool) {
+    let mut changed = false;
+    let mut browse = false;
+    ui.push_id(salt, |ui| {
+        ui.horizontal(|ui| {
+            changed = ui
+                .add(
+                    TextEdit::singleline(value)
+                        .desired_width((ui.available_width() - 74.0).max(120.0))
+                        .hint_text(hint),
+                )
+                .changed();
+            browse = ui.button("Browse…").clicked();
+        });
+    });
+    (changed, browse)
 }
 
 fn split_paths(text: &str) -> Vec<PathBuf> {
