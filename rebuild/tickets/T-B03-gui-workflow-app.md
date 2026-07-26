@@ -98,9 +98,12 @@
 2. **「Export CE Model」單一動作**：對使用者而言 Model tab 的主動作是
    「導出 CE 模型」，不是「輸出 .mtl+request 中間產物」。按鈕改名
    `Export CE Model`，行為 = convert（.mtl + request）→ RC.exe → CGF
-   一氣呵成（RC 路徑：`CE_RC_EXE` → 預設 S: 路徑 → 皆無時降級為只出
-   .mtl+request 並明示「RC 不可用，已輸出中間產物」）。本程式不輸出 FBX
-   檔——來源 FBX 原樣即是 RC 輸入。
+   一氣呵成。**RC 位置由 UI 選擇**（2026-07-26 業主追加）：設定區加
+   「RC Path」欄位 + Browse 鈕，與輸出目錄同樣記憶；解析優先序 =
+   UI 設定路徑 → `CE_RC_EXE` → 預設 S: 路徑；皆無效時 Export 降級為只出
+   .mtl+request 並明示「RC not configured — intermediate files exported」，
+   RC Path 欄位同時標紅提示。本程式不輸出 FBX 檔——來源 FBX 原樣即是
+   RC 輸入。
 3. **UI 全英文**：所有文案改英文（推翻原票 zh-TW 決定）。
 
 DoD 追加：
@@ -108,4 +111,5 @@ DoD 追加：
   （證明走的是同一政策通道）。
 - Export CE Model 在有 RC 環境對 car.fbx 產出 CGF，材質對齊 16/16
   （複用 rc_smoke_rust 的驗法）；無 RC 環境降級路徑有明確 UI 提示。
+- RC Path 欄位：Browse 選檔、跨重啟記憶、無效路徑紅框提示三者實測。
 - 其餘首版 DoD（hash 一致、KB3D 劇本）在修訂後重驗不退步。
