@@ -186,3 +186,18 @@ GUI/CLI 逐位元 hash 證明（同值 manifest 基準）；CLI 凍結契約與�
 清除即復原，非程式問題。
 
 尚待：業主目視簽核後改為 DONE。
+
+## R2（2026-07-26 業主指示）：demo3 工作台視覺/互動重做，分步執行
+
+基準：`rebuild/ux-demos/demo3-workbench.html`（業主選定方案）+ R1 全部裁決。
+執行模式：Miss Fox（Opus subagent）分三步，每步審查通過才進下一步。
+
+- **R2-S1 原生檔案/目錄選擇器全覆蓋**（治「目錄手 key」）：
+  擴充 file_dialog.rs——多選影像檔、資料夾選擇、單檔開啟（FBX/manifest/
+  overrides/settings）；八個路徑入口全部配 Browse 或直接用對話框
+  （Add Files / Add Folder 直接彈窗）。無新依賴（沿用 Win32 FFI 路線）。
+- **R2-S2 demo3 三欄佈局重構**：左欄 tabs+檔案清單、中欄預覽+分組表、
+  右欄設定（常用五項+Advanced 摺疊）+四動作鈕、底部狀態列。
+- **R2-S3 demo3 互動細節 + Model tab 收尾 + QA**：分組表列選取→預覽、
+  unknown 內嵌下拉、進度模態+取消、狀態列診斷 popover；材質表
+  physicalize、Export CE Model 動線復驗；英文文案總審；gate + 截圖交業主。
