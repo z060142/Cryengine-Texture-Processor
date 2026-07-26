@@ -537,3 +537,22 @@ ScrollArea 外的 `ui.horizontal`，資料列各自包在 `Frame.inner_margin(4,
   完整顯示、長名截字帶「…」，**所有型別燈仍精準對齊各自表頭欄**，AtlasA 選取
   列藍底滿版整列——證明長名不再推移欄位。截圖後終止 texproc-gui/texproc 程序，
   確認無殘留；臨時對抗資料夾已刪。
+
+## R4（2026-07-26 業主裁決）
+
+1. **資料夾選擇器換現代型**：棄用 SHBrowseForFolderW（老樹狀窗，圖 343），
+   改 `IFileOpenDialog` + `FOS_PICKFOLDERS`（檔案總管式，圖 344 同款）。
+   COM FFI 無新依賴；檔案開啟對話框已是現代型不用動。
+2. **.mtl 隨附 .mtl.cryasset**：規則移植 `output_formats/mtl_exporter.py:404`
+   `export_mtl_cryasset`——路徑 = mtl 路徑 + `.cryasset`；XML
+   `AssetMetadata version="0" type="Material" guid=<uuid4>`；`Files/File`
+   = mtl 檔名；`Details`：subMaterialCount（排除 ignored set）、
+   textureCount；`Dependencies`：三張 `%ENGINE%` white 貼圖 + 專案 `.dds`
+   相對路徑（`./` 前綴、排序）。實作放 converter lib（CLI 與 GUI 同惠）。
+   - uuid：不加依賴，std 熵源自產 v4 形狀即可。
+   - gamesdk 實例含 `timestamp` 屬性（epoch 秒），加上（Python 漏的，
+     以引擎實例為準）。
+   - **CLI 契約註記**：convert 成功輸出自此多一個 `<stem>.mtl.cryasset`，
+     本節即為契約變更的開票紀錄；旗標/退出碼不變。
+   - 驗收：與 Python 版對同輸入的 cryasset 正規化 XML 比對，白名單僅
+     guid 與 timestamp。
