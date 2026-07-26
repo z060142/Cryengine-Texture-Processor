@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct ConvertOutputs {
     pub request: PathBuf,
     pub mtl: PathBuf,
+    pub cryasset: PathBuf,
     pub material_diagnostics: Vec<MaterialTextureDiagnostic>,
 }
 
@@ -63,6 +64,7 @@ pub fn convert_file_with_physicalize(
         .map_err(|error| format!("failed to create {}: {error}", out_dir.display()))?;
     let request_path = out_dir.join(format!("{base_name}.json"));
     let mtl_path = out_dir.join(format!("{base_name}.mtl"));
+    let cryasset_path = out_dir.join(format!("{base_name}.mtl.cryasset"));
     let texture_dir = texture_dir.unwrap_or(out_dir);
     write_request(&request, &request_path)?;
     let material_diagnostics = write_mtl(
@@ -76,6 +78,7 @@ pub fn convert_file_with_physicalize(
     Ok(ConvertOutputs {
         request: request_path,
         mtl: mtl_path,
+        cryasset: cryasset_path,
         material_diagnostics,
     })
 }

@@ -173,6 +173,8 @@ pub fn write_mtl(
         .collect();
     let mtl_dir = out.parent().unwrap_or_else(|| Path::new(""));
     let mut diagnostics = Vec::new();
+    // (material name, texture files) captured for the sibling .mtl.cryasset.
+    let mut cryasset_materials: Vec<(String, Vec<String>)> = Vec::new();
 
     let mut writer = Writer::new(Vec::new());
     write_start(
@@ -230,6 +232,13 @@ pub fn write_mtl(
             ),
         };
         diagnostics.push(diagnostic);
+        cryasset_materials.push((
+            material.name.clone(),
+            textures
+                .iter()
+                .map(|texture| texture.file.clone())
+                .collect(),
+        ));
         let fallback_policy = fallback_shader_policy(&textures);
         let override_state = overrides.and_then(|payload| payload.state(&material.name));
         let mut attrs = default_material_attrs();
@@ -296,6 +305,7 @@ pub fn write_mtl(
     let xml = String::from_utf8(writer.into_inner())
         .map_err(|error| format!("MTL writer produced invalid UTF-8: {error}"))?;
     fs::write(out, xml).map_err(|error| format!("failed to write {}: {error}", out.display()))?;
+    crate::cryasset::write_cryasset(out, &cryasset_materials)?;
 
     for preserved in &preserved_materials {
         if !matched_preserved_names.contains(preserved.name.as_str()) {

@@ -1,4 +1,5 @@
 pub mod convert;
+pub mod cryasset;
 pub mod diagnostic;
 pub mod dump;
 pub mod index_assigner;

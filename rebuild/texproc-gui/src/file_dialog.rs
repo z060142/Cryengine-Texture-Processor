@@ -72,18 +72,6 @@ mod win {
         extended_flags: u32,
     }
 
-    #[repr(C)]
-    struct BrowseInfoW {
-        owner: *mut c_void,
-        root: *const c_void,
-        display_name: *mut u16,
-        title: *const u16,
-        flags: u32,
-        callback: *mut c_void,
-        lparam: isize,
-        image: i32,
-    }
-
     #[link(name = "Comdlg32")]
     extern "system" {
         fn GetOpenFileNameW(open_file_name: *mut OpenFileNameW) -> i32;
@@ -91,15 +79,27 @@ mod win {
         fn CommDlgExtendedError() -> u32;
     }
 
-    #[link(name = "Shell32")]
-    extern "system" {
-        fn SHBrowseForFolderW(browse_info: *mut BrowseInfoW) -> *mut c_void;
-        fn SHGetPathFromIDListW(id_list: *const c_void, path: *mut u16) -> i32;
+    // COM plumbing for the modern IFileOpenDialog folder picker.
+    #[repr(C)]
+    struct Guid {
+        data1: u32,
+        data2: u16,
+        data3: u16,
+        data4: [u8; 8],
     }
 
     #[link(name = "Ole32")]
     extern "system" {
         fn CoTaskMemFree(pointer: *mut c_void);
+        fn CoInitializeEx(reserved: *mut c_void, co_init: u32) -> i32;
+        fn CoUninitialize();
+        fn CoCreateInstance(
+            clsid: *const Guid,
+            outer: *mut c_void,
+            context: u32,
+            iid: *const Guid,
+            object: *mut *mut c_void,
+        ) -> i32;
     }
 
     const OFN_OVERWRITEPROMPT: u32 = 0x0000_0002;
@@ -109,11 +109,78 @@ mod win {
     const OFN_ALLOWMULTISELECT: u32 = 0x0000_0200;
     const OFN_EXPLORER: u32 = 0x0008_0000;
 
-    const BIF_RETURNONLYFSDIRS: u32 = 0x0000_0001;
-    const BIF_EDITBOX: u32 = 0x0000_0010;
-    const BIF_NEWDIALOGSTYLE: u32 = 0x0000_0040;
+    const COINIT_APARTMENTTHREADED: u32 = 0x2;
+    const CLSCTX_INPROC_SERVER: u32 = 0x1;
+    const FOS_PICKFOLDERS: u32 = 0x20;
+    const FOS_FORCEFILESYSTEM: u32 = 0x40;
+    const SIGDN_FILESYSPATH: u32 = 0x8005_8000;
 
-    const MAX_PATH: usize = 260;
+    // HRESULTs we branch on (as signed i32; negative == failure).
+    const S_OK: i32 = 0;
+    const S_FALSE: i32 = 1;
+    const RPC_E_CHANGED_MODE: i32 = 0x8001_0106_u32 as i32;
+    const HRESULT_CANCELLED: i32 = 0x8007_04C7_u32 as i32; // HRESULT_FROM_WIN32(ERROR_CANCELLED)
+
+    // CLSID_FileOpenDialog {DC1C5A9C-E88A-4dde-A5A1-60F82A20AEF7}
+    const CLSID_FILE_OPEN_DIALOG: Guid = Guid {
+        data1: 0xDC1C_5A9C,
+        data2: 0xE88A,
+        data3: 0x4DDE,
+        data4: [0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7],
+    };
+    // IID_IFileOpenDialog {D57C7288-D4AD-4768-BE02-9D969532D960}
+    const IID_IFILE_OPEN_DIALOG: Guid = Guid {
+        data1: 0xD57C_7288,
+        data2: 0xD4AD,
+        data3: 0x4768,
+        data4: [0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60],
+    };
+
+    /// Vtable slots up to `GetResult`; slots we never call are opaque pointers.
+    /// Layout order is IUnknown -> IModalWindow -> IFileDialog and must not move.
+    #[repr(C)]
+    struct IFileOpenDialogVtbl {
+        query_interface: *const c_void,
+        add_ref: *const c_void,
+        release: unsafe extern "system" fn(*mut c_void) -> u32,
+        show: unsafe extern "system" fn(*mut c_void, *mut c_void) -> i32,
+        set_file_types: *const c_void,
+        set_file_type_index: *const c_void,
+        get_file_type_index: *const c_void,
+        advise: *const c_void,
+        unadvise: *const c_void,
+        set_options: unsafe extern "system" fn(*mut c_void, u32) -> i32,
+        get_options: unsafe extern "system" fn(*mut c_void, *mut u32) -> i32,
+        set_default_folder: *const c_void,
+        set_folder: *const c_void,
+        get_folder: *const c_void,
+        get_current_selection: *const c_void,
+        set_file_name: *const c_void,
+        get_file_name: *const c_void,
+        set_title: unsafe extern "system" fn(*mut c_void, *const u16) -> i32,
+        set_ok_button_label: *const c_void,
+        set_file_name_label: *const c_void,
+        get_result: unsafe extern "system" fn(*mut c_void, *mut *mut c_void) -> i32,
+    }
+
+    /// IShellItem vtable up to `GetDisplayName`.
+    #[repr(C)]
+    struct IShellItemVtbl {
+        query_interface: *const c_void,
+        add_ref: *const c_void,
+        release: unsafe extern "system" fn(*mut c_void) -> u32,
+        bind_to_handler: *const c_void,
+        get_parent: *const c_void,
+        get_display_name: unsafe extern "system" fn(*mut c_void, u32, *mut *mut u16) -> i32,
+    }
+
+    unsafe fn dialog_vtbl<'a>(this: *mut c_void) -> &'a IFileOpenDialogVtbl {
+        &**(this as *const *const IFileOpenDialogVtbl)
+    }
+
+    unsafe fn shell_item_vtbl<'a>(this: *mut c_void) -> &'a IShellItemVtbl {
+        &**(this as *const *const IShellItemVtbl)
+    }
 
     #[derive(Clone, Copy)]
     pub(super) enum Mode {
@@ -236,42 +303,95 @@ mod win {
         }
     }
 
+    /// Modern Explorer-style folder picker (IFileOpenDialog + FOS_PICKFOLDERS).
     pub(super) fn browse_folder(title: &str) -> Result<Option<PathBuf>, String> {
         let title_wide = wide(title);
-        let mut display = vec![0_u16; MAX_PATH];
-        let mut info = BrowseInfoW {
-            owner: ptr::null_mut(),
-            root: ptr::null(),
-            display_name: display.as_mut_ptr(),
-            title: title_wide.as_ptr(),
-            flags: BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE | BIF_EDITBOX,
-            callback: ptr::null_mut(),
-            lparam: 0,
-            image: 0,
+
+        // SAFETY: CoInitializeEx is called per invocation on this thread; a
+        // balanced CoUninitialize runs only when this call actually initialised
+        // COM (S_OK/S_FALSE). RPC_E_CHANGED_MODE means COM is already usable in
+        // another apartment model, so we proceed without owning the reference.
+        let hr_init = unsafe { CoInitializeEx(ptr::null_mut(), COINIT_APARTMENTTHREADED) };
+        let owns_com = match hr_init {
+            S_OK | S_FALSE => true,
+            RPC_E_CHANGED_MODE => false,
+            _ => return Err(format!("CoInitializeEx failed: 0x{hr_init:08X}")),
         };
 
-        // SAFETY: `info` matches BROWSEINFOW and the display buffer lives for
-        // the call. COM is already initialised on the UI thread by winit's
-        // OleInitialize (drag-and-drop is active), which the new-style dialog
-        // requires.
-        let id_list = unsafe { SHBrowseForFolderW(&mut info) };
-        if id_list.is_null() {
-            return Ok(None); // cancelled
+        // SAFETY: all COM calls below use the well-known FileOpenDialog vtable
+        // layout; every interface pointer is released before returning.
+        let result = unsafe { browse_folder_com(&title_wide) };
+
+        if owns_com {
+            // SAFETY: balances the successful CoInitializeEx above.
+            unsafe { CoUninitialize() };
         }
-        let mut path = vec![0_u16; MAX_PATH];
-        // SAFETY: `id_list` is a valid absolute PIDL from the shell; the buffer
-        // holds MAX_PATH wide chars.
-        let resolved = unsafe { SHGetPathFromIDListW(id_list, path.as_mut_ptr()) };
-        // SAFETY: the PIDL was allocated by the shell and is freed exactly once.
-        unsafe { CoTaskMemFree(id_list) };
-        if resolved == 0 {
-            return Err("The selected item is not a file-system folder.".to_owned());
+        result
+    }
+
+    unsafe fn browse_folder_com(title_wide: &[u16]) -> Result<Option<PathBuf>, String> {
+        let mut dialog: *mut c_void = ptr::null_mut();
+        let hr = CoCreateInstance(
+            &CLSID_FILE_OPEN_DIALOG,
+            ptr::null_mut(),
+            CLSCTX_INPROC_SERVER,
+            &IID_IFILE_OPEN_DIALOG,
+            &mut dialog,
+        );
+        if hr < 0 || dialog.is_null() {
+            return Err(format!(
+                "CoCreateInstance(FileOpenDialog) failed: 0x{hr:08X}"
+            ));
         }
-        let length = path
-            .iter()
-            .position(|value| *value == 0)
-            .unwrap_or(path.len());
-        Ok(Some(PathBuf::from(OsString::from_wide(&path[..length]))))
+        let vtbl = dialog_vtbl(dialog);
+
+        let mut options: u32 = 0;
+        (vtbl.get_options)(dialog, &mut options);
+        let hr = (vtbl.set_options)(dialog, options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+        if hr < 0 {
+            (vtbl.release)(dialog);
+            return Err(format!("IFileDialog::SetOptions failed: 0x{hr:08X}"));
+        }
+        (vtbl.set_title)(dialog, title_wide.as_ptr());
+
+        let hr = (vtbl.show)(dialog, ptr::null_mut());
+        if hr < 0 {
+            (vtbl.release)(dialog);
+            return if hr == HRESULT_CANCELLED {
+                Ok(None)
+            } else {
+                Err(format!("IFileDialog::Show failed: 0x{hr:08X}"))
+            };
+        }
+
+        let mut item: *mut c_void = ptr::null_mut();
+        let hr = (vtbl.get_result)(dialog, &mut item);
+        if hr < 0 || item.is_null() {
+            (vtbl.release)(dialog);
+            return Err(format!("IFileDialog::GetResult failed: 0x{hr:08X}"));
+        }
+
+        let item_vtbl = shell_item_vtbl(item);
+        let mut wide_path: *mut u16 = ptr::null_mut();
+        let hr = (item_vtbl.get_display_name)(item, SIGDN_FILESYSPATH, &mut wide_path);
+        let path = if hr >= 0 && !wide_path.is_null() {
+            let length = (0..)
+                .take_while(|&index| *wide_path.add(index) != 0)
+                .count();
+            let slice = std::slice::from_raw_parts(wide_path, length);
+            let resolved = PathBuf::from(OsString::from_wide(slice));
+            CoTaskMemFree(wide_path as *mut c_void);
+            Some(resolved)
+        } else {
+            None
+        };
+        (item_vtbl.release)(item);
+        (vtbl.release)(dialog);
+
+        match path {
+            Some(resolved) => Ok(Some(resolved)),
+            None => Err("The selected item has no file-system path.".to_owned()),
+        }
     }
 }
 
@@ -285,8 +405,8 @@ pub fn choose_files_multi(title: &str, filter: &str) -> Result<Vec<PathBuf>, Str
 
 #[cfg(windows)]
 pub fn choose_folder(title: &str, _initial: &str) -> Result<Option<PathBuf>, String> {
-    // ponytail: SHBrowseForFolderW has no simple initial-dir argument without a
-    // callback; the extra plumbing is not worth it for a folder picker.
+    // ponytail: the modern picker remembers its own last location, so wiring an
+    // initial folder (SetFolder needs a built IShellItem) buys nothing here.
     win::browse_folder(title)
 }
 

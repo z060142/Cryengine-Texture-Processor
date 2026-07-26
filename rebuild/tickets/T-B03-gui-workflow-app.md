@@ -556,3 +556,78 @@ ScrollArea 外的 `ui.horizontal`，資料列各自包在 `Frame.inner_margin(4,
      本節即為契約變更的開票紀錄；旗標/退出碼不變。
    - 驗收：與 Python 版對同輸入的 cryasset 正規化 XML 比對，白名單僅
      guid 與 timestamp。
+
+## R4 實作紀錄（2026-07-26，Miss Fox）
+
+動 `texproc-gui/src/file_dialog.rs`（Item 1）與 `converter`（Item 2：新增
+`cryasset.rs`、`mtl.rs`/`convert.rs`/`lib.rs` 接線）；無新依賴；凍結 CLI
+旗標/退出碼不變（R4 本即契約變更票，convert 成功多出一個 sibling
+`<stem>.mtl.cryasset`）。
+
+### Item 1：現代資料夾選擇器（IFileOpenDialog + FOS_PICKFOLDERS）
+
+- 以手搓 COM FFI（沿用既有 vtable struct 風格，無 windows crate）取代
+  `SHBrowseForFolderW`：`CoCreateInstance(CLSID_FileOpenDialog,
+  IID_IFileOpenDialog)` → `GetOptions|SetOptions(FOS_PICKFOLDERS |
+  FOS_FORCEFILESYSTEM)` → `SetTitle` → `Show` → `GetResult` →
+  `IShellItem::GetDisplayName(SIGDN_FILESYSPATH)`，得到檔案總管式對話框。
+- `CoInitializeEx(COINIT_APARTMENTTHREADED)` per-call：`S_OK`/`S_FALSE` 皆視為
+  成功並在函式尾平衡 `CoUninitialize`；`RPC_E_CHANGED_MODE`（COM 已於他式
+  初始化，仍可用）則不擁有引用、不 uninit；其餘失敗 HRESULT 回 Err。
+- vtable 只宣告到 `GetResult`（IShellItem 到 `GetDisplayName`），用不到的槽位
+  以 `*const c_void` 佔位保持 ABI 順序；`Show` 取消回傳 `HRESULT_CANCELLED`
+  → `Ok(None)` 靜默取消。每個介面指標在返回前皆 `Release`；PWSTR 以
+  `CoTaskMemFree` 釋放。
+- `choose_folder` public 簽章不變（main.rs 呼叫端零改動）；泛用檔案開啟／儲存
+  對話框（`GetOpenFileNameW`/`GetSaveFileNameW`）維持原樣，已是現代型。移除
+  now-dead 的 `SHBrowseForFolderW`/`SHGetPathFromIDListW`/`BrowseInfoW`/BIF_*
+  /MAX_PATH 與 Shell32 link。
+
+### Item 2：.mtl 隨附 .mtl.cryasset（converter lib 層）
+
+- 新 `converter::cryasset`：`build_cryasset_xml`（純函式、可測）+
+  `write_cryasset`。輸出路徑 = `<mtl>.cryasset`，在 `write_mtl` 成功寫出 .mtl
+  後立即寫（CLI convert 與 GUI 皆走 `write_mtl`，一處接線兩邊同惠）。
+- XML shape 對齊 Python `export_mtl_cryasset` + 引擎實例：
+  `<AssetMetadata version="0" type="Material" guid=<uuid4形> timestamp=<epoch秒>>`；
+  `Files/File path=<mtl 檔名>`；`Details` 的 subMaterialCount（排除 ignored set
+  `{"Material","Dots Stroke"}`）、textureCount（唯一貼圖路徑數，含非 dds）；
+  `Dependencies` 先三張 `%ENGINE%/EngineAssets/Textures/white{,_ddna,_displ}.dds`
+  （usageCount="1"），再接排序去重的專案 `.dds`（`./` 前綴——路徑本即 mtl 相對
+  形，已 `./`/`../`/`%` 者不重複加）。單空格縮排、無 XML 宣告列。
+- guid：無 uuid/rand 依賴，兩個 `RandomState` 種子 + wall-clock nanos 混雜出
+  128 bit，設 version(4)/variant 半位元組，格式
+  `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`（非密碼學用途，僅資產唯一 id）。
+  timestamp：`SystemTime` epoch 秒（Python 漏、引擎實例有，以引擎為準）。
+- `ConvertOutputs` 加 `cryasset` 欄（additive）：CLI convert stdout JSON 現含
+  mtl/request/cryasset 三路徑；旗標與退出碼不變。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui -p converter --all-targets --release --locked
+  -- -D warnings`：PASS。
+- `cargo test -p converter --release --locked`：45 lib（含新增 5 個 cryasset
+  單元測試：counts/去重、engine-first + 排序 + 僅 dds、header/root shape、
+  `./` 前綴條件、guid uuid4 形 256 抽樣）+ 7 CLI PASS。
+- `cargo test -p texproc-gui --release --locked`：5 model + 9 main（1 ignored）
+  PASS，無退步。
+- **Python 基準正規化比對**（白名單僅 guid、timestamp）：以 car.fbx 實跑
+  `converter convert`（texture-dir seed 自 `car-generated-reference.mtl` 的
+  Texture File）得 Rust `kb3d_...native.mtl.cryasset`（17 submaterials、65
+  textures、engine-first、`../tex/*.dds` 排序）；再把同一份生成 mtl 的
+  submaterial 餵回 Python `export_mtl_cryasset`，`tools/compare_xml_golden.py`
+  正規化樹比對 `OK=True`、0 mismatch、220 值相等、僅 guid/timestamp 命中白名單。
+- `run_gates.ps1`（完整含 RC）：ALL GATES PASSED；T-005 MTL golden／schema
+  gate／preserve 17/17 未受影響（cryasset 為 sibling 檔），converter RC 16/16、
+  texproc RC/DDS 8/8、ddna 2/2 核心零退步。
+- release GUI 啟動 6s 存活不崩、截止手動終止；資料夾對話框本身（合成點擊
+  無效之限制）留待業主目視簽核。收尾確認無殘留 texproc-gui/texproc/rc/
+  converter 程序。
+
+### 偏離
+
+- 資料夾對話框無法在此環境 robo-click 驗收（既有限制）；以程式碼層 + 啟動不崩
+  佐證，視覺由業主確認。
+- `choose_folder` 的 `initial` 參數仍不接（現代對話框自記上次位置，SetFolder
+  需另建 IShellItem，不划算）——已 ponytail 註記，行為與 R2-S1 相同。
