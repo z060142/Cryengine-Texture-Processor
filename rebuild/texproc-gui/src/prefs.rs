@@ -16,6 +16,9 @@ pub struct AppPreferences {
     pub overrides_path: String,
     pub rc_path: String,
     pub generate_dds: bool,
+    pub delete_request_json: bool,
+    pub delete_tif_after_dds: bool,
+    pub export_associated_textures: bool,
 }
 
 impl Default for AppPreferences {
@@ -30,6 +33,9 @@ impl Default for AppPreferences {
             overrides_path: String::new(),
             rc_path: String::new(),
             generate_dds: false,
+            delete_request_json: false,
+            delete_tif_after_dds: false,
+            export_associated_textures: false,
         }
     }
 }
@@ -53,10 +59,10 @@ impl AppPreferences {
         preferences.manifest_path = string(&value, "manifest_path");
         preferences.overrides_path = string(&value, "overrides_path");
         preferences.rc_path = string(&value, "rc_path");
-        preferences.generate_dds = value
-            .get("generate_dds")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
+        preferences.generate_dds = bool_field(&value, "generate_dds");
+        preferences.delete_request_json = bool_field(&value, "delete_request_json");
+        preferences.delete_tif_after_dds = bool_field(&value, "delete_tif_after_dds");
+        preferences.export_associated_textures = bool_field(&value, "export_associated_textures");
         preferences
     }
 
@@ -76,6 +82,9 @@ impl AppPreferences {
             "overrides_path": self.overrides_path,
             "rc_path": self.rc_path,
             "generate_dds": self.generate_dds,
+            "delete_request_json": self.delete_request_json,
+            "delete_tif_after_dds": self.delete_tif_after_dds,
+            "export_associated_textures": self.export_associated_textures,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");
@@ -113,6 +122,10 @@ fn string(value: &Value, key: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned()
+}
+
+fn bool_field(value: &Value, key: &str) -> bool {
+    value.get(key).and_then(Value::as_bool).unwrap_or(false)
 }
 
 fn non_empty_or(value: String, fallback: String) -> String {

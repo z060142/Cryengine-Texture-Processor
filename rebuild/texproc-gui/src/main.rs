@@ -26,7 +26,7 @@ use file_dialog::{
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
     load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, OutputResolution,
-    ScanEntry, ScanGroup, Severity, TextureSettings,
+    ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
 };
 use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
 use worker::{
@@ -87,13 +87,22 @@ struct TextureState {
     files: Vec<PathBuf>,
     document: Option<ReviewDocument>,
     scan_receiver: Option<Receiver<ScanEvent>>,
-    selected_file: Option<usize>,
+    /// Multi-selection into `files` (click / Ctrl+click / Shift+click).
+    selected_files: BTreeSet<usize>,
+    /// Anchor for Shift-range selection.
+    selection_anchor: Option<usize>,
     selected_group: Option<usize>,
     group_search: String,
     review_only: bool,
     /// Set when a scan was triggered by auto-ingesting an FBX's textures, so the
     /// scan-complete status can honestly report the FBX import.
     pending_fbx_import: Option<(usize, usize)>,
+    /// Overrides the scan-complete status line for one scan (Remove Selected /
+    /// Add Related), so their message survives the regroup that follows.
+    pending_import_status: Option<String>,
+    /// Lowercased absolute paths of textures ingested from the loaded FBX — the
+    /// origin set that "Export associated textures with model" processes.
+    fbx_ingested: BTreeSet<String>,
     /// Group keys that had unknowns at scan time — lets the Unassigned column
     /// show "✓ Assigned" (all resolved) versus "—" (never had unknowns).
     ever_unknown: BTreeSet<String>,
@@ -244,6 +253,8 @@ impl WorkflowApp {
             return;
         }
         self.preferences.model_path = path.to_string_lossy().into_owned();
+        // A new FBX defines a new associated-texture origin set.
+        self.texture.fbx_ingested.clear();
         self.model.receiver = Some(worker::start_model_load(path));
         self.model.review = None;
         self.model.selected_material = None;
@@ -312,7 +323,13 @@ impl WorkflowApp {
             .then(|| resolve_rc_path(&self.preferences.rc_path).path)
             .flatten();
         self.process = Some(ProcessState {
-            job: worker::start_process(scan, self.settings, output, rc_exe),
+            job: worker::start_process(
+                scan,
+                self.settings,
+                output,
+                rc_exe,
+                self.preferences.delete_tif_after_dds,
+            ),
             completed: 0,
             total,
             current_group: "Preparing".to_owned(),
@@ -345,23 +362,201 @@ impl WorkflowApp {
         }
         let manifest = optional_path(&self.preferences.manifest_path);
         let overrides = optional_path(&self.preferences.overrides_path);
-        let texture_dir = optional_path(&self.preferences.texture_output_directory);
         let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
         self.model.rc_missing_warning = rc_resolution.path.is_none();
+
+        // Item 4: when enabled, process the FBX-ingested texture groups into the
+        // texture output directory and point MTL resolution at those outputs.
+        let review_path = review.path.clone();
+        let (associated, texture_dir) = if self.preferences.export_associated_textures {
+            match self.build_associated_textures() {
+                Ok(Some(associated)) => {
+                    let dir = Some(associated.output_dir.clone());
+                    (Some(associated), dir)
+                }
+                Ok(None) => {
+                    self.status = "No FBX-ingested texture groups to export; exporting model only."
+                        .to_owned();
+                    (
+                        None,
+                        optional_path(&self.preferences.texture_output_directory),
+                    )
+                }
+                Err(error) => {
+                    self.status = error;
+                    return;
+                }
+            }
+        } else {
+            (
+                None,
+                optional_path(&self.preferences.texture_output_directory),
+            )
+        };
+
         self.model.export_receiver = Some(worker::start_model_export(
-            review.path.clone(),
+            review_path,
             manifest,
             overrides,
             texture_dir,
             output,
             self.model.physicalize_overrides.clone(),
             rc_resolution.path,
+            associated,
         ));
         self.model.export_summary = None;
         self.model.export_cgf = None;
         self.model.export_modal_open = true;
         self.model.export_stage = "Preparing export…".to_owned();
         self.status = "Exporting CryEngine intermediates and CE model…".to_owned();
+    }
+
+    /// Build the associated-texture set for item 4: the current groups that
+    /// contain at least one FBX-ingested file (and have processable slots).
+    /// `Ok(None)` means there is nothing FBX-ingested to process.
+    fn build_associated_textures(&self) -> Result<Option<worker::AssociatedTextures>, String> {
+        let Some(document) = &self.texture.document else {
+            return Ok(None);
+        };
+        if self.texture.fbx_ingested.is_empty() {
+            return Ok(None);
+        }
+        let groups = document
+            .scan()
+            .groups
+            .iter()
+            .filter(|group| {
+                !group.slots.is_empty()
+                    && group_contains_ingested(group, &self.texture.fbx_ingested)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        if groups.is_empty() {
+            return Ok(None);
+        }
+        let output_dir = PathBuf::from(self.preferences.texture_output_directory.trim());
+        if output_dir.as_os_str().is_empty() {
+            return Err(
+                "Set a texture output directory before exporting associated textures.".to_owned(),
+            );
+        }
+        fs::create_dir_all(&output_dir)
+            .map_err(|error| format!("Could not create texture output directory: {error}"))?;
+        Ok(Some(worker::AssociatedTextures {
+            scan: ScanResult {
+                version: 1,
+                groups,
+                diagnostics: Vec::new(),
+            },
+            settings: self.settings,
+            output_dir,
+            generate_dds: self.preferences.generate_dds,
+            delete_tif: self.preferences.delete_tif_after_dds,
+        }))
+    }
+
+    /// Apply a click on an imported-texture row to the multi-selection:
+    /// plain = select only, Ctrl = toggle, Shift = range from the anchor.
+    fn apply_selection_click(&mut self, index: usize, ctrl: bool, shift: bool) {
+        if shift {
+            if let Some(anchor) = self.texture.selection_anchor {
+                let (low, high) = (anchor.min(index), anchor.max(index));
+                self.texture.selected_files = (low..=high).collect();
+                return;
+            }
+        } else if ctrl {
+            if !self.texture.selected_files.remove(&index) {
+                self.texture.selected_files.insert(index);
+            }
+            self.texture.selection_anchor = Some(index);
+            return;
+        }
+        self.texture.selected_files = BTreeSet::from([index]);
+        self.texture.selection_anchor = Some(index);
+    }
+
+    /// Multi-select: remove the selected imported textures and regroup. Roots are
+    /// flattened to the surviving file paths so folder inputs cannot re-add the
+    /// removed files on the next scan.
+    fn remove_selected_textures(&mut self) {
+        if self.texture.selected_files.is_empty() {
+            return;
+        }
+        let removed = self.texture.selected_files.len();
+        let remaining = self
+            .texture
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| !self.texture.selected_files.contains(index))
+            .map(|(_, path)| path.clone())
+            .collect::<Vec<_>>();
+        if remaining.is_empty() {
+            self.clear_textures();
+            self.status = format!("Removed {removed} textures. Import set is empty.");
+            return;
+        }
+        self.texture.roots = remaining;
+        self.texture.selected_files.clear();
+        self.texture.selection_anchor = None;
+        self.texture.pending_import_status = Some(format!("Removed {removed} textures."));
+        self.texture.scan_receiver = Some(worker::start_scan(self.texture.roots.clone()));
+        self.status = "Regrouping…".to_owned();
+    }
+
+    /// Add Related: for the selected texture(s), pull in sibling textures of the
+    /// same group from disk. Each unique directory is read exactly once and
+    /// candidates are matched by filename only — no image decode at candidate
+    /// stage (owner's performance red line).
+    fn add_related_textures(&mut self) {
+        let selected = self
+            .texture
+            .selected_files
+            .iter()
+            .filter_map(|&index| self.texture.files.get(index).cloned())
+            .collect::<Vec<_>>();
+        if selected.is_empty() {
+            self.status = "Select one or more textures first.".to_owned();
+            return;
+        }
+        let suffixes = match SuffixTable::embedded() {
+            Ok(value) => value,
+            Err(error) => {
+                self.status = error.to_string();
+                return;
+            }
+        };
+        let wanted = texproc_gui::related_wanted_bases(&selected, &suffixes);
+        let already = self
+            .texture
+            .files
+            .iter()
+            .map(|path| path.to_string_lossy().to_lowercase())
+            .collect::<BTreeSet<_>>();
+        let mut to_add = Vec::new();
+        let mut dirs_scanned = 0;
+        for (directory, bases) in &wanted {
+            let Ok(entries) = fs::read_dir(directory) else {
+                continue;
+            };
+            dirs_scanned += 1;
+            let filenames = entries
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+                .collect::<Vec<_>>();
+            to_add.extend(texproc_gui::related_matches_in_dir(
+                directory, &filenames, bases, &already, &suffixes,
+            ));
+        }
+        let added = to_add.len();
+        if added == 0 {
+            self.status = format!("No related textures found ({dirs_scanned} dirs scanned).");
+            return;
+        }
+        self.texture.pending_import_status = Some(format!(
+            "Added {added} related textures ({dirs_scanned} dirs scanned)."
+        ));
+        self.add_texture_roots(to_add);
     }
 
     /// Pull referenced + embedded textures out of the loaded FBX and feed them
@@ -381,6 +576,14 @@ impl WorkflowApp {
             Ok(ingest) => {
                 let tab = self.tab;
                 self.texture.pending_fbx_import = Some((ingest.paths.len(), ingest.embedded));
+                // Record ingestion origin so "Export associated textures with
+                // model" can pick out exactly these groups later.
+                self.texture.fbx_ingested.extend(
+                    ingest
+                        .paths
+                        .iter()
+                        .map(|path| path.to_string_lossy().to_lowercase()),
+                );
                 self.add_texture_roots(ingest.paths);
                 self.tab = tab;
             }
@@ -431,6 +634,9 @@ impl WorkflowApp {
                     .map(|group| group.unknown.len())
                     .sum::<usize>();
                 self.texture.files = input_files;
+                // File indices changed; drop any stale multi-selection.
+                self.texture.selected_files.clear();
+                self.texture.selection_anchor = None;
                 self.texture.ever_unknown = scan
                     .groups
                     .iter()
@@ -455,14 +661,17 @@ impl WorkflowApp {
                         },
                         Some,
                     );
-                self.status = match self.texture.pending_fbx_import.take() {
-                    Some((count, embedded)) => format!(
+                self.status = if let Some(message) = self.texture.pending_import_status.take() {
+                    message
+                } else if let Some((count, embedded)) = self.texture.pending_fbx_import.take() {
+                    format!(
                         "{count} textures imported from FBX ({embedded} embedded): {groups} groups, {unknown} unknown."
-                    ),
-                    None => format!(
+                    )
+                } else {
+                    format!(
                         "Imported {} textures: {groups} groups, {unknown} unknown.",
                         self.texture.files.len()
-                    ),
+                    )
                 };
                 if let Some((path, source_type)) = preview_request {
                     self.request_preview(path, source_type);
@@ -659,10 +868,37 @@ impl WorkflowApp {
                         )
                     }
                 };
+                // Item 3a: delete the request JSON only on full success (RC
+                // produced a CGF); .mtl and .mtl.cryasset are kept.
+                let mut request_line = format!("Request: {}", report.outputs.request.display());
+                if self.preferences.delete_request_json
+                    && matches!(report.rc, RcExportOutcome::Succeeded { .. })
+                {
+                    match fs::remove_file(&report.outputs.request) {
+                        Ok(()) => request_line = "Request: deleted after export".to_owned(),
+                        Err(error) => {
+                            request_line = format!(
+                                "Request: {} (delete failed: {error})",
+                                report.outputs.request.display()
+                            );
+                        }
+                    }
+                }
+                let textures_line = match &report.textures {
+                    Some(textures) => {
+                        let dds = textures.dds.as_ref().map_or_else(String::new, |dds| {
+                            format!(" · DDS {}/{}", dds.succeeded, dds.total)
+                        });
+                        format!(
+                            "\nAssociated textures: {} groups, {} files{dds}",
+                            textures.groups, textures.written
+                        )
+                    }
+                    None => String::new(),
+                };
                 let summary = format!(
-                    "MTL: {}\nRequest: {}\n{rc_summary}\n{} diagnostic(s)",
+                    "MTL: {}\n{request_line}\n{rc_summary}{textures_line}\n{} diagnostic(s)",
                     report.outputs.mtl.display(),
-                    report.outputs.request.display(),
                     report.outputs.material_diagnostics.len()
                 );
                 self.model.export_summary = Some(summary);
@@ -989,7 +1225,11 @@ impl WorkflowApp {
                     ui.label(&self.model.export_stage);
                 });
                 ui.add_space(6.0);
-                ui.weak("Convert (.mtl + request) → Resource Compiler (CGF)");
+                if self.preferences.export_associated_textures {
+                    ui.weak("Textures → Convert (.mtl + request) → Resource Compiler (CGF) → DDS");
+                } else {
+                    ui.weak("Convert (.mtl + request) → Resource Compiler (CGF)");
+                }
             } else if let Some(summary) = &self.model.export_summary {
                 ui.heading("CE Model Export");
                 ui.label(summary);
@@ -1067,6 +1307,20 @@ impl WorkflowApp {
             if ui.button("Clear All").clicked() {
                 self.clear_textures();
             }
+            let has_selection = !self.texture.selected_files.is_empty();
+            if ui
+                .add_enabled(has_selection, egui::Button::new("Remove Selected"))
+                .clicked()
+            {
+                self.remove_selected_textures();
+            }
+            if ui
+                .add_enabled(has_selection, egui::Button::new("Add Related"))
+                .on_hover_text("Pull in sibling textures of the selected group(s) from disk")
+                .clicked()
+            {
+                self.add_related_textures();
+            }
         });
         if self.texture.scan_receiver.is_some() {
             ui.horizontal(|ui| {
@@ -1077,9 +1331,15 @@ impl WorkflowApp {
         ui.add_space(8.0);
         ui.group(|ui| {
             ui.set_width(ui.available_width());
-            ui.strong(format!("Imported Textures ({})", self.texture.files.len()));
+            ui.strong(format!(
+                "Imported Textures ({}) · {} selected",
+                self.texture.files.len(),
+                self.texture.selected_files.len()
+            ));
+            ui.weak("Click, Ctrl+click, Shift+click to multi-select.");
             ui.separator();
-            let mut preview_request = None;
+            let modifiers = ui.input(|input| input.modifiers);
+            let mut clicked = None;
             ScrollArea::vertical()
                 .id_salt("imported_texture_list")
                 .max_height(ui.available_height() - 80.0)
@@ -1090,16 +1350,16 @@ impl WorkflowApp {
                             .and_then(|name| name.to_str())
                             .unwrap_or_default();
                         if ui
-                            .selectable_label(self.texture.selected_file == Some(index), label)
+                            .selectable_label(self.texture.selected_files.contains(&index), label)
                             .on_hover_text(path.display().to_string())
                             .clicked()
                         {
-                            self.texture.selected_file = Some(index);
-                            preview_request = Some(path.clone());
+                            clicked = Some((index, path.clone()));
                         }
                     }
                 });
-            if let Some(path) = preview_request {
+            if let Some((index, path)) = clicked {
+                self.apply_selection_click(index, modifiers.ctrl, modifiers.shift);
                 let source_type = source_type_for_path(self.texture.document.as_ref(), &path);
                 self.request_preview(path, source_type);
             }
@@ -1326,6 +1586,16 @@ impl WorkflowApp {
             .response
             .on_hover_text("RC not configured");
         }
+        if ui
+            .checkbox(
+                &mut self.preferences.delete_tif_after_dds,
+                "Delete TIF after DDS export",
+            )
+            .on_hover_text("After each successful DDS, delete the source TIF (kept on failure)")
+            .changed()
+        {
+            self.save_preferences();
+        }
     }
 
     fn advanced_settings(&mut self, ui: &mut egui::Ui) {
@@ -1522,6 +1792,29 @@ impl WorkflowApp {
             }
         }
         if changed {
+            self.save_preferences();
+        }
+        if ui
+            .checkbox(
+                &mut self.preferences.export_associated_textures,
+                "Export associated textures with model",
+            )
+            .on_hover_text(
+                "Process the FBX-ingested texture groups into the Texture Output Directory and \
+                 resolve the MTL against them before RC",
+            )
+            .changed()
+        {
+            self.save_preferences();
+        }
+        if ui
+            .checkbox(
+                &mut self.preferences.delete_request_json,
+                "Delete request JSON after model export",
+            )
+            .on_hover_text("On full success (RC produced a CGF); keeps .mtl and .mtl.cryasset")
+            .changed()
+        {
             self.save_preferences();
         }
         self.rc_path_field(ui);
@@ -2212,6 +2505,16 @@ fn source_type_for_path(document: Option<&ReviewDocument>, path: &Path) -> Strin
         .flat_map(|group| group.slots.values().chain(group.unknown.iter()))
         .find(|entry| entry.path.eq_ignore_ascii_case(&key))
         .map_or_else(|| "unknown".to_owned(), |entry| entry.source_type.clone())
+}
+
+/// True when any of the group's textures (slots or unknown) is in the
+/// FBX-ingested origin set (`ingested` holds lowercased absolute paths).
+fn group_contains_ingested(group: &ScanGroup, ingested: &BTreeSet<String>) -> bool {
+    group
+        .slots
+        .values()
+        .chain(group.unknown.iter())
+        .any(|entry| ingested.contains(&entry.path.to_lowercase()))
 }
 
 fn first_group_entry(group: &ScanGroup) -> Option<&ScanEntry> {

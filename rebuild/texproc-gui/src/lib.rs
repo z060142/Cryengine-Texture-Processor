@@ -1,9 +1,80 @@
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fs,
     path::{Path, PathBuf},
 };
 
-use texproc::{ScanEntry, ScanResult, Severity};
+use texproc::{parse_base_name, ScanEntry, ScanResult, Severity, SuffixTable};
+
+/// Image extensions the scanner accepts — mirrors texproc's supported set. Used
+/// to skip non-image files in a directory listing without touching the file.
+const RELATED_IMAGE_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "tif", "tiff", "exr"];
+
+/// Reduce a texture selection to the unique `(directory, lowercase base-name)`
+/// pairs whose siblings we want to pull in. Base names come from texproc's
+/// filename-only parser — **no image is opened**. This is the "one listing per
+/// directory" guarantee for Add Related: each returned directory is scanned once.
+pub fn related_wanted_bases(
+    selected: &[PathBuf],
+    suffixes: &SuffixTable,
+) -> BTreeMap<PathBuf, BTreeSet<String>> {
+    let mut wanted: BTreeMap<PathBuf, BTreeSet<String>> = BTreeMap::new();
+    for path in selected {
+        let (Some(directory), Some(filename)) = (
+            path.parent(),
+            path.file_name().and_then(|name| name.to_str()),
+        ) else {
+            continue;
+        };
+        let base = parse_base_name(filename, suffixes).to_lowercase();
+        wanted
+            .entry(directory.to_path_buf())
+            .or_default()
+            .insert(base);
+    }
+    wanted
+}
+
+/// From one directory's raw filenames, pick the image files whose parsed base
+/// name matches a wanted base and that are not already imported. Pure string
+/// work — filenames only, no filesystem, no decode, no header probe — so it
+/// stays O(listing) regardless of selection size. `already` holds lowercased
+/// absolute paths of the current import set.
+pub fn related_matches_in_dir(
+    directory: &Path,
+    filenames: &[String],
+    wanted_bases: &BTreeSet<String>,
+    already: &BTreeSet<String>,
+    suffixes: &SuffixTable,
+) -> Vec<PathBuf> {
+    let mut matches = Vec::new();
+    for filename in filenames {
+        if !is_related_image(filename) {
+            continue;
+        }
+        let base = parse_base_name(filename, suffixes).to_lowercase();
+        if !wanted_bases.contains(&base) {
+            continue;
+        }
+        let full = directory.join(filename);
+        if already.contains(&full.to_string_lossy().to_lowercase()) {
+            continue;
+        }
+        matches.push(full);
+    }
+    matches
+}
+
+fn is_related_image(filename: &str) -> bool {
+    Path::new(filename)
+        .extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| {
+            RELATED_IMAGE_EXTENSIONS
+                .iter()
+                .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+        })
+}
 
 pub const ASSIGNABLE_SOURCE_TYPES: [&str; 12] = [
     "diffuse",
@@ -245,6 +316,121 @@ mod tests {
         assert_eq!(saved.groups[0].unknown.len(), 1);
         assert!(!document.is_dirty());
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn related_bases_dedup_pairs_across_a_selection() {
+        let table = SuffixTable::embedded().unwrap();
+        // Two different maps of the same group in one dir + a second group in
+        // another dir → two unique (dir, base) pairs, one base each.
+        let selected = vec![
+            PathBuf::from(r"Z:\tex\4k\KB3D_ENC_AtlasA_basecolor.png"),
+            PathBuf::from(r"Z:\tex\4k\KB3D_ENC_AtlasA_normal.png"),
+            PathBuf::from(r"Z:\tex\props\Crate_orm.png"),
+        ];
+        let wanted = related_wanted_bases(&selected, &table);
+        assert_eq!(wanted.len(), 2, "two directories");
+        assert_eq!(
+            wanted[Path::new(r"Z:\tex\4k")],
+            BTreeSet::from(["kb3d_enc_atlasa".to_owned()]),
+            "both selected files collapse to one base"
+        );
+        assert_eq!(
+            wanted[Path::new(r"Z:\tex\props")],
+            BTreeSet::from(["crate".to_owned()])
+        );
+    }
+
+    /// Performance red-line evidence for Add Related on the real KB3D 4k set:
+    /// import only `KB3D_ENC_AtlasA_basecolor.png`, then match siblings via a
+    /// single directory listing of ~793 entries — no image decode. Ignored by
+    /// default (needs Z:); run with:
+    ///   cargo test -p texproc-gui -- --ignored --nocapture add_related_timing
+    #[test]
+    #[ignore = "requires the real Z:\\enchanted\\KB3DTextures\\4k dataset"]
+    fn add_related_timing_on_real_kb3d_directory() {
+        use std::time::Instant;
+
+        let dir = Path::new(r"Z:\enchanted\KB3DTextures\4k");
+        let selected = vec![dir.join("KB3D_ENC_AtlasA_basecolor.png")];
+        assert!(
+            selected[0].is_file(),
+            "dataset not present at {}",
+            dir.display()
+        );
+        let table = SuffixTable::embedded().unwrap();
+        let already = selected
+            .iter()
+            .map(|path| path.to_string_lossy().to_lowercase())
+            .collect::<BTreeSet<_>>();
+
+        let started = Instant::now();
+        let wanted = related_wanted_bases(&selected, &table);
+        let mut added = Vec::new();
+        let mut dirs_scanned = 0;
+        let mut listing_entries = 0;
+        for (directory, bases) in &wanted {
+            let entries = std::fs::read_dir(directory).unwrap();
+            dirs_scanned += 1;
+            let filenames = entries
+                .filter_map(|entry| entry.ok())
+                .filter_map(|entry| entry.file_name().to_str().map(str::to_owned))
+                .collect::<Vec<_>>();
+            listing_entries += filenames.len();
+            added.extend(related_matches_in_dir(
+                directory, &filenames, bases, &already, &table,
+            ));
+        }
+        let elapsed = started.elapsed();
+
+        let names = added
+            .iter()
+            .filter_map(|path| path.file_name().and_then(|name| name.to_str()))
+            .collect::<Vec<_>>();
+        eprintln!(
+            "Add Related: {} files added, {dirs_scanned} dir(s), {listing_entries} entries listed, {:.1} ms",
+            added.len(),
+            elapsed.as_secs_f64() * 1000.0
+        );
+        eprintln!("added = {names:?}");
+        assert_eq!(added.len(), 6, "expected the 6 AtlasA siblings: {names:?}");
+        assert!(
+            names.iter().all(|name| !name.contains("SignAtlasA")),
+            "must not pull the distinct SignAtlasA group: {names:?}"
+        );
+        assert!(
+            elapsed.as_secs_f64() < 1.0,
+            "Add Related must stay well under a second (was {elapsed:?})"
+        );
+    }
+
+    #[test]
+    fn related_matches_base_and_skips_imported_and_non_images() {
+        let table = SuffixTable::embedded().unwrap();
+        let dir = Path::new(r"Z:\tex\4k");
+        let wanted = BTreeSet::from(["kb3d_enc_atlasa".to_owned()]);
+        // basecolor is already imported → excluded; readme.txt is not an image;
+        // OtherGroup does not match the wanted base.
+        let already = BTreeSet::from([r"z:\tex\4k\kb3d_enc_atlasa_basecolor.png".to_owned()]);
+        let filenames = vec![
+            "KB3D_ENC_AtlasA_basecolor.png".to_owned(),
+            "KB3D_ENC_AtlasA_normal.png".to_owned(),
+            "KB3D_ENC_AtlasA_roughness.png".to_owned(),
+            "KB3D_ENC_OtherGroup_normal.png".to_owned(),
+            "readme.txt".to_owned(),
+        ];
+        let matches = related_matches_in_dir(dir, &filenames, &wanted, &already, &table);
+        let names = matches
+            .iter()
+            .filter_map(|path| path.file_name().and_then(|name| name.to_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            names,
+            vec![
+                "KB3D_ENC_AtlasA_normal.png",
+                "KB3D_ENC_AtlasA_roughness.png"
+            ]
+        );
     }
 
     #[test]

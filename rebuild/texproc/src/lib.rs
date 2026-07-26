@@ -12,7 +12,8 @@ pub mod settings;
 pub use batch::{process_scan_group, process_scan_parallel, BatchProcessReport, ProcessedGroup};
 pub use error::{Result, TexprocError};
 pub use grouping::{
-    scan_inputs, Diagnostic, ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable,
+    parse_base_name, scan_inputs, Diagnostic, ScanEntry, ScanGroup, ScanResult, Severity,
+    SuffixTable,
 };
 pub use io::{decode_image, probe_header, write_tiff_lzw, HeaderInfo};
 pub use output::{

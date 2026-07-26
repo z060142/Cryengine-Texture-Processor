@@ -265,6 +265,43 @@ pub fn scan_inputs(inputs: &[PathBuf], suffixes: &SuffixTable) -> Result<ScanRes
     })
 }
 
+/// Parse a filename down to its group base name using suffix rules only —
+/// **no header probe, no image decode**. Mirrors `classify_path`'s base-name
+/// derivation (qualifier peeling → ARM alias → CE suffix → ambiguous a/d →
+/// configured suffixes → fallback). String ops only, so it is safe to run over
+/// every candidate in a directory listing (the Add Related performance red
+/// line). The source type is intentionally not resolved here, since that is the
+/// only part of classification that needs the header.
+pub fn parse_base_name(filename: &str, suffixes: &SuffixTable) -> String {
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .unwrap_or(filename);
+    let (candidate, _qualifiers) = peel_qualifiers(stem, &suffixes.removable);
+    if let Some((base, _alias)) = match_arm_alias(&candidate) {
+        return base;
+    }
+    for (suffix, _source_type) in CE_SUFFIXES {
+        if let Some(base) = strip_terminal(&candidate, suffix) {
+            return base;
+        }
+    }
+    for ambiguous in ["a", "d"] {
+        if let Some(base) = strip_terminal(&candidate, ambiguous) {
+            return base;
+        }
+    }
+    for (suffix, _source_type) in &suffixes.entries {
+        if matches!(suffix.as_str(), "a" | "d") {
+            continue;
+        }
+        if let Some(base) = strip_terminal(&candidate, suffix) {
+            return base;
+        }
+    }
+    candidate
+}
+
 fn classify_path(
     path: &Path,
     suffixes: &SuffixTable,
@@ -560,6 +597,31 @@ mod tests {
         assert_eq!(
             strip_terminal("normal_wall_normal", "normal"),
             Some("normal_wall".to_owned())
+        );
+    }
+
+    #[test]
+    fn parse_base_name_is_header_free_and_matches_grouping() {
+        let table = SuffixTable::embedded().unwrap();
+        // Configured suffix (basecolor → diffuse) and a plain map suffix.
+        assert_eq!(
+            parse_base_name("KB3D_ENC_AtlasA_basecolor.png", &table),
+            "KB3D_ENC_AtlasA"
+        );
+        assert_eq!(
+            parse_base_name("KB3D_ENC_AtlasA_normal.png", &table),
+            "KB3D_ENC_AtlasA"
+        );
+        // Trailing resolution qualifier is peeled before the suffix is matched.
+        assert_eq!(parse_base_name("Wall_roughness_4k.png", &table), "Wall");
+        // ARM alias collapses to the base.
+        assert_eq!(parse_base_name("Crate_orm.png", &table), "Crate");
+        // Ambiguous single-letter suffix strips regardless of header.
+        assert_eq!(parse_base_name("Panel_d.png", &table), "Panel");
+        // No recognized suffix → the peeled stem is the base.
+        assert_eq!(
+            parse_base_name("loose_texture.png", &table),
+            "loose_texture"
         );
     }
 

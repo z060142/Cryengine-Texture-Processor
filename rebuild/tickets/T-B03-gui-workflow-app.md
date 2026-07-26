@@ -659,3 +659,99 @@ ScrollArea 外的 `ui.horizontal`，資料列各自包在 `Frame.inner_margin(4,
 DoD：四項各有實測證據；效能證據 = 對 Z:\enchanted\KB3DTextures\4k
 （793 檔目錄）做一次 Add Related 的耗時（應為列舉一次目錄的量級，
 毫秒級～百毫秒級）；gate 全綠不退步。
+
+## R5 實作紀錄（2026-07-26，Miss Fox）
+
+改動集中於 `texproc-gui`（`main.rs` / `worker.rs` / `prefs.rs` / `lib.rs`）
+與 `texproc`（新增純函式 `parse_base_name`）；未動 `converter` 與凍結 CLI
+契約；無新依賴。R1–R4 能力全數保留。
+
+### 1. 多選 + Remove Selected
+
+- `TextureState` 以 `selected_files: BTreeSet<usize>` + `selection_anchor`
+  取代單選 `selected_file`；點選＝單選、Ctrl+點＝切換、Shift+點＝自 anchor
+  的範圍選（`apply_selection_click` 純邏輯）。清單標題顯示「(N) · M selected」
+  與操作提示。掃描完成即清空選取（索引會變）。
+- `Remove Selected`（選取非空才啟用）：把「現有 files 去掉選取」的結果**攤平
+  成明確檔案清單**設回 `roots` 再重掃，避免資料夾 root 於下次掃描把移除的檔
+  重新帶回；全部移除時回到空匯入態。保留 Clear All。
+
+### 2. Add Related（效能紅線）
+
+- 純邏輯放 model 層：`texproc-gui::related_wanted_bases`（選取集合先歸納唯一
+  `(目錄, 小寫 base_name)` 對）＋ `related_matches_in_dir`（單一目錄檔名清單
+  → 純檔名比對 base、跳過已匯入與非影像）。base_name 一律走新 `texproc::
+  parse_base_name`（**純字串、無 header probe、無解碼**，鏡射 classify_path
+  的 base 推導）。
+- `main.rs::add_related_textures` 對每個唯一目錄 `read_dir` **一次**，只有比中
+  的檔才進既有 add 流程（歧義後綴的 header probe 是 O(加入數)）。狀態列：
+  `Added N related textures (M dirs scanned).`（以 `pending_import_status`
+  讓訊息熬過隨後的重掃）。
+- 單元測試：`related_bases_dedup_pairs_across_a_selection`（配對去重）、
+  `related_matches_base_and_skips_imported_and_non_images`（base 比對／不重複
+  加入／濾非影像）、`parse_base_name_is_header_free_and_matches_grouping`。
+
+### 3. 導出後刪除選項（prefs 持久化，預設 off）
+
+- `Delete request JSON after model export`：僅在**完整成功（RC 產出 CGF）**時
+  刪 `<stem>.json`，保留 `.mtl` 與 `.mtl.cryasset`（`poll_model_export` 於
+  `RcExportOutcome::Succeeded` 才刪；摘要顯示「Request: deleted after export」）。
+- `Delete TIF after DDS export`：`run_dds_pass` 每張 RC 成功後才刪對應 .tif；
+  單張失敗保留該 tif 並記診斷（沿用既有 pattern）。`start_process` 加
+  `delete_tif` 參數。
+
+### 4. Export associated textures with model（checkbox，預設 off）
+
+- 追蹤匯入來源：`ingest_model_textures` 記下 FBX 拉入貼圖的小寫絕對路徑
+  （`fbx_ingested`），載入新 FBX 時清空。
+- 勾選後 `start_model_export` 走 staged worker（新增 `AssociatedTextures`
+  入參）：(a) 把「含 FBX 來源檔且有 slot」的貼圖組 `process_scan_parallel`
+  到 Texture Output Directory → (b) convert 以該目錄作 texture-dir，MTL 指向
+  處理後貼圖 → (c) RC → CGF → (d) 若開 DDS 則 TIF→DDS（含選項 3 刪 tif）。
+  模態顯示四階段 `Textures → Convert → RC → DDS`。無 FBX 來源組時跳過 (a)
+  並於狀態列註記。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui -p texproc -p converter --all-targets --release
+  --locked -- -D warnings`：PASS（`start_model_export` 參數多，加
+  `#[allow(too_many_arguments)]` 並 ponytail 註記）。
+- `cargo test -p texproc-gui --release --locked`：7 model + 9 main PASS
+  （2 ignored 為真資料/真 RC 整合測試）。
+- `cargo test -p texproc --release --locked`：48 lib（含 parse_base_name）
+  + fixture + CLI PASS。
+- `run_gates.ps1`（完整含 RC）：**ALL GATES PASSED**；converter RC 16/16、
+  texproc RC/DDS 8/8、ddna 2/2、preserve 17/17、T-005 MTL/schema golden 零退步。
+
+### 真實資料證據
+
+- **Add Related 計時**（`texproc-gui` `#[ignore]` 測試
+  `add_related_timing_on_real_kb3d_directory` 走 model/worker 程式路徑）：於
+  `Z:\enchanted\KB3DTextures\4k` 只匯入 `KB3D_ENC_AtlasA_basecolor.png` 後
+  Add Related → **列舉一次目錄（793 entries）、加入 6 檔、耗時 0.8 ms**，
+  加入者為 AtlasA 的 ao/height/metallic/normal/opacity/roughness；正確排除
+  同名前綴但不同組的 `KB3D_ENC_SignAtlasA_*`。遠低於一秒，符合效能紅線。
+- **Export CE Model + item 4**（`#[ignore]` 測試
+  `export_with_associated_textures_produces_cgf_and_dds`，走 worker
+  `start_model_export`）：以 `fixtures/KB3D_ENC_PropAxe_A_grp.fbx`（引用貼圖
+  於 Z:\...\4k），開 associated + DDS + delete-tif → 四階段全跑；associated
+  2 groups / 6 files、DDS 6/6、輸出目錄剩 6 .dds / 0 .tif（刪 tif 生效）；
+  `.mtl` 產出且含 Texture 引用；`.cgf` 43,610 bytes（RC exit 0）。
+- 截圖（`rebuild/ux-demos/`）：
+  - `r5-list-multiselect.png`：Imported Textures (13) · 0 selected、多選提示、
+    `Remove Selected` / `Add Related` 鈕（0 選取時停用，示範啟用條件）。
+  - `r5-export-with-textures.png`：Model tab 載入 PropAxe（2 組×6 貼圖，引用自
+    Z:\...\4k）；右欄四個 R5/DDS 核取框皆勾選
+    （Export associated textures / Delete request JSON / Delete TIF after DDS /
+    Generate CryEngine DDS）、RC Path 已解析。
+
+### 偏離
+
+- **GUI 即時互動截圖限制**（沿 R3/R4）：本環境對 egui 視窗的合成點擊無效，
+  無法擷取「實際多選高亮」「進度模態」等互動態；改以（a）上述兩支真資料
+  `#[ignore]` 整合測試證明 model/worker 程式路徑、（b）配置態截圖佐證。
+- **右欄面板寬度**：截圖以較窄視窗（1180px）擷取，使右欄設定完整可讀
+  （寬視窗時本環境的 DPI/scale 會把右欄裁到邊，屬既有現象）。
+- Add Related 的目錄列舉在 UI 執行緒同步跑（單一 `read_dir`，實測 0.8 ms，
+  無需背景化）。

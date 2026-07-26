@@ -179,6 +179,7 @@ pub fn start_process(
     settings: TextureSettings,
     output_root: PathBuf,
     rc_exe: Option<PathBuf>,
+    delete_tif: bool,
 ) -> ProcessJob {
     let (sender, receiver) = mpsc::channel();
     let cancel = Arc::new(AtomicBool::new(false));
@@ -200,7 +201,14 @@ pub fn start_process(
         let complete = report.map(|report| {
             let dds = match &rc_exe {
                 Some(rc_exe) if !report.cancelled => {
-                    Some(run_dds_pass(rc_exe, &report, &output_root, &sender))
+                    let tifs = dds_jobs(&report);
+                    Some(run_dds_pass(
+                        rc_exe,
+                        &tifs,
+                        &output_root,
+                        delete_tif,
+                        Some(&sender),
+                    ))
                 }
                 _ => None,
             };
@@ -228,14 +236,17 @@ pub fn dds_jobs(report: &BatchProcessReport) -> Vec<PathBuf> {
 
 /// Feed each produced TIFF to RC.exe sequentially: `RC.exe <tif> /refresh
 /// /userdialog=0`, cwd = output dir. Per-file failures are collected, never
-/// aborting the batch. DDS files land next to the TIFFs.
+/// aborting the batch. DDS files land next to the TIFFs. When `delete_tif` is
+/// set, each source TIFF is removed only after its DDS is produced; a failed
+/// conversion keeps its TIFF (and its diagnostic). `sender` is optional so the
+/// model-export flow (no per-file progress bar) can reuse the same pass.
 fn run_dds_pass(
     rc_exe: &Path,
-    report: &BatchProcessReport,
+    jobs: &[PathBuf],
     output_root: &Path,
-    sender: &mpsc::Sender<ProcessEvent>,
+    delete_tif: bool,
+    sender: Option<&mpsc::Sender<ProcessEvent>>,
 ) -> DdsSummary {
-    let jobs = dds_jobs(report);
     let total = jobs.len();
     let mut succeeded = 0;
     let mut failures = Vec::new();
@@ -245,13 +256,20 @@ fn run_dds_pass(
             .and_then(|value| value.to_str())
             .unwrap_or_default()
             .to_owned();
-        let _ = sender.send(ProcessEvent::DdsProgress {
-            completed: index + 1,
-            total,
-            name: name.clone(),
-        });
+        if let Some(sender) = sender {
+            let _ = sender.send(ProcessEvent::DdsProgress {
+                completed: index + 1,
+                total,
+                name: name.clone(),
+            });
+        }
         match run_rc_dds(rc_exe, tif, output_root) {
-            Ok(()) => succeeded += 1,
+            Ok(()) => {
+                succeeded += 1;
+                if delete_tif {
+                    let _ = fs::remove_file(tif);
+                }
+            }
             Err(error) => failures.push(format!("{name}: {error}")),
         }
     }
@@ -336,6 +354,25 @@ pub enum ModelExportEvent {
 pub struct ModelExportReport {
     pub outputs: ConvertOutputs,
     pub rc: RcExportOutcome,
+    /// Present only when "Export associated textures with model" ran.
+    pub textures: Option<AssociatedTexturesReport>,
+}
+
+/// Stage (a)+(d) of the "Export associated textures with model" flow: the
+/// FBX-ingested texture groups processed into the texture output directory, and
+/// the optional DDS pass over the resulting TIFFs.
+pub struct AssociatedTextures {
+    pub scan: ScanResult,
+    pub settings: TextureSettings,
+    pub output_dir: PathBuf,
+    pub generate_dds: bool,
+    pub delete_tif: bool,
+}
+
+pub struct AssociatedTexturesReport {
+    pub groups: usize,
+    pub written: usize,
+    pub dds: Option<DdsSummary>,
 }
 
 pub enum RcExportOutcome {
@@ -350,6 +387,9 @@ pub enum RcExportOutcome {
     },
 }
 
+// ponytail: export request has many independently-sourced fields; a params
+// struct would be churn for one worker entry point.
+#[allow(clippy::too_many_arguments)]
 pub fn start_model_export(
     input: PathBuf,
     manifest: Option<PathBuf>,
@@ -358,9 +398,40 @@ pub fn start_model_export(
     output_dir: PathBuf,
     physicalize_overrides: BTreeMap<String, String>,
     rc_exe: Option<PathBuf>,
+    associated: Option<AssociatedTextures>,
 ) -> Receiver<ModelExportEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
+        // Stage (a): process the FBX-ingested texture groups into the texture
+        // output directory so the MTL below resolves against fresh outputs.
+        let textures = match associated.as_ref() {
+            Some(assoc) => {
+                let _ = sender.send(ModelExportEvent::Stage(format!(
+                    "Processing {} associated texture groups…",
+                    assoc.scan.groups.len()
+                )));
+                let cancel = AtomicBool::new(false);
+                match process_scan_parallel(
+                    &assoc.scan,
+                    &assoc.settings,
+                    &assoc.output_dir,
+                    &cancel,
+                    |_| {},
+                ) {
+                    Ok(report) => Some(report),
+                    Err(error) => {
+                        let _ = sender.send(ModelExportEvent::Failed(format!(
+                            "associated texture processing failed: {error}"
+                        )));
+                        return;
+                    }
+                }
+            }
+            None => None,
+        };
+
+        // Stage (b): convert (.mtl + request), pointing texture resolution at
+        // the texture output directory when associated textures were processed.
         let _ = sender.send(ModelExportEvent::Stage(
             "Converting materials (.mtl + request)…".to_owned(),
         ));
@@ -373,22 +444,57 @@ pub fn start_model_export(
             &output_dir,
             &physicalize_overrides,
         );
-        let event = match result {
-            Ok(outputs) => {
-                let rc = match rc_exe {
-                    Some(rc_exe) => {
-                        let _ = sender.send(ModelExportEvent::Stage(
-                            "Running Resource Compiler (CGF)…".to_owned(),
-                        ));
-                        run_resource_compiler(&rc_exe, &input, &outputs, &output_dir)
-                    }
-                    None => RcExportOutcome::NotConfigured,
-                };
-                ModelExportEvent::Completed(ModelExportReport { outputs, rc })
+        let outputs = match result {
+            Ok(outputs) => outputs,
+            Err(error) => {
+                let _ = sender.send(ModelExportEvent::Failed(error));
+                return;
             }
-            Err(error) => ModelExportEvent::Failed(error),
         };
-        let _ = sender.send(event);
+
+        // Stage (c): RC → CGF.
+        let rc = match &rc_exe {
+            Some(rc_exe) => {
+                let _ = sender.send(ModelExportEvent::Stage(
+                    "Running Resource Compiler (CGF)…".to_owned(),
+                ));
+                run_resource_compiler(rc_exe, &input, &outputs, &output_dir)
+            }
+            None => RcExportOutcome::NotConfigured,
+        };
+
+        // Stage (d): optional TIF → DDS over the associated texture outputs.
+        let textures = textures.map(|report| {
+            let written = report.groups.iter().map(|group| group.written.len()).sum();
+            let assoc = associated.as_ref().expect("report implies associated set");
+            let dds = match (&rc_exe, assoc.generate_dds) {
+                (Some(rc_exe), true) => {
+                    let _ = sender.send(ModelExportEvent::Stage(
+                        "Compiling associated DDS via RC…".to_owned(),
+                    ));
+                    let tifs = dds_jobs(&report);
+                    Some(run_dds_pass(
+                        rc_exe,
+                        &tifs,
+                        &assoc.output_dir,
+                        assoc.delete_tif,
+                        None,
+                    ))
+                }
+                _ => None,
+            };
+            AssociatedTexturesReport {
+                groups: report.groups.len(),
+                written,
+                dds,
+            }
+        });
+
+        let _ = sender.send(ModelExportEvent::Completed(ModelExportReport {
+            outputs,
+            rc,
+            textures,
+        }));
     });
     receiver
 }
@@ -480,6 +586,154 @@ mod tests {
     use super::*;
     use texproc::batch::ProcessedGroup;
 
+    /// End-to-end evidence for item 4 (Export associated textures with model):
+    /// process the PropAxe FBX's referenced texture groups into a texture output
+    /// dir, convert with texture_dir pointing there, RC → CGF, then DDS with
+    /// delete-tif. Ignored by default (needs Z: fixtures + RC); run with:
+    ///   set CE_RC_EXE=...\rc.exe && cargo test -p texproc-gui -- --ignored --nocapture export_with_associated
+    #[test]
+    #[ignore = "requires the PropAxe referenced textures (Z:) and a real RC.exe"]
+    fn export_with_associated_textures_produces_cgf_and_dds() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let rc = std::env::var_os("CE_RC_EXE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe")
+            });
+        assert!(rc.is_file(), "RC not found at {}", rc.display());
+
+        let fbx = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("fixtures")
+            .join("KB3D_ENC_PropAxe_A_grp.fbx");
+        assert!(fbx.is_file(), "fixture missing: {}", fbx.display());
+
+        // Collect the FBX's referenced textures that exist on disk (mirrors the
+        // GUI's ingest), then scan them into the associated texture groups.
+        let model = ConverterModel::load(&fbx).unwrap();
+        let model_dir = fbx.parent().unwrap();
+        let mut referenced = Vec::new();
+        for texture in model
+            .materials
+            .iter()
+            .flat_map(|material| material.textures.iter())
+        {
+            if let Some(path) = [
+                PathBuf::from(&texture.absolute_filename),
+                model_dir.join(&texture.relative_filename),
+                model_dir.join(&texture.filename),
+            ]
+            .into_iter()
+            .find(|path| path.is_file())
+            {
+                referenced.push(path);
+            }
+        }
+        assert!(!referenced.is_empty(), "no referenced textures resolved");
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = texproc::scan_inputs(&referenced, &suffixes).unwrap();
+        assert!(!scan.groups.is_empty());
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("texproc-gui-assoc-{}-{nonce}", std::process::id()));
+        let tex_out = root.join("textures");
+        let model_out = root.join("model");
+        fs::create_dir_all(&tex_out).unwrap();
+        fs::create_dir_all(&model_out).unwrap();
+
+        let associated = AssociatedTextures {
+            scan,
+            settings: TextureSettings::default(),
+            output_dir: tex_out.clone(),
+            generate_dds: true,
+            delete_tif: true,
+        };
+        let receiver = start_model_export(
+            fbx.clone(),
+            None,
+            None,
+            Some(tex_out.clone()),
+            model_out.clone(),
+            BTreeMap::new(),
+            Some(rc),
+            Some(associated),
+        );
+
+        let mut report = None;
+        while let Ok(event) = receiver.recv() {
+            match event {
+                ModelExportEvent::Stage(stage) => eprintln!("stage: {stage}"),
+                ModelExportEvent::Completed(value) => {
+                    report = Some(value);
+                    break;
+                }
+                ModelExportEvent::Failed(error) => panic!("export failed: {error}"),
+            }
+        }
+        let report = report.expect("export completed");
+
+        // Stage (c): CGF produced.
+        match &report.rc {
+            RcExportOutcome::Succeeded { cgf, .. } => {
+                assert!(cgf.is_file(), "CGF missing: {}", cgf.display());
+                eprintln!(
+                    "CGF: {} ({} bytes)",
+                    cgf.display(),
+                    fs::metadata(cgf).unwrap().len()
+                );
+            }
+            other => panic!("RC did not succeed: {:?}", rc_label(other)),
+        }
+        // Stage (b): MTL exists and references texture files.
+        let mtl = fs::read_to_string(&report.outputs.mtl).unwrap();
+        assert!(mtl.contains("Texture "), "MTL has no texture references");
+        eprintln!("MTL: {}", report.outputs.mtl.display());
+        // Stage (a)+(d): associated textures processed; DDS present, TIFs gone.
+        let textures = report.textures.expect("associated textures ran");
+        let dds = textures.dds.expect("DDS pass ran");
+        eprintln!(
+            "associated: {} groups, {} files, DDS {}/{}",
+            textures.groups, textures.written, dds.succeeded, dds.total
+        );
+        assert_eq!(dds.succeeded, dds.total, "DDS failures: {:?}", dds.failures);
+        let produced = fs::read_dir(&tex_out).unwrap().filter_map(|e| e.ok());
+        let (mut dds_count, mut tif_count) = (0, 0);
+        for entry in produced {
+            match entry
+                .path()
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(str::to_ascii_lowercase)
+                .as_deref()
+            {
+                Some("dds") => dds_count += 1,
+                Some("tif") => tif_count += 1,
+                _ => {}
+            }
+        }
+        eprintln!("output dir: {dds_count} .dds, {tif_count} .tif remaining");
+        assert!(dds_count > 0, "no DDS produced");
+        assert_eq!(
+            tif_count, 0,
+            "delete-tif should have removed every source TIF"
+        );
+
+        fs::remove_dir_all(&root).ok();
+    }
+
+    fn rc_label(outcome: &RcExportOutcome) -> String {
+        match outcome {
+            RcExportOutcome::NotConfigured => "not configured".to_owned(),
+            RcExportOutcome::Succeeded { return_code, .. } => format!("ok ({return_code})"),
+            RcExportOutcome::Failed { error, .. } => format!("failed: {error}"),
+        }
+    }
+
     fn report(written: Vec<&str>) -> BatchProcessReport {
         BatchProcessReport {
             groups: vec![ProcessedGroup {
@@ -541,7 +795,13 @@ mod tests {
             std::env::temp_dir().join(format!("texproc-gui-dds-{}-{nonce}", std::process::id()));
         fs::create_dir_all(&out).unwrap();
 
-        let job = start_process(scan, TextureSettings::default(), out.clone(), Some(rc));
+        let job = start_process(
+            scan,
+            TextureSettings::default(),
+            out.clone(),
+            Some(rc),
+            false,
+        );
         let mut complete = None;
         let mut dds_progress = 0;
         while let Ok(event) = job.receiver.recv() {
