@@ -30,35 +30,43 @@ enum SupportedFormat {
     Jpeg,
     Tiff,
     Exr,
+    Tga,
+    Bmp,
+    WebP,
+}
+
+fn extension_hint(path: &Path) -> Option<String> {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
 }
 
 pub fn probe_header(path: impl AsRef<Path>) -> Result<HeaderInfo> {
-    let file = File::open(path.as_ref()).map_err(|error| {
-        TexprocError::new(format!(
-            "failed to open image header {}: {error}",
-            path.as_ref().display()
-        ))
+    let path = path.as_ref();
+    let file = File::open(path).map_err(|error| {
+        TexprocError::new(format!("failed to open image header {}: {error}", path.display()))
     })?;
-    let (header, _) = probe_reader(BufReader::new(file))?;
+    let (header, _) = probe_reader(BufReader::new(file), extension_hint(path).as_deref())?;
     Ok(header)
 }
 
 pub fn decode_image(path: impl AsRef<Path>) -> Result<PlanarImage> {
-    let file = File::open(path.as_ref()).map_err(|error| {
-        TexprocError::new(format!(
-            "failed to open image {}: {error}",
-            path.as_ref().display()
-        ))
+    let path = path.as_ref();
+    let file = File::open(path).map_err(|error| {
+        TexprocError::new(format!("failed to open image {}: {error}", path.display()))
     })?;
-    let (_, format) = probe_reader(BufReader::new(file))?;
+    let (_, format) = probe_reader(BufReader::new(file), extension_hint(path).as_deref())?;
     let image_format = match format {
         SupportedFormat::Png => ImageFormat::Png,
         SupportedFormat::Jpeg => ImageFormat::Jpeg,
         SupportedFormat::Tiff => ImageFormat::Tiff,
         SupportedFormat::Exr => ImageFormat::OpenExr,
+        SupportedFormat::Tga => ImageFormat::Tga,
+        SupportedFormat::Bmp => ImageFormat::Bmp,
+        SupportedFormat::WebP => ImageFormat::WebP,
     };
 
-    let reader = ImageReader::with_format(BufReader::new(File::open(path.as_ref())?), image_format);
+    let reader = ImageReader::with_format(BufReader::new(File::open(path)?), image_format);
     dynamic_to_planar(reader.decode()?)
 }
 
@@ -126,12 +134,17 @@ fn dynamic_to_planar(image: DynamicImage) -> Result<PlanarImage> {
     }
 }
 
-fn probe_reader<R: Read + Seek>(mut reader: R) -> Result<(HeaderInfo, SupportedFormat)> {
-    let mut magic = [0_u8; 8];
+fn probe_reader<R: Read + Seek>(
+    mut reader: R,
+    ext_hint: Option<&str>,
+) -> Result<(HeaderInfo, SupportedFormat)> {
+    // 12 bytes covers every magic we sniff (WebP needs `RIFF....WEBP`); all
+    // magic-bearing formats we accept have headers longer than this.
+    let mut magic = [0_u8; 12];
     reader.read_exact(&mut magic)?;
     reader.seek(SeekFrom::Start(0))?;
 
-    if magic == PNG_SIGNATURE {
+    if magic[..8] == PNG_SIGNATURE {
         return Ok((probe_png(&mut reader)?, SupportedFormat::Png));
     }
     if magic[..2] == [0xff, 0xd8] {
@@ -143,10 +156,125 @@ fn probe_reader<R: Read + Seek>(mut reader: R) -> Result<(HeaderInfo, SupportedF
     if u32::from_le_bytes(magic[..4].try_into().expect("four-byte slice")) == EXR_MAGIC {
         return Ok((probe_exr(&mut reader)?, SupportedFormat::Exr));
     }
+    if &magic[..2] == b"BM" {
+        return Ok((probe_bmp(&mut reader)?, SupportedFormat::Bmp));
+    }
+    if &magic[..4] == b"RIFF" && &magic[8..12] == b"WEBP" {
+        return Ok((probe_webp(&mut reader)?, SupportedFormat::WebP));
+    }
+    // TGA carries no leading magic (its signature is an optional footer), so it
+    // is dispatched by file extension when no magic matched.
+    if ext_hint.is_some_and(|ext| ext.eq_ignore_ascii_case("tga")) {
+        return Ok((probe_tga(&mut reader)?, SupportedFormat::Tga));
+    }
 
     Err(TexprocError::new(
-        "unsupported image format; expected PNG, JPEG, TIFF, or OpenEXR",
+        "unsupported image format; expected PNG, JPEG, TIFF, OpenEXR, TGA, BMP, or WebP",
     ))
+}
+
+/// TGA fixed 18-byte header: width/height are LE u16 at offsets 12/14 and the
+/// pixel depth (total bits per pixel) is at offset 16. Channels are derived from
+/// the depth; bit depth per channel is 8.
+fn probe_tga<R: Read>(reader: &mut R) -> Result<HeaderInfo> {
+    let mut header = [0_u8; 18];
+    reader.read_exact(&mut header)?;
+    let width = u32::from(u16::from_le_bytes([header[12], header[13]]));
+    let height = u32::from(u16::from_le_bytes([header[14], header[15]]));
+    let channels = match header[16] {
+        8 => 1,
+        16 => 2,
+        24 => 3,
+        32 => 4,
+        depth => {
+            return Err(TexprocError::new(format!(
+                "unsupported TGA pixel depth {depth}"
+            )))
+        }
+    };
+    validate_header(channels, 8, width, height)
+}
+
+/// BMP: 14-byte file header (`BM`) then the DIB header. `BITMAPCOREHEADER`
+/// (size 12) stores u16 dimensions; `BITMAPINFOHEADER` and its V4/V5 supersets
+/// store i32 dimensions at the same offsets. Channels come from the bit count
+/// (32-bit carries alpha).
+fn probe_bmp<R: Read>(reader: &mut R) -> Result<HeaderInfo> {
+    let mut file_header = [0_u8; 14];
+    reader.read_exact(&mut file_header)?;
+    if &file_header[..2] != b"BM" {
+        return Err(TexprocError::new("invalid BMP signature"));
+    }
+    let dib_size = read_u32(reader, Endian::Little)?;
+    let (width, height, bit_count) = if dib_size == 12 {
+        let width = u32::from(read_u16(reader, Endian::Little)?);
+        let height = u32::from(read_u16(reader, Endian::Little)?);
+        let _planes = read_u16(reader, Endian::Little)?;
+        (width, height, read_u16(reader, Endian::Little)?)
+    } else {
+        let width = read_u32(reader, Endian::Little)? as i32;
+        let height = read_u32(reader, Endian::Little)? as i32;
+        let _planes = read_u16(reader, Endian::Little)?;
+        (
+            width.unsigned_abs(),
+            height.unsigned_abs(),
+            read_u16(reader, Endian::Little)?,
+        )
+    };
+    let channels = if bit_count >= 32 { 4 } else { 3 };
+    validate_header(channels, 8, width, height)
+}
+
+/// WebP: 12-byte RIFF container (`RIFF....WEBP`) then a single VP8/VP8L/VP8X
+/// chunk whose header carries the canvas dimensions.
+fn probe_webp<R: Read>(reader: &mut R) -> Result<HeaderInfo> {
+    let mut riff = [0_u8; 12];
+    reader.read_exact(&mut riff)?;
+    if &riff[..4] != b"RIFF" || &riff[8..12] != b"WEBP" {
+        return Err(TexprocError::new("invalid WebP RIFF/WEBP signature"));
+    }
+    let mut chunk = [0_u8; 8];
+    reader.read_exact(&mut chunk)?; // fourcc(4) + chunk size(4)
+    match &chunk[..4] {
+        b"VP8 " => {
+            // Lossy keyframe: 3-byte frame tag, 3-byte start code, then 14-bit
+            // width and height (each with a 2-bit scale in the high bits).
+            let mut payload = [0_u8; 10];
+            reader.read_exact(&mut payload)?;
+            if payload[3..6] != [0x9d, 0x01, 0x2a] {
+                return Err(TexprocError::new("invalid VP8 start code"));
+            }
+            let width = u32::from(u16::from_le_bytes([payload[6], payload[7]]) & 0x3fff);
+            let height = u32::from(u16::from_le_bytes([payload[8], payload[9]]) & 0x3fff);
+            validate_header(3, 8, width, height)
+        }
+        b"VP8L" => {
+            let mut payload = [0_u8; 5];
+            reader.read_exact(&mut payload)?;
+            if payload[0] != 0x2f {
+                return Err(TexprocError::new("invalid VP8L signature"));
+            }
+            let bits = u32::from_le_bytes([payload[1], payload[2], payload[3], payload[4]]);
+            let width = (bits & 0x3fff) + 1;
+            let height = ((bits >> 14) & 0x3fff) + 1;
+            let channels = if (bits >> 28) & 1 == 1 { 4 } else { 3 };
+            validate_header(channels, 8, width, height)
+        }
+        b"VP8X" => {
+            // Extended: 4 flag/reserved bytes then 3-byte canvas width-1 and
+            // 3-byte canvas height-1 (all little-endian).
+            let mut payload = [0_u8; 10];
+            reader.read_exact(&mut payload)?;
+            let width = (u32::from_le_bytes([payload[4], payload[5], payload[6], 0]) & 0x00ff_ffff) + 1;
+            let height = (u32::from_le_bytes([payload[7], payload[8], payload[9], 0]) & 0x00ff_ffff) + 1;
+            let channels = if payload[0] & 0x10 != 0 { 4 } else { 3 };
+            validate_header(channels, 8, width, height)
+        }
+        other => Err(TexprocError::new(format!(
+            "unsupported WebP chunk {:?}; expected VP8/VP8L/VP8X",
+            String::from_utf8_lossy(other)
+        ))),
+    }
 }
 
 fn probe_png<R: Read>(reader: &mut R) -> Result<HeaderInfo> {
@@ -679,6 +807,157 @@ mod tests {
             ),
             (1, 1, 3)
         );
+    }
+
+    // --- T-016: TGA / BMP / WebP source formats ---------------------------
+
+    /// Anchor 1: TGA (uncompressed + RLE) decodes pixel-identical to the same
+    /// content saved as PNG. The image crate encodes TGA as RLE by default, so
+    /// the uncompressed case is written with an explicit encoder option.
+    #[test]
+    fn decode_tga_rle_and_uncompressed_match_png() {
+        use image::codecs::tga::TgaEncoder;
+        use image::RgbImage;
+
+        let pixels: Vec<u8> = vec![
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 200, 190, 180, 30, 30, 30,
+        ];
+        let rgb = RgbImage::from_raw(3, 2, pixels.clone()).unwrap();
+
+        let png = TestFile::new("png");
+        rgb.save_with_format(&png.0, ImageFormat::Png).unwrap();
+        let expected = decode_image(&png.0).unwrap().to_interleaved_u8();
+
+        // RLE (image crate default for TGA).
+        let tga_rle = TestFile::new("tga");
+        rgb.save_with_format(&tga_rle.0, ImageFormat::Tga).unwrap();
+        assert_eq!(decode_image(&tga_rle.0).unwrap().to_interleaved_u8(), expected);
+
+        // Uncompressed via the explicit encoder (RLE disabled).
+        let tga_raw = TestFile::new("tga");
+        {
+            let mut writer = BufWriter::new(File::create(&tga_raw.0).unwrap());
+            TgaEncoder::new(&mut writer)
+                .disable_rle()
+                .encode(&pixels, 3, 2, ExtendedColorType::Rgb8)
+                .unwrap();
+        }
+        assert_eq!(decode_image(&tga_raw.0).unwrap().to_interleaved_u8(), expected);
+    }
+
+    /// Anchor 1: BMP decodes pixel-identical to the same content saved as PNG.
+    #[test]
+    fn decode_bmp_matches_png() {
+        use image::RgbImage;
+
+        let pixels: Vec<u8> = vec![
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 200, 190, 180, 30, 30, 30,
+        ];
+        let rgb = RgbImage::from_raw(3, 2, pixels).unwrap();
+
+        let png = TestFile::new("png");
+        rgb.save_with_format(&png.0, ImageFormat::Png).unwrap();
+        let expected = decode_image(&png.0).unwrap().to_interleaved_u8();
+
+        let bmp = TestFile::new("bmp");
+        rgb.save_with_format(&bmp.0, ImageFormat::Bmp).unwrap();
+        assert_eq!(decode_image(&bmp.0).unwrap().to_interleaved_u8(), expected);
+    }
+
+    /// Anchor 1: lossless WebP decodes pixel-identical to the same content saved
+    /// as PNG; a lossy WebP is only proven to decode (no bit comparison).
+    #[test]
+    fn decode_webp_lossless_matches_png_and_lossy_decodes() {
+        use image::codecs::webp::WebPEncoder;
+        use image::RgbImage;
+
+        let pixels: Vec<u8> = vec![
+            10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 200, 190, 180, 30, 30, 30,
+        ];
+        let rgb = RgbImage::from_raw(3, 2, pixels.clone()).unwrap();
+
+        let png = TestFile::new("png");
+        rgb.save_with_format(&png.0, ImageFormat::Png).unwrap();
+        let expected = decode_image(&png.0).unwrap();
+
+        // Lossless (image-webp only encodes lossless).
+        let webp = TestFile::new("webp");
+        {
+            let writer = BufWriter::new(File::create(&webp.0).unwrap());
+            WebPEncoder::new_lossless(writer)
+                .encode(&pixels, 3, 2, ExtendedColorType::Rgb8)
+                .unwrap();
+        }
+        let decoded = decode_image(&webp.0).unwrap();
+        assert_eq!(
+            (decoded.width, decoded.height),
+            (expected.width, expected.height)
+        );
+        // Compare the RGB planes regardless of a decoder-added opaque alpha.
+        for channel in 0..3 {
+            assert_eq!(decoded.planes[channel], expected.planes[channel]);
+        }
+
+        // Lossy: just prove it decodes into the T1 contract.
+        let lossy = webp_lossy_fixture();
+        let file = write_header_probe(&lossy, "webp");
+        assert!(decode_image(&file.0).is_ok());
+    }
+
+    /// Anchor 2: probe_header reports correct w/h/channels for all three
+    /// formats without decoding pixels.
+    #[test]
+    fn probe_header_reports_dimensions_for_new_formats() {
+        use image::{RgbImage, RgbaImage};
+
+        // TGA 24-bit -> 3 channels.
+        let tga = TestFile::new("tga");
+        RgbImage::from_raw(7, 5, vec![128; 7 * 5 * 3])
+            .unwrap()
+            .save_with_format(&tga.0, ImageFormat::Tga)
+            .unwrap();
+        assert_eq!(
+            probe_header(&tga.0).unwrap(),
+            HeaderInfo { channels: 3, bit_depth: 8, width: 7, height: 5 }
+        );
+
+        // BMP 32-bit RGBA -> 4 channels.
+        let bmp = TestFile::new("bmp");
+        RgbaImage::from_raw(7, 5, vec![64; 7 * 5 * 4])
+            .unwrap()
+            .save_with_format(&bmp.0, ImageFormat::Bmp)
+            .unwrap();
+        assert_eq!(
+            probe_header(&bmp.0).unwrap(),
+            HeaderInfo { channels: 4, bit_depth: 8, width: 7, height: 5 }
+        );
+
+        // WebP lossless from RGB -> 3 channels.
+        let webp = TestFile::new("webp");
+        {
+            use image::codecs::webp::WebPEncoder;
+            let writer = BufWriter::new(File::create(&webp.0).unwrap());
+            WebPEncoder::new_lossless(writer)
+                .encode(&vec![200; 7 * 5 * 3], 7, 5, ExtendedColorType::Rgb8)
+                .unwrap();
+        }
+        assert_eq!(
+            probe_header(&webp.0).unwrap(),
+            HeaderInfo { channels: 3, bit_depth: 8, width: 7, height: 5 }
+        );
+    }
+
+    /// image-webp only encodes lossless, so the lossy proof uses a real 4x4 VP8
+    /// (lossy) file generated once with libwebp/ImageMagick.
+    fn webp_lossy_fixture() -> Vec<u8> {
+        const BYTES: &[u8] = &[
+            0x52, 0x49, 0x46, 0x46, 0x34, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50,
+            0x38, 0x20, 0x28, 0x00, 0x00, 0x00, 0x90, 0x01, 0x00, 0x9d, 0x01, 0x2a, 0x04, 0x00,
+            0x04, 0x00, 0x02, 0x00, 0x34, 0x25, 0xa0, 0x02, 0x74, 0xba, 0x00, 0x03, 0x98, 0x00,
+            0xfe, 0xd6, 0x31, 0xff, 0x70, 0x66, 0x7d, 0x5d, 0x8e, 0x1f, 0xdc, 0xd8, 0xe7, 0x16,
+            0xc8, 0x60, 0x00, 0x00,
+        ];
+        BYTES.to_vec()
     }
 
     #[test]

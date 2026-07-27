@@ -135,7 +135,7 @@ const GROUP_COLUMNS: [(&str, &str); 12] = [
 const GROUP_CELL_W: f32 = 38.0;
 const GROUP_UNKNOWN_W: f32 = 134.0;
 const GROUP_ROW_H: f32 = 26.0;
-const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr\0All files (*.*)\0*.*\0";
+const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr, tga, bmp, webp)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr;*.tga;*.bmp;*.webp\0All files (*.*)\0*.*\0";
 const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
 const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
 

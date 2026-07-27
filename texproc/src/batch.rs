@@ -462,6 +462,75 @@ mod tests {
         );
     }
 
+    /// Anchor 3 (T-016): a single texture group whose four members carry
+    /// different source suffixes — `.png` + `.tga` + `.bmp` + `.webp` — scans
+    /// into ONE group with all four slots resolved and processes through the
+    /// normal TIF pipeline into the full CE TIF set.
+    #[test]
+    fn mixed_suffix_source_formats_scan_into_one_group_and_process() {
+        use image::codecs::webp::WebPEncoder;
+        use image::{ExtendedColorType, ImageEncoder, ImageFormat, RgbImage};
+
+        use crate::{scan_inputs, SuffixTable};
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("texproc-t016-mixed-{}-{nonce}", std::process::id()));
+        let input = root.join("in");
+        let output = root.join("out");
+        std::fs::create_dir_all(&input).unwrap();
+
+        let pixels: Vec<u8> = (0..4 * 4 * 3).map(|value| value as u8).collect();
+        let rgb = RgbImage::from_raw(4, 4, pixels.clone()).unwrap();
+
+        rgb.save_with_format(input.join("Mat_basecolor.png"), ImageFormat::Png)
+            .unwrap();
+        rgb.save_with_format(input.join("Mat_normal.tga"), ImageFormat::Tga)
+            .unwrap();
+        rgb.save_with_format(input.join("Mat_ao.bmp"), ImageFormat::Bmp)
+            .unwrap();
+        {
+            let writer =
+                std::io::BufWriter::new(std::fs::File::create(input.join("Mat_roughness.webp")).unwrap());
+            WebPEncoder::new_lossless(writer)
+                .encode(&pixels, 4, 4, ExtendedColorType::Rgb8)
+                .unwrap();
+        }
+
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = scan_inputs(&[input.clone()], &suffixes).unwrap();
+        assert_eq!(scan.groups.len(), 1, "mixed suffixes must form ONE group");
+        let group = &scan.groups[0];
+        let mut slots = group.slots.keys().cloned().collect::<Vec<_>>();
+        slots.sort();
+        assert_eq!(slots, vec!["ao", "diffuse", "normal", "roughness"]);
+
+        let cancel = AtomicBool::new(false);
+        let report =
+            process_scan_parallel(&scan, &TextureSettings::default(), &output, &cancel, |_| {})
+                .expect("processing succeeds");
+        assert!(report.failed.is_empty(), "no group should fail: {:?}", report.failed);
+
+        let produced = std::fs::read_dir(&output)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(
+            produced.iter().any(|n| n.eq_ignore_ascii_case("Mat_diff.tif")),
+            "diffuse TIF missing: {produced:?}"
+        );
+        assert!(
+            produced.iter().any(|n| n.eq_ignore_ascii_case("Mat_ddna.tif")),
+            "normal ddna TIF missing: {produced:?}"
+        );
+
+        std::fs::remove_dir_all(&root).ok();
+    }
+
     /// Anchor 2 (T-015): a mixed input directory — a real PNG texture group plus
     /// one `.hdr` and one `.exr` env map — scans without tripping the exit-3 gate;
     /// the PNG group yields TIFs while the hdr/exr each yield exactly one staged

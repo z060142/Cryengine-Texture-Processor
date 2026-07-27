@@ -14,7 +14,8 @@ use crate::{
 const DEFAULT_SUFFIXES: &str = include_str!("../data/suffix_settings.json");
 // `hdr`/`exr` are HDR passthrough formats (T-015): accepted by the scanner so
 // they never trip DEF-20, then staged straight to RC instead of the TIF pipeline.
-const SUPPORTED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tif", "tiff", "exr", "hdr"];
+const SUPPORTED_EXTENSIONS: &[&str] =
+    &["png", "jpg", "jpeg", "tif", "tiff", "exr", "hdr", "tga", "bmp", "webp"];
 const SOURCE_TYPES: &[&str] = &[
     "diffuse",
     "normal",
