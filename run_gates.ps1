@@ -4,8 +4,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$rebuildRoot = $PSScriptRoot
-$repoRoot = Split-Path -Parent $rebuildRoot
+$workspaceRoot = $PSScriptRoot
+$legacyRoot = Join-Path $workspaceRoot "legacy"
 $previousLocation = Get-Location
 $previousConverterExe = $env:CE_CONVERTER_EXE
 $tempBase = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
@@ -36,7 +36,7 @@ try {
     }
 
     New-Item -ItemType Directory -Path $tempRoot | Out-Null
-    Set-Location $rebuildRoot
+    Set-Location $workspaceRoot
 
     Invoke-NativeStep "Build release core workspace (GUI excluded)" {
         & cargo build --workspace --exclude texproc-gui --release --locked
@@ -50,13 +50,13 @@ try {
         & cargo build -p texproc-gui --release --locked
     }
 
-    $converterExe = Join-Path $rebuildRoot "target\release\converter.exe"
+    $converterExe = Join-Path $workspaceRoot "target\release\converter.exe"
     if (-not (Test-Path -LiteralPath $converterExe -PathType Leaf)) {
         throw "release converter was not produced at $converterExe"
     }
     $env:CE_CONVERTER_EXE = $converterExe
 
-    $texprocExe = Join-Path $rebuildRoot "target\release\texproc.exe"
+    $texprocExe = Join-Path $workspaceRoot "target\release\texproc.exe"
     if (-not (Test-Path -LiteralPath $texprocExe -PathType Leaf)) {
         throw "release texproc was not produced at $texprocExe"
     }
@@ -64,7 +64,7 @@ try {
     $texprocSmokeOutput = Join-Path $tempRoot "texproc-smoke-output"
     $texprocSmokeGroups = Join-Path $tempRoot "texproc-smoke-groups.json"
     Invoke-NativeStep "T-012 generate texproc smoke inputs" {
-        & uv run python "..\tools\generate_t012_smoke_inputs.py" --out $texprocSmokeInput
+        & uv run --project $legacyRoot python "legacy\tools\generate_t012_smoke_inputs.py" --out $texprocSmokeInput
     }
     Invoke-NativeStep "T-012 texproc scan smoke" {
         & $texprocExe scan --out $texprocSmokeGroups $texprocSmokeInput
@@ -97,20 +97,20 @@ try {
             --out $reportPath
     }
     Invoke-NativeStep "T-004 direct RC request-material golden" {
-        & uv run python "..\tools\compare_json_golden.py" `
-            "..\docs\car_direct_rc_export_material_report.json" $reportPath `
+        & uv run --project $legacyRoot python "legacy\tools\compare_json_golden.py" `
+            "legacy\docs\car_direct_rc_export_material_report.json" $reportPath `
             --expected-pointer "/request_materials" `
             --actual-pointer "/golden_policy_projection/request_materials"
     }
     Invoke-NativeStep "T-004 trailing-unassigned request-material golden" {
-        & uv run python "..\tools\compare_json_golden.py" `
-            "..\docs\phase104_car_trailing_unassigned_material_report.json" $reportPath `
+        & uv run --project $legacyRoot python "legacy\tools\compare_json_golden.py" `
+            "legacy\docs\phase104_car_trailing_unassigned_material_report.json" $reportPath `
             --expected-pointer "/request_materials" `
             --actual-pointer "/golden_policy_projection/request_materials"
     }
     Invoke-NativeStep "T-004 material-slot evidence golden" {
-        & uv run python "..\tools\compare_json_golden.py" `
-            "..\docs\current_car_user_flow_material_slot_evidence.json" $reportPath `
+        & uv run --project $legacyRoot python "legacy\tools\compare_json_golden.py" `
+            "legacy\docs\current_car_user_flow_material_slot_evidence.json" $reportPath `
             --expected-pointer "/material_slot_evidence/rows" `
             --actual-pointer "/material_slot_evidence/rows" `
             --expected-field "slot=/slot" `
@@ -126,7 +126,7 @@ try {
     $textureDir = Join-Path $tempRoot "example\car"
     $outDir = Join-Path $tempRoot "phase\rc_work"
     New-Item -ItemType Directory -Force -Path $textureDir, $outDir | Out-Null
-    $generatedMtlReference = Join-Path $rebuildRoot "fixtures\car\car-generated-reference.mtl"
+    $generatedMtlReference = Join-Path $workspaceRoot "fixtures\car\car-generated-reference.mtl"
     [xml]$generatedMtl = Get-Content -LiteralPath $generatedMtlReference -Raw
     foreach ($texture in $generatedMtl.SelectNodes("//Texture[@File]")) {
         $filename = Split-Path -Leaf ($texture.File -replace "/", "\")
@@ -139,7 +139,7 @@ try {
     Invoke-NativeStep "T-005 convert" {
         & $converterExe convert "fixtures\car\car.fbx" `
             --manifest "fixtures\car\car.fbx_material_manifest.json" `
-            --overrides "..\docs\car_native_material_overrides.json" `
+            --overrides "legacy\docs\car_native_material_overrides.json" `
             --texture-dir $textureDir `
             --out-dir $outDir
     }
@@ -149,13 +149,13 @@ try {
         # golden records legacy defect forward_up_axes "-Y+Z"; correctness is
         # anchored to the native car CGF chunk (+Z+Y, up=+Y) and the Sandbox
         # Y-up import default -Z+Y. See T-B03 R9. Golden file is not edited.
-        & uv run python "..\tools\compare_json_golden.py" `
+        & uv run --project $legacyRoot python "legacy\tools\compare_json_golden.py" `
             "fixtures\car\car-reference.request.json" $requestPath `
             --allow-path-separators `
             --ignore "`$.forward_up_axes"
     }
     Invoke-NativeStep "T-005 generated MTL golden" {
-        & uv run python "..\tools\compare_xml_golden.py" `
+        & uv run --project $legacyRoot python "legacy\tools\compare_xml_golden.py" `
             "fixtures\car\car-generated-reference.mtl" $mtlPath
     }
 
@@ -165,14 +165,14 @@ try {
     Invoke-NativeStep "T-B01 convert with native MTL texture authority" {
         & $converterExe convert "fixtures\car\car.fbx" `
             --manifest "fixtures\car\car.fbx_material_manifest.json" `
-            --overrides "..\docs\car_native_material_overrides.json" `
+            --overrides "legacy\docs\car_native_material_overrides.json" `
             --texture-dir $textureDir `
             --preserve-mtl-textures "fixtures\car\car-reference.mtl" `
             --out-dir $preserveMtlOutDir > $preserveMtlStdout
     }
     $preserveMtlPath = Join-Path $preserveMtlOutDir "kb3d_citycarsessentialssedan-native.mtl"
     Invoke-NativeStep "T-B01 native MTL texture sections" {
-        & uv run python "..\tools\compare_mtl_textures.py" `
+        & uv run --project $legacyRoot python "legacy\tools\compare_mtl_textures.py" `
             "fixtures\car\car-reference.mtl" $preserveMtlPath
     }
     $preserveMtlResult = Get-Content -LiteralPath $preserveMtlStdout -Raw | ConvertFrom-Json
@@ -195,23 +195,23 @@ try {
     }
     $gatePath = [IO.Path]::ChangeExtension($requestPath, "schema_gate.json")
     Invoke-NativeStep "T-005 schema-gate golden" {
-        & uv run python "..\tools\compare_json_golden.py" `
-            "..\docs\car_direct_rc_export_mtl_schema_gate.json" $gatePath `
+        & uv run --project $legacyRoot python "legacy\tools\compare_json_golden.py" `
+            "legacy\docs\car_direct_rc_export_mtl_schema_gate.json" $gatePath `
             --expected-pointer "/gate/summary" `
             --actual-pointer "/gate/summary"
     }
 
-    $assetFlowTests = Get-ChildItem -LiteralPath (Join-Path $repoRoot "tests") `
+    $assetFlowTests = Get-ChildItem -LiteralPath (Join-Path $legacyRoot "tests") `
         -Filter "test_asset_flow_*.py" |
         Sort-Object Name |
         ForEach-Object FullName
     Invoke-NativeStep "Python asset_flow E2E" {
-        & uv run pytest @assetFlowTests -q
+        & uv run --project $legacyRoot pytest @assetFlowTests -q
     }
     Invoke-NativeStep "Python RC smoke policy tests" {
-        & uv run pytest `
-            (Join-Path $repoRoot "tests\test_rc_smoke_rust.py") `
-            (Join-Path $repoRoot "tests\test_texproc_rc_smoke.py") -q
+        & uv run --project $legacyRoot pytest `
+            (Join-Path $legacyRoot "tests\test_rc_smoke_rust.py") `
+            (Join-Path $legacyRoot "tests\test_texproc_rc_smoke.py") -q
     }
 
     $defaultRcExe = "S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe"
@@ -238,17 +238,17 @@ try {
         $rcSmokeRoot = Join-Path $tempRoot "rust-rc-smoke"
         $rcSmokeReport = Join-Path $rcSmokeRoot "rust_rc_smoke_car.json"
         Invoke-NativeStep "Optional converter RC smoke" {
-            & uv run python "..\tools\rc_smoke_rust.py" `
+            & uv run --project $legacyRoot python "legacy\tools\rc_smoke_rust.py" `
                 --rc $rcExe `
                 --converter $converterExe `
                 --fbx "fixtures\car\car.fbx" `
                 --manifest "fixtures\car\car.fbx_material_manifest.json" `
-                --overrides "..\docs\car_native_material_overrides.json" `
+                --overrides "legacy\docs\car_native_material_overrides.json" `
                 --work-dir $rcSmokeRoot `
                 --output $rcSmokeReport
         }
 
-        $texprocFixtureRoot = Join-Path $rebuildRoot "fixtures\textures"
+        $texprocFixtureRoot = Join-Path $workspaceRoot "fixtures\textures"
         $texprocFixtureNames = @(
             "KB3D_ENC_AtlasA_ao.png",
             "KB3D_ENC_AtlasA_basecolor.png",
@@ -273,7 +273,7 @@ try {
         $texprocRcSmokeRoot = Join-Path $tempRoot "rust-texproc-rc-smoke"
         $texprocRcSmokeReport = Join-Path $texprocRcSmokeRoot "rust_texproc_rc_smoke.json"
         Invoke-NativeStep "Optional texproc RC/DDS smoke" {
-            & uv run python "..\tools\texproc_rc_smoke.py" `
+            & uv run --project $legacyRoot python "legacy\tools\texproc_rc_smoke.py" `
                 --rc $rcExe `
                 --texproc $texprocExe `
                 --work-dir $texprocRcSmokeRoot `

@@ -11,7 +11,7 @@ use crate::{
     io::{probe_header, HeaderInfo},
 };
 
-const DEFAULT_SUFFIXES: &str = include_str!("../../../suffix_settings.json");
+const DEFAULT_SUFFIXES: &str = include_str!("../data/suffix_settings.json");
 const SUPPORTED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tif", "tiff", "exr"];
 const SOURCE_TYPES: &[&str] = &[
     "diffuse",

@@ -10,7 +10,7 @@
 //! and writes `_diff` / `_spec` / `_ddna` TIFFs plus PNG eyeball copies for both.
 //!
 //! This is a cargo *example*, not a CLI subcommand: the frozen `texproc` CLI
-//! contract is untouched. Run from `rebuild/`:
+//! contract is untouched. Run from the workspace root:
 //!
 //!   cargo run -p texproc --release --example metal_swatch [OUT_DIR]
 //!

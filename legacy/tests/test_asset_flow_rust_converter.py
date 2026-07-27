@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-REBUILD_ROOT = REPO_ROOT / "rebuild"
+REBUILD_ROOT = REPO_ROOT.parent
 FIXTURE_ROOT = REBUILD_ROOT / "fixtures" / "car"
 DEFAULT_CONVERTER_EXE = REBUILD_ROOT / "target" / "release" / "converter.exe"
 EXPECTED_DUMP_SHA256 = "332F2A2ADB5DB0210797321C6F8F7ADB92AD9E94E1BC8C8543CD717049BB8FC0"
@@ -104,7 +104,7 @@ def test_rust_converter_asset_flow(tmp_path):
         "--manifest",
         CAR_MANIFEST,
         "--overrides",
-        "../docs/car_native_material_overrides.json",
+        "legacy/docs/car_native_material_overrides.json",
         "--texture-dir",
         texture_dir,
         "--out-dir",

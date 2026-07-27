@@ -120,9 +120,9 @@ mod tests {
     fn embedded_schema_matches_repository_snapshot() {
         let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
             .parent()
-            .expect("ce-schema must be inside the rebuild workspace");
+            .expect("ce-schema must be inside the workspace");
         let repository_schema =
-            fs::read_to_string(workspace_root.join("../docs/converter_schema.json"))
+            fs::read_to_string(workspace_root.join("legacy/docs/converter_schema.json"))
                 .expect("repository converter schema must be available");
 
         assert_eq!(SCHEMA_JSON, repository_schema);

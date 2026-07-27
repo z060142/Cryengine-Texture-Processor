@@ -88,7 +88,7 @@ mod tests {
     fn car_dump_has_no_t003_regression_when_fixture_is_available() {
         let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let input = crate_dir.join("../fixtures/car/car.fbx");
-        let baseline = crate_dir.join("../../docs/ufbx_alignment_report.json");
+        let baseline = crate_dir.join("../legacy/docs/ufbx_alignment_report.json");
         if !input.exists() || !baseline.exists() {
             return;
         }

@@ -70,7 +70,7 @@ pub enum ArmOrder {
 
 /// Metal gate (T-014): a per-pixel effective-metallic mask that replaces the
 /// raw metallic factor at the two conversion consumption points (INT-ALBEDO
-/// darkening, INT-REFLECTION lerp). See `rebuild/metal-gate-design.md`.
+/// darkening, INT-REFLECTION lerp). See `docs/metal-gate-design.md`.
 /// With `enabled = false` the mask collapses to `gray(metallic)`, so the
 /// pipeline is byte-identical to the pre-gate behaviour.
 #[derive(Clone, Copy, Debug, PartialEq)]

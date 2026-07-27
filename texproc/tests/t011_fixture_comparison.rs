@@ -157,9 +157,9 @@ struct ComparisonContext {
 impl ComparisonContext {
     fn discover() -> Option<Self> {
         let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let repository = manifest.parent()?.parent()?.to_path_buf();
-        let fixtures = repository.join("rebuild/fixtures/textures");
-        let driver = repository.join("tools/run_t011_python_baseline.py");
+        let repository = manifest.parent()?.to_path_buf();
+        let fixtures = repository.join("fixtures/textures");
+        let driver = repository.join("legacy/tools/run_t011_python_baseline.py");
         let fixtures_exist = FIXTURE_FILES
             .iter()
             .all(|filename| fixtures.join(filename).is_file());
@@ -194,7 +194,7 @@ fn run_python(
 ) {
     let mut command = Command::new("uv");
     command
-        .current_dir(&context.repository)
+        .current_dir(context.repository.join("legacy"))
         .args(["run", "python"])
         .arg(&context.driver)
         .arg("--fixtures")

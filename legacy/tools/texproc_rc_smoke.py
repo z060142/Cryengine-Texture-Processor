@@ -14,7 +14,7 @@ import sys
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TEXPROC_EXE = REPO_ROOT / "rebuild" / "target" / "release" / "texproc.exe"
+DEFAULT_TEXPROC_EXE = REPO_ROOT.parent / "target" / "release" / "texproc.exe"
 
 DDS_MAGIC = b"DDS "
 DDS_PIXEL_FORMAT_OFFSET = 76
@@ -227,7 +227,7 @@ def run_smoke(
         texproc_command.append("--allow-unknown")
     texproc_command.extend(["--out", str(texture_dir)])
     texproc_command.extend(str(path) for path in inputs)
-    texproc_result = _run(texproc_command, cwd=REPO_ROOT / "rebuild")
+    texproc_result = _run(texproc_command, cwd=REPO_ROOT.parent)
     if texproc_result.returncode != 0:
         raise RuntimeError(
             f"texproc exited with {texproc_result.returncode}: "

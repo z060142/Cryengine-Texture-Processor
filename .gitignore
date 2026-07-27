@@ -1,5 +1,17 @@
-ClaudeCode.md
-run.bat
+# Rust workspace
+/target/
+/fixtures/metal-swatch/
+
+# Legacy Python (frozen under legacy/, still used by acceptance gates)
 __pycache__/
+.venv/
 venv/
+.pytest_cache/
 .texproc_temp/
+
+# Local scratch
+run.bat
+ClaudeCode.md
+
+# Leftover pre-v2 build dir; delete after closing any running texproc-gui.exe
+/rebuild/

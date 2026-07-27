@@ -14,7 +14,7 @@ import xml.etree.ElementTree as ET
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CONVERTER_EXE = REPO_ROOT / "rebuild" / "target" / "release" / "converter.exe"
+DEFAULT_CONVERTER_EXE = REPO_ROOT.parent / "target" / "release" / "converter.exe"
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -250,7 +250,7 @@ def run_smoke(
         converter_command.extend(["--overrides", str(overrides_path)])
     if texture_dir:
         converter_command.extend(["--texture-dir", str(texture_dir)])
-    converter_result = _run(converter_command, cwd=REPO_ROOT / "rebuild")
+    converter_result = _run(converter_command, cwd=REPO_ROOT.parent)
     if converter_result.returncode != 0:
         raise RuntimeError(
             f"Rust converter exited with {converter_result.returncode}: "
@@ -266,7 +266,7 @@ def run_smoke(
     if cgf_path.exists():
         cgf_path.unlink()
     rc_command = build_rc_command(rc_exe, request_path, copied_fbx_path, cgf_path)
-    rc_result = _run(rc_command, cwd=REPO_ROOT / "rebuild")
+    rc_result = _run(rc_command, cwd=REPO_ROOT.parent)
     cgf_exists = cgf_path.is_file()
 
     cgf_summary = {}
