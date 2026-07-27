@@ -1204,3 +1204,12 @@ CLI `unit_size` 仍 `cm` 凍結）。
   且防止送出壞 request）。
 - **GUI 即時互動**（面板下拉、override 高亮、進度模態）本環境合成點擊無效，
   沿 R3–R8 既有限制，以 build/test + castle 端到端 CGF 佐證，視覺由業主目視。
+
+
+### R9 追記（2026-07-27 審查者）：stale exe 事故
+
+業主實測「仍倒下 + 無面板 + 顯示 -Y+Z」——查證為 **舊 exe**（build 01:57
+= R8 期，R9 提交 13:48；run_gates 排除 GUI 導致 GUI exe 不在任何驗收步驟
+中被重建）。已重建並驗證新 exe 含 Conversion Settings 字串；run_gates
+永久加入「Build release GUI（只建不測）」步驟杜絕復發。業主需以新 exe
+重測城堡。

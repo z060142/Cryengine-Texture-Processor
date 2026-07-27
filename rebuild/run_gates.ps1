@@ -44,6 +44,11 @@ try {
     Invoke-NativeStep "Run Rust core workspace tests (GUI excluded)" {
         & cargo test --workspace --exclude texproc-gui --release --locked
     }
+    # GUI is excluded from headless tests, but the release exe must still be
+    # rebuilt here so owners never smoke-test a stale binary (R9 lesson).
+    Invoke-NativeStep "Build release GUI (build only, no tests)" {
+        & cargo build -p texproc-gui --release --locked
+    }
 
     $converterExe = Join-Path $rebuildRoot "target\release\converter.exe"
     if (-not (Test-Path -LiteralPath $converterExe -PathType Leaf)) {
