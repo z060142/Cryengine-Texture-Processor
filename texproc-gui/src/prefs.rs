@@ -23,6 +23,8 @@ pub struct AppPreferences {
     /// re-detected per FBX and deliberately not persisted.
     pub conversion_unit: String,
     pub conversion_scale: f64,
+    /// GUI language code ("en" / "zh-cn"). Unknown values load back as "en".
+    pub language: String,
 }
 
 impl Default for AppPreferences {
@@ -42,6 +44,7 @@ impl Default for AppPreferences {
             export_associated_textures: false,
             conversion_unit: "file".to_owned(),
             conversion_scale: 1.0,
+            language: "en".to_owned(),
         }
     }
 }
@@ -77,6 +80,8 @@ impl AppPreferences {
             .get("conversion_scale")
             .and_then(Value::as_f64)
             .unwrap_or(preferences.conversion_scale);
+        // Unknown / missing language codes fall back to "en".
+        preferences.language = normalize_language(&string(&value, "language"));
         preferences
     }
 
@@ -101,6 +106,7 @@ impl AppPreferences {
             "export_associated_textures": self.export_associated_textures,
             "conversion_unit": self.conversion_unit,
             "conversion_scale": self.conversion_scale,
+            "language": self.language,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");
@@ -149,5 +155,60 @@ fn non_empty_or(value: String, fallback: String) -> String {
         fallback
     } else {
         value
+    }
+}
+
+/// Canonicalize a stored language code. Only "zh-cn" is recognized alongside
+/// "en"; anything else (empty, unknown, legacy) resolves to "en".
+fn normalize_language(code: &str) -> String {
+    match code {
+        "zh-cn" => "zh-cn".to_owned(),
+        _ => "en".to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn language_defaults_to_en() {
+        assert_eq!(AppPreferences::default().language, "en");
+    }
+
+    #[test]
+    fn language_normalizes_unknown_to_en() {
+        assert_eq!(normalize_language("zh-cn"), "zh-cn");
+        assert_eq!(normalize_language("en"), "en");
+        assert_eq!(normalize_language("fr"), "en");
+        assert_eq!(normalize_language(""), "en");
+    }
+
+    #[test]
+    fn language_survives_save_load_round_trip() {
+        // Isolate the on-disk prefs to a temp dir via LOCALAPPDATA; this is the
+        // only prefs test that touches env, so no intra-crate race.
+        let temp = env::temp_dir().join(format!(
+            "texproc-prefs-test-{}",
+            std::process::id()
+        ));
+        let previous = env::var_os("LOCALAPPDATA");
+        env::set_var("LOCALAPPDATA", &temp);
+
+        let mut prefs = AppPreferences::default();
+        prefs.language = "zh-cn".to_owned();
+        prefs.save().expect("save prefs");
+        assert_eq!(AppPreferences::load().language, "zh-cn");
+
+        // An unknown code on disk loads back as "en".
+        prefs.language = "de".to_owned();
+        prefs.save().expect("save prefs");
+        assert_eq!(AppPreferences::load().language, "en");
+
+        match previous {
+            Some(value) => env::set_var("LOCALAPPDATA", value),
+            None => env::remove_var("LOCALAPPDATA"),
+        }
+        let _ = fs::remove_dir_all(&temp);
     }
 }
