@@ -1078,3 +1078,32 @@ GUI 無 console，abort 訊息不可見 → 靜默消失。CLI 同病，只是�
   枚舉單元測試證明，本機語料無此檔可端到端跑。
 - GUI 即時互動（多選高亮、批量鈕、進度模態）本環境合成點擊無效，沿 R3–R7
   既有限制，以 build/test/啟動不崩佐證，視覺由業主目視驗收。
+
+## R9（2026-07-27 業主回報 + 面板研究裁決）
+
+**診斷（證據鏈完整）**：`KB3D_ENC_BldgLgCastle_A_grp.fbx` 宣告標準 Y-up
+（up=+Y, front=+Z）。native car CGF（引擎內正確）的 import settings 實錄
+`forward_up_axes="+Z+Y"`（up=+Y！）、`unit_size="file"`
+（phase99_car_example_import_settings_raw.json）；Sandbox 匯入面板對同類
+Y-up 檔預設 Forward=-Z / Up=+Y。**舊 Python 寫死的 `-Y+Z`（up=+Z）對
+Y-up 檔是缺陷**，被移植進 request golden，R8 錨定了錯值 → 模型翻倒。
+
+1. **修推導**（刻意不等價，Sandbox/native-car 錨定）：
+   `up = 宣告 up`、`forward = −宣告 front`（ufbx front 朝觀者）。
+   Y-up/front+Z → **`-Z+Y`**。car golden 的 `forward_up_axes` 欄位加入
+   白名單（附註：golden 記錄的是舊工具缺陷值 `-Y+Z`；正確性以 native car
+   chunk +Z+Y 的 up=+Y 與 Sandbox 預設為錨）。全枚舉測試更新。
+2. **Conversion Settings 手動面板**（Sandbox 同構，讀錯時美術可救）：
+   Model tab 新增區塊，全部是 request 既有欄位的 GUI 化：
+   - Unit（下拉，值域照 rc_import_schema 的合法 unit_size，含 `file`；
+     預設 `file`）、Scale（數字，預設 1）。
+   - Forward / Up（各一下拉 ±X/±Y/±Z，預設 = 自動偵測值，可改；
+     顯示「Detected: …」供對照）。
+   - Merge all nodes / Scene origin 核取框（預設 false）。
+   - 手動值一律覆蓋自動偵測進 request；與偵測不同時欄位標示 override 態。
+3. 城堡實測：castle.fbx 以修正推導（或手動 -Z+Y）convert→RC→CGF，
+   業主引擎內確認站立方向正確（結票條件）。
+
+**DoD**：推導修正 + 白名單註記；面板六控件實作與持久化（Unit/Scale 記憶，
+Forward/Up 每檔重偵測不記憶）；gate 全綠（request golden 除白名單欄位）；
+castle CGF 產出待業主目視。
