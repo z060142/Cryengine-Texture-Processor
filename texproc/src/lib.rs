@@ -5,6 +5,7 @@ pub mod grouping;
 pub mod io;
 pub mod ops;
 pub mod output;
+pub mod passthrough;
 pub mod pipeline;
 pub mod planar;
 pub mod settings;
@@ -18,6 +19,7 @@ pub use grouping::{
     SuffixTable,
 };
 pub use io::{decode_image, probe_header, write_tiff_lzw, HeaderInfo};
+pub use passthrough::{is_passthrough_ext, is_passthrough_path, stage_passthrough};
 pub use output::{
     process_and_write_stage2, process_stage2, write_stage2_outputs, DiffFormat, OutputImage,
     OutputResolution, OutputTextures, Stage2Report, Stage2Step, TextureSettings,

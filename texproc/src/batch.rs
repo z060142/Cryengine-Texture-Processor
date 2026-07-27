@@ -146,17 +146,40 @@ pub fn process_scan_group(
         panic!("injected test panic");
     }
     let started = Instant::now();
-    let sources = load_sources(&scan_group.slots, settings)?;
-    let mut group = TextureGroup {
-        base_name: scan_group.base_name.clone(),
-        sources,
-        intermediate: Default::default(),
-        output: OutputTextures::default(),
-    };
-    process_stage1(&mut group, &settings.intermediate_settings())?;
-    // Stream each Stage 2 output to disk and drop it, instead of accumulating
-    // all six in `group.output` before writing.
-    let written = process_and_write_stage2(&group, settings, output_root)?;
+
+    // T-015: `.hdr`/`.exr` inputs skip the TIF pipeline and are staged into the
+    // output directory as Radiance `.hdr` for RC's cubemap-HDR path. They arrive
+    // as `unknown` entries (env maps carry no type suffix); branch on extension.
+    let mut written = Vec::new();
+    let mut passthrough_count = 0;
+    for entry in &scan_group.unknown {
+        if crate::passthrough::is_passthrough_path(Path::new(&entry.path)) {
+            written.push(crate::passthrough::stage_passthrough(
+                Path::new(&entry.path),
+                output_root,
+            )?);
+            passthrough_count += 1;
+        }
+    }
+
+    // Run Stage 1/2 unless the group is nothing but passthrough files — a pure
+    // env-map group must not emit a fallback spec TIF.
+    let pipeline_work =
+        !scan_group.slots.is_empty() || passthrough_count != scan_group.unknown.len();
+    if pipeline_work {
+        let sources = load_sources(&scan_group.slots, settings)?;
+        let mut group = TextureGroup {
+            base_name: scan_group.base_name.clone(),
+            sources,
+            intermediate: Default::default(),
+            output: OutputTextures::default(),
+        };
+        process_stage1(&mut group, &settings.intermediate_settings())?;
+        // Stream each Stage 2 output to disk and drop it, instead of accumulating
+        // all six in `group.output` before writing.
+        written.extend(process_and_write_stage2(&group, settings, output_root)?);
+    }
+
     Ok(ProcessedGroup {
         base_name: scan_group.base_name.clone(),
         written,
@@ -437,6 +460,103 @@ mod tests {
             budget_override_bytes(Some(" 2048 ")),
             Some(2048 * 1024 * 1024)
         );
+    }
+
+    /// Anchor 2 (T-015): a mixed input directory — a real PNG texture group plus
+    /// one `.hdr` and one `.exr` env map — scans without tripping the exit-3 gate;
+    /// the PNG group yields TIFs while the hdr/exr each yield exactly one staged
+    /// `.hdr` in the output dir, and neither emits a fallback spec TIF.
+    #[test]
+    fn mixed_png_hdr_exr_dir_stages_hdr_and_keeps_tif_pipeline() {
+        use std::io::BufWriter;
+
+        use image::codecs::{hdr::HdrEncoder, openexr::OpenExrEncoder};
+        use image::{ColorType, ExtendedColorType, ImageEncoder, ImageFormat, Rgb};
+
+        use crate::{scan_inputs, SuffixTable};
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir()
+            .join(format!("texproc-t015-mixed-{}-{nonce}", std::process::id()));
+        let input = root.join("in");
+        let output = root.join("out");
+        std::fs::create_dir_all(&input).unwrap();
+
+        // A real PNG texture group (diffuse + normal).
+        for name in ["Wall_diff.png", "Wall_normal.png"] {
+            image::save_buffer_with_format(
+                input.join(name),
+                &[10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120],
+                2,
+                2,
+                ColorType::Rgb8,
+                ImageFormat::Png,
+            )
+            .unwrap();
+        }
+        // One .hdr env map (Radiance).
+        HdrEncoder::new(BufWriter::new(
+            std::fs::File::create(input.join("Sky.hdr")).unwrap(),
+        ))
+        .encode(&vec![Rgb([2.0f32, 1.0, 0.5]); 4], 2, 2)
+        .unwrap();
+        // One .exr env map.
+        let exr_bytes = [0.5f32, 1.0, 2.0]
+            .iter()
+            .cycle()
+            .take(12)
+            .flat_map(|s| s.to_ne_bytes())
+            .collect::<Vec<_>>();
+        OpenExrEncoder::new(BufWriter::new(
+            std::fs::File::create(input.join("Env.exr")).unwrap(),
+        ))
+        .write_image(&exr_bytes, 2, 2, ExtendedColorType::Rgb32F)
+        .unwrap();
+
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = scan_inputs(&[input.clone()], &suffixes).unwrap();
+        // Exit-3 gate is clear: the hdr/exr passthrough groups do not block.
+        assert_eq!(scan.unknown_only_groups().count(), 0, "passthrough must not block");
+
+        let cancel = AtomicBool::new(false);
+        let report =
+            process_scan_parallel(&scan, &TextureSettings::default(), &output, &cancel, |_| {})
+                .expect("processing succeeds");
+        assert!(report.failed.is_empty(), "no group should fail: {:?}", report.failed);
+
+        let names = |dir: &Path| {
+            std::fs::read_dir(dir)
+                .unwrap()
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        };
+        let produced = names(&output);
+        // hdr and exr each produced exactly one staged .hdr.
+        assert!(produced.contains(&"Sky.hdr".to_owned()), "Sky.hdr missing: {produced:?}");
+        assert!(produced.contains(&"Env.hdr".to_owned()), "Env.hdr missing: {produced:?}");
+        // The PNG group still emits TIFs.
+        assert!(
+            produced.iter().any(|n| n.eq_ignore_ascii_case("Wall_diff.tif")),
+            "Wall_diff.tif missing: {produced:?}"
+        );
+        // No fallback spec TIF for the pure env-map groups.
+        assert!(
+            !produced.iter().any(|n| n.starts_with("Sky") && n.ends_with(".tif")),
+            "env map must not emit a TIF: {produced:?}"
+        );
+        assert!(
+            !produced.iter().any(|n| n.starts_with("Env") && n.ends_with(".tif")),
+            "env map must not emit a TIF: {produced:?}"
+        );
+        // Source files are untouched (both hdr and exr still present).
+        assert!(input.join("Sky.hdr").is_file());
+        assert!(input.join("Env.exr").is_file());
+
+        std::fs::remove_dir_all(&root).ok();
     }
 
     #[test]

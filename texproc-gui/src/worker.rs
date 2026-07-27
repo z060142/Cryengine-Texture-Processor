@@ -240,7 +240,9 @@ pub fn start_process(
     ProcessJob { receiver, cancel }
 }
 
-/// Collect the TIFF outputs from a batch report — one RC → DDS job each.
+/// Collect the RC → DDS jobs from a batch report — one per produced file. TIFFs
+/// from the texture pipeline plus staged `.hdr` env maps (T-015 passthrough),
+/// which RC compiles as its cubemap-HDR special case.
 pub fn dds_jobs(report: &BatchProcessReport) -> Vec<PathBuf> {
     report
         .groups
@@ -249,7 +251,7 @@ pub fn dds_jobs(report: &BatchProcessReport) -> Vec<PathBuf> {
         .filter(|path| {
             path.extension()
                 .and_then(|ext| ext.to_str())
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("tif"))
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("tif") || ext.eq_ignore_ascii_case("hdr"))
         })
         .cloned()
         .collect()
@@ -1004,6 +1006,179 @@ mod tests {
     use super::*;
     use texproc::batch::ProcessedGroup;
 
+    /// T-015 anchors 3 & 4: push a real `.hdr` (and an `.exr`) through the new
+    /// passthrough path with a real RC and `delete_tif=true`. Asserts RC produced
+    /// a DDS from the staged `.hdr`, probes the DDS header for cubemap/HDR
+    /// evidence, and asserts cleanup deleted the output-dir `.tif`/`.hdr` while
+    /// the input-dir source files are untouched. Ignored by default (needs RC):
+    ///   set CE_RC_EXE=...\rc.exe
+    ///   cargo test -p texproc-gui -- --ignored --nocapture hdr_passthrough_rc
+    #[test]
+    #[ignore = "requires a real RC.exe (CE_RC_EXE or the default S: path)"]
+    fn hdr_passthrough_rc_produces_dds_and_cleans_staged_files() {
+        use std::io::Read;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        use texproc::{scan_inputs, SuffixTable};
+
+        let rc = std::env::var_os("CE_RC_EXE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe")
+            });
+        assert!(rc.is_file(), "RC not found at {}", rc.display());
+
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("texproc-gui-t015-{}-{nonce}", std::process::id()));
+        let input = root.join("in");
+        let output = root.join("out");
+        fs::create_dir_all(&input).unwrap();
+
+        // A real PNG texture group (copied fixtures) so a real TIF is produced
+        // alongside the env map — no `image` dependency needed in this crate.
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("fixtures")
+            .join("textures");
+        for name in ["KB3D_ENC_AtlasA_basecolor.png", "KB3D_ENC_AtlasA_normal.png"] {
+            fs::copy(fixtures.join(name), input.join(name))
+                .unwrap_or_else(|e| panic!("copy fixture {name}: {e}"));
+        }
+        // A synthetic HDR environment map (2:1 lat-long, values above 1.0),
+        // written as flat old-format Radiance RGBE (universally decodable).
+        fs::write(input.join("Sky.hdr"), &synth_radiance_hdr(256, 128)).unwrap();
+
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = scan_inputs(&[input.clone()], &suffixes).unwrap();
+        assert_eq!(scan.unknown_only_groups().count(), 0);
+
+        let job = start_process(
+            scan,
+            TextureSettings::default(),
+            output.clone(),
+            Some(rc.clone()),
+            true, // delete_tif
+        );
+        let mut complete = None;
+        while let Ok(event) = job.receiver.recv() {
+            match event {
+                ProcessEvent::Finished(result) => {
+                    complete = Some(result.expect("processing succeeded"));
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let complete = complete.expect("worker finished");
+        let dds = complete.dds.expect("DDS pass ran");
+        eprintln!(
+            "DDS: {}/{} succeeded; failures: {:?}",
+            dds.succeeded, dds.total, dds.failures
+        );
+
+        let sky_dds = output.join("Sky.dds");
+        assert!(sky_dds.is_file(), "RC did not produce Sky.dds");
+
+        // Probe the DDS header for cubemap/HDR evidence.
+        let mut bytes = Vec::new();
+        fs::File::open(&sky_dds).unwrap().read_to_end(&mut bytes).unwrap();
+        let summary = dds_header_summary(&bytes);
+        eprintln!("Sky.dds header: {summary}");
+        assert!(
+            summary.contains("cubemap") || summary.contains("BC6H") || summary.contains("HDR-float"),
+            "Sky.dds is not cubemap/HDR: {summary}"
+        );
+
+        // Cleanup (delete_tif): staged .hdr and produced .tif are gone from the
+        // output dir once their DDS succeeded.
+        let out_names = fs::read_dir(&output)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        eprintln!("output dir after cleanup: {out_names:?}");
+        assert!(
+            !out_names.iter().any(|n| n.ends_with(".hdr")),
+            "staged .hdr should be deleted: {out_names:?}"
+        );
+        assert!(
+            !out_names.iter().any(|n| n.ends_with(".tif")),
+            "produced .tif should be deleted: {out_names:?}"
+        );
+        assert!(out_names.iter().any(|n| n == "Sky.dds"));
+
+        // Sources in the input dir are untouched.
+        for name in [
+            "Sky.hdr",
+            "KB3D_ENC_AtlasA_basecolor.png",
+            "KB3D_ENC_AtlasA_normal.png",
+        ] {
+            assert!(input.join(name).is_file(), "source {name} was modified/deleted");
+        }
+
+        if std::env::var_os("TEXPROC_KEEP_OUTPUT").is_none() {
+            fs::remove_dir_all(&root).ok();
+        } else {
+            eprintln!("kept outputs under {}", root.display());
+        }
+    }
+
+    /// Build a flat old-format Radiance HDR (RGBE, no RLE) with an HDR-range
+    /// gradient. Mantissa bytes stay in 64..=255 so no scanline is mistaken for
+    /// a new/old RLE marker — every pixel is read literally by any decoder.
+    fn synth_radiance_hdr(width: usize, height: usize) -> Vec<u8> {
+        let mut out = format!("#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y {height} +X {width}\n")
+            .into_bytes();
+        for y in 0..height {
+            for x in 0..width {
+                let r = 64 + (x * 191 / width) as u8;
+                let g = 64 + (y * 191 / height) as u8;
+                let b = 128u8;
+                let e = 130u8; // exponent 130 → scale 2^2 = 4×, so values exceed 1.0
+                out.extend_from_slice(&[r, g, b, e]);
+            }
+        }
+        out
+    }
+
+    /// One-line DDS header summary: dimensions, fourCC, caps2 cubemap flag, and
+    /// (for DX10 headers) the DXGI format with HDR/BC6H classification.
+    fn dds_header_summary(bytes: &[u8]) -> String {
+        let dword = |off: usize| {
+            u32::from_le_bytes(bytes[off..off + 4].try_into().unwrap())
+        };
+        if bytes.len() < 128 || &bytes[0..4] != b"DDS " {
+            return "not a DDS file".to_owned();
+        }
+        let height = dword(12);
+        let width = dword(16);
+        let four_cc = String::from_utf8_lossy(&bytes[84..88]).into_owned();
+        let caps2 = dword(112);
+        let cubemap = (caps2 & 0x200) != 0;
+        let mut parts = vec![format!("{width}x{height}"), format!("fourCC='{four_cc}'")];
+        if cubemap {
+            parts.push("cubemap(caps2=0x200)".to_owned());
+        }
+        if four_cc == "DX10" && bytes.len() >= 148 {
+            let dxgi = dword(128);
+            let label = match dxgi {
+                2 => "R32G32B32A32_FLOAT (HDR-float)",
+                10 => "R16G16B16A16_FLOAT (HDR-float)",
+                67 => "R9G9B9E5_SHAREDEXP (HDR-float)",
+                94 | 95 | 96 => "BC6H (HDR)",
+                other => return format!("{} dxgi={other}", parts.join(" ")),
+            };
+            let arr = dword(136); // arraySize; 6 with MISC_TEXTURECUBE => cubemap
+            let misc = dword(132);
+            if (misc & 0x4) != 0 {
+                parts.push(format!("cubemap(DX10 misc=0x4, array={arr})"));
+            }
+            parts.push(label.to_owned());
+        }
+        parts.join(" ")
+    }
+
     /// End-to-end evidence for item 4 (Export associated textures with model):
     /// process the PropAxe FBX's referenced texture groups into a texture output
     /// dir, convert with texture_dir pointing there, RC → CGF, then DDS with
@@ -1170,19 +1345,21 @@ mod tests {
     }
 
     #[test]
-    fn dds_jobs_selects_only_tiff_outputs() {
+    fn dds_jobs_selects_tiff_and_staged_hdr_outputs() {
         let report = report(vec![
             r"C:\out\Stone_diff.tif",
             r"C:\out\Stone_ddna.TIF",
+            r"C:\out\Sky_env.hdr", // T-015 staged env map → RC cubemap-HDR
+            r"C:\out\Sky_env.HDR",
             r"C:\out\Stone_diff.dds",
             r"C:\out\notes.txt",
         ]);
         let jobs = dds_jobs(&report);
-        assert_eq!(jobs.len(), 2);
+        assert_eq!(jobs.len(), 4);
         assert!(jobs.iter().all(|path| path
             .extension()
             .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("tif"))));
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("tif") || ext.eq_ignore_ascii_case("hdr"))));
     }
 
     const GIB: u64 = 1024 * 1024 * 1024;

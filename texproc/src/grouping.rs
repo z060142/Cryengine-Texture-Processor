@@ -12,7 +12,9 @@ use crate::{
 };
 
 const DEFAULT_SUFFIXES: &str = include_str!("../data/suffix_settings.json");
-const SUPPORTED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tif", "tiff", "exr"];
+// `hdr`/`exr` are HDR passthrough formats (T-015): accepted by the scanner so
+// they never trip DEF-20, then staged straight to RC instead of the TIF pipeline.
+const SUPPORTED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "tif", "tiff", "exr", "hdr"];
 const SOURCE_TYPES: &[&str] = &[
     "diffuse",
     "normal",
@@ -189,9 +191,16 @@ pub struct ScanResult {
 
 impl ScanResult {
     pub fn unknown_only_groups(&self) -> impl Iterator<Item = &ScanGroup> {
-        self.groups
-            .iter()
-            .filter(|group| group.slots.is_empty() && !group.unknown.is_empty())
+        // HDR passthrough entries (`.hdr`/`.exr`, T-015) are unclassified by
+        // design but are handled by the process stage, so a group that is only
+        // passthrough files must not trip the exit-3 grouping gate.
+        self.groups.iter().filter(|group| {
+            group.slots.is_empty()
+                && group
+                    .unknown
+                    .iter()
+                    .any(|entry| !crate::passthrough::is_passthrough_path(Path::new(&entry.path)))
+        })
     }
 }
 
@@ -330,6 +339,16 @@ fn classify_path(
             Some(path),
             None,
         ));
+        return unknown_entry(path, &filename, raw_stem, None);
+    }
+
+    // T-015: `.hdr`/`.exr` are HDR passthrough formats. Branch on extension
+    // *before* any header probe or type classification: they carry no type
+    // suffix (env maps), Radiance HDR is not a probe-able format here, and the
+    // owner's ruling routes every `.exr` to RC rather than the TIF pipeline
+    // regardless of suffix. They land as `unknown` and the process stage stages
+    // them to RC (see `passthrough` / `batch::process_scan_group`).
+    if crate::passthrough::is_passthrough_ext(&extension) {
         return unknown_entry(path, &filename, raw_stem, None);
     }
 
