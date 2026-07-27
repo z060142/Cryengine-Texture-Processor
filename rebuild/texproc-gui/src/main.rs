@@ -1956,6 +1956,12 @@ impl WorkflowApp {
                 &mut self.settings.generate_sss_from_diffuse,
                 "Generate SSS from Diffuse",
             );
+            ui.add_space(6.0);
+            ui.checkbox(&mut self.settings.metal_gate, "Metal Gate")
+                .on_hover_text(
+                    "Suppress metallic conversion for pixels that would land in the CE \
+                     dead zone (low metallic / dark predicted spec). Off = raw metallic factor.",
+                );
             Grid::new("advanced_texture_settings")
                 .num_columns(2)
                 .show(ui, |ui| {
@@ -1999,6 +2005,44 @@ impl WorkflowApp {
                             .speed(0.05)
                             .range(0.0..=5.0),
                     );
+                    ui.end_row();
+
+                    ui.add_enabled_ui(self.settings.metal_gate, |ui| {
+                        Grid::new("metal_gate_settings")
+                            .num_columns(2)
+                            .show(ui, |ui| {
+                                ui.label("Metal Gate Metallic Cut");
+                                ui.add(
+                                    egui::DragValue::new(
+                                        &mut self.settings.metal_gate_metallic_cut,
+                                    )
+                                    .speed(0.01)
+                                    .range(0.0..=1.0),
+                                );
+                                ui.end_row();
+                                ui.label("Metal Gate Spec Min");
+                                ui.add(
+                                    egui::DragValue::new(&mut self.settings.metal_gate_spec_min)
+                                        .speed(0.01)
+                                        .range(0.0..=1.0),
+                                );
+                                ui.end_row();
+                                ui.label("Metal Gate Gloss Cut (0 = off)");
+                                ui.add(
+                                    egui::DragValue::new(&mut self.settings.metal_gate_gloss_cut)
+                                        .speed(0.01)
+                                        .range(0.0..=1.0),
+                                );
+                                ui.end_row();
+                                ui.label("Metal Gate Transition (0 = hard)");
+                                ui.add(
+                                    egui::DragValue::new(&mut self.settings.metal_gate_transition)
+                                        .speed(0.01)
+                                        .range(0.0..=0.5),
+                                );
+                                ui.end_row();
+                            });
+                    });
                     ui.end_row();
                 });
         });

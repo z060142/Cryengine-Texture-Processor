@@ -284,6 +284,9 @@ fn produce_rust_metallic_sample(fixtures: &Path, output: &Path) -> PathBuf {
     group.sources.alpha = Some(source(fixtures, "KB3D_ENC_AtlasA_opacity.png"));
     let settings = TextureSettings {
         texture_types: only_diff(),
+        // DEF-05 anchor compares the raw linear-burn conversion vs the old
+        // Python path; keep the metal gate off so this stays the pre-T-014 anchor.
+        metal_gate: false,
         ..TextureSettings::default()
     };
     process_stage1(&mut group, &settings.intermediate_settings()).unwrap();

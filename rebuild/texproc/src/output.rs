@@ -15,7 +15,7 @@ use crate::{
         auto_level, colorize, copy_opacity, eval_mul, flip_green, gray, resize, srgb_decode,
         srgb_encode,
     },
-    pipeline::{ArmOrder, IntermediateSettings, TextureGroup},
+    pipeline::{ArmOrder, IntermediateSettings, MetalGate, TextureGroup},
     planar::PlanarImage,
 };
 
@@ -63,6 +63,11 @@ pub struct TextureSettings {
     pub normal_flip_green: bool,
     pub normalize_height: bool,
     pub process_metallic: bool,
+    pub metal_gate: bool,
+    pub metal_gate_metallic_cut: f32,
+    pub metal_gate_spec_min: f32,
+    pub metal_gate_gloss_cut: f32,
+    pub metal_gate_transition: f32,
     pub normal_from_height_strength: f32,
     pub arm_order: ArmOrder,
     pub generate_missing_spec: bool,
@@ -84,6 +89,11 @@ impl Default for TextureSettings {
             normal_flip_green: false,
             normalize_height: false,
             process_metallic: true,
+            metal_gate: true,
+            metal_gate_metallic_cut: 0.5,
+            metal_gate_spec_min: 180.0 / 255.0,
+            metal_gate_gloss_cut: 0.0,
+            metal_gate_transition: 0.05,
             normal_from_height_strength: 10.0,
             arm_order: ArmOrder::Arm,
             generate_missing_spec: true,
@@ -105,6 +115,13 @@ impl TextureSettings {
             process_metallic: self.process_metallic,
             normal_from_height_strength: self.normal_from_height_strength,
             arm_order: self.arm_order,
+            metal_gate: MetalGate {
+                enabled: self.metal_gate,
+                metallic_cut: self.metal_gate_metallic_cut,
+                spec_min: self.metal_gate_spec_min,
+                gloss_cut: self.metal_gate_gloss_cut,
+                transition: self.metal_gate_transition,
+            },
         }
     }
 }

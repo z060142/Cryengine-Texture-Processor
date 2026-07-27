@@ -1,5 +1,5 @@
 use crate::{
-    constants::DEFAULT_NONMETAL_REFLECTION,
+    constants::{DEFAULT_NONMETAL_REFLECTION, LUMA_WEIGHTS},
     error::{Result, TexprocError},
     ops::{flip_green, gray, invert, linear_burn, normal_from_height, srgb_decode, srgb_encode},
     output::OutputTextures,
@@ -68,11 +68,42 @@ pub enum ArmOrder {
     Rma,
 }
 
+/// Metal gate (T-014): a per-pixel effective-metallic mask that replaces the
+/// raw metallic factor at the two conversion consumption points (INT-ALBEDO
+/// darkening, INT-REFLECTION lerp). See `rebuild/metal-gate-design.md`.
+/// With `enabled = false` the mask collapses to `gray(metallic)`, so the
+/// pipeline is byte-identical to the pre-gate behaviour.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MetalGate {
+    pub enabled: bool,
+    /// C1: metallic must clear this cut (PBR: metallic is essentially binary).
+    pub metallic_cut: f32,
+    /// C3: predicted spec luma (linear luma of basecolor) must clear this.
+    pub spec_min: f32,
+    /// C2: optional CE gloss floor; `0.0` disables the gloss condition.
+    pub gloss_cut: f32,
+    /// smoothstep transition half-width; `0.0` = hard cut.
+    pub transition: f32,
+}
+
+impl Default for MetalGate {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            metallic_cut: 0.5,
+            spec_min: 180.0 / 255.0,
+            gloss_cut: 0.0,
+            transition: 0.05,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IntermediateSettings {
     pub process_metallic: bool,
     pub normal_from_height_strength: f32,
     pub arm_order: ArmOrder,
+    pub metal_gate: MetalGate,
 }
 
 impl Default for IntermediateSettings {
@@ -81,6 +112,7 @@ impl Default for IntermediateSettings {
             process_metallic: true,
             normal_from_height_strength: 10.0,
             arm_order: ArmOrder::Arm,
+            metal_gate: MetalGate::default(),
         }
     }
 }
@@ -265,7 +297,15 @@ fn process_albedo(
             .map(|source| &source.image)
             .or(intermediate.metallic.as_ref());
         if let Some(metallic) = metallic {
-            let inverted_metallic = invert(&gray(metallic));
+            // INT-ALBEDO consumption point: darken by M_eff instead of raw metallic.
+            let gloss = gate_gloss(sources, intermediate, &settings.metal_gate);
+            let mask = effective_metallic(
+                metallic,
+                &diffuse.image,
+                gloss.as_ref(),
+                &settings.metal_gate,
+            );
+            let inverted_metallic = invert(&mask);
             return linear_burn(&diffuse.image, &inverted_metallic).map(Some);
         }
     }
@@ -386,12 +426,25 @@ fn process_reflection(
         .map(|source| &source.image)
         .or(intermediate.metallic.as_ref());
 
+    let gloss = gate_gloss(sources, intermediate, &settings.metal_gate);
     metallic
-        .map(|metallic| metal_reflection(&diffuse.image, metallic))
+        .map(|metallic| {
+            metal_reflection(
+                &diffuse.image,
+                metallic,
+                gloss.as_ref(),
+                &settings.metal_gate,
+            )
+        })
         .transpose()
 }
 
-fn metal_reflection(diffuse: &PlanarImage, metallic: &PlanarImage) -> Result<PlanarImage> {
+fn metal_reflection(
+    diffuse: &PlanarImage,
+    metallic: &PlanarImage,
+    gloss: Option<&PlanarImage>,
+    gate: &MetalGate,
+) -> Result<PlanarImage> {
     if diffuse.width != metallic.width || diffuse.height != metallic.height {
         return Err(TexprocError::new(format!(
             "INT-REFLECTION dimension mismatch: diffuse {}x{} versus metallic {}x{}",
@@ -399,7 +452,8 @@ fn metal_reflection(diffuse: &PlanarImage, metallic: &PlanarImage) -> Result<Pla
         )));
     }
 
-    let metallic = gray(metallic);
+    // INT-REFLECTION consumption point: lerp factor is M_eff, not raw metallic.
+    let mask = effective_metallic(metallic, diffuse, gloss, gate);
     let gray_linear = srgb_decode(DEFAULT_NONMETAL_REFLECTION[0]);
     let mut planes = vec![
         Vec::with_capacity(diffuse.pixel_count()),
@@ -407,7 +461,7 @@ fn metal_reflection(diffuse: &PlanarImage, metallic: &PlanarImage) -> Result<Pla
         Vec::with_capacity(diffuse.pixel_count()),
     ];
     for index in 0..diffuse.pixel_count() {
-        let factor = metallic.planes[0][index];
+        let factor = mask.planes[0][index];
         for (channel, plane) in planes.iter_mut().enumerate() {
             let diffuse_encoded = if diffuse.channels() < 3 {
                 diffuse.planes[0][index]
@@ -421,6 +475,89 @@ fn metal_reflection(diffuse: &PlanarImage, metallic: &PlanarImage) -> Result<Pla
         }
     }
     PlanarImage::new(diffuse.width, diffuse.height, planes)
+}
+
+/// Resolve the gloss channel the gate needs. Only computed when the gloss
+/// condition is active (`gloss_cut > 0`); otherwise `None`, so C2 collapses
+/// to 1 and no gloss work is done. `process_gloss` returns the same value
+/// whether called before (albedo) or after (reflection) the gloss step.
+fn gate_gloss(
+    sources: &SourceTextures,
+    intermediate: &IntermediateTextures,
+    gate: &MetalGate,
+) -> Option<PlanarImage> {
+    if gate.enabled && gate.gloss_cut > 0.0 {
+        process_gloss(sources, intermediate)
+    } else {
+        None
+    }
+}
+
+/// Per-pixel effective metallic mask `M_eff` (single plane). When the gate is
+/// disabled this is exactly `gray(metallic)`, keeping the pipeline byte-identical
+/// to pre-gate behaviour.
+fn effective_metallic(
+    metallic: &PlanarImage,
+    diffuse: &PlanarImage,
+    gloss: Option<&PlanarImage>,
+    gate: &MetalGate,
+) -> PlanarImage {
+    let metallic = gray(metallic);
+    if !gate.enabled {
+        return metallic;
+    }
+    let plane = (0..metallic.pixel_count())
+        .map(|index| {
+            let m = metallic.planes[0][index];
+            let g = gloss.map_or(0.0, |gloss| gloss.planes[0][index]);
+            let spec_pred = linear_luma(diffuse, index);
+            metal_gate_factor(m, g, spec_pred, gate)
+        })
+        .collect();
+    PlanarImage::new(metallic.width, metallic.height, vec![plane])
+        .expect("gate mask preserves the metallic image's valid dimensions")
+}
+
+/// Predicted post-conversion spec luma: luma(basecolor) computed in the LINEAR
+/// domain (reuse the DEF-08 island's `srgb_decode`).
+fn linear_luma(image: &PlanarImage, index: usize) -> f32 {
+    if image.channels() < 3 {
+        srgb_decode(image.planes[0][index])
+    } else {
+        LUMA_WEIGHTS[0] * srgb_decode(image.planes[0][index])
+            + LUMA_WEIGHTS[1] * srgb_decode(image.planes[1][index])
+            + LUMA_WEIGHTS[2] * srgb_decode(image.planes[2][index])
+    }
+}
+
+/// `M_eff = T(C1) · T(C2) · T(C3)` (design §2, corrected 2026-07-27). True
+/// binarization: metallic enters *only* through C1's smoothstep, so a passing
+/// pixel snaps to `M_eff ≈ 1` (full conversion) and a failing one to 0 — no
+/// leading `m` factor, no partial half-conversion for mid-value metallic. `T`
+/// is a smoothstep across `[cut − w, cut + w]`; `w = 0` is a hard cut. The
+/// gloss condition (C2) is skipped entirely when `gloss_cut <= 0`.
+fn metal_gate_factor(metallic: f32, gloss: f32, spec_pred: f32, gate: &MetalGate) -> f32 {
+    if !gate.enabled {
+        return metallic;
+    }
+    let w = gate.transition.max(0.0);
+    let c1 = gate_step(gate.metallic_cut, w, metallic);
+    let c2 = if gate.gloss_cut > 0.0 {
+        gate_step(gate.gloss_cut, w, gloss)
+    } else {
+        1.0
+    };
+    let c3 = gate_step(gate.spec_min, w, spec_pred);
+    c1 * c2 * c3
+}
+
+fn gate_step(cut: f32, half_width: f32, value: f32) -> f32 {
+    if half_width <= 0.0 {
+        // ponytail: hard cut; boundary passes (>= cut).
+        return if value >= cut { 1.0 } else { 0.0 };
+    }
+    let t = ((value - (cut - half_width)) / (2.0 * half_width)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
 }
 
 fn process_height(sources: &SourceTextures) -> Option<PlanarImage> {
@@ -466,14 +603,33 @@ mod tests {
     }
 
     fn run(sources: SourceTextures) -> (TextureGroup, Stage1Report) {
+        run_with(sources, &IntermediateSettings::default())
+    }
+
+    fn run_with(
+        sources: SourceTextures,
+        settings: &IntermediateSettings,
+    ) -> (TextureGroup, Stage1Report) {
         let mut group = TextureGroup {
             base_name: "sample".to_owned(),
             sources,
             intermediate: IntermediateTextures::default(),
             output: OutputTextures::default(),
         };
-        let report = process_stage1(&mut group, &IntermediateSettings::default()).unwrap();
+        let report = process_stage1(&mut group, settings).unwrap();
         (group, report)
+    }
+
+    /// Metal gate off: the compatibility anchor — pipeline is byte-identical to
+    /// the pre-T-014 behaviour, so the DEF-05/DEF-08 islands are asserted here.
+    fn gate_off() -> IntermediateSettings {
+        IntermediateSettings {
+            metal_gate: MetalGate {
+                enabled: false,
+                ..MetalGate::default()
+            },
+            ..IntermediateSettings::default()
+        }
     }
 
     fn assert_close(actual: f32, expected: f32) {
@@ -514,11 +670,14 @@ mod tests {
             ],
         )
         .unwrap();
-        let (group, _) = run(SourceTextures {
-            diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
-            metallic: Some(source("surface_metallic.png", metallic)),
-            ..SourceTextures::default()
-        });
+        let (group, _) = run_with(
+            SourceTextures {
+                diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
+                metallic: Some(source("surface_metallic.png", metallic)),
+                ..SourceTextures::default()
+            },
+            &gate_off(),
+        );
         let reflection = group.intermediate.reflection.unwrap();
 
         for plane in &reflection.planes {
@@ -543,28 +702,37 @@ mod tests {
         let metallic = mono(vec![0.25]);
         let dedicated = one_rgb(0.2, 0.3, 0.4);
 
-        let (dedicated_group, _) = run(SourceTextures {
-            diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
-            metallic: Some(source("surface_metallic.png", metallic.clone())),
-            albedo: Some(source("surface_albedo.png", dedicated.clone())),
-            ..SourceTextures::default()
-        });
+        let (dedicated_group, _) = run_with(
+            SourceTextures {
+                diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
+                metallic: Some(source("surface_metallic.png", metallic.clone())),
+                albedo: Some(source("surface_albedo.png", dedicated.clone())),
+                ..SourceTextures::default()
+            },
+            &gate_off(),
+        );
         assert_eq!(dedicated_group.intermediate.albedo, Some(dedicated));
 
-        let (burn_group, _) = run(SourceTextures {
-            diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
-            metallic: Some(source("surface_metallic.png", metallic)),
-            ..SourceTextures::default()
-        });
+        let (burn_group, _) = run_with(
+            SourceTextures {
+                diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
+                metallic: Some(source("surface_metallic.png", metallic)),
+                ..SourceTextures::default()
+            },
+            &gate_off(),
+        );
         let burned = burn_group.intermediate.albedo.unwrap();
         assert_close(burned.planes[0][0], 0.55);
         assert_close(burned.planes[1][0], 0.15);
         assert_close(burned.planes[2][0], 0.0);
 
-        let (naked_group, _) = run(SourceTextures {
-            diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
-            ..SourceTextures::default()
-        });
+        let (naked_group, _) = run_with(
+            SourceTextures {
+                diffuse: Some(source("surface_diffuse.png", diffuse.clone())),
+                ..SourceTextures::default()
+            },
+            &gate_off(),
+        );
         assert_eq!(naked_group.intermediate.albedo, Some(diffuse));
     }
 
@@ -745,5 +913,144 @@ mod tests {
 
         assert_eq!(fs::read_dir(&temp_dir).unwrap().count(), 0);
         fs::remove_dir(&temp_dir).unwrap();
+    }
+
+    // ---- T-014 metal gate (design §5) ----
+
+    // §5(c): M_eff pure-function — cuts, transitions, hard cut, gloss toggle.
+    #[test]
+    fn metal_gate_factor_cuts_transitions_and_toggles() {
+        let gate = MetalGate::default(); // on, w=0.05, gloss off, m_cut 0.5, s_min 180/255
+
+        // C1 metallic cut: below cut - w -> fully gated out.
+        assert_eq!(metal_gate_factor(0.4, 1.0, 1.0, &gate), 0.0);
+        // All conditions cleared -> passes as raw m (spec_pred 1.0 >= s_min).
+        assert_close(metal_gate_factor(1.0, 0.0, 1.0, &gate), 1.0);
+        // C3 spec cut: dark predicted spec -> gated out (this is the rust filter).
+        assert_eq!(metal_gate_factor(1.0, 1.0, 0.1, &gate), 0.0);
+        // Smoothstep midpoint at the metallic cut = 0.5 factor -> M_eff = 0.5
+        // (binarization: no leading m, C1 alone carries the metallic snap).
+        assert_close(metal_gate_factor(0.5, 1.0, 1.0, &gate), 0.5);
+
+        // C2 disabled by default: gloss value is irrelevant.
+        assert_eq!(
+            metal_gate_factor(1.0, 0.0, 1.0, &gate),
+            metal_gate_factor(1.0, 1.0, 1.0, &gate)
+        );
+
+        // C2 enabled: gloss below its cut gates the pixel out; high gloss passes.
+        let gloss_gate = MetalGate {
+            gloss_cut: 0.9,
+            ..MetalGate::default()
+        };
+        assert_eq!(metal_gate_factor(1.0, 0.5, 1.0, &gloss_gate), 0.0);
+        assert_close(metal_gate_factor(1.0, 1.0, 1.0, &gloss_gate), 1.0);
+
+        // Hard cut (w = 0): boundary passes -> full conversion (1.0), below -> 0.
+        let hard = MetalGate {
+            transition: 0.0,
+            ..MetalGate::default()
+        };
+        assert_eq!(metal_gate_factor(0.6, 0.0, 1.0, &hard), 1.0);
+        assert_eq!(metal_gate_factor(0.49, 0.0, 1.0, &hard), 0.0);
+
+        // Disabled gate returns the raw metallic factor unchanged.
+        let off = MetalGate {
+            enabled: false,
+            ..MetalGate::default()
+        };
+        assert_eq!(metal_gate_factor(0.3, 0.9, 0.0, &off), 0.3);
+    }
+
+    // §5 rust case: dark basecolor + metallic=1 -> pure dielectric output.
+    #[test]
+    fn metal_gate_rust_basecolor_stays_dielectric() {
+        let diffuse = one_rgb(137.0 / 255.0, 72.0 / 255.0, 42.0 / 255.0);
+        let (group, _) = run(SourceTextures {
+            diffuse: Some(source("rust_diffuse.png", diffuse.clone())),
+            metallic: Some(source("rust_metallic.png", mono(vec![1.0]))),
+            ..SourceTextures::default()
+        });
+
+        // Albedo untouched (no darkening).
+        let albedo = group.intermediate.albedo.unwrap();
+        for channel in 0..3 {
+            assert_close(albedo.planes[channel][0], diffuse.planes[channel][0]);
+        }
+        // Reflection collapses to gray62 (dielectric), per channel.
+        let reflection = group.intermediate.reflection.unwrap();
+        for plane in &reflection.planes {
+            assert_eq!(quantize_u8(plane[0]), 62);
+        }
+    }
+
+    // §5 dead-zone sweep: with binarization (M_eff = product of gate steps, no
+    // leading m), a CONTINUOUS metallic sweep must snap every non-band pixel to
+    // fully-metal or fully-dielectric. No output pixel lands in the dead zone
+    // except within the transition band (near an active cut), and the band
+    // fraction stays under the theoretical bound. Covers the core m=0.3..0.7.
+    #[test]
+    fn metal_gate_sweep_confines_dead_zone_to_transition_band() {
+        let gate = MetalGate::default();
+        let gray62 = DEFAULT_NONMETAL_REFLECTION[0];
+        let gray62_linear = srgb_decode(gray62);
+        let s_min = gate.spec_min;
+        let w = gate.transition;
+        let eps = 1.0 / 255.0;
+
+        // Continuous metallic incl. the cut±w edges; core m=0.5±0.3 = [0.2,0.8].
+        let mut metallics: Vec<f32> = (0..=64).map(|i| i as f32 / 64.0).collect();
+        metallics.push(gate.metallic_cut - w);
+        metallics.push(gate.metallic_cut + w);
+
+        let steps = 64;
+        let mut total = 0u32;
+        let mut band = 0u32;
+        for &m in &metallics {
+            for gi in 0..=steps {
+                let gloss = gi as f32 / steps as f32; // swept; C2 disabled by default
+                for bi in 0..=steps {
+                    let basecolor = bi as f32 / steps as f32; // grayscale, encoded sRGB
+                    let spec_pred = srgb_decode(basecolor);
+                    let m_eff = metal_gate_factor(m, gloss, spec_pred, &gate);
+                    total += 1;
+
+                    // Reproduce both consumption points on the grayscale pixel.
+                    let albedo = (basecolor - m_eff).max(0.0); // linear_burn, encoded
+                    let darkened = m_eff > 0.0;
+                    let spec = srgb_encode(gray62_linear + (spec_pred - gray62_linear) * m_eff);
+
+                    let diffuse_dead = darkened && albedo > 20.0 / 255.0;
+                    let spec_dead = spec > gray62 + eps && spec < s_min - eps;
+
+                    // Transition band: within w of an *active* cut boundary. C1 is
+                    // partial iff m is within w of the metallic cut; C3 is partial
+                    // iff spec_pred is within w of s_min. Outside both, M_eff snaps
+                    // to {0,1} and cannot be dead.
+                    let near_metallic_cut = (m - gate.metallic_cut).abs() <= w;
+                    let near_spec_cut = (spec_pred - s_min).abs() <= w;
+                    let in_band = near_metallic_cut || near_spec_cut;
+                    if in_band {
+                        band += 1;
+                    }
+
+                    if diffuse_dead || spec_dead {
+                        assert!(
+                            in_band,
+                            "dead-zone pixel outside band: m={m} basecolor={basecolor} \
+                             m_eff={m_eff} albedo={albedo} spec={spec}"
+                        );
+                    }
+                }
+            }
+        }
+
+        // Band = union of two ~2w strips (metallic cut, spec cut); comfortably
+        // under this loose bound over the sweep.
+        let band_fraction = band as f32 / total as f32;
+        assert!(
+            band_fraction <= 0.2,
+            "band fraction {band_fraction} exceeds theoretical bound"
+        );
     }
 }

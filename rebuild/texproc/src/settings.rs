@@ -78,6 +78,13 @@ pub fn texture_settings_from_value(value: &Value) -> Result<TextureSettings> {
             "normal_flip_green" => settings.normal_flip_green = required_bool(value, key)?,
             "normalize_height" => settings.normalize_height = required_bool(value, key)?,
             "process_metallic" => settings.process_metallic = required_bool(value, key)?,
+            "metal_gate" => settings.metal_gate = required_bool(value, key)?,
+            "metal_gate_metallic_cut" => {
+                settings.metal_gate_metallic_cut = required_f32(value, key)?
+            }
+            "metal_gate_spec_min" => settings.metal_gate_spec_min = required_f32(value, key)?,
+            "metal_gate_gloss_cut" => settings.metal_gate_gloss_cut = required_f32(value, key)?,
+            "metal_gate_transition" => settings.metal_gate_transition = required_f32(value, key)?,
             "normal_from_height_strength" => {
                 settings.normal_from_height_strength = required_f32(value, key)?
             }
@@ -128,6 +135,11 @@ pub fn texture_settings_to_value(settings: &TextureSettings) -> Value {
         "normal_flip_green": settings.normal_flip_green,
         "normalize_height": settings.normalize_height,
         "process_metallic": settings.process_metallic,
+        "metal_gate": settings.metal_gate,
+        "metal_gate_metallic_cut": settings.metal_gate_metallic_cut,
+        "metal_gate_spec_min": settings.metal_gate_spec_min,
+        "metal_gate_gloss_cut": settings.metal_gate_gloss_cut,
+        "metal_gate_transition": settings.metal_gate_transition,
         "normal_from_height_strength": settings.normal_from_height_strength,
         "generate_missing_spec": settings.generate_missing_spec,
         "generate_missing_emissive": settings.generate_missing_emissive,

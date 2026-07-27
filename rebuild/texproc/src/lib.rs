@@ -24,7 +24,7 @@ pub use output::{
     TextureTypeSettings,
 };
 pub use pipeline::{
-    process_stage1, ArmOrder, IntermediateSettings, IntermediateTextures, SourceImage,
+    process_stage1, ArmOrder, IntermediateSettings, IntermediateTextures, MetalGate, SourceImage,
     SourceTextures, Stage1Diagnostic, Stage1Report, Stage1Step, TextureGroup,
 };
 pub use planar::PlanarImage;
