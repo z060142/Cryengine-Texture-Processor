@@ -19,6 +19,10 @@ pub struct AppPreferences {
     pub delete_request_json: bool,
     pub delete_tif_after_dds: bool,
     pub export_associated_textures: bool,
+    /// Conversion Settings (R9): unit_size dropdown, persisted. Forward/Up are
+    /// re-detected per FBX and deliberately not persisted.
+    pub conversion_unit: String,
+    pub conversion_scale: f64,
 }
 
 impl Default for AppPreferences {
@@ -36,6 +40,8 @@ impl Default for AppPreferences {
             delete_request_json: false,
             delete_tif_after_dds: false,
             export_associated_textures: false,
+            conversion_unit: "file".to_owned(),
+            conversion_scale: 1.0,
         }
     }
 }
@@ -63,6 +69,14 @@ impl AppPreferences {
         preferences.delete_request_json = bool_field(&value, "delete_request_json");
         preferences.delete_tif_after_dds = bool_field(&value, "delete_tif_after_dds");
         preferences.export_associated_textures = bool_field(&value, "export_associated_textures");
+        preferences.conversion_unit = non_empty_or(
+            string(&value, "conversion_unit"),
+            preferences.conversion_unit,
+        );
+        preferences.conversion_scale = value
+            .get("conversion_scale")
+            .and_then(Value::as_f64)
+            .unwrap_or(preferences.conversion_scale);
         preferences
     }
 
@@ -85,6 +99,8 @@ impl AppPreferences {
             "delete_request_json": self.delete_request_json,
             "delete_tif_after_dds": self.delete_tif_after_dds,
             "export_associated_textures": self.export_associated_textures,
+            "conversion_unit": self.conversion_unit,
+            "conversion_scale": self.conversion_scale,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");

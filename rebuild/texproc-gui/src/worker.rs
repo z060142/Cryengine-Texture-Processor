@@ -17,6 +17,7 @@ use converter::{
     diagnostic::Diagnostic as ConverterDiagnostic,
     index_assigner::{assign_sub_indices, inputs_from_model, Assignment},
     model::ConverterModel,
+    request::ConversionOverrides,
     slot_table::{build_expanded_slot_table, MaterialSlot},
 };
 use eframe::egui::ColorImage;
@@ -678,6 +679,7 @@ pub fn start_model_export(
     texture_dir: Option<PathBuf>,
     output_dir: PathBuf,
     physicalize_overrides: BTreeMap<String, String>,
+    conversion: ConversionOverrides,
     rc_exe: Option<PathBuf>,
     associated: Option<AssociatedTextures>,
 ) -> Receiver<ModelExportEvent> {
@@ -716,7 +718,7 @@ pub fn start_model_export(
         let _ = sender.send(ModelExportEvent::Stage(
             "Converting materials (.mtl + request)…".to_owned(),
         ));
-        let result = converter::convert_file_with_physicalize(
+        let result = converter::convert::convert_file_with_options(
             &input,
             existing_optional(&manifest),
             existing_optional(&overrides),
@@ -724,6 +726,7 @@ pub fn start_model_export(
             None,
             &output_dir,
             &physicalize_overrides,
+            &conversion,
         );
         let outputs = match result {
             Ok(outputs) => outputs,
@@ -950,6 +953,7 @@ mod tests {
             Some(tex_out.clone()),
             model_out.clone(),
             BTreeMap::new(),
+            ConversionOverrides::default(),
             Some(rc),
             Some(associated),
         );

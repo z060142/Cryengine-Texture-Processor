@@ -141,9 +141,13 @@ try {
     $requestPath = Join-Path $outDir "kb3d_citycarsessentialssedan-native.json"
     $mtlPath = Join-Path $outDir "kb3d_citycarsessentialssedan-native.mtl"
     Invoke-NativeStep "T-005 request golden" {
+        # golden records legacy defect forward_up_axes "-Y+Z"; correctness is
+        # anchored to the native car CGF chunk (+Z+Y, up=+Y) and the Sandbox
+        # Y-up import default -Z+Y. See T-B03 R9. Golden file is not edited.
         & uv run python "..\tools\compare_json_golden.py" `
             "fixtures\car\car-reference.request.json" $requestPath `
-            --allow-path-separators
+            --allow-path-separators `
+            --ignore "`$.forward_up_axes"
     }
     Invoke-NativeStep "T-005 generated MTL golden" {
         & uv run python "..\tools\compare_xml_golden.py" `

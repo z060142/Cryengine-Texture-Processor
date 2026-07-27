@@ -235,6 +235,40 @@ fn lod_level(name: &str) -> Option<u32> {
         .flatten()
 }
 
+/// Optional GUI-supplied overrides for the RC import request's conversion
+/// fields (Sandbox-mirror panel). Every field is `None` for the frozen CLI
+/// path; a `Some` value wins over the auto-derived / default request value.
+#[derive(Debug, Clone, Default)]
+pub struct ConversionOverrides {
+    pub unit_size: Option<String>,
+    pub scale: Option<f64>,
+    pub forward_up_axes: Option<String>,
+    pub merge_all_nodes: Option<bool>,
+    pub scene_origin: Option<bool>,
+}
+
+impl ConversionOverrides {
+    /// Apply the present overrides onto a built request. Manual values always win
+    /// over detection / defaults.
+    pub fn apply(&self, request: &mut ImportRequest) {
+        if let Some(unit_size) = &self.unit_size {
+            request.unit_size = Some(unit_size.clone());
+        }
+        if let Some(scale) = self.scale {
+            request.scale = Some(scale);
+        }
+        if let Some(forward_up_axes) = &self.forward_up_axes {
+            request.forward_up_axes = Some(forward_up_axes.clone());
+        }
+        if let Some(merge_all_nodes) = self.merge_all_nodes {
+            request.merge_all_nodes = Some(merge_all_nodes);
+        }
+        if let Some(scene_origin) = self.scene_origin {
+            request.scene_origin = Some(scene_origin);
+        }
+    }
+}
+
 pub fn build_import_request(
     model: &ConverterModel,
     manifest: Option<&MaterialManifest>,

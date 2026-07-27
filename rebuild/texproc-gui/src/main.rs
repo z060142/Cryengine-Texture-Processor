@@ -28,7 +28,10 @@ use texproc::{
     load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, FailedGroup,
     OutputResolution, ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
 };
-use texproc_gui::{ReviewDocument, ASSIGNABLE_SOURCE_TYPES};
+use texproc_gui::{
+    axes_parallel, compose_forward_up, parse_forward_up, ReviewDocument, ASSIGNABLE_SOURCE_TYPES,
+    AXIS_TOKENS,
+};
 use worker::{
     DdsSummary, ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob,
     RcExportOutcome, ScanEvent,
@@ -37,6 +40,11 @@ use worker::{
 const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
 const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
+/// Legal `unit_size` values for the Conversion Settings Unit dropdown. The RC
+/// import schema (output_formats/rc_import_schema.py) accepts unit_size as a
+/// free string; this mirrors the CryEngine Sandbox FBX-import unit choices,
+/// with `file` (use the FBX's own unit) as the native-car default.
+const UNIT_SIZE_VALUES: [&str; 6] = ["file", "mm", "cm", "m", "inch", "foot"];
 /// GUI default physicalize seed for every material (the practical golden flow is
 /// all `no`). Seeded as explicit metadata; a loaded manifest still wins.
 const DEFAULT_PHYSICALIZE: &str = "no";
@@ -78,6 +86,20 @@ fn seed_default_physicalize<'a>(
         .into_iter()
         .map(|name| (name.to_owned(), DEFAULT_PHYSICALIZE.to_owned()))
         .collect()
+}
+
+/// A labeled ±X/±Y/±Z axis dropdown bound to `token`.
+fn axis_dropdown(ui: &mut egui::Ui, label: &str, id: &str, token: &mut String) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(token.as_str())
+            .show_ui(ui, |ui| {
+                for value in AXIS_TOKENS {
+                    ui.selectable_value(token, value.to_owned(), value);
+                }
+            });
+    });
 }
 
 /// Bulk-set physicalize for the selected material rows in one action.
@@ -270,6 +292,21 @@ struct ModelState {
     export_cgf: Option<PathBuf>,
     physicalize_overrides: BTreeMap<String, String>,
     rc_missing_warning: bool,
+    conversion: ConversionSettings,
+}
+
+/// Conversion Settings panel state (R9 item 2), Sandbox-mirror. Unit/Scale come
+/// from prefs and persist; Forward/Up re-detect per loaded FBX and never persist.
+#[derive(Default)]
+struct ConversionSettings {
+    /// RC `forward_up_axes` token as auto-detected from the FBX (for the
+    /// "Detected: …" caption and override highlight).
+    detected_forward: String,
+    detected_up: String,
+    forward: String,
+    up: String,
+    merge_all_nodes: bool,
+    scene_origin: bool,
 }
 
 struct WorkflowApp {
@@ -463,6 +500,21 @@ impl WorkflowApp {
             self.status = "Load an FBX file first.".to_owned();
             return;
         };
+        if axes_parallel(&self.model.conversion.forward, &self.model.conversion.up) {
+            self.status =
+                "Forward and Up axes must be different; fix Conversion Settings first.".to_owned();
+            return;
+        }
+        let conversion = converter::request::ConversionOverrides {
+            unit_size: Some(self.preferences.conversion_unit.clone()),
+            scale: Some(self.preferences.conversion_scale),
+            forward_up_axes: Some(compose_forward_up(
+                &self.model.conversion.forward,
+                &self.model.conversion.up,
+            )),
+            merge_all_nodes: Some(self.model.conversion.merge_all_nodes),
+            scene_origin: Some(self.model.conversion.scene_origin),
+        };
         let output = PathBuf::from(self.preferences.model_output_directory.trim());
         if output.as_os_str().is_empty() {
             self.status = "Set a model output directory first.".to_owned();
@@ -513,6 +565,7 @@ impl WorkflowApp {
             texture_dir,
             output,
             self.model.physicalize_overrides.clone(),
+            conversion,
             rc_resolution.path,
             associated,
         ));
@@ -957,6 +1010,16 @@ impl WorkflowApp {
                 self.model.selected_materials.clear();
                 self.model.material_selection_anchor = None;
                 self.model.bulk_physicalize = DEFAULT_PHYSICALIZE.to_owned();
+                // Re-detect Forward/Up per FBX (never persisted): seed the panel
+                // dropdowns from the auto-derived axes.
+                let (forward, up) = parse_forward_up(&review.model.axes.forward_up_axes)
+                    .unwrap_or_else(|| ("-Z".to_owned(), "+Y".to_owned()));
+                self.model.conversion.detected_forward = forward.clone();
+                self.model.conversion.detected_up = up.clone();
+                self.model.conversion.forward = forward;
+                self.model.conversion.up = up;
+                self.model.conversion.merge_all_nodes = false;
+                self.model.conversion.scene_origin = false;
                 self.model.review = Some(*review);
                 self.model.selected_material = (materials > 0).then_some(0);
                 self.status = format!(
@@ -1582,9 +1645,11 @@ impl WorkflowApp {
                     ui.label(axes.summary());
                 } else {
                     ui.colored_label(egui::Color32::from_rgb(0xE0, 0xA0, 0x30), axes.summary())
-                        .on_hover_text("FBX does not declare coordinate axes; using default -Y+Z");
+                        .on_hover_text("FBX does not declare coordinate axes; using default -Z+Y");
                 }
             });
+            ui.add_space(8.0);
+            self.conversion_settings(ui);
             ui.add_space(8.0);
             if ui
                 .button("Re-send Referenced / Embedded Textures to Texture Conversion")
@@ -1595,6 +1660,90 @@ impl WorkflowApp {
         } else {
             ui.weak("No model loaded. You can also drop car.fbx into the window.");
         }
+    }
+
+    /// Conversion Settings panel (R9 item 2): Sandbox-mirror RC import fields.
+    /// Manual values win over auto-detection when the request is built.
+    fn conversion_settings(&mut self, ui: &mut egui::Ui) {
+        ui.group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.strong("Conversion Settings");
+
+            // Unit (persisted) + Scale (persisted).
+            ui.horizontal(|ui| {
+                ui.label("Unit");
+                let mut unit_changed = false;
+                egui::ComboBox::from_id_salt("conversion_unit")
+                    .selected_text(&self.preferences.conversion_unit)
+                    .show_ui(ui, |ui| {
+                        for value in UNIT_SIZE_VALUES {
+                            if ui
+                                .selectable_value(
+                                    &mut self.preferences.conversion_unit,
+                                    value.to_owned(),
+                                    value,
+                                )
+                                .changed()
+                            {
+                                unit_changed = true;
+                            }
+                        }
+                    });
+                if unit_changed {
+                    self.save_preferences();
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label("Scale");
+                if ui
+                    .add(
+                        egui::DragValue::new(&mut self.preferences.conversion_scale)
+                            .speed(0.01)
+                            .range(0.0001..=100_000.0),
+                    )
+                    .changed()
+                {
+                    self.save_preferences();
+                }
+            });
+
+            // Forward / Up (re-detected per FBX, not persisted). A value that
+            // differs from detection is marked as an override.
+            let detected = compose_forward_up(
+                &self.model.conversion.detected_forward,
+                &self.model.conversion.detected_up,
+            );
+            axis_dropdown(
+                ui,
+                "Forward",
+                "conversion_forward",
+                &mut self.model.conversion.forward,
+            );
+            axis_dropdown(ui, "Up", "conversion_up", &mut self.model.conversion.up);
+            let current =
+                compose_forward_up(&self.model.conversion.forward, &self.model.conversion.up);
+            ui.horizontal(|ui| {
+                ui.weak(format!("Detected: {detected}"));
+                if current != detected {
+                    ui.colored_label(
+                        Color32::from_rgb(0xE0, 0xA0, 0x30),
+                        format!("(override → {current})"),
+                    );
+                }
+            });
+            if axes_parallel(&self.model.conversion.forward, &self.model.conversion.up) {
+                ui.colored_label(
+                    Color32::from_rgb(210, 70, 65),
+                    "Forward and Up must be different axes — Export CE Model is disabled.",
+                );
+            }
+
+            ui.checkbox(
+                &mut self.model.conversion.merge_all_nodes,
+                "Merge all nodes",
+            );
+            ui.checkbox(&mut self.model.conversion.scene_origin, "Scene origin");
+        });
     }
 
     fn right_panel(&mut self, context: &egui::Context) {
@@ -1993,9 +2142,10 @@ impl WorkflowApp {
     }
 
     fn model_export_action(&mut self, ui: &mut egui::Ui) {
+        let axes_ok = !axes_parallel(&self.model.conversion.forward, &self.model.conversion.up);
         if ui
             .add_enabled(
-                self.model.review.is_some() && self.model.export_receiver.is_none(),
+                self.model.review.is_some() && self.model.export_receiver.is_none() && axes_ok,
                 egui::Button::new(RichText::new("Export CE Model").strong().size(16.0))
                     .min_size([ui.available_width(), 36.0].into()),
             )

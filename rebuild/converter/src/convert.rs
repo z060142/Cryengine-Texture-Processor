@@ -1,7 +1,9 @@
 use crate::manifest::MaterialManifest;
 use crate::model::ConverterModel;
 use crate::mtl::{write_mtl, MaterialOverridePayload, MaterialTextureDiagnostic};
-use crate::request::{build_import_request_with_physicalize_overrides, write_request};
+use crate::request::{
+    build_import_request_with_physicalize_overrides, write_request, ConversionOverrides,
+};
 use serde::Serialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -43,14 +45,42 @@ pub fn convert_file_with_physicalize(
     out_dir: &Path,
     physicalize_overrides: &BTreeMap<String, String>,
 ) -> Result<ConvertOutputs, String> {
+    convert_file_with_options(
+        input,
+        manifest,
+        overrides,
+        texture_dir,
+        preserve_mtl_textures,
+        out_dir,
+        physicalize_overrides,
+        &ConversionOverrides::default(),
+    )
+}
+
+/// As [`convert_file_with_physicalize`], plus GUI-supplied conversion overrides
+/// (unit/scale/axes/merge/scene-origin) that win over the derived/default
+/// request values. The CLI path passes `ConversionOverrides::default()`, so its
+/// contract is unchanged.
+#[allow(clippy::too_many_arguments)]
+pub fn convert_file_with_options(
+    input: &Path,
+    manifest: Option<&Path>,
+    overrides: Option<&Path>,
+    texture_dir: Option<&Path>,
+    preserve_mtl_textures: Option<&Path>,
+    out_dir: &Path,
+    physicalize_overrides: &BTreeMap<String, String>,
+    conversion: &ConversionOverrides,
+) -> Result<ConvertOutputs, String> {
     let model = ConverterModel::load(input)?;
     let manifest = manifest.map(MaterialManifest::load).transpose()?;
     let overrides = overrides.map(MaterialOverridePayload::load).transpose()?;
-    let request = build_import_request_with_physicalize_overrides(
+    let mut request = build_import_request_with_physicalize_overrides(
         &model,
         manifest.as_ref(),
         physicalize_overrides,
     );
+    conversion.apply(&mut request);
     let base_name = Path::new(&request.source_filename)
         .file_stem()
         .and_then(|name| name.to_str())

@@ -1107,3 +1107,100 @@ Y-up 檔是缺陷**，被移植進 request golden，R8 錨定了錯值 → 模�
 **DoD**：推導修正 + 白名單註記；面板六控件實作與持久化（Unit/Scale 記憶，
 Forward/Up 每檔重偵測不記憶）；gate 全綠（request golden 除白名單欄位）；
 castle CGF 產出待業主目視。
+
+## R9 實作紀錄（2026-07-27，Miss Fox）
+
+動 `converter`（`model.rs` 推導與 fallback、`request.rs` 新增
+`ConversionOverrides`、`convert.rs` 新增 `convert_file_with_options`）與
+`texproc-gui`（`lib.rs` 軸向純函式、`main.rs` 面板、`worker.rs` 接線、
+`prefs.rs` 持久化）；`run_gates.ps1` 與 `tests/test_asset_flow_rust_converter.py`
+加白名單。無新依賴；CLI 旗標/退出碼不變（僅 `forward_up_axes` 推導值改變，
+CLI `unit_size` 仍 `cm` 凍結）。
+
+### Item 1：修軸向推導（converter）
+
+- `derive_forward_up_axes` 由 R8 的「forward=negate(up)、up=front」改為
+  R9 裁定「**forward token = negate(front)、up token = up**」（ufbx front 朝
+  觀者，故 source forward = negate(front)；up 直接取宣告 up）。標準 Y-up/
+  front+Z → `-Z+Y`（Sandbox 匯入預設 Forward=-Z / Up=+Y，且 up=+Y 對齊
+  native car CGF chunk 的 `+Z+Y`）。
+- `FALLBACK_FORWARD_UP_AXES` 由 `-Y+Z` 改為 **`-Z+Y`**（標準 FBX 即 Y-up；
+  未宣告軸向之檔幾乎必為 Y-up，故 fallback 取 Sandbox Y-up 預設）+ 診斷
+  （GUI 摘要橘字 hover 文案同步改 `-Z+Y`）。
+- 測試：`car_anchor_...` 換成 `sandbox_anchor_derives_y_up_forward_up_axes`
+  （Y-up→`-Z+Y`，附註 phase99 native car `+Z+Y`/up=+Y 與舊 `-Y+Z` 為 Python
+  缺陷）；全 6×6 枚舉掃描改新規則、Z-up 抽點 front=-Y/up=+Z→`+Y+Z`；
+  `unknown_axes_fall_back` 沿用（常數已改）。
+
+### T-005 request golden 白名單（不改 golden 檔）
+
+- `run_gates.ps1` 的「T-005 request golden」加 `--ignore "$.forward_up_axes"`
+  ＋ inline 註解：golden 記錄舊工具缺陷值 `-Y+Z`，正確性以 native car CGF
+  chunk（`+Z+Y`, up=+Y）與 Sandbox 預設為錨。
+- `tests/test_asset_flow_rust_converter.py` 做全 JSON 比對，於比對前對
+  expected/actual 各 `pop("forward_up_axes")`（等效單欄白名單）＋同註解。
+- golden 檔 `car-reference.request.json` 未動；schema-gate golden 只比
+  `/gate/summary`，不受影響。
+
+### Item 2：Conversion Settings 面板（texproc-gui，Sandbox 同構）
+
+- converter 新增 `request::ConversionOverrides`（unit_size/scale/
+  forward_up_axes/merge_all_nodes/scene_origin，皆 `Option`，`Some` 覆蓋
+  request 內推導/預設值）＋ `convert::convert_file_with_options`；
+  `convert_file_with_physicalize` 改為以 `default()` 呼叫新入口，**CLI 路徑
+  行為不變**。GUI worker `start_model_export` 多收一個 `ConversionOverrides`
+  並改走 `convert_file_with_options`。
+- Model tab（左欄）新增「Conversion Settings」group：
+  - **Unit** 下拉（`UNIT_SIZE_VALUES = file/mm/cm/m/inch/foot`，預設 `file`）＋
+    **Scale** DragValue（預設 1.0），兩者存入 prefs（`conversion_unit`/
+    `conversion_scale`）並即時持久化。
+  - **Forward / Up** 各一 ±X/±Y/±Z 下拉，預設＝載入 FBX 的自動偵測值
+    （`poll_model` 由 `axes.forward_up_axes` 拆出，**每檔重偵測、不持久化**）；
+    下方 `Detected: -Z+Y` 對照，與偵測不同時顯示橘字 `(override → …)`。
+  - **Merge all nodes / Scene origin** 核取框（預設 false，不持久化）。
+- 手動值一律覆蓋偵測：request 的 `forward_up_axes` 由兩個下拉組出
+  （`compose_forward_up`），unit/scale/merge/scene_origin 由面板值進
+  `ConversionOverrides`。
+- **非法組合**（Forward 與 Up 同軸，`axes_parallel`）：Export CE Model 鈕停用
+  ＋面板紅字提示，`start_model_export` 亦二次守門（選「停用 Export」最簡路線）。
+- model 層純函式與測試（`lib.rs`）：`compose_forward_up`/`parse_forward_up`
+  （round-trip 全枚舉）、`axes_parallel`（同軸不同號皆拒、正交放行）、
+  `manual_axes_win_over_detection`（覆蓋值 ≠ 偵測值）。
+
+### Item 3：城堡實測（修正推導 → RC → CGF）
+
+- `Z:\enchanted\output\KB3D_ENC_BldgLgCastle_A_grp.fbx`（無 manifest）複製到
+  work dir 後 release `converter convert`：request `forward_up_axes` = **`-Z+Y`**
+  （unit_size `cm`、scale 1.0），convert exit 0，產出 .mtl/.cryasset/.json。
+- RC（`castle.json /overwriteextension=fbx /overwritesourcefile=<work>\castle.fbx
+  /overwritefilename=castle.cgf`，cwd=work dir，即 GUI worker/rc_smoke 形狀）
+  **exit 0，產出 `castle.cgf` 400,201,439 bytes**。log 僅有 physics-proxy
+  非流形與 tree 頂點超限（>65535 改 Box Physicalizer）等幾何警告，與軸向無關。
+- **R8「Cannot find converter for *.json」quirk 更正**：實為在 Git Bash 下叫用
+  RC 時 MSYS 把 `/overwrite…` 旗標誤轉成 Windows 路徑所致（非 RC 本身問題）；
+  改由 PowerShell（等同 Rust worker `Command` 與 rc_smoke 的 Python subprocess，
+  皆不經 MSYS）叫用即正常出 CGF。引擎內站立方向為業主目視結票條件。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui -p texproc -p converter --all-targets --release
+  --locked -- -D warnings`：PASS。
+- `cargo test -p converter --release --locked`：48 lib + 7 CLI PASS。
+- `cargo test -p texproc-gui --release --locked`：10 lib（1 ignored）+ 23 main
+  （4 ignored 為真 RC/真資料整合測試）PASS；新增 3 個軸向 model 層測試。
+- `run_gates.ps1`（完整含 RC）：**ALL GATES PASSED**（含加白名單後的 T-005
+  request golden、Python asset_flow E2E、converter RC 16/16、texproc RC/DDS
+  8/8、ddna 2/2）。
+- 收尾終止所有 spawned 程序（rc/converter/texproc/texproc-gui = 0 殘留），
+  刪除 castle work dir。
+
+### 偏離／觀察
+
+- **unit_size 值域**：`rc_import_schema.py` 只把 `unit_size` 列為允許鍵、
+  未列舉合法值；面板下拉以 CryEngine Sandbox FBX 匯入單位集
+  （file/mm/cm/m/inch/foot）為準，`file` 為 native-car 預設。已於常數註記。
+- **非法軸向處置**：採「停用 Export CE Model + 紅字」而非可提交後報錯（最簡、
+  且防止送出壞 request）。
+- **GUI 即時互動**（面板下拉、override 高亮、進度模態）本環境合成點擊無效，
+  沿 R3–R8 既有限制，以 build/test + castle 端到端 CGF 佐證，視覺由業主目視。

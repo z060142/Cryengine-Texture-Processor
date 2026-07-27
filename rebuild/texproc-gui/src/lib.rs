@@ -76,6 +76,34 @@ fn is_related_image(filename: &str) -> bool {
         })
 }
 
+/// Signed axis tokens for the Conversion Settings Forward/Up dropdowns, in the
+/// `<sign><axis>` shape RC uses in `forward_up_axes`.
+pub const AXIS_TOKENS: [&str; 6] = ["+X", "-X", "+Y", "-Y", "+Z", "-Z"];
+
+/// Join a Forward and an Up axis token into an RC `forward_up_axes` string
+/// (`<forward><up>`, e.g. `"-Z"` + `"+Y"` → `"-Z+Y"`).
+pub fn compose_forward_up(forward: &str, up: &str) -> String {
+    format!("{forward}{up}")
+}
+
+/// Split an RC `forward_up_axes` string back into `(forward, up)` tokens.
+/// Returns `None` unless it is exactly two `<sign><axis>` tokens.
+pub fn parse_forward_up(value: &str) -> Option<(String, String)> {
+    if value.len() != 4 {
+        return None;
+    }
+    let (forward, up) = value.split_at(2);
+    (AXIS_TOKENS.contains(&forward) && AXIS_TOKENS.contains(&up))
+        .then(|| (forward.to_owned(), up.to_owned()))
+}
+
+/// A Forward/Up combination is illegal when both name the same axis (parallel),
+/// regardless of sign — RC cannot build a basis from it. The last char is the
+/// axis letter (`X`/`Y`/`Z`).
+pub fn axes_parallel(forward: &str, up: &str) -> bool {
+    forward.chars().last() == up.chars().last()
+}
+
 pub const ASSIGNABLE_SOURCE_TYPES: [&str; 12] = [
     "diffuse",
     "normal",
@@ -431,6 +459,57 @@ mod tests {
                 "KB3D_ENC_AtlasA_roughness.png"
             ]
         );
+    }
+
+    #[test]
+    fn forward_up_composes_and_round_trips() {
+        assert_eq!(compose_forward_up("-Z", "+Y"), "-Z+Y");
+        assert_eq!(
+            parse_forward_up("-Z+Y"),
+            Some(("-Z".to_owned(), "+Y".to_owned()))
+        );
+        // Every legal combination round-trips.
+        for forward in AXIS_TOKENS {
+            for up in AXIS_TOKENS {
+                let joined = compose_forward_up(forward, up);
+                assert_eq!(
+                    parse_forward_up(&joined),
+                    Some((forward.to_owned(), up.to_owned()))
+                );
+            }
+        }
+        assert_eq!(
+            parse_forward_up("-Y+Z"),
+            Some(("-Y".to_owned(), "+Z".to_owned()))
+        );
+        assert_eq!(parse_forward_up("bogus"), None);
+        assert_eq!(parse_forward_up("-Z+Q"), None);
+    }
+
+    #[test]
+    fn manual_axes_win_over_detection() {
+        // Detected Y-up "-Z+Y"; the artist overrides Up to +Z. The request string
+        // is built from the dropdowns, so the manual value wins — this is the
+        // whole point of the override panel.
+        let (detected_forward, detected_up) = parse_forward_up("-Z+Y").unwrap();
+        assert_eq!(
+            (detected_forward.as_str(), detected_up.as_str()),
+            ("-Z", "+Y")
+        );
+        let manual = compose_forward_up("-Z", "+Z");
+        assert_eq!(manual, "-Z+Z");
+        assert_ne!(manual, "-Z+Y", "override differs from detection");
+    }
+
+    #[test]
+    fn parallel_forward_and_up_are_rejected() {
+        // Same axis letter (any sign) is illegal — RC cannot form a basis.
+        assert!(axes_parallel("+Z", "-Z"));
+        assert!(axes_parallel("-Y", "+Y"));
+        assert!(axes_parallel("+X", "+X"));
+        // Orthogonal combinations are legal.
+        assert!(!axes_parallel("-Z", "+Y"));
+        assert!(!axes_parallel("+X", "+Y"));
     }
 
     #[test]

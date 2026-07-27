@@ -118,9 +118,13 @@ def test_rust_converter_asset_flow(tmp_path):
     expected_request = json.loads(
         (FIXTURE_ROOT / "car-reference.request.json").read_text(encoding="utf-8")
     )
-    assert _normalize_json(json.loads(actual_request.read_text(encoding="utf-8"))) == _normalize_json(
-        expected_request
-    )
+    actual_request_json = json.loads(actual_request.read_text(encoding="utf-8"))
+    # Whitelist forward_up_axes: the golden records the legacy Python defect
+    # "-Y+Z" (up=+Z), but correctness is anchored to the native car CGF chunk
+    # (+Z+Y, up=+Y) and the Sandbox Y-up import default "-Z+Y". See T-B03 R9.
+    for request in (expected_request, actual_request_json):
+        request.pop("forward_up_axes", None)
+    assert _normalize_json(actual_request_json) == _normalize_json(expected_request)
 
     _run_converter("validate", actual_request)
     gate_path = actual_request.with_suffix(".schema_gate.json")

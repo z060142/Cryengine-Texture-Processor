@@ -26,9 +26,11 @@ pub struct AxisDetection {
     pub front_token: Option<&'static str>,
 }
 
-/// RC default source axes for a standard FBX; used when a file does not declare
-/// its coordinate axes. Also the historical hardcoded value.
-pub const FALLBACK_FORWARD_UP_AXES: &str = "-Y+Z";
+/// RC default source axes used when a file does not declare its coordinate axes.
+/// Standard FBX is Y-up, so an undeclared file is almost certainly Y-up: the
+/// Sandbox default for a Y-up import is Forward=-Z / Up=+Y, i.e. `-Z+Y`. (The
+/// old hardcoded `-Y+Z` was a legacy defect — up=+Z is wrong for a Y-up file.)
+pub const FALLBACK_FORWARD_UP_AXES: &str = "-Z+Y";
 
 impl AxisDetection {
     /// Fallback for undeclared axes (and the value used by hand-built test models).
@@ -98,10 +100,12 @@ fn negated_axis_token(axis: ufbx::CoordinateAxis) -> Option<&'static str> {
 /// (`<forward><up>`).
 ///
 /// ufbx defines `front` as the _opposite_ of forward (ufbx.h: "front is the
-/// _opposite_ from forward"), so source forward = -front. Empirically anchored
-/// to car.fbx (ufbx up=+Y, front=+Z) which must derive `-Y+Z`, the rule is:
-///   forward token = negate(up), up token = front
-/// (equivalently `(-source_up, -source_forward)`).
+/// _opposite_ from forward"), so the source's forward direction = negate(front).
+/// The RC up token is the source up axis unchanged. Anchored to the Sandbox
+/// import default for a standard Y-up file (ufbx up=+Y, front=+Z) which Sandbox
+/// imports as Forward=-Z / Up=+Y → `-Z+Y`; this also matches the native car CGF
+/// chunk's up=+Y (phase99 evidence `+Z+Y`). The rule is:
+///   forward token = negate(front), up token = up
 ///
 /// Returns `None` when either axis is `Unknown` (undeclared) so the caller can
 /// fall back to [`FALLBACK_FORWARD_UP_AXES`].
@@ -109,7 +113,7 @@ pub fn derive_forward_up_axes(
     front: ufbx::CoordinateAxis,
     up: ufbx::CoordinateAxis,
 ) -> Option<String> {
-    Some(format!("{}{}", negated_axis_token(up)?, axis_token(front)?))
+    Some(format!("{}{}", negated_axis_token(front)?, axis_token(up)?))
 }
 
 #[derive(Debug, Clone)]
@@ -285,12 +289,15 @@ mod tests {
     use ufbx::CoordinateAxis::*;
 
     #[test]
-    fn car_anchor_derives_default_forward_up_axes() {
-        // car.fbx declares standard FBX Y-up axes (ufbx up=+Y, front=+Z),
-        // verified by probing the fixture. The T-005 request golden pins "-Y+Z".
+    fn sandbox_anchor_derives_y_up_forward_up_axes() {
+        // Standard FBX Y-up (ufbx up=+Y, front=+Z, as car.fbx and every KB3D
+        // fixture probe) must derive the Sandbox import default `-Z+Y`
+        // (Forward=-Z / Up=+Y). This is up=+Y, matching the native car CGF
+        // import-settings chunk (phase99 `+Z+Y`, up=+Y); the old `-Y+Z` was a
+        // legacy Python defect (up=+Z) that flipped Y-up models over.
         assert_eq!(
             derive_forward_up_axes(PositiveZ, PositiveY).as_deref(),
-            Some("-Y+Z")
+            Some("-Z+Y")
         );
     }
 
@@ -311,21 +318,21 @@ mod tests {
         for &front in &axes {
             for &up in &axes {
                 let derived = derive_forward_up_axes(front, up).unwrap();
-                // forward token = negate(up), up token = front.
+                // forward token = negate(front), up token = up.
                 let expected = format!(
                     "{}{}",
-                    negated_axis_token(up).unwrap(),
-                    axis_token(front).unwrap()
+                    negated_axis_token(front).unwrap(),
+                    axis_token(up).unwrap()
                 );
                 assert_eq!(derived, expected, "front={front:?} up={up:?}");
-                // Structure: 2 signed axis tokens, forward flips the up axis' sign.
+                // Structure: 2 signed axis tokens (forward then up).
                 assert_eq!(derived.len(), 4);
             }
         }
         // Spot-check a genuinely Z-up source (up=+Z, front=-Y → forward=+Y).
         assert_eq!(
             derive_forward_up_axes(NegativeY, PositiveZ).as_deref(),
-            Some("-Z-Y")
+            Some("+Y+Z")
         );
     }
 }
