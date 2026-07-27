@@ -1,6 +1,6 @@
 # T-B03 — texproc-gui 重做：完整工作流應用（以原版 UX 為藍本）
 
-狀態：R1 IMPLEMENTED／AWAITING OWNER VISUAL SIGNOFF（2026-07-26；release GUI 劇本與自動化 DoD 全數通過）
+狀態：ACTIVE（R1–R11 全數業主簽核，2026-07-27。GUI 工作流應用長期迭代票）
 出處：T-B02 UX 否決。業主裁示：**按原版思路——貼圖轉換與 FBX 材質轉換是兩個不同目標；本工具以貼圖轉換為主，FBX 是後加的可選功能。**
 繼承：T-B02 的 model 層（groups 載入/指派/存檔 round-trip）、egui/eframe 依賴核可。
 
