@@ -1,7 +1,10 @@
 use crate::{
     constants::{DEFAULT_NONMETAL_REFLECTION, LUMA_WEIGHTS},
     error::{Result, TexprocError},
-    ops::{flip_green, gray, invert, linear_burn, normal_from_height, srgb_decode, srgb_encode},
+    ops::{
+        flip_green, gray, invert, linear_burn, normal_from_height, resize_to, srgb_decode,
+        srgb_encode,
+    },
     output::OutputTextures,
     planar::PlanarImage,
 };
@@ -298,9 +301,14 @@ fn process_albedo(
             .or(intermediate.metallic.as_ref());
         if let Some(metallic) = metallic {
             // INT-ALBEDO consumption point: darken by M_eff instead of raw metallic.
-            let gloss = gate_gloss(sources, intermediate, &settings.metal_gate);
+            // Primary source = diffuse; force-fit metallic/gloss secondaries (T-017).
+            let (width, height) = (diffuse.image.width, diffuse.image.height);
+            let metallic = resize_to(metallic, width, height)?;
+            let gloss = gate_gloss(sources, intermediate, &settings.metal_gate)
+                .map(|gloss| resize_to(&gloss, width, height))
+                .transpose()?;
             let mask = effective_metallic(
-                metallic,
+                &metallic,
                 &diffuse.image,
                 gloss.as_ref(),
                 &settings.metal_gate,
@@ -429,9 +437,16 @@ fn process_reflection(
     let gloss = gate_gloss(sources, intermediate, &settings.metal_gate);
     metallic
         .map(|metallic| {
+            // Primary source = diffuse; force-fit metallic/gloss secondaries (T-017).
+            let (width, height) = (diffuse.image.width, diffuse.image.height);
+            let metallic = resize_to(metallic, width, height)?;
+            let gloss = gloss
+                .as_ref()
+                .map(|gloss| resize_to(gloss, width, height))
+                .transpose()?;
             metal_reflection(
                 &diffuse.image,
-                metallic,
+                &metallic,
                 gloss.as_ref(),
                 &settings.metal_gate,
             )

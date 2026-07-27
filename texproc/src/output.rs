@@ -12,8 +12,8 @@ use crate::{
     error::{Result, TexprocError},
     io::write_tiff_lzw,
     ops::{
-        auto_level, colorize, copy_opacity, eval_mul, flip_green, gray, resize, srgb_decode,
-        srgb_encode,
+        auto_level, colorize, copy_opacity, eval_mul, flip_green, gray, resize, resize_to,
+        srgb_decode, srgb_encode,
     },
     pipeline::{ArmOrder, IntermediateSettings, MetalGate, TextureGroup},
     planar::PlanarImage,
@@ -312,12 +312,13 @@ fn export_diff(group: &TextureGroup, settings: &TextureSettings) -> Result<Optio
             .as_ref()
             .or_else(|| source_image(group, SourceSlot::Ao));
         if let Some(ao) = ao {
-            let ao = resize_for_output(&gray(ao), settings.output_resolution)?;
+            // Secondary source: force-fit onto the primary's working grid (T-017).
+            let ao = resize_to(&gray(ao), image.width, image.height)?;
             image = multiply_ao_linear(&image, &ao)?;
         }
     }
     if let Some(alpha) = source_image(group, SourceSlot::Alpha) {
-        let alpha = resize_for_output(&gray(alpha), settings.output_resolution)?;
+        let alpha = resize_to(&gray(alpha), image.width, image.height)?;
         image = copy_opacity(&image, &alpha)?;
     }
 
@@ -361,7 +362,8 @@ fn export_ddna(group: &TextureGroup, settings: &TextureSettings) -> Result<Optio
 
     let has_gloss = group.intermediate.glossiness.is_some();
     if let Some(glossiness) = &group.intermediate.glossiness {
-        let glossiness = resize_for_output(&gray(glossiness), settings.output_resolution)?;
+        // Secondary source: force-fit onto the normal's working grid (T-017).
+        let glossiness = resize_to(&gray(glossiness), image.width, image.height)?;
         image = copy_opacity(&image, &glossiness)?;
     }
 
@@ -620,6 +622,110 @@ mod tests {
             (actual - expected).abs() <= 1.0e-6,
             "{actual} != {expected}"
         );
+    }
+
+    fn solid_mono(width: u32, height: u32, value: f32) -> PlanarImage {
+        let count = (width * height) as usize;
+        PlanarImage::new(width, height, vec![vec![value; count]]).unwrap()
+    }
+
+    fn solid_rgb(width: u32, height: u32, r: f32, g: f32, b: f32) -> PlanarImage {
+        let count = (width * height) as usize;
+        PlanarImage::new(
+            width,
+            height,
+            vec![vec![r; count], vec![g; count], vec![b; count]],
+        )
+        .unwrap()
+    }
+
+    fn mixed_group() -> TextureGroup {
+        // basecolor 512, ao 128, normal 256, roughness 128, height 128 — scaled
+        // stand-ins for 4K/1K/2K/1K/1K; the ratios exercise every combine path.
+        group(SourceTextures {
+            diffuse: Some(source("mix_diffuse.png", solid_rgb(512, 512, 0.6, 0.5, 0.4))),
+            ao: Some(source("mix_ao.png", solid_mono(128, 128, 0.5))),
+            normal: Some(source("mix_normal_dx.png", solid_rgb(256, 256, 0.5, 0.5, 1.0))),
+            roughness: Some(source("mix_roughness.png", solid_mono(128, 128, 0.25))),
+            height: Some(source("mix_height.png", solid_mono(128, 128, 0.5))),
+            ..SourceTextures::default()
+        })
+    }
+
+    #[test]
+    fn t017_anchor1_original_keeps_each_primary_size() {
+        let mut group = mixed_group();
+        let settings = TextureSettings {
+            diff_format: DiffFormat::DiffuseAo,
+            process_metallic: false,
+            output_resolution: OutputResolution::Original,
+            ..TextureSettings::default()
+        };
+        process_both(&mut group, &settings);
+
+        let diff = group.output.diff.unwrap().image;
+        assert_eq!((diff.width, diff.height), (512, 512)); // AO (128) upsampled onto it
+        let ddna = group.output.ddna.unwrap().image;
+        assert_eq!((ddna.width, ddna.height), (256, 256)); // roughness (128) fitted
+        assert_eq!(ddna.channels(), 4);
+        let displ = group.output.displ.unwrap().image;
+        assert_eq!((displ.width, displ.height), (128, 128));
+    }
+
+    #[test]
+    fn t017_anchor2_max_caps_but_never_upscales() {
+        let mut group = mixed_group();
+        let settings = TextureSettings {
+            diff_format: DiffFormat::DiffuseAo,
+            process_metallic: false,
+            output_resolution: OutputResolution::Max(256),
+            ..TextureSettings::default()
+        };
+        process_both(&mut group, &settings);
+
+        let diff = group.output.diff.unwrap().image;
+        assert_eq!((diff.width, diff.height), (256, 256)); // 512 capped to 256
+        let ddna = group.output.ddna.unwrap().image;
+        assert_eq!((ddna.width, ddna.height), (256, 256)); // already at target
+        let displ = group.output.displ.unwrap().image;
+        assert_eq!((displ.width, displ.height), (128, 128)); // below target, not upscaled
+    }
+
+    #[test]
+    fn t017_anchor3_aspect_mismatch_ao_hard_scaled_without_crop() {
+        // AO 256x128, horizontal gradient dark->bright; base 512x512.
+        let (ao_w, ao_h) = (256u32, 128u32);
+        let mut ao_plane = Vec::with_capacity((ao_w * ao_h) as usize);
+        for _y in 0..ao_h {
+            for x in 0..ao_w {
+                ao_plane.push(x as f32 / (ao_w as f32 - 1.0));
+            }
+        }
+        let ao = PlanarImage::new(ao_w, ao_h, vec![ao_plane]).unwrap();
+        let mut group = group(SourceTextures {
+            diffuse: Some(source("mix_diffuse.png", solid_rgb(512, 512, 0.6, 0.6, 0.6))),
+            ao: Some(source("mix_ao.png", ao)),
+            ..SourceTextures::default()
+        });
+        let settings = TextureSettings {
+            diff_format: DiffFormat::DiffuseAo,
+            process_metallic: false,
+            output_resolution: OutputResolution::Original,
+            ..TextureSettings::default()
+        };
+        process_both(&mut group, &settings);
+
+        let diff = group.output.diff.unwrap().image;
+        assert_eq!((diff.width, diff.height), (512, 512));
+        // Gradient must span the full width (non-uniform stretch, not cropped):
+        // left column near-black, right column near the un-darkened base.
+        let row = 200u32 * 512; // arbitrary interior row
+        let left = diff.planes[0][(row) as usize];
+        let mid = diff.planes[0][(row + 256) as usize];
+        let right = diff.planes[0][(row + 511) as usize];
+        assert!(left < mid && mid < right, "AO darkening must vary left->right");
+        assert!(left < 0.15, "left edge should be strongly darkened, got {left}");
+        assert!(right > 0.55, "right edge should be near base, got {right}");
     }
 
     #[test]

@@ -122,6 +122,33 @@ pub fn resize(image: &PlanarImage, max_dimension: u32) -> Result<PlanarImage> {
     PlanarImage::new(target_width, target_height, planes)
 }
 
+/// Force-resize to explicit dimensions (T-017 secondary-source fit). Unlike
+/// [`resize`], this may upscale, downscale, or distort aspect — a secondary
+/// per-pixel input (AO, alpha, gloss, metallic mask) is fitted onto the primary
+/// source's working grid before combining. Same Lanczos3 filter as `resize`.
+/// When the image already matches `width`/`height` it is an exact clone, so
+/// same-size paths stay bit-identical.
+pub fn resize_to(image: &PlanarImage, width: u32, height: u32) -> Result<PlanarImage> {
+    if width == 0 || height == 0 {
+        return Err(TexprocError::new(
+            "OP-RESIZE-TO target dimensions must be non-zero",
+        ));
+    }
+    if image.width == width && image.height == height {
+        return Ok(image.clone());
+    }
+
+    let mut planes = Vec::with_capacity(image.channels());
+    for plane in &image.planes {
+        let buffer =
+            ImageBuffer::<Luma<f32>, Vec<f32>>::from_raw(image.width, image.height, plane.clone())
+                .expect("plane length was validated by PlanarImage");
+        let resized = image::imageops::resize(&buffer, width, height, FilterType::Lanczos3);
+        planes.push(resized.into_raw());
+    }
+    PlanarImage::new(width, height, planes)
+}
+
 pub fn auto_level(image: &PlanarImage) -> PlanarImage {
     let planes = image
         .planes
@@ -389,6 +416,27 @@ mod tests {
             .iter()
             .all(|value| (0.0..=1.0).contains(value)));
         assert!(resize(&large, 0).is_err());
+    }
+
+    #[test]
+    fn op_resize_to_clones_on_match_and_forces_arbitrary_dims() {
+        // Exact dimensions match -> bit-identical clone (no filtering).
+        let same = mono(&[0.1, 0.9], 2, 1);
+        assert_eq!(resize_to(&same, 2, 1).unwrap(), same);
+
+        // Upscale is allowed (unlike `resize`).
+        let up = resize_to(&same, 4, 1).unwrap();
+        assert_eq!((up.width, up.height), (4, 1));
+
+        // Non-uniform stretch: 2x2 -> 4x1, distorting aspect, succeeds.
+        let square = mono(&[0.0, 1.0, 1.0, 0.0], 2, 2);
+        let stretched = resize_to(&square, 4, 1).unwrap();
+        assert_eq!((stretched.width, stretched.height), (4, 1));
+        assert!(stretched.planes[0]
+            .iter()
+            .all(|value| (0.0..=1.0).contains(value)));
+
+        assert!(resize_to(&same, 0, 4).is_err());
     }
 
     #[test]
