@@ -40,15 +40,3 @@ Python 端（golden 比對、E2E harness）位於 `legacy/`，經
 可選 RC smoke：設定 `CE_RC_EXE` 指向你的 `rc.exe`，或將 CRYENGINE 5.7 LTS
 安裝於預設位置。
 
-## 文件
-
-- `docs/rust-workspace-design.md` — 架構決策（D-01…D-12）與缺陷裁決
-- `docs/texture-pipeline-spec.md` — 貼圖管線規格
-- `docs/metal-gate-design.md` — 金屬轉換終止線（Metal Gate）設計
-- `docs/cga-research.md`、`docs/helper-node-research.md` — 研究報告
-- `docs/tickets/` — 實作票與紀錄
-
-## Legacy（v1）
-
-原 Python/PySide 實作原封保存於 `legacy/`，作為驗收閘門的驗證基線
-（golden 檔案、E2E 測試）。見 [`legacy/README.md`](legacy/README.md)。

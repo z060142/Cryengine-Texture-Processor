@@ -12,6 +12,3 @@ venv/
 # Local scratch
 run.bat
 ClaudeCode.md
-
-# Leftover pre-v2 build dir; delete after closing any running texproc-gui.exe
-/rebuild/
