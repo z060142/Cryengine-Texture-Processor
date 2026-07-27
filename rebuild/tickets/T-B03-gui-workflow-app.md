@@ -1213,3 +1213,27 @@ CLI `unit_size` 仍 `cm` 凍結）。
 中被重建）。已重建並驗證新 exe 含 Conversion Settings 字串；run_gates
 永久加入「Build release GUI（只建不測）」步驟杜絕復發。業主需以新 exe
 重測城堡。
+
+## R10（2026-07-27 業主裁決）：批量 FBX 導入
+
+**美觀約束**：不新增面板、不動三欄結構——Model tab 左欄改用與 Texture
+Import 完全同款的清單版式。
+
+1. **模型清單**：`Add FBX…`（多選對話框）+ 清單（檔名、材質數、diagnostics
+   數、helper 數徽章）；多選 + Remove Selected（沿用 R5 選取 helper）；
+   選中單一模型時中欄照現狀顯示其材質表/詳情/Conversion Settings
+   （Forward/Up 偵測與 override **per model** 保存於清單項）。
+2. **每檔載入行為照舊**：自動貼圖拉入（R3）、physicalize 種子 no（R8）、
+   軸向偵測（R9）逐檔執行；貼圖去重靠既有 absolute-path dedup。
+3. **Export All**：新按鈕（單模型 Export CE Model 保留，作用於選中者）；
+   逐模型跑 convert→RC（模型間序列即可；DDS 階段沿用 R7 自適應 pool）；
+   進度模態顯示「模型 i/N：階段」；單模型失敗記診斷續跑，完成摘要列
+   成功/失敗清單。R5 的 delete-json / export-textures-with-model /
+   DDS 選項對每個模型生效。
+4. **併入小項**（helper-node-research 後續）：Model 摘要與清單徽章加
+   helper 節點數；移除 `request.rs` 的 `is_helper` 死碼（`detect_node_type`
+   相應測試同步修）。
+
+DoD：多 FBX 實測（≥3 檔含 car + 兩個 KB3D）Export All 全綠、產物與逐檔
+單獨導出位元一致（抽一檔比對）；清單版式截圖與 Texture Import 對照無違和；
+gate 全綠。
