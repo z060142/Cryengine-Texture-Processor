@@ -1237,3 +1237,17 @@ Import 完全同款的清單版式。
 DoD：多 FBX 實測（≥3 檔含 car + 兩個 KB3D）Export All 全綠、產物與逐檔
 單獨導出位元一致（抽一檔比對）；清單版式截圖與 Texture Import 對照無違和；
 gate 全綠。
+
+## R11（2026-07-27 業主裁決，與 R10 平行）：diffuse 帶 alpha → AlphaTest=0.5
+
+- 規則：sub-material 解析出的 Diffuse 貼圖檔含 alpha 通道時，該 sub-material
+  寫出 `AlphaTest="0.5"`；override 通道（cryengine_material 等）已明確給
+  AlphaTest 者以 override 為準，不覆蓋。
+- 偵測：header 層（不解碼像素）——TIF SamplesPerPixel/ExtraSamples、
+  PNG color type、DDS pixel-format alpha flags/DX10 format；其他格式不設。
+  管線自產的 _diff 只有在 alpha 源存在時才有 A 通道，channel 存在即內容存在。
+- 實作限 converter：mtl.rs + texture_resolver.rs（+就地小 probe，不動
+  lib.rs/request.rs——R10 平行作業中，檔案邊界隔離）。
+- Python 版 AlphaTest 既有行為與 gamesdk 樣本 .mtl 先查證再定屬性格式。
+- DoD：單元測試（有/無 alpha、override 優先）、gamesdk 樣本格式對照、
+  MTL golden 不受影響（car 貼圖無 alpha 案例驗證）或差異歸因；gate 全綠。
