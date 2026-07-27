@@ -35,8 +35,8 @@ pub fn helper_node_count(model: &ConverterModel) -> usize {
 
 /// Image extensions the scanner accepts — mirrors texproc's supported set. Used
 /// to skip non-image files in a directory listing without touching the file.
-const RELATED_IMAGE_EXTENSIONS: [&str; 9] =
-    ["png", "jpg", "jpeg", "tif", "tiff", "exr", "tga", "bmp", "webp"];
+const RELATED_IMAGE_EXTENSIONS: [&str; 10] =
+    ["png", "jpg", "jpeg", "tif", "tiff", "exr", "hdr", "tga", "bmp", "webp"];
 
 /// Reduce a texture selection to the unique `(directory, lowercase base-name)`
 /// pairs whose siblings we want to pull in. Base names come from texproc's
