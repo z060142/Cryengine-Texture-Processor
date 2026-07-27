@@ -461,11 +461,20 @@ fn visit_directory(directory: &Path, output: &mut Vec<PathBuf>) -> Result<()> {
         let path = entry.path();
         if path.is_dir() {
             visit_directory(&path, output)?;
-        } else if path.is_file() {
+        } else if path.is_file() && has_supported_extension(&path) {
+            // Folder expansion silently skips unrelated extensions (.txt, .fbx,
+            // .mat, ...) so importing a whole directory never queues junk.
+            // Explicitly listed files keep the DEF-20 diagnostic path instead.
             output.push(path);
         }
     }
     Ok(())
+}
+
+fn has_supported_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|ext| SUPPORTED_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
 }
 
 fn peel_qualifiers(stem: &str, removable: &HashSet<String>) -> (String, Vec<String>) {
@@ -589,6 +598,62 @@ fn diagnostic(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Folder expansion silently drops unrelated extensions, while an
+    /// explicitly listed unsupported file still surfaces as a DEF-20 unknown.
+    #[test]
+    fn directory_scan_skips_unrelated_extensions_but_explicit_files_diagnose() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "texproc-dirfilter-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        image::save_buffer_with_format(
+            dir.join("Wall_diff.png"),
+            &[10, 20, 30],
+            1,
+            1,
+            image::ColorType::Rgb8,
+            image::ImageFormat::Png,
+        )
+        .unwrap();
+        for junk in ["readme.txt", "model.fbx", "data.json", "noext"] {
+            fs::write(dir.join(junk), b"junk").unwrap();
+        }
+
+        let suffixes = SuffixTable::embedded().unwrap();
+        let scan = scan_inputs(&[dir.clone()], &suffixes).unwrap();
+        let all_paths = scan
+            .groups
+            .iter()
+            .flat_map(|group| {
+                group
+                    .slots
+                    .values()
+                    .map(|slot| slot.path.clone())
+                    .chain(group.unknown.iter().map(|entry| entry.path.clone()))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(all_paths.len(), 1, "only the png should survive: {all_paths:?}");
+        assert!(all_paths[0].ends_with("Wall_diff.png"));
+        assert!(
+            !scan.diagnostics.iter().any(|d| d.code == "DEF-20"),
+            "folder junk must not produce DEF-20 diagnostics"
+        );
+
+        // Explicit unsupported file keeps the diagnostic path.
+        let explicit = scan_inputs(&[dir.join("readme.txt")], &suffixes).unwrap();
+        assert!(
+            explicit.diagnostics.iter().any(|d| d.code == "DEF-20"),
+            "explicit unsupported file must diagnose DEF-20"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn suffix_normalization_and_conflicts_are_deterministic() {
