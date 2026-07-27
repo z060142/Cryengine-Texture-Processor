@@ -1238,6 +1238,110 @@ DoD：多 FBX 實測（≥3 檔含 car + 兩個 KB3D）Export All 全綠、產�
 單獨導出位元一致（抽一檔比對）；清單版式截圖與 Texture Import 對照無違和；
 gate 全綠。
 
+## R10 實作紀錄（2026-07-27，Miss Fox）
+
+動 `texproc-gui`（`main.rs` / `worker.rs` / `lib.rs`）與 `converter`
+（`request.rs` 死碼移除）；無新依賴；凍結 CLI 契約未動；三欄美學與 Texture
+Import 清單版式維持一致。
+
+### 1. Model tab 左欄改為清單（不動三欄結構）
+
+- 單一 `ModelState.review` 改為 `Vec<ModelEntry>`：每個 `ModelEntry` 帶自己的
+  `review`（載入的 ConverterModel）、`physicalize_overrides`、`conversion`
+  （Forward/Up 偵測＋override）、材質選取、`helper_nodes`、`fbx_ingested`——
+  per-model 狀態完全隔離（切換選中模型不會洩漏 physicalize/軸向編輯）。
+- 左欄版式鏡射 Imported Textures 清單：`Add FBX…`（多選對話框，*.fbx）＋
+  `Add Path`／`Clear All`／`Remove Selected`（Remove 沿用 R5 的
+  `apply_click_selection` 選取 helper）。清單列＝檔名＋三個徽章
+  （`N mat` 材質數／`N diag` 診斷數／`N helper` helper 節點數），沿用貼圖
+  型別徽章的同款 `badge()` 小 pill。多選（點／Ctrl／Shift）。
+- **選中恰好一個模型**才驅動中欄材質表／Material Details／診斷與左欄的
+  模型摘要＋Conversion Settings；0 或多選時中欄顯示提示。`selected_entry_index`
+  純邏輯判定。中欄以 `mem::take` 借出該 entry 的可變工作態（physicalize/
+  材質選取/bulk），immutable 借 review 完成 render 後寫回，避免借用衝突。
+
+### 2. 每檔載入行為照舊（逐檔）
+
+- `load_model_files` 多檔並行載入，各自 push 成 entry。`add_model_entry` 逐檔跑：
+  physicalize 種子 `no`（R8，無 manifest 時）、Forward/Up 偵測（R9，每檔重偵測
+  不持久化）、helper 節點數計算、自動貼圖拉入（R3，記入該 entry 的
+  `fbx_ingested`；貼圖池仍靠既有絕對路徑去重）。
+
+### 3. Export All（右欄，與 Export CE Model 並列）
+
+- `Export CE Model` 改為作用於「選中的單一模型」；新增 `Export All` 逐模型序列
+  導出。worker 抽出共用 `export_one_model`（associated 貼圖 → convert → RC →
+  associated DDS，R5 delete-json 內建於 worker），單檔 `start_model_export` 與
+  批次 `start_batch_export` 共用同一路徑，行為逐位元一致。
+- 批次 worker 逐模型送 `Progress{index,total,name,stage}`＋`ModelDone{ok,detail}`；
+  進度模態顯示「Model i/N — <name>: <stage>」，單模型失敗記診斷續跑，完成摘要
+  列成功/失敗清單。Cancel 於階段間停止並終止在跑的 RC——`run_resource_compiler`
+  改 spawn＋try_wait 輪詢，cancel 一設即 `kill()`（TerminateProcess）；DDS 階段
+  沿用 R7 自適應 pool 的既有 kill 語意。R5 的
+  delete-json／export-textures-with-model／DDS 選項對每個模型生效。
+
+### 4. helper 節點數 + is_helper 死碼移除
+
+- `helper_node_count`（`lib.rs` 純函式）：meshless 非根節點數＝走 scene tree
+  非根節點、扣掉「名字出現在某 mesh instances」的 mesh 宿主節點（正確處理
+  多重 instance）。car.fbx 實測＝1（研究值一致）。Model 摘要與清單徽章顯示。
+- `converter/src/request.rs` 移除 `NodeType.is_helper` 欄位與
+  `detect_node_type` 的名稱樣式判定（研究證明 RC 以有無 mesh 決定 helper、
+  不看名稱，此旗標從未被消費）；單元測試同步移除 `wheel_pivot` 斷言。
+  未動 `is_proxy`/`is_lod`。純死碼移除，goldens 不受影響。
+
+### 5. CLI 多引數載入
+
+- `main` 由讀單一 `nth(1)` 改為 `args_os().skip(1)` 全收：FBX 引數各載入為獨立
+  清單 entry（供批量載入與截圖；沿 R3–R9「合成點擊無效」限制以 CLI 引數載入）。
+
+### 驗證
+
+- `cargo fmt --all -- --check`：PASS。
+- `cargo clippy -p texproc-gui -p texproc -p converter --all-targets --release
+  --locked -- -D warnings`：PASS。
+- `cargo test`：converter 55 lib + 7 CLI；texproc 56 lib + 2 fixture + 4 CLI；
+  texproc-gui 11 lib（+`helper_node_count_counts_meshless_non_root_nodes`）
+  + 24 main（+`per_model_physicalize_edits_do_not_leak_between_models`），
+  全 PASS（GUI 5 個 ignored 為真 RC/真資料整合測試）。
+- `run_gates.ps1`（完整含 RC，須以 pwsh 7 執行；Windows PowerShell 5.1 於本機
+  缺 `Get-FileHash`）：**ALL GATES PASSED**——converter RC 16/16、texproc
+  RC/DDS 8/8、ddna 2/2、preserve 17/17、T-005 request/MTL/schema golden、
+  Python asset-flow 全綠。converter 改動為純死碼移除，goldens 零退步。
+
+### 真資料批次證據（worker 程式路徑，`#[ignore]`
+`batch_export_matches_single_export_byte_for_byte`）
+
+- 三檔 Export All（`fixtures/car/car.fbx`、`fixtures/KB3D_ENC_PropAxe_A_grp.fbx`、
+  `Z:\enchanted\output\KB3D_ENC_BldgSmWindmill_A_grp.fbx`），RC＝
+  `S:\...\rc.exe`：三檔 RC exit 0，批次目錄產出 3 個 CGF
+  （car.cgf 8,203,570／PropAxe 43,706／Windmill 23,113,224 bytes）。
+- 再以相同 job 參數單獨 Export car，car 的確定性產物逐位元相等（cryasset 因
+  隨機 guid/timestamp 不比）：
+  - `car.mtl` SHA-256（batch＝single）
+    `C3E63AEB4FEA61CC32A9B5C1DB0F3956A81C2705F1C39A21CCC99FC7702E2E64`
+  - `car.json`（request）SHA-256（batch＝single）
+    `43AF06AE6E214C4B6CD49140801D7FB57B55FB0C738758828DA6B783E06D6910`
+
+### 截圖
+
+- `rebuild/ux-demos/r10-model-list.png`：Model tab 載入 3 模型
+  （PropAxe 3 mat/0 diag/1 helper、car 17 mat/0 diag/1 helper、
+  Windmill 36 mat/0 diag/1 helper），選中 Windmill 驅動中欄 36 槽材質表；
+  左欄模型摘要含 `Helper nodes: 1`＋Conversion Settings；清單版式與 Imported
+  Textures 對照一致。以 CLI 三引數載入擷取（GUI 合成點擊無效之既有限制）。
+
+### 偏離／觀察
+
+- **右欄 DPI 裁切**（沿 R2–R9 既有現象）：截圖右側 Output Settings 面板最右數
+  px 因顯示 scale 被視窗邊裁切；`Export CE Model`／`Export All` 動作鈕釘於
+  右欄底部同受影響，內容可辨識，功能由 build/test 佐證。
+- **模型清單徽章值**：三檔 helper 皆＝1（各含一個 meshless `*_grp` null）；
+  car 與研究錨定值一致。
+- **run_gates 主機**：本機 `powershell`（5.1）缺 `Get-FileHash`，須以 `pwsh`
+  （7）執行 run_gates；非程式問題。
+- 收尾終止所有 spawned 程序（texproc-gui／texproc／rc／converter＝0 殘留）。
+
 ## R11（2026-07-27 業主裁決，與 R10 平行）：diffuse 帶 alpha → AlphaTest=0.5
 
 - 規則：sub-material 解析出的 Diffuse 貼圖檔含 alpha 通道時，該 sub-material
@@ -1251,3 +1355,71 @@ gate 全綠。
 - Python 版 AlphaTest 既有行為與 gamesdk 樣本 .mtl 先查證再定屬性格式。
 - DoD：單元測試（有/無 alpha、override 優先）、gamesdk 樣本格式對照、
   MTL golden 不受影響（car 貼圖無 alpha 案例驗證）或差異歸因；gate 全綠。
+
+## R11 實作紀錄（2026-07-27，Miss Fox）
+
+只動 `converter/src/mtl.rs`（就地新增 header 探針私函式 + 觸發邏輯）；未動
+`texture_resolver.rs`、`lib.rs`、`request.rs`、`convert.rs` 與 texproc-gui；
+無新依賴；凍結 CLI 旗標/退出碼不變（輸出多一個 AlphaTest 屬性屬既有屬性策略內）。
+
+### 觸發條件與屬性放置（對齊 Python）
+
+- 移植 `mtl_exporter.py:241-242`：sub-material 解析出的 **Diffuse** 貼圖檔
+  （CE map `Diffuse`）含 alpha 通道時，寫出 `AlphaTest="0.5"`。
+- override 優先：override 通道（cryengine_material / ce_material / mtl_overrides
+  或 row 本身）已提供 `AlphaTest`（任意值，含明確 `"0"`）者以 override 為準——
+  自動填入前先檢查 `attrs.contains_key("AlphaTest")`，故 override extend 之後才
+  補自動值，override 恆勝。
+- 屬性以既有 `BTreeMap` 寫出（比較器忽略屬性順序；Python 是 default→Emittance→
+  AlphaTest→override 順序，語意等價）。gamesdk 樣本
+  （`alocasia.mtl`、`ddd/KB3D_ENC_BldgSmWatermill_A_grp.mtl` 的
+  `KB3D_ENC_AtlasLeafA`）實證 `AlphaTest="0.5"` 即為 sub-material `<Material>` 上
+  的平屬性，格式吻合。
+
+### Alpha 偵測（header-only，無像素解碼）
+
+就地私函式（`file_has_alpha_channel` 依副檔名分派）：
+- **PNG**：IHDR color type 4（grey+alpha）或 6（truecolour+alpha）。
+- **TIFF**：讀 8-byte header 取 byte order + IFD offset，seek 至 IFD，掃描
+  entries——`SamplesPerPixel`(277) 為 2/≥4 或 `ExtraSamples`(338) 存在即判 alpha。
+  只讀 header + IFD 區塊，不碰 pixel strips。
+- **DDS**：`DDPF_ALPHAPIXELS`/`DDPF_ALPHA` 旗標、legacy `DXT2/3/4/5` fourCC、
+  或 DX10 的 DXGI alpha 格式集合。**超出 Python 版**（Python 對 .dds 一律回
+  False）；T-013 CRYF 附掛 alpha 非 header 可判，已 ponytail 註記，只做
+  DDPF/DXGI（票面允許）。
+- 其他/不可讀/空檔/`%ENGINE%` 引擎貼圖 → 一律回 no-alpha、不報錯。
+
+### 驗證
+
+- `cargo test -p converter --release --locked`：55 lib（+5 新增）+ 7 CLI PASS。
+  新增：alpha-present→有 AlphaTest、no-alpha→無、override `"0.3"` 勝、override
+  `"0"` 勝（皆不自動），與 png/dds/tiff-IFD 純函式探針（in-test 手搓 header
+  byte fixtures，含 DXT1/BC1 opaque 反例、RGB SamplesPerPixel=3 反例）。
+- `cargo clippy -p converter --all-targets --release --locked -- -D warnings`：PASS。
+- `cargo fmt --all -- --check`：PASS。
+- **MTL golden 不受影響**：手動重放 T-005 generated MTL golden（gate 因平行 agent
+  之 texproc-gui `worker.rs` 尚在編修而在 GUI build 步驟前中止，該步早於 native
+  golden 步驟，故直接以已建置 converter.exe 重放）——`compare_xml_golden.py`
+  `ok=true`、999 值、0 mismatch；生成 MTL 內 `AlphaTest` 出現 0 次（golden 的
+  car 貼圖為空 stub 檔，探針判 no-alpha，如票面預期）。
+- **真實資料端到端**：`KB3D_ENC_AtlasA`（有 opacity map）以 texproc process →
+  `KB3D_ENC_AtlasA_diff.tif` 為 RGBA（alpha 存在，PIL 確認）；再對
+  `kb3d_enchanted-native.fbx`（2.33 GB）`convert --texture-dir <該輸出>`，生成
+  MTL 的 AtlasA sub-material：
+  `<Material Name="KB3D_ENC_AtlasA" AlphaTest="0.5" ... >`，Diffuse 指向
+  `../atlasA_out/KB3D_ENC_AtlasA_diff.tif`。同 texture-dir 內僅 AtlasA 有可解析的
+  alpha diff，其餘材質不誤加 AlphaTest。
+- 收尾終止 converter/texproc/texproc-gui/rc 程序，臨時資料已刪。
+
+### 偏離
+
+- **gate 未能全綠跑完**：run_gates 的 GUI build 步驟因平行 agent（R10）之
+  texproc-gui `worker.rs` 缺 `request_deleted` 欄位而編譯失敗，該步早於 native
+  golden 步驟並中止全 gate。此為檔案邊界外、與本 R11 無關；converter/texproc/
+  ce_schema 全部核心測試（GUI build 步驟之前）綠、且 T-005 MTL golden 經手動重放
+  證明零退步。GUI 修好後 gate 應自然全綠。
+- **DDS alpha 偵測為 Python 版新增能力**（Python skip .dds）；CRYF 附掛 alpha
+  未涵蓋（非 header trivially 可判），已註記。
+- 只實作票面 R11 明訂的「Diffuse 檔含 alpha」觸發；未移植 Python
+  `_material_has_alpha` 另一分支（群組內含 alpha/opacity/mask 型別貼圖即判）——
+  本管線 opacity 已烘進 diff 的 A 通道，diff-alpha 探針即覆蓋實際案例。

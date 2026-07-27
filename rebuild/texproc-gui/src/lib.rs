@@ -4,7 +4,34 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use converter::model::{ConverterModel, NodeRecord};
 use texproc::{parse_base_name, ScanEntry, ScanResult, Severity, SuffixTable};
+
+/// Count the loaded model's helper/anchor nodes: meshless, non-root scene nodes.
+/// RC turns every meshless node into a CGF `NODE_HELPER` (see
+/// helper-node-research.md), so this mirrors what RC will produce. A node hosts a
+/// mesh when its name appears in some mesh's instance list; walking the scene
+/// tree's non-root nodes and counting the rest handles multi-instanced meshes
+/// correctly. Verified against car.fbx = 1 (the meshless `*_grp` null).
+pub fn helper_node_count(model: &ConverterModel) -> usize {
+    let mesh_nodes: BTreeSet<&str> = model
+        .meshes
+        .iter()
+        .flat_map(|mesh| mesh.instances.iter().map(String::as_str))
+        .collect();
+    fn walk(nodes: &[NodeRecord], mesh_nodes: &BTreeSet<&str>, count: &mut usize) {
+        for node in nodes {
+            if !mesh_nodes.contains(node.name.as_str()) {
+                *count += 1;
+            }
+            walk(&node.children, mesh_nodes, count);
+        }
+    }
+    let mut count = 0;
+    // `scene_tree` is the synthetic root; its children are the real (non-root) nodes.
+    walk(&model.scene_tree.children, &mesh_nodes, &mut count);
+    count
+}
 
 /// Image extensions the scanner accepts — mirrors texproc's supported set. Used
 /// to skip non-image files in a directory listing without touching the file.
@@ -510,6 +537,47 @@ mod tests {
         // Orthogonal combinations are legal.
         assert!(!axes_parallel("-Z", "+Y"));
         assert!(!axes_parallel("+X", "+Y"));
+    }
+
+    #[test]
+    fn helper_node_count_counts_meshless_non_root_nodes() {
+        use converter::model::{AxisDetection, ConverterModel, MeshRecord, NodeRecord};
+        fn node(name: &str, children: Vec<NodeRecord>) -> NodeRecord {
+            NodeRecord {
+                name: name.to_owned(),
+                element_id: 0,
+                typed_id: 0,
+                children,
+            }
+        }
+        fn mesh(name: &str) -> MeshRecord {
+            MeshRecord {
+                name: name.to_owned(),
+                element_id: 0,
+                typed_id: 0,
+                instances: vec![name.to_owned()],
+                material_slots: Vec::new(),
+                face_count: 1,
+                face_material_counts: Vec::new(),
+            }
+        }
+        // Mirrors car.fbx: synthetic root → meshless `_grp` null → two mesh nodes.
+        let model = ConverterModel {
+            source_fbx: "car.fbx".to_owned(),
+            materials: Vec::new(),
+            meshes: vec![mesh("Body"), mesh("Wheel")],
+            scene_tree: node(
+                "",
+                vec![node(
+                    "Car_grp",
+                    vec![node("Body", vec![]), node("Wheel", vec![])],
+                )],
+            ),
+            node_count: 4,
+            axes: AxisDetection::fallback(),
+        };
+        // Only `Car_grp` is a meshless non-root node.
+        assert_eq!(helper_node_count(&model), 1);
     }
 
     #[test]

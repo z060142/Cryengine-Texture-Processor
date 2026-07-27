@@ -638,6 +638,44 @@ pub struct ModelExportReport {
     pub rc: RcExportOutcome,
     /// Present only when "Export associated textures with model" ran.
     pub textures: Option<AssociatedTexturesReport>,
+    /// True when the request JSON was deleted after a fully successful export
+    /// (R5 delete-json). The .mtl / .mtl.cryasset are always kept.
+    pub request_deleted: bool,
+}
+
+/// One model's export inputs. Built on the UI thread from a model-list entry; the
+/// worker runs it through convert → RC → optional associated-texture DDS. Shared
+/// by single Export CE Model and batch Export All.
+pub struct ModelJob {
+    pub name: String,
+    pub input: PathBuf,
+    pub manifest: Option<PathBuf>,
+    pub overrides: Option<PathBuf>,
+    pub texture_dir: Option<PathBuf>,
+    pub physicalize_overrides: BTreeMap<String, String>,
+    pub conversion: ConversionOverrides,
+    pub associated: Option<AssociatedTextures>,
+}
+
+/// Export All progress events, one sequence per batch.
+pub enum BatchExportEvent {
+    Progress {
+        index: usize,
+        total: usize,
+        name: String,
+        stage: String,
+    },
+    ModelDone {
+        name: String,
+        ok: bool,
+        detail: String,
+    },
+    Finished,
+}
+
+pub struct BatchExportJob {
+    pub receiver: Receiver<BatchExportEvent>,
+    pub cancel: Arc<AtomicBool>,
 }
 
 /// Stage (a)+(d) of the "Export associated textures with model" flow: the
@@ -669,127 +707,194 @@ pub enum RcExportOutcome {
     },
 }
 
-// ponytail: export request has many independently-sourced fields; a params
-// struct would be churn for one worker entry point.
-#[allow(clippy::too_many_arguments)]
+/// Single-model export (Export CE Model). Not separately cancellable — a
+/// never-set flag drives the shared `export_one_model` path.
 pub fn start_model_export(
-    input: PathBuf,
-    manifest: Option<PathBuf>,
-    overrides: Option<PathBuf>,
-    texture_dir: Option<PathBuf>,
-    output_dir: PathBuf,
-    physicalize_overrides: BTreeMap<String, String>,
-    conversion: ConversionOverrides,
+    job: ModelJob,
     rc_exe: Option<PathBuf>,
-    associated: Option<AssociatedTextures>,
+    output_dir: PathBuf,
+    delete_request_json: bool,
 ) -> Receiver<ModelExportEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
-        // Stage (a): process the FBX-ingested texture groups into the texture
-        // output directory so the MTL below resolves against fresh outputs.
-        let textures = match associated.as_ref() {
-            Some(assoc) => {
-                let _ = sender.send(ModelExportEvent::Stage(format!(
-                    "Processing {} associated texture groups…",
-                    assoc.scan.groups.len()
-                )));
-                let cancel = AtomicBool::new(false);
-                match process_scan_parallel(
-                    &assoc.scan,
-                    &assoc.settings,
-                    &assoc.output_dir,
-                    &cancel,
-                    |_| {},
-                ) {
-                    Ok(report) => Some(report),
-                    Err(error) => {
-                        let _ = sender.send(ModelExportEvent::Failed(format!(
-                            "associated texture processing failed: {error}"
-                        )));
-                        return;
-                    }
-                }
-            }
-            None => None,
-        };
-
-        // Stage (b): convert (.mtl + request), pointing texture resolution at
-        // the texture output directory when associated textures were processed.
-        let _ = sender.send(ModelExportEvent::Stage(
-            "Converting materials (.mtl + request)…".to_owned(),
-        ));
-        let result = converter::convert::convert_file_with_options(
-            &input,
-            existing_optional(&manifest),
-            existing_optional(&overrides),
-            texture_dir.as_deref(),
-            None,
+        let cancel = AtomicBool::new(false);
+        let result = export_one_model(
+            &job,
+            rc_exe.as_deref(),
             &output_dir,
-            &physicalize_overrides,
-            &conversion,
+            delete_request_json,
+            &cancel,
+            |stage| {
+                let _ = sender.send(ModelExportEvent::Stage(stage.to_owned()));
+            },
         );
-        let outputs = match result {
-            Ok(outputs) => outputs,
-            Err(error) => {
-                let _ = sender.send(ModelExportEvent::Failed(error));
-                return;
-            }
+        let _ = match result {
+            Ok(report) => sender.send(ModelExportEvent::Completed(Box::new(report))),
+            Err(error) => sender.send(ModelExportEvent::Failed(error)),
         };
-
-        // Stage (c): RC → CGF.
-        let rc = match &rc_exe {
-            Some(rc_exe) => {
-                let _ = sender.send(ModelExportEvent::Stage(
-                    "Running Resource Compiler (CGF)…".to_owned(),
-                ));
-                run_resource_compiler(rc_exe, &input, &outputs, &output_dir)
-            }
-            None => RcExportOutcome::NotConfigured,
-        };
-
-        // Stage (d): optional TIF → DDS over the associated texture outputs.
-        let textures = textures.map(|report| {
-            let written = report.groups.iter().map(|group| group.written.len()).sum();
-            let assoc = associated.as_ref().expect("report implies associated set");
-            let dds = match (&rc_exe, assoc.generate_dds) {
-                (Some(rc_exe), true) => {
-                    let _ = sender.send(ModelExportEvent::Stage(
-                        "Compiling associated DDS via RC…".to_owned(),
-                    ));
-                    let tifs = dds_jobs(&report);
-                    // The model-export flow is not separately cancellable; a
-                    // never-set flag drives the same pool used by the DDS stage.
-                    let cancel = AtomicBool::new(false);
-                    Some(run_dds_pool(
-                        rc_exe,
-                        &tifs,
-                        &assoc.output_dir,
-                        assoc.delete_tif,
-                        &cancel,
-                        |_, _, _| {},
-                        |from, to| {
-                            let _ = sender.send(ModelExportEvent::Stage(format!(
-                                "RC workers: {from} → {to}"
-                            )));
-                        },
-                    ))
-                }
-                _ => None,
-            };
-            AssociatedTexturesReport {
-                groups: report.groups.len(),
-                written,
-                dds,
-            }
-        });
-
-        let _ = sender.send(ModelExportEvent::Completed(Box::new(ModelExportReport {
-            outputs,
-            rc,
-            textures,
-        })));
     });
     receiver
+}
+
+/// Batch export (Export All): iterate models sequentially, one convert → RC →
+/// optional DDS per model. A failing model is recorded and the batch continues.
+/// Cancel stops between stages/models and terminates any in-flight RC.
+pub fn start_batch_export(
+    jobs: Vec<ModelJob>,
+    rc_exe: Option<PathBuf>,
+    output_dir: PathBuf,
+    delete_request_json: bool,
+) -> BatchExportJob {
+    let (sender, receiver) = mpsc::channel();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let worker_cancel = Arc::clone(&cancel);
+    thread::spawn(move || {
+        let total = jobs.len();
+        for (position, job) in jobs.into_iter().enumerate() {
+            if worker_cancel.load(Ordering::Relaxed) {
+                break;
+            }
+            let index = position + 1;
+            let name = job.name.clone();
+            let stage_name = name.clone();
+            let result = export_one_model(
+                &job,
+                rc_exe.as_deref(),
+                &output_dir,
+                delete_request_json,
+                &worker_cancel,
+                |stage| {
+                    let _ = sender.send(BatchExportEvent::Progress {
+                        index,
+                        total,
+                        name: stage_name.clone(),
+                        stage: stage.to_owned(),
+                    });
+                },
+            );
+            let (ok, detail) = match result {
+                Ok(report) => summarize_model_report(&report),
+                Err(error) => (false, error),
+            };
+            let _ = sender.send(BatchExportEvent::ModelDone { name, ok, detail });
+        }
+        let _ = sender.send(BatchExportEvent::Finished);
+    });
+    BatchExportJob { receiver, cancel }
+}
+
+/// (ok, one-line detail) for a model's batch summary line.
+fn summarize_model_report(report: &ModelExportReport) -> (bool, String) {
+    match &report.rc {
+        RcExportOutcome::Succeeded { cgf, return_code } => (
+            true,
+            format!("CGF {} (RC exit {return_code})", cgf.display()),
+        ),
+        RcExportOutcome::NotConfigured => (
+            true,
+            "intermediates exported (RC not configured)".to_owned(),
+        ),
+        RcExportOutcome::Failed { error, .. } => (false, format!("RC failed: {error}")),
+    }
+}
+
+/// Run one model's export through convert → RC → optional associated-texture DDS.
+/// Stages are reported via `on_stage`; `cancel` stops between stages and kills the
+/// in-flight RC. Shared by single and batch export so their behavior is identical.
+fn export_one_model(
+    job: &ModelJob,
+    rc_exe: Option<&Path>,
+    output_dir: &Path,
+    delete_request_json: bool,
+    cancel: &AtomicBool,
+    mut on_stage: impl FnMut(&str),
+) -> Result<ModelExportReport, String> {
+    // Stage (a): process the FBX-ingested texture groups into the texture output
+    // directory so the MTL below resolves against fresh outputs.
+    let textures_report = match &job.associated {
+        Some(assoc) => {
+            on_stage(&format!(
+                "Processing {} associated texture groups…",
+                assoc.scan.groups.len()
+            ));
+            match process_scan_parallel(
+                &assoc.scan,
+                &assoc.settings,
+                &assoc.output_dir,
+                cancel,
+                |_| {},
+            ) {
+                Ok(report) => Some(report),
+                Err(error) => return Err(format!("associated texture processing failed: {error}")),
+            }
+        }
+        None => None,
+    };
+
+    // Stage (b): convert (.mtl + request), pointing texture resolution at the
+    // texture output directory when associated textures were processed.
+    on_stage("Converting materials (.mtl + request)…");
+    let outputs = converter::convert::convert_file_with_options(
+        &job.input,
+        existing_optional(&job.manifest),
+        existing_optional(&job.overrides),
+        job.texture_dir.as_deref(),
+        None,
+        output_dir,
+        &job.physicalize_overrides,
+        &job.conversion,
+    )?;
+
+    // Stage (c): RC → CGF (cancellable — kills the in-flight rc.exe).
+    let rc = match rc_exe {
+        Some(rc_exe) if !cancel.load(Ordering::Relaxed) => {
+            on_stage("Running Resource Compiler (CGF)…");
+            run_resource_compiler(rc_exe, &job.input, &outputs, output_dir, cancel)
+        }
+        _ => RcExportOutcome::NotConfigured,
+    };
+
+    // R5 delete-json: only on full success (RC produced a CGF); .mtl/.cryasset kept.
+    let request_deleted = delete_request_json
+        && matches!(rc, RcExportOutcome::Succeeded { .. })
+        && fs::remove_file(&outputs.request).is_ok();
+
+    // Stage (d): optional TIF → DDS over the associated texture outputs.
+    let textures = textures_report.map(|report| {
+        let written = report.groups.iter().map(|group| group.written.len()).sum();
+        let assoc = job
+            .associated
+            .as_ref()
+            .expect("report implies associated set");
+        let dds = match (rc_exe, assoc.generate_dds) {
+            (Some(rc_exe), true) => {
+                on_stage("Compiling associated DDS via RC…");
+                let tifs = dds_jobs(&report);
+                Some(run_dds_pool(
+                    rc_exe,
+                    &tifs,
+                    &assoc.output_dir,
+                    assoc.delete_tif,
+                    cancel,
+                    |_, _, _| {},
+                    |from, to| on_stage(&format!("RC workers: {from} → {to}")),
+                ))
+            }
+            _ => None,
+        };
+        AssociatedTexturesReport {
+            groups: report.groups.len(),
+            written,
+            dds,
+        }
+    });
+
+    Ok(ModelExportReport {
+        outputs,
+        rc,
+        textures,
+        request_deleted,
+    })
 }
 
 fn run_resource_compiler(
@@ -797,6 +902,7 @@ fn run_resource_compiler(
     input: &Path,
     outputs: &ConvertOutputs,
     output_dir: &Path,
+    cancel: &AtomicBool,
 ) -> RcExportOutcome {
     let request = match fs::read_to_string(&outputs.request)
         .map_err(|error| error.to_string())
@@ -836,14 +942,20 @@ fn run_resource_compiler(
         .arg("/overwriteextension=fbx")
         .arg(format!("/overwritesourcefile={}", input.display()))
         .arg(format!("/overwritefilename={}", cgf_name.to_string_lossy()))
-        .current_dir(output_dir);
+        .current_dir(output_dir)
+        // Null stdio (the GUI has no console) so cancel-polling never blocks on a
+        // child pipe buffer. Trade-off: no captured RC stderr on failure.
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x0800_0000);
     }
-    let output = match command.output() {
-        Ok(output) => output,
+    // Spawn + poll so a cancel can TerminateProcess the in-flight RC (Export All).
+    let mut child = match command.spawn() {
+        Ok(child) => child,
         Err(error) => {
             return RcExportOutcome::Failed {
                 error: format!("failed to start {}: {error}", rc_exe.display()),
@@ -851,19 +963,32 @@ fn run_resource_compiler(
             };
         }
     };
-    let return_code = output.status.code().unwrap_or(-1);
-    if output.status.success() && cgf.is_file() {
+    let status = loop {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return RcExportOutcome::Failed {
+                error: "cancelled".to_owned(),
+                return_code: None,
+            };
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            Err(error) => {
+                return RcExportOutcome::Failed {
+                    error: format!("RC wait failed: {error}"),
+                    return_code: None,
+                };
+            }
+        }
+    };
+    let return_code = status.code().unwrap_or(-1);
+    if status.success() && cgf.is_file() {
         RcExportOutcome::Succeeded { cgf, return_code }
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_owned();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_owned();
-        let detail = if !stderr.is_empty() { stderr } else { stdout };
         RcExportOutcome::Failed {
-            error: if detail.is_empty() {
-                format!("RC exited with {return_code}, CGF was not produced")
-            } else {
-                format!("RC exited with {return_code}: {detail}")
-            },
+            error: format!("RC exited with {return_code}, CGF was not produced"),
             return_code: Some(return_code),
         }
     }
@@ -946,17 +1071,17 @@ mod tests {
             generate_dds: true,
             delete_tif: true,
         };
-        let receiver = start_model_export(
-            fbx.clone(),
-            None,
-            None,
-            Some(tex_out.clone()),
-            model_out.clone(),
-            BTreeMap::new(),
-            ConversionOverrides::default(),
-            Some(rc),
-            Some(associated),
-        );
+        let job = ModelJob {
+            name: "PropAxe".to_owned(),
+            input: fbx.clone(),
+            manifest: None,
+            overrides: None,
+            texture_dir: Some(tex_out.clone()),
+            physicalize_overrides: BTreeMap::new(),
+            conversion: ConversionOverrides::default(),
+            associated: Some(associated),
+        };
+        let receiver = start_model_export(job, Some(rc), model_out.clone(), false);
 
         let mut report = None;
         while let Ok(event) = receiver.recv() {
@@ -1375,5 +1500,153 @@ mod tests {
             );
         }
         fs::remove_dir_all(&out).ok();
+    }
+
+    /// R10 batch evidence: Export All over 3 real FBX (car + PropAxe + a KB3D
+    /// building) through the batch worker, then re-export car alone through the
+    /// single worker; car's deterministic outputs (.mtl, request .json) must be
+    /// byte-identical between the two paths. (.mtl.cryasset is intentionally
+    /// non-deterministic — random guid/timestamp — so it is not compared.)
+    /// Ignored by default (needs Z: fixtures + RC); run with:
+    ///   set CE_RC_EXE=...\rc.exe
+    ///   cargo test -p texproc-gui -- --ignored --nocapture batch_export_matches_single
+    #[test]
+    #[ignore = "requires the Z: KB3D FBX and a real RC.exe"]
+    fn batch_export_matches_single_export_byte_for_byte() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let rc = std::env::var_os("CE_RC_EXE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe")
+            });
+        assert!(rc.is_file(), "RC not found at {}", rc.display());
+
+        let fixtures = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("fixtures");
+        let car = fixtures.join("car").join("car.fbx");
+        let propaxe = fixtures.join("KB3D_ENC_PropAxe_A_grp.fbx");
+        let kb3d = PathBuf::from(r"Z:\enchanted\output\KB3D_ENC_BldgSmWindmill_A_grp.fbx");
+        for path in [&car, &propaxe, &kb3d] {
+            assert!(path.is_file(), "fixture missing: {}", path.display());
+        }
+
+        let job = |name: &str, input: &Path| ModelJob {
+            name: name.to_owned(),
+            input: input.to_owned(),
+            manifest: None,
+            overrides: None,
+            texture_dir: None,
+            physicalize_overrides: BTreeMap::new(),
+            conversion: ConversionOverrides::default(),
+            associated: None,
+        };
+
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("texproc-gui-r10-{}-{nonce}", std::process::id()));
+        let batch_dir = root.join("batch");
+        let single_dir = root.join("single");
+        fs::create_dir_all(&batch_dir).unwrap();
+        fs::create_dir_all(&single_dir).unwrap();
+
+        // Export All (batch worker) over the three models.
+        let jobs = vec![
+            job("car.fbx", &car),
+            job("KB3D_ENC_PropAxe_A_grp.fbx", &propaxe),
+            job("KB3D_ENC_BldgSmWindmill_A_grp.fbx", &kb3d),
+        ];
+        let batch = start_batch_export(jobs, Some(rc.clone()), batch_dir.clone(), false);
+        let mut ok_count = 0;
+        while let Ok(event) = batch.receiver.recv() {
+            match event {
+                BatchExportEvent::Progress {
+                    index,
+                    total,
+                    name,
+                    stage,
+                } => {
+                    eprintln!("Model {index}/{total} — {name}: {stage}");
+                }
+                BatchExportEvent::ModelDone { name, ok, detail } => {
+                    eprintln!("done {name}: ok={ok} — {detail}");
+                    assert!(ok, "batch model {name} failed: {detail}");
+                    ok_count += 1;
+                }
+                BatchExportEvent::Finished => break,
+            }
+        }
+        assert_eq!(ok_count, 3, "all three models should export");
+        let cgf_count = fs::read_dir(&batch_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("cgf"))
+            })
+            .count();
+        assert_eq!(cgf_count, 3, "batch should produce three CGF files");
+
+        // Re-export car alone (single worker) with identical job parameters.
+        let receiver =
+            start_model_export(job("car.fbx", &car), Some(rc), single_dir.clone(), false);
+        let mut single = None;
+        while let Ok(event) = receiver.recv() {
+            match event {
+                ModelExportEvent::Stage(stage) => eprintln!("single stage: {stage}"),
+                ModelExportEvent::Completed(report) => {
+                    single = Some(report);
+                    break;
+                }
+                ModelExportEvent::Failed(error) => panic!("single export failed: {error}"),
+            }
+        }
+        let single = single.expect("single export completed");
+        assert!(
+            matches!(single.rc, RcExportOutcome::Succeeded { .. }),
+            "single car export must produce a CGF"
+        );
+
+        // car's deterministic outputs must match byte-for-byte across paths.
+        for output in [&single.outputs.mtl, &single.outputs.request] {
+            let name = output.file_name().unwrap();
+            let batch_copy = batch_dir.join(name);
+            let single_bytes = fs::read(output).unwrap();
+            let batch_bytes = fs::read(&batch_copy).unwrap();
+            let hash = |bytes: &[u8]| {
+                use std::hash::{Hash, Hasher};
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                bytes.hash(&mut hasher);
+                hasher.finish()
+            };
+            eprintln!(
+                "{}: single {} bytes (h={:016x}) vs batch {} bytes (h={:016x})",
+                name.to_string_lossy(),
+                single_bytes.len(),
+                hash(&single_bytes),
+                batch_bytes.len(),
+                hash(&batch_bytes),
+            );
+            assert_eq!(
+                single_bytes,
+                batch_bytes,
+                "{} differs between batch and single export",
+                name.to_string_lossy()
+            );
+        }
+
+        // Keep the outputs for external SHA-256 evidence when asked.
+        if std::env::var_os("TEXPROC_KEEP_OUTPUT").is_some() {
+            eprintln!("kept outputs under {}", root.display());
+        } else {
+            fs::remove_dir_all(&root).ok();
+        }
     }
 }

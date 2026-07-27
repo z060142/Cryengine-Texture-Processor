@@ -6,7 +6,8 @@ use quick_xml::{Reader, Writer};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::fs::{self, File};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 const ROOT_MTL_FLAGS: &str = "524544";
@@ -252,6 +253,12 @@ pub fn write_mtl(
             attrs
                 .entry("StringGenMask".to_owned())
                 .or_insert_with(|| fallback_policy.1.clone());
+        }
+        // Python parity (mtl_exporter.py:242): a diffuse texture that carries an
+        // alpha channel emits AlphaTest="0.5". An explicit override AlphaTest
+        // (any value, including "0") wins, so only auto-fill when absent.
+        if !attrs.contains_key("AlphaTest") && diffuse_has_alpha(&textures, mtl_dir) {
+            attrs.insert("AlphaTest".to_owned(), "0.5".to_owned());
         }
 
         let mut ordered_attrs = vec![("Name".to_owned(), material.name.clone())];
@@ -580,6 +587,172 @@ fn write_end(writer: &mut Writer<Vec<u8>>, name: &str) -> Result<(), String> {
         .map_err(|error| format!("failed to write MTL XML: {error}"))
 }
 
+/// Header-only alpha probe of the sub-material's resolved Diffuse texture.
+/// Unknown / unreadable / engine (`%...`) textures probe as no-alpha.
+fn diffuse_has_alpha(textures: &[TextureEntry], mtl_dir: &Path) -> bool {
+    textures
+        .iter()
+        .find(|texture| texture.map == "Diffuse")
+        .is_some_and(|texture| {
+            !texture.file.starts_with('%') && file_has_alpha_channel(&mtl_dir.join(&texture.file))
+        })
+}
+
+/// Dispatch by extension. No pixel decode: only container headers are read.
+fn file_has_alpha_channel(path: &Path) -> bool {
+    let ext = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match ext.as_str() {
+        "png" => read_prefix(path, 26).is_some_and(|bytes| png_has_alpha(&bytes)),
+        "tif" | "tiff" => tiff_has_alpha(path),
+        "dds" => read_prefix(path, 148).is_some_and(|bytes| dds_has_alpha(&bytes)),
+        _ => false,
+    }
+}
+
+/// Best-effort read of up to `n` leading bytes (short files return what exists).
+fn read_prefix(path: &Path, n: usize) -> Option<Vec<u8>> {
+    let mut file = File::open(path).ok()?;
+    let mut buffer = vec![0u8; n];
+    let mut filled = 0;
+    while filled < n {
+        match file.read(&mut buffer[filled..]) {
+            Ok(0) => break,
+            Ok(read) => filled += read,
+            Err(_) => return None,
+        }
+    }
+    buffer.truncate(filled);
+    Some(buffer)
+}
+
+fn read_u16(bytes: &[u8], little_endian: bool) -> u16 {
+    let value = [bytes[0], bytes[1]];
+    if little_endian {
+        u16::from_le_bytes(value)
+    } else {
+        u16::from_be_bytes(value)
+    }
+}
+
+fn read_u32(bytes: &[u8], little_endian: bool) -> u32 {
+    let value = [bytes[0], bytes[1], bytes[2], bytes[3]];
+    if little_endian {
+        u32::from_le_bytes(value)
+    } else {
+        u32::from_be_bytes(value)
+    }
+}
+
+/// PNG: IHDR colour type 4 (grey+alpha) or 6 (truecolour+alpha) carries alpha.
+fn png_has_alpha(bytes: &[u8]) -> bool {
+    const SIGNATURE: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+    bytes.len() >= 26
+        && bytes[0..8] == SIGNATURE
+        && &bytes[12..16] == b"IHDR"
+        && matches!(bytes[25], 4 | 6)
+}
+
+/// TIFF: seek the first IFD and inspect SamplesPerPixel (277) / ExtraSamples
+/// (338). Reads only the header and IFD block, never the pixel strips.
+fn tiff_has_alpha(path: &Path) -> bool {
+    let Ok(mut file) = File::open(path) else {
+        return false;
+    };
+    let mut header = [0u8; 8];
+    if file.read_exact(&mut header).is_err() {
+        return false;
+    }
+    let little_endian = match &header[0..2] {
+        b"II" => true,
+        b"MM" => false,
+        _ => return false,
+    };
+    if read_u16(&header[2..4], little_endian) != 42 {
+        return false;
+    }
+    let ifd_offset = read_u32(&header[4..8], little_endian) as u64;
+    if file.seek(SeekFrom::Start(ifd_offset)).is_err() {
+        return false;
+    }
+    let mut count = [0u8; 2];
+    if file.read_exact(&mut count).is_err() {
+        return false;
+    }
+    let entries = read_u16(&count, little_endian) as usize;
+    let mut ifd = vec![0u8; entries * 12];
+    if file.read_exact(&mut ifd).is_err() {
+        return false;
+    }
+    tiff_ifd_has_alpha(&ifd, little_endian)
+}
+
+fn tiff_ifd_has_alpha(entries: &[u8], little_endian: bool) -> bool {
+    let mut samples_per_pixel = 1u32;
+    let mut has_extra_samples = false;
+    for entry in entries.chunks_exact(12) {
+        let tag = read_u16(&entry[0..2], little_endian);
+        let field_type = read_u16(&entry[2..4], little_endian);
+        let value_count = read_u32(&entry[4..8], little_endian);
+        match tag {
+            277 => {
+                samples_per_pixel = if field_type == 3 {
+                    read_u16(&entry[8..10], little_endian) as u32
+                } else {
+                    read_u32(&entry[8..12], little_endian)
+                };
+            }
+            338 if value_count > 0 => has_extra_samples = true,
+            _ => {}
+        }
+    }
+    has_extra_samples || samples_per_pixel == 2 || samples_per_pixel >= 4
+}
+
+/// DDS: DDPF alpha flags, legacy DXTn fourCCs, or a DX10 DXGI alpha format.
+/// ponytail: T-013 CRYF attached-alpha is not header-detectable here; plain
+/// DDPF/DXGI alpha only, as the ticket permits.
+fn dds_has_alpha(bytes: &[u8]) -> bool {
+    const DDPF_ALPHAPIXELS: u32 = 0x1;
+    const DDPF_ALPHA: u32 = 0x2;
+    const DDPF_FOURCC: u32 = 0x4;
+    if bytes.len() < 128 || &bytes[0..4] != b"DDS " {
+        return false;
+    }
+    // Pixel format sits at header offset 76; its flags at 80, fourCC at 84.
+    let pixel_flags = read_u32(&bytes[80..84], true);
+    if pixel_flags & (DDPF_ALPHAPIXELS | DDPF_ALPHA) != 0 {
+        return true;
+    }
+    if pixel_flags & DDPF_FOURCC != 0 {
+        let fourcc = &bytes[84..88];
+        if matches!(fourcc, b"DXT2" | b"DXT3" | b"DXT4" | b"DXT5") {
+            return true;
+        }
+        if fourcc == b"DX10" && bytes.len() >= 132 {
+            return dxgi_format_has_alpha(read_u32(&bytes[128..132], true));
+        }
+    }
+    false
+}
+
+fn dxgi_format_has_alpha(format: u32) -> bool {
+    matches!(
+        format,
+        // R32G32B32A32 / R16G16B16A16 / R10G10B10A2 / R8G8B8A8 typeless..int
+        2 | 3 | 4 | 10 | 11 | 12 | 13 | 14 | 23 | 24 | 25 | 28 | 29 | 30 | 31
+        // A8_UNORM
+        | 65
+        // B8G8R8A8 variants
+        | 87 | 88 | 90 | 91
+        // BC2 / BC3 / BC7 (typeless, unorm, unorm_srgb)
+        | 74 | 75 | 76 | 77 | 78 | 79 | 98 | 99 | 100
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -802,5 +975,138 @@ mod tests {
         assert!(extra_json["texture_source"].is_null());
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Minimal DDS header; `alpha` toggles the DDPF_ALPHAPIXELS pixel-format bit.
+    fn write_dds(path: &Path, alpha: bool) {
+        let mut header = vec![0u8; 128];
+        header[0..4].copy_from_slice(b"DDS ");
+        if alpha {
+            header[80] = 0x1; // DDPF_ALPHAPIXELS
+        }
+        fs::write(path, header).unwrap();
+    }
+
+    fn write_alpha_mtl(
+        root: &Path,
+        overrides: Option<&MaterialOverridePayload>,
+        alpha: bool,
+    ) -> String {
+        let out = root.join("out.mtl");
+        write_dds(&root.join("AlphaCar_diff.dds"), alpha);
+        write_mtl(
+            &model(&["AlphaCar"]),
+            &request(&["AlphaCar"]),
+            overrides,
+            root,
+            None,
+            &out,
+        )
+        .unwrap();
+        fs::read_to_string(&out).unwrap()
+    }
+
+    #[test]
+    fn diffuse_alpha_channel_emits_alpha_test() {
+        let root = temp_dir("alpha-present");
+        let mtl = write_alpha_mtl(&root, None, true);
+        assert!(mtl.contains("AlphaTest=\"0.5\""), "{mtl}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn diffuse_without_alpha_omits_alpha_test() {
+        let root = temp_dir("alpha-absent");
+        let mtl = write_alpha_mtl(&root, None, false);
+        assert!(!mtl.contains("AlphaTest"), "{mtl}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn explicit_override_alpha_test_wins_over_auto() {
+        let root = temp_dir("alpha-override");
+        let overrides = payload(r#"{"material_overrides":{"AlphaCar":{"AlphaTest":"0.3"}}}"#);
+        let mtl = write_alpha_mtl(&root, Some(&overrides), true);
+        assert!(mtl.contains("AlphaTest=\"0.3\""), "{mtl}");
+        assert!(!mtl.contains("AlphaTest=\"0.5\""), "{mtl}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn explicit_override_alpha_test_zero_suppresses_auto() {
+        let root = temp_dir("alpha-override-zero");
+        let overrides = payload(r#"{"material_overrides":{"AlphaCar":{"AlphaTest":"0"}}}"#);
+        let mtl = write_alpha_mtl(&root, Some(&overrides), true);
+        assert!(mtl.contains("AlphaTest=\"0\""), "{mtl}");
+        assert!(!mtl.contains("AlphaTest=\"0.5\""), "{mtl}");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn png_alpha_probe_reads_ihdr_colour_type() {
+        let mut ihdr_alpha = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a];
+        ihdr_alpha.extend_from_slice(&[0, 0, 0, 13]); // IHDR length
+        ihdr_alpha.extend_from_slice(b"IHDR");
+        ihdr_alpha.extend_from_slice(&[0, 0, 0, 1, 0, 0, 0, 1]); // width/height
+        ihdr_alpha.push(8); // bit depth
+        ihdr_alpha.push(6); // colour type 6 = truecolour + alpha
+        assert!(png_has_alpha(&ihdr_alpha));
+
+        let mut opaque = ihdr_alpha.clone();
+        opaque[25] = 2; // colour type 2 = truecolour, no alpha
+        assert!(!png_has_alpha(&opaque));
+        assert!(!png_has_alpha(b"not a png"));
+    }
+
+    #[test]
+    fn dds_alpha_probe_covers_ddpf_dxtn_and_dxgi() {
+        let mut ddpf = vec![0u8; 128];
+        ddpf[0..4].copy_from_slice(b"DDS ");
+        assert!(!dds_has_alpha(&ddpf));
+        ddpf[80] = 0x1; // DDPF_ALPHAPIXELS
+        assert!(dds_has_alpha(&ddpf));
+
+        let mut dxt5 = vec![0u8; 128];
+        dxt5[0..4].copy_from_slice(b"DDS ");
+        dxt5[80] = 0x4; // DDPF_FOURCC
+        dxt5[84..88].copy_from_slice(b"DXT5");
+        assert!(dds_has_alpha(&dxt5));
+
+        let mut dxt1 = dxt5.clone();
+        dxt1[84..88].copy_from_slice(b"DXT1");
+        assert!(!dds_has_alpha(&dxt1));
+
+        let mut dx10 = vec![0u8; 132];
+        dx10[0..4].copy_from_slice(b"DDS ");
+        dx10[80] = 0x4;
+        dx10[84..88].copy_from_slice(b"DX10");
+        dx10[128] = 77; // DXGI_FORMAT_BC3_TYPELESS
+        assert!(dds_has_alpha(&dx10));
+        dx10[128] = 71; // DXGI_FORMAT_BC1_UNORM (no alpha)
+        assert!(!dds_has_alpha(&dx10));
+    }
+
+    #[test]
+    fn tiff_ifd_probe_detects_extra_samples_and_sample_count() {
+        // One IFD entry: ExtraSamples (338), SHORT, count 1.
+        let mut extra = Vec::new();
+        extra.extend_from_slice(&338u16.to_le_bytes());
+        extra.extend_from_slice(&3u16.to_le_bytes());
+        extra.extend_from_slice(&1u32.to_le_bytes());
+        extra.extend_from_slice(&[2, 0, 0, 0]); // unassociated alpha
+        assert!(tiff_ifd_has_alpha(&extra, true));
+
+        // SamplesPerPixel (277) = 4 with no ExtraSamples still counts as alpha.
+        let mut spp4 = Vec::new();
+        spp4.extend_from_slice(&277u16.to_le_bytes());
+        spp4.extend_from_slice(&3u16.to_le_bytes());
+        spp4.extend_from_slice(&1u32.to_le_bytes());
+        spp4.extend_from_slice(&[4, 0, 0, 0]);
+        assert!(tiff_ifd_has_alpha(&spp4, true));
+
+        // SamplesPerPixel = 3 (RGB) is opaque.
+        let mut spp3 = spp4.clone();
+        spp3[8] = 3;
+        assert!(!tiff_ifd_has_alpha(&spp3, true));
     }
 }

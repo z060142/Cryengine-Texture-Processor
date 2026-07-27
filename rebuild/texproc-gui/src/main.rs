@@ -9,8 +9,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{
-        atomic::Ordering,
+        atomic::{AtomicBool, Ordering},
         mpsc::{Receiver, TryRecvError},
+        Arc,
     },
     time::Duration,
 };
@@ -29,12 +30,12 @@ use texproc::{
     OutputResolution, ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
 };
 use texproc_gui::{
-    axes_parallel, compose_forward_up, parse_forward_up, ReviewDocument, ASSIGNABLE_SOURCE_TYPES,
-    AXIS_TOKENS,
+    axes_parallel, compose_forward_up, helper_node_count, parse_forward_up, ReviewDocument,
+    ASSIGNABLE_SOURCE_TYPES, AXIS_TOKENS,
 };
 use worker::{
-    DdsSummary, ModelEvent, ModelExportEvent, ModelReview, PreviewEvent, ProcessEvent, ProcessJob,
-    RcExportOutcome, ScanEvent,
+    BatchExportEvent, DdsSummary, ModelEvent, ModelExportEvent, ModelJob, ModelReview,
+    PreviewEvent, ProcessEvent, ProcessJob, RcExportOutcome, ScanEvent,
 };
 
 const APP_TITLE: &str = "CryEngine Texture Processor";
@@ -145,7 +146,9 @@ fn main() -> eframe::Result {
     if std::env::var_os("TEXPROC_GUI_TEST_PANIC").is_some() {
         panic!("synthetic crash-log test panic");
     }
-    let initial_path = std::env::args_os().nth(1).map(PathBuf::from);
+    // Any number of paths may be passed (textures, folders, and/or FBX files) —
+    // FBX args load as separate model-list entries (batch import / screenshots).
+    let initial_paths = std::env::args_os().skip(1).map(PathBuf::from).collect();
     let options = eframe::NativeOptions {
         viewport: ViewportBuilder::default()
             .with_inner_size([1440.0, 900.0])
@@ -155,7 +158,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         APP_TITLE,
         options,
-        Box::new(move |_creation| Ok(Box::new(WorkflowApp::new(initial_path)))),
+        Box::new(move |_creation| Ok(Box::new(WorkflowApp::new(initial_paths)))),
     )
 }
 
@@ -225,9 +228,6 @@ struct TextureState {
     /// Overrides the scan-complete status line for one scan (Remove Selected /
     /// Add Related), so their message survives the regroup that follows.
     pending_import_status: Option<String>,
-    /// Lowercased absolute paths of textures ingested from the loaded FBX — the
-    /// origin set that "Export associated textures with model" processes.
-    fbx_ingested: BTreeSet<String>,
     /// Group keys that had unknowns at scan time — lets the Unassigned column
     /// show "✓ Assigned" (all resolved) versus "—" (never had unknowns).
     ever_unknown: BTreeSet<String>,
@@ -277,22 +277,55 @@ struct DiagItem {
     message: String,
 }
 
-#[derive(Default)]
-struct ModelState {
-    receiver: Option<Receiver<ModelEvent>>,
-    review: Option<ModelReview>,
+/// One imported FBX in the model list. All per-model state lives here so
+/// switching the selected model never leaks edits (physicalize, axis overrides)
+/// between models.
+struct ModelEntry {
+    review: ModelReview,
+    physicalize_overrides: BTreeMap<String, String>,
+    conversion: ConversionSettings,
     selected_material: Option<usize>,
     selected_materials: BTreeSet<usize>,
     material_selection_anchor: Option<usize>,
     bulk_physicalize: String,
+    /// Meshless non-root scene nodes (RC helper/anchor nodes).
+    helper_nodes: usize,
+    /// Lowercased absolute paths of textures ingested from this FBX — the origin
+    /// set that "Export associated textures with model" processes for this model.
+    fbx_ingested: BTreeSet<String>,
+}
+
+#[derive(Default)]
+struct ModelState {
+    /// Pending FBX loads (multi-select import loads N files at once).
+    load_receivers: Vec<Receiver<ModelEvent>>,
+    entries: Vec<ModelEntry>,
+    /// Multi-selection into `entries`; exactly one selection drives the center.
+    selected: BTreeSet<usize>,
+    selection_anchor: Option<usize>,
+    // Single-model export (Export CE Model on the selected model).
     export_receiver: Option<Receiver<ModelExportEvent>>,
     export_summary: Option<String>,
     export_modal_open: bool,
     export_stage: String,
     export_cgf: Option<PathBuf>,
-    physicalize_overrides: BTreeMap<String, String>,
     rc_missing_warning: bool,
-    conversion: ConversionSettings,
+    // Batch export (Export All).
+    batch: Option<BatchState>,
+}
+
+/// Export All progress/summary state.
+struct BatchState {
+    receiver: Receiver<BatchExportEvent>,
+    cancel: Arc<AtomicBool>,
+    total: usize,
+    current: usize,
+    current_name: String,
+    stage: String,
+    succeeded: Vec<String>,
+    failed: Vec<(String, String)>,
+    done: bool,
+    modal_open: bool,
 }
 
 /// Conversion Settings panel state (R9 item 2), Sandbox-mirror. Unit/Scale come
@@ -324,7 +357,7 @@ struct WorkflowApp {
 }
 
 impl WorkflowApp {
-    fn new(initial_path: Option<PathBuf>) -> Self {
+    fn new(initial_paths: Vec<PathBuf>) -> Self {
         let preferences = AppPreferences::load();
         let settings = load_texture_settings(Path::new(&preferences.settings_path))
             .unwrap_or_else(|_| TextureSettings::default());
@@ -341,24 +374,24 @@ impl WorkflowApp {
             model: ModelState::default(),
             status: "Ready. Drop textures, folders, or an FBX file to begin.".to_owned(),
         };
-        if let Some(path) = initial_path {
-            app.receive_paths(vec![path]);
+        if !initial_paths.is_empty() {
+            app.receive_paths(initial_paths);
         }
         app
     }
 
     fn receive_paths(&mut self, paths: Vec<PathBuf>) {
         let mut texture_paths = Vec::new();
+        let mut fbx_paths = Vec::new();
         for path in paths {
-            if path
-                .extension()
-                .and_then(|value| value.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("fbx"))
-            {
-                self.start_model_load(path);
+            if is_fbx(&path) {
+                fbx_paths.push(path);
             } else {
                 texture_paths.push(path);
             }
+        }
+        if !fbx_paths.is_empty() {
+            self.load_model_files(fbx_paths);
         }
         if !texture_paths.is_empty() {
             self.add_texture_roots(texture_paths);
@@ -393,25 +426,59 @@ impl WorkflowApp {
         self.status = "Cleared imported textures and transient groups.".to_owned();
     }
 
-    fn start_model_load(&mut self, path: PathBuf) {
-        if !path.is_file() {
-            self.status = format!("FBX does not exist: {}", path.display());
+    /// Start loading one or more FBX files; each completes into its own model-list
+    /// entry (batch import). Existing entries are kept.
+    fn load_model_files(&mut self, paths: Vec<PathBuf>) {
+        let mut started = 0;
+        for path in paths {
+            if !path.is_file() {
+                self.status = format!("FBX does not exist: {}", path.display());
+                continue;
+            }
+            self.preferences.model_path = path.to_string_lossy().into_owned();
+            self.model
+                .load_receivers
+                .push(worker::start_model_load(path));
+            started += 1;
+        }
+        if started == 0 {
             return;
         }
-        self.preferences.model_path = path.to_string_lossy().into_owned();
-        // A new FBX defines a new associated-texture origin set.
-        self.texture.fbx_ingested.clear();
-        self.model.receiver = Some(worker::start_model_load(path));
-        self.model.review = None;
-        self.model.selected_material = None;
-        self.model.selected_materials.clear();
-        self.model.material_selection_anchor = None;
-        self.model.export_summary = None;
-        self.model.physicalize_overrides.clear();
-        self.model.rc_missing_warning = false;
         self.tab = WorkflowTab::Model;
-        self.status = "Loading FBX materials and texture references…".to_owned();
+        self.status = format!("Loading {started} FBX file(s)…");
         self.save_preferences();
+    }
+
+    /// Index of the single selected model, or `None` when 0 or >1 are selected.
+    fn selected_entry_index(&self) -> Option<usize> {
+        (self.model.selected.len() == 1)
+            .then(|| self.model.selected.iter().next().copied())
+            .flatten()
+    }
+
+    fn clear_models(&mut self) {
+        self.model.entries.clear();
+        self.model.selected.clear();
+        self.model.selection_anchor = None;
+        self.status = "Cleared loaded models.".to_owned();
+    }
+
+    /// Multi-select removal from the model list, mirroring Remove Selected on the
+    /// texture list. Selection indices become stale after removal, so clear them.
+    fn remove_selected_models(&mut self) {
+        if self.model.selected.is_empty() {
+            return;
+        }
+        let selected = std::mem::take(&mut self.model.selected);
+        let removed = selected.len();
+        let mut index = 0;
+        self.model.entries.retain(|_| {
+            let keep = !selected.contains(&index);
+            index += 1;
+            keep
+        });
+        self.model.selection_anchor = None;
+        self.status = format!("Removed {removed} model(s).");
     }
 
     fn request_preview(&mut self, path: PathBuf, source_type: impl Into<String>) {
@@ -495,25 +562,60 @@ impl WorkflowApp {
         self.status = format!("Processing {total} texture groups…");
     }
 
-    fn start_model_export(&mut self) {
-        let Some(review) = &self.model.review else {
-            self.status = "Load an FBX file first.".to_owned();
-            return;
-        };
-        if axes_parallel(&self.model.conversion.forward, &self.model.conversion.up) {
-            self.status =
-                "Forward and Up axes must be different; fix Conversion Settings first.".to_owned();
-            return;
+    /// Build the export job for one model-list entry, shared by single Export CE
+    /// Model and batch Export All. Errors on illegal (parallel) axes so a bad
+    /// model can't be sent to RC.
+    fn build_model_job(&self, entry_index: usize) -> Result<ModelJob, String> {
+        let entry = &self.model.entries[entry_index];
+        let name = entry_name(entry);
+        if axes_parallel(&entry.conversion.forward, &entry.conversion.up) {
+            return Err(format!("`{name}`: Forward and Up axes must be different."));
         }
         let conversion = converter::request::ConversionOverrides {
             unit_size: Some(self.preferences.conversion_unit.clone()),
             scale: Some(self.preferences.conversion_scale),
             forward_up_axes: Some(compose_forward_up(
-                &self.model.conversion.forward,
-                &self.model.conversion.up,
+                &entry.conversion.forward,
+                &entry.conversion.up,
             )),
-            merge_all_nodes: Some(self.model.conversion.merge_all_nodes),
-            scene_origin: Some(self.model.conversion.scene_origin),
+            merge_all_nodes: Some(entry.conversion.merge_all_nodes),
+            scene_origin: Some(entry.conversion.scene_origin),
+        };
+        // Item 4: when enabled, process this model's FBX-ingested texture groups
+        // into the texture output directory and point MTL resolution there.
+        let (associated, texture_dir) = if self.preferences.export_associated_textures {
+            match self.build_associated_textures(entry_index)? {
+                Some(associated) => {
+                    let dir = Some(associated.output_dir.clone());
+                    (Some(associated), dir)
+                }
+                None => (
+                    None,
+                    optional_path(&self.preferences.texture_output_directory),
+                ),
+            }
+        } else {
+            (
+                None,
+                optional_path(&self.preferences.texture_output_directory),
+            )
+        };
+        Ok(ModelJob {
+            name,
+            input: entry.review.path.clone(),
+            manifest: optional_path(&self.preferences.manifest_path),
+            overrides: optional_path(&self.preferences.overrides_path),
+            texture_dir,
+            physicalize_overrides: entry.physicalize_overrides.clone(),
+            conversion,
+            associated,
+        })
+    }
+
+    fn start_model_export(&mut self) {
+        let Some(index) = self.selected_entry_index() else {
+            self.status = "Select a single model to export.".to_owned();
+            return;
         };
         let output = PathBuf::from(self.preferences.model_output_directory.trim());
         if output.as_os_str().is_empty() {
@@ -524,50 +626,24 @@ impl WorkflowApp {
             self.status = format!("Could not create model output directory: {error}");
             return;
         }
-        let manifest = optional_path(&self.preferences.manifest_path);
-        let overrides = optional_path(&self.preferences.overrides_path);
+        let job = match self.build_model_job(index) {
+            Ok(job) => job,
+            Err(error) => {
+                self.status = error;
+                return;
+            }
+        };
+        if self.preferences.export_associated_textures && job.associated.is_none() {
+            self.status =
+                "No FBX-ingested texture groups to export; exporting model only.".to_owned();
+        }
         let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
         self.model.rc_missing_warning = rc_resolution.path.is_none();
-
-        // Item 4: when enabled, process the FBX-ingested texture groups into the
-        // texture output directory and point MTL resolution at those outputs.
-        let review_path = review.path.clone();
-        let (associated, texture_dir) = if self.preferences.export_associated_textures {
-            match self.build_associated_textures() {
-                Ok(Some(associated)) => {
-                    let dir = Some(associated.output_dir.clone());
-                    (Some(associated), dir)
-                }
-                Ok(None) => {
-                    self.status = "No FBX-ingested texture groups to export; exporting model only."
-                        .to_owned();
-                    (
-                        None,
-                        optional_path(&self.preferences.texture_output_directory),
-                    )
-                }
-                Err(error) => {
-                    self.status = error;
-                    return;
-                }
-            }
-        } else {
-            (
-                None,
-                optional_path(&self.preferences.texture_output_directory),
-            )
-        };
-
         self.model.export_receiver = Some(worker::start_model_export(
-            review_path,
-            manifest,
-            overrides,
-            texture_dir,
-            output,
-            self.model.physicalize_overrides.clone(),
-            conversion,
+            job,
             rc_resolution.path,
-            associated,
+            output,
+            self.preferences.delete_request_json,
         ));
         self.model.export_summary = None;
         self.model.export_cgf = None;
@@ -576,24 +652,74 @@ impl WorkflowApp {
         self.status = "Exporting CryEngine intermediates and CE model…".to_owned();
     }
 
+    /// Export All: iterate every loaded model sequentially in a worker.
+    fn start_batch_export(&mut self) {
+        if self.model.entries.is_empty() {
+            self.status = "Load FBX files first.".to_owned();
+            return;
+        }
+        let output = PathBuf::from(self.preferences.model_output_directory.trim());
+        if output.as_os_str().is_empty() {
+            self.status = "Set a model output directory first.".to_owned();
+            return;
+        }
+        if let Err(error) = fs::create_dir_all(&output) {
+            self.status = format!("Could not create model output directory: {error}");
+            return;
+        }
+        let mut jobs = Vec::with_capacity(self.model.entries.len());
+        for index in 0..self.model.entries.len() {
+            match self.build_model_job(index) {
+                Ok(job) => jobs.push(job),
+                Err(error) => {
+                    self.status = error;
+                    return;
+                }
+            }
+        }
+        let total = jobs.len();
+        let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
+        self.model.rc_missing_warning = rc_resolution.path.is_none();
+        let job = worker::start_batch_export(
+            jobs,
+            rc_resolution.path,
+            output,
+            self.preferences.delete_request_json,
+        );
+        self.model.batch = Some(BatchState {
+            receiver: job.receiver,
+            cancel: job.cancel,
+            total,
+            current: 0,
+            current_name: String::new(),
+            stage: "Preparing…".to_owned(),
+            succeeded: Vec::new(),
+            failed: Vec::new(),
+            done: false,
+            modal_open: true,
+        });
+        self.status = format!("Exporting {total} models…");
+    }
+
     /// Build the associated-texture set for item 4: the current groups that
-    /// contain at least one FBX-ingested file (and have processable slots).
-    /// `Ok(None)` means there is nothing FBX-ingested to process.
-    fn build_associated_textures(&self) -> Result<Option<worker::AssociatedTextures>, String> {
+    /// contain at least one file ingested from this model's FBX (and have
+    /// processable slots). `Ok(None)` means there is nothing to process.
+    fn build_associated_textures(
+        &self,
+        entry_index: usize,
+    ) -> Result<Option<worker::AssociatedTextures>, String> {
         let Some(document) = &self.texture.document else {
             return Ok(None);
         };
-        if self.texture.fbx_ingested.is_empty() {
+        let ingested = &self.model.entries[entry_index].fbx_ingested;
+        if ingested.is_empty() {
             return Ok(None);
         }
         let groups = document
             .scan()
             .groups
             .iter()
-            .filter(|group| {
-                !group.slots.is_empty()
-                    && group_contains_ingested(group, &self.texture.fbx_ingested)
-            })
+            .filter(|group| !group.slots.is_empty() && group_contains_ingested(group, ingested))
             .cloned()
             .collect::<Vec<_>>();
         if groups.is_empty() {
@@ -719,12 +845,12 @@ impl WorkflowApp {
     /// into the texture groups. Shared by automatic ingestion on FBX load and
     /// the manual re-send button. Keeps the caller's tab; the scan-complete
     /// status honestly reports the FBX import via `pending_fbx_import`.
-    fn ingest_model_textures(&mut self) {
-        let Some(review) = &self.model.review else {
-            self.status = "Load an FBX file first.".to_owned();
-            return;
+    fn ingest_entry_textures(&mut self, entry_index: usize) {
+        let ingest = {
+            let review = &self.model.entries[entry_index].review;
+            extract_model_texture_paths(review)
         };
-        match extract_model_texture_paths(review) {
+        match ingest {
             Ok(ingest) if ingest.paths.is_empty() => {
                 self.status =
                     "No textures found in the FBX to import (references not on disk).".to_owned();
@@ -732,9 +858,9 @@ impl WorkflowApp {
             Ok(ingest) => {
                 let tab = self.tab;
                 self.texture.pending_fbx_import = Some((ingest.paths.len(), ingest.embedded));
-                // Record ingestion origin so "Export associated textures with
-                // model" can pick out exactly these groups later.
-                self.texture.fbx_ingested.extend(
+                // Record ingestion origin (on this model's entry) so "Export
+                // associated textures with model" can pick out exactly its groups.
+                self.model.entries[entry_index].fbx_ingested.extend(
                     ingest
                         .paths
                         .iter()
@@ -755,11 +881,13 @@ impl WorkflowApp {
         self.poll_process();
         self.poll_model();
         self.poll_model_export();
+        self.poll_batch_export();
         if self.texture.scan_receiver.is_some()
             || self.preview.receiver.is_some()
             || self.process.is_some()
-            || self.model.receiver.is_some()
+            || !self.model.load_receivers.is_empty()
             || self.model.export_receiver.is_some()
+            || self.model.batch.as_ref().is_some_and(|batch| !batch.done)
         {
             context.request_repaint_after(Duration::from_millis(80));
         }
@@ -980,59 +1108,80 @@ impl WorkflowApp {
     }
 
     fn poll_model(&mut self) {
-        let event = self
-            .model
-            .receiver
-            .as_ref()
-            .and_then(|receiver| receiver.try_recv().ok());
-        let Some(event) = event else {
+        if self.model.load_receivers.is_empty() {
             return;
-        };
-        self.model.receiver = None;
-        match event {
-            ModelEvent::Completed(review) => {
-                let materials = review.material_slots.len();
-                let references = review
-                    .model
-                    .materials
-                    .iter()
-                    .map(|material| material.textures.len())
-                    .sum::<usize>();
-                // Seed explicit "no" physicalize for every material (item 1
-                // default). A configured manifest still wins, so only seed when
-                // no manifest is loaded — the converter applies overrides after
-                // the manifest, and unconditional seeding would beat it.
-                if self.preferences.manifest_path.trim().is_empty() {
-                    self.model.physicalize_overrides = seed_default_physicalize(
-                        review.material_slots.iter().map(|s| s.name.as_str()),
-                    );
-                }
-                self.model.selected_materials.clear();
-                self.model.material_selection_anchor = None;
-                self.model.bulk_physicalize = DEFAULT_PHYSICALIZE.to_owned();
-                // Re-detect Forward/Up per FBX (never persisted): seed the panel
-                // dropdowns from the auto-derived axes.
-                let (forward, up) = parse_forward_up(&review.model.axes.forward_up_axes)
-                    .unwrap_or_else(|| ("-Z".to_owned(), "+Y".to_owned()));
-                self.model.conversion.detected_forward = forward.clone();
-                self.model.conversion.detected_up = up.clone();
-                self.model.conversion.forward = forward;
-                self.model.conversion.up = up;
-                self.model.conversion.merge_all_nodes = false;
-                self.model.conversion.scene_origin = false;
-                self.model.review = Some(*review);
-                self.model.selected_material = (materials > 0).then_some(0);
-                self.status = format!(
-                    "FBX loaded: {materials} material slots, {references} texture references."
-                );
-                // Automatically ingest the FBX's referenced + embedded textures
-                // into the texture groups (Python-original model-import behavior).
-                self.ingest_model_textures();
-            }
-            ModelEvent::Failed(error) => {
-                self.status = format!("FBX load failed: {error}");
+        }
+        // Drain any loads that finished this frame; keep the rest pending.
+        let mut pending = Vec::new();
+        let mut completed = Vec::new();
+        for receiver in std::mem::take(&mut self.model.load_receivers) {
+            match receiver.try_recv() {
+                Ok(event) => completed.push(event),
+                Err(TryRecvError::Empty) => pending.push(receiver),
+                Err(TryRecvError::Disconnected) => {}
             }
         }
+        self.model.load_receivers = pending;
+        for event in completed {
+            match event {
+                ModelEvent::Completed(review) => self.add_model_entry(*review),
+                ModelEvent::Failed(error) => {
+                    self.status = format!("FBX load failed: {error}");
+                }
+            }
+        }
+    }
+
+    /// Push a freshly loaded model into the list, running the per-file behaviors:
+    /// physicalize seed "no" (R8), Forward/Up detection (R9), helper-node count,
+    /// then auto-ingest its textures (R3).
+    fn add_model_entry(&mut self, review: ModelReview) {
+        let materials = review.material_slots.len();
+        let references = review
+            .model
+            .materials
+            .iter()
+            .map(|material| material.textures.len())
+            .sum::<usize>();
+        // Seed explicit "no" physicalize for every material (item 1 default). A
+        // configured manifest still wins, so only seed when no manifest is loaded.
+        let physicalize_overrides = if self.preferences.manifest_path.trim().is_empty() {
+            seed_default_physicalize(review.material_slots.iter().map(|s| s.name.as_str()))
+        } else {
+            BTreeMap::new()
+        };
+        // Re-detect Forward/Up per FBX (never persisted).
+        let (forward, up) = parse_forward_up(&review.model.axes.forward_up_axes)
+            .unwrap_or_else(|| ("-Z".to_owned(), "+Y".to_owned()));
+        let conversion = ConversionSettings {
+            detected_forward: forward.clone(),
+            detected_up: up.clone(),
+            forward,
+            up,
+            merge_all_nodes: false,
+            scene_origin: false,
+        };
+        let helper_nodes = helper_node_count(&review.model);
+        let index = self.model.entries.len();
+        self.model.entries.push(ModelEntry {
+            review,
+            physicalize_overrides,
+            conversion,
+            selected_material: (materials > 0).then_some(0),
+            selected_materials: BTreeSet::new(),
+            material_selection_anchor: None,
+            bulk_physicalize: DEFAULT_PHYSICALIZE.to_owned(),
+            helper_nodes,
+            fbx_ingested: BTreeSet::new(),
+        });
+        // Select the newly added model so it drives the center panel.
+        self.model.selected = BTreeSet::from([index]);
+        self.model.selection_anchor = Some(index);
+        self.tab = WorkflowTab::Model;
+        self.status =
+            format!("FBX loaded: {materials} material slots, {references} texture references.");
+        // Auto-ingest this FBX's referenced + embedded textures into the groups.
+        self.ingest_entry_textures(index);
     }
 
     fn poll_model_export(&mut self) {
@@ -1075,22 +1224,13 @@ impl WorkflowApp {
                         )
                     }
                 };
-                // Item 3a: delete the request JSON only on full success (RC
+                // Item 3a: the worker deletes the request JSON on full success (RC
                 // produced a CGF); .mtl and .mtl.cryasset are kept.
-                let mut request_line = format!("Request: {}", report.outputs.request.display());
-                if self.preferences.delete_request_json
-                    && matches!(report.rc, RcExportOutcome::Succeeded { .. })
-                {
-                    match fs::remove_file(&report.outputs.request) {
-                        Ok(()) => request_line = "Request: deleted after export".to_owned(),
-                        Err(error) => {
-                            request_line = format!(
-                                "Request: {} (delete failed: {error})",
-                                report.outputs.request.display()
-                            );
-                        }
-                    }
-                }
+                let request_line = if report.request_deleted {
+                    "Request: deleted after export".to_owned()
+                } else {
+                    format!("Request: {}", report.outputs.request.display())
+                };
                 let textures_line = match &report.textures {
                     Some(textures) => {
                         let dds = textures.dds.as_ref().map_or_else(String::new, |dds| {
@@ -1115,6 +1255,51 @@ impl WorkflowApp {
                 self.model.export_summary = Some(format!("Export failed: {error}"));
                 self.status = format!("CE model export failed: {error}");
             }
+        }
+    }
+
+    fn poll_batch_export(&mut self) {
+        let mut finished = None;
+        {
+            let Some(batch) = self.model.batch.as_mut() else {
+                return;
+            };
+            loop {
+                match batch.receiver.try_recv() {
+                    Ok(BatchExportEvent::Progress {
+                        index,
+                        total,
+                        name,
+                        stage,
+                    }) => {
+                        batch.current = index;
+                        batch.total = total;
+                        batch.current_name = name;
+                        batch.stage = stage;
+                    }
+                    Ok(BatchExportEvent::ModelDone { name, ok, detail }) => {
+                        if ok {
+                            batch.succeeded.push(format!("{name} — {detail}"));
+                        } else {
+                            batch.failed.push((name, detail));
+                        }
+                    }
+                    Ok(BatchExportEvent::Finished) => {
+                        batch.done = true;
+                        finished = Some((batch.succeeded.len(), batch.failed.len()));
+                        break;
+                    }
+                    Err(TryRecvError::Empty) => break,
+                    Err(TryRecvError::Disconnected) => {
+                        batch.done = true;
+                        finished = Some((batch.succeeded.len(), batch.failed.len()));
+                        break;
+                    }
+                }
+            }
+        }
+        if let Some((succeeded, failed)) = finished {
+            self.status = format!("Export All complete: {succeeded} succeeded, {failed} failed.");
         }
     }
 
@@ -1166,9 +1351,9 @@ impl WorkflowApp {
                 ui.heading(APP_TITLE);
                 ui.separator();
                 ui.label("Texture conversion workflow");
-                if self.model.review.is_some() {
+                if !self.model.entries.is_empty() {
                     ui.separator();
-                    ui.weak("FBX material tool ready");
+                    ui.weak(format!("{} model(s) loaded", self.model.entries.len()));
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.weak("Drop files or folders anywhere");
@@ -1183,8 +1368,9 @@ impl WorkflowApp {
             ui.horizontal(|ui| {
                 ui.label(&self.status);
                 if self.texture.scan_receiver.is_some()
-                    || self.model.receiver.is_some()
+                    || !self.model.load_receivers.is_empty()
                     || self.model.export_receiver.is_some()
+                    || self.model.batch.as_ref().is_some_and(|batch| !batch.done)
                     || self.process.is_some()
                 {
                     ui.spinner();
@@ -1241,7 +1427,10 @@ impl WorkflowApp {
                 }
             }
         }
-        if let Some(review) = &self.model.review {
+        if let Some(review) = self
+            .selected_entry_index()
+            .map(|index| &self.model.entries[index].review)
+        {
             let resolution = resolve_rc_path(&self.preferences.rc_path);
             if resolution.path.is_none() {
                 items.push(DiagItem {
@@ -1283,6 +1472,15 @@ impl WorkflowApp {
                         message: failure.clone(),
                     });
                 }
+            }
+        }
+        if let Some(batch) = self.model.batch.as_ref() {
+            for (name, detail) in &batch.failed {
+                items.push(DiagItem {
+                    severity: "Error",
+                    title: format!("Model failed · {name}"),
+                    message: detail.clone(),
+                });
             }
         }
         items
@@ -1482,6 +1680,86 @@ impl WorkflowApp {
         }
     }
 
+    fn batch_modal(&mut self, context: &egui::Context) {
+        let Some(batch) = self.model.batch.as_ref() else {
+            return;
+        };
+        if !batch.modal_open {
+            return;
+        }
+        let mut cancel = false;
+        let mut close = false;
+        let model_output = self.preferences.model_output_directory.clone();
+        Modal::new(Id::new("batch_modal")).show(context, |ui| {
+            ui.set_width(560.0);
+            if !batch.done {
+                ui.heading("Exporting Models…");
+                ui.label(format!(
+                    "Model {} / {} — {}",
+                    batch.current.max(1),
+                    batch.total,
+                    batch.current_name
+                ));
+                ui.label(&batch.stage);
+                let progress = if batch.total == 0 {
+                    0.0
+                } else {
+                    batch.current.saturating_sub(1) as f32 / batch.total as f32
+                };
+                ui.add(ProgressBar::new(progress).show_percentage());
+                ui.add_space(6.0);
+                ui.label(format!(
+                    "{} done · {} failed",
+                    batch.succeeded.len(),
+                    batch.failed.len()
+                ));
+                ui.add_space(8.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    cancel = ui.button("Cancel").clicked();
+                });
+            } else {
+                ui.heading("Export All Complete");
+                ui.label(format!(
+                    "{} succeeded · {} failed",
+                    batch.succeeded.len(),
+                    batch.failed.len()
+                ));
+                ui.add_space(6.0);
+                ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
+                    for ok in &batch.succeeded {
+                        ui.horizontal(|ui| {
+                            ui.colored_label(Color32::from_rgb(70, 165, 95), "✓");
+                            ui.label(ok);
+                        });
+                    }
+                    for (name, detail) in &batch.failed {
+                        ui.horizontal_top(|ui| {
+                            ui.colored_label(Color32::from_rgb(210, 70, 65), "✗");
+                            ui.label(format!("{name}: {detail}"));
+                        });
+                    }
+                });
+                ui.add_space(6.0);
+                ui.hyperlink_to("Open output folder", file_url(Path::new(&model_output)));
+                ui.add_space(8.0);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.button("Close").clicked();
+                });
+            }
+        });
+        if cancel {
+            if let Some(batch) = self.model.batch.as_ref() {
+                batch.cancel.store(true, Ordering::Relaxed);
+            }
+            self.status = "Cancelling batch export; the current stage will stop.".to_owned();
+        }
+        if close {
+            if let Some(batch) = self.model.batch.as_mut() {
+                batch.modal_open = false;
+            }
+        }
+    }
+
     fn left_panel(&mut self, context: &egui::Context) {
         egui::SidePanel::left("imports")
             .resizable(true)
@@ -1596,75 +1874,168 @@ impl WorkflowApp {
 
     fn model_import_panel(&mut self, ui: &mut egui::Ui) {
         ui.heading("Model Import");
-        ui.label("FBX conversion is an independent optional workflow.");
+        ui.label("Add FBX files. FBX conversion is an independent optional workflow.");
         ui.add_space(6.0);
-        let (_, browse) = path_row(
-            ui,
-            "model_path",
-            &mut self.preferences.model_path,
-            "FBX file path",
-        );
-        if browse {
-            let initial = self.preferences.model_path.clone();
-            if let Some(path) =
-                self.dialog_result(choose_file_open("Select FBX File", FBX_FILTER, &initial))
-            {
-                self.preferences.model_path = path.to_string_lossy().into_owned();
-                self.save_preferences();
+        ui.add(TextEdit::singleline(&mut self.preferences.model_path).hint_text("FBX file path"));
+        ui.horizontal_wrapped(|ui| {
+            if ui.button("Add FBX…").clicked() {
+                match choose_files_multi("Select FBX Files", FBX_FILTER) {
+                    Ok(files) if !files.is_empty() => self.load_model_files(files),
+                    Ok(_) => {}
+                    Err(error) => self.status = error,
+                }
             }
-        }
-        if ui
-            .add_enabled(self.model.receiver.is_none(), egui::Button::new("Load FBX"))
-            .clicked()
-        {
-            self.start_model_load(PathBuf::from(self.preferences.model_path.trim()));
-        }
-        if self.model.receiver.is_some() {
+            if ui.button("Add Path").clicked() {
+                let paths = split_paths(&self.preferences.model_path)
+                    .into_iter()
+                    .filter(|path| path.exists())
+                    .collect::<Vec<_>>();
+                if paths.is_empty() {
+                    self.status = "Enter an existing FBX path first.".to_owned();
+                } else {
+                    self.load_model_files(paths);
+                }
+            }
+            if ui.button("Clear All").clicked() {
+                self.clear_models();
+            }
+            let has_selection = !self.model.selected.is_empty();
+            if ui
+                .add_enabled(has_selection, egui::Button::new("Remove Selected"))
+                .clicked()
+            {
+                self.remove_selected_models();
+            }
+        });
+        if !self.model.load_receivers.is_empty() {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("Loading model…");
+                ui.label(format!(
+                    "Loading {} model(s)…",
+                    self.model.load_receivers.len()
+                ));
             });
         }
         ui.add_space(8.0);
-        if let Some(review) = &self.model.review {
-            ui.group(|ui| {
-                ui.set_width(ui.available_width());
-                ui.strong(
-                    review
-                        .path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("FBX"),
+        // Model list — same visual pattern as the Imported Textures list.
+        ui.group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.strong(format!(
+                "Loaded Models ({}) · {} selected",
+                self.model.entries.len(),
+                self.model.selected.len()
+            ));
+            ui.weak("Click, Ctrl+click, Shift+click to multi-select.");
+            ui.separator();
+            let modifiers = ui.input(|input| input.modifiers);
+            let mut clicked = None;
+            ScrollArea::vertical()
+                .id_salt("model_list")
+                .max_height(230.0)
+                .show(ui, |ui| {
+                    for (index, entry) in self.model.entries.iter().enumerate() {
+                        let name = entry
+                            .review
+                            .path
+                            .file_name()
+                            .and_then(|value| value.to_str())
+                            .unwrap_or("FBX");
+                        if ui
+                            .selectable_label(self.model.selected.contains(&index), name)
+                            .on_hover_text(entry.review.path.display().to_string())
+                            .clicked()
+                        {
+                            clicked = Some(index);
+                        }
+                        let diagnostics = entry.review.diagnostics.len();
+                        ui.horizontal(|ui| {
+                            ui.add_space(4.0);
+                            badge(
+                                ui,
+                                format!("{} mat", entry.review.material_slots.len()),
+                                Color32::from_rgb(70, 110, 190),
+                            );
+                            badge(
+                                ui,
+                                format!("{diagnostics} diag"),
+                                if diagnostics > 0 {
+                                    Color32::from_rgb(200, 130, 40)
+                                } else {
+                                    Color32::from_rgb(110, 110, 115)
+                                },
+                            );
+                            badge(
+                                ui,
+                                format!("{} helper", entry.helper_nodes),
+                                Color32::from_rgb(110, 110, 115),
+                            );
+                        });
+                    }
+                });
+            if let Some(index) = clicked {
+                apply_click_selection(
+                    &mut self.model.selected,
+                    &mut self.model.selection_anchor,
+                    index,
+                    modifiers.ctrl,
+                    modifiers.shift,
                 );
-                ui.label(format!("Material slots: {}", review.material_slots.len()));
-                ui.label(format!("Meshes: {}", review.model.meshes.len()));
-                ui.label(format!("Nodes: {}", review.model.node_count));
-                ui.label(format!("Diagnostics: {}", review.diagnostics.len()));
-                let axes = &review.model.axes;
-                if axes.declared {
-                    ui.label(axes.summary());
-                } else {
-                    ui.colored_label(egui::Color32::from_rgb(0xE0, 0xA0, 0x30), axes.summary())
-                        .on_hover_text("FBX does not declare coordinate axes; using default -Z+Y");
-                }
-            });
+            }
+        });
+        ui.add_space(8.0);
+        if let Some(index) = self.selected_entry_index() {
+            self.model_summary(ui, index);
             ui.add_space(8.0);
-            self.conversion_settings(ui);
+            self.conversion_settings(ui, index);
             ui.add_space(8.0);
             if ui
                 .button("Re-send Referenced / Embedded Textures to Texture Conversion")
                 .clicked()
             {
-                self.ingest_model_textures();
+                self.ingest_entry_textures(index);
             }
+        } else if self.model.entries.is_empty() {
+            ui.weak("No models loaded. You can also drop FBX files into the window.");
         } else {
-            ui.weak("No model loaded. You can also drop car.fbx into the window.");
+            ui.weak("Select a single model to review and configure it.");
         }
     }
 
-    /// Conversion Settings panel (R9 item 2): Sandbox-mirror RC import fields.
+    /// Per-model summary shown under the list for the single selected model.
+    fn model_summary(&self, ui: &mut egui::Ui, index: usize) {
+        let entry = &self.model.entries[index];
+        let review = &entry.review;
+        ui.group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.strong(
+                review
+                    .path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("FBX"),
+            );
+            ui.label(format!("Material slots: {}", review.material_slots.len()));
+            ui.label(format!("Meshes: {}", review.model.meshes.len()));
+            ui.label(format!("Nodes: {}", review.model.node_count));
+            ui.label(format!("Helper nodes: {}", entry.helper_nodes));
+            ui.label(format!("Diagnostics: {}", review.diagnostics.len()));
+            let axes = &review.model.axes;
+            if axes.declared {
+                ui.label(axes.summary());
+            } else {
+                ui.colored_label(Color32::from_rgb(0xE0, 0xA0, 0x30), axes.summary())
+                    .on_hover_text("FBX does not declare coordinate axes; using default -Z+Y");
+            }
+        });
+    }
+
+    /// Conversion Settings panel (R9 item 2): Sandbox-mirror RC import fields for
+    /// the selected model. Forward/Up are per-model; Unit/Scale stay global prefs.
     /// Manual values win over auto-detection when the request is built.
-    fn conversion_settings(&mut self, ui: &mut egui::Ui) {
+    fn conversion_settings(&mut self, ui: &mut egui::Ui, index: usize) {
+        // Take the entry's conversion out so we can freely touch self.preferences
+        // (Unit/Scale + save) without a borrow conflict, then write it back.
+        let mut conv = std::mem::take(&mut self.model.entries[index].conversion);
         ui.group(|ui| {
             ui.set_width(ui.available_width());
             ui.strong("Conversion Settings");
@@ -1709,19 +2080,10 @@ impl WorkflowApp {
 
             // Forward / Up (re-detected per FBX, not persisted). A value that
             // differs from detection is marked as an override.
-            let detected = compose_forward_up(
-                &self.model.conversion.detected_forward,
-                &self.model.conversion.detected_up,
-            );
-            axis_dropdown(
-                ui,
-                "Forward",
-                "conversion_forward",
-                &mut self.model.conversion.forward,
-            );
-            axis_dropdown(ui, "Up", "conversion_up", &mut self.model.conversion.up);
-            let current =
-                compose_forward_up(&self.model.conversion.forward, &self.model.conversion.up);
+            let detected = compose_forward_up(&conv.detected_forward, &conv.detected_up);
+            axis_dropdown(ui, "Forward", "conversion_forward", &mut conv.forward);
+            axis_dropdown(ui, "Up", "conversion_up", &mut conv.up);
+            let current = compose_forward_up(&conv.forward, &conv.up);
             ui.horizontal(|ui| {
                 ui.weak(format!("Detected: {detected}"));
                 if current != detected {
@@ -1731,19 +2093,17 @@ impl WorkflowApp {
                     );
                 }
             });
-            if axes_parallel(&self.model.conversion.forward, &self.model.conversion.up) {
+            if axes_parallel(&conv.forward, &conv.up) {
                 ui.colored_label(
                     Color32::from_rgb(210, 70, 65),
                     "Forward and Up must be different axes — Export CE Model is disabled.",
                 );
             }
 
-            ui.checkbox(
-                &mut self.model.conversion.merge_all_nodes,
-                "Merge all nodes",
-            );
-            ui.checkbox(&mut self.model.conversion.scene_origin, "Scene origin");
+            ui.checkbox(&mut conv.merge_all_nodes, "Merge all nodes");
+            ui.checkbox(&mut conv.scene_origin, "Scene origin");
         });
+        self.model.entries[index].conversion = conv;
     }
 
     fn right_panel(&mut self, context: &egui::Context) {
@@ -2186,20 +2546,43 @@ impl WorkflowApp {
     }
 
     fn model_export_action(&mut self, ui: &mut egui::Ui) {
-        let axes_ok = !axes_parallel(&self.model.conversion.forward, &self.model.conversion.up);
+        let single_ok = self.selected_entry_index().is_some_and(|index| {
+            let conv = &self.model.entries[index].conversion;
+            !axes_parallel(&conv.forward, &conv.up)
+        });
+        let exporting = self.model.export_receiver.is_some()
+            || self.model.batch.as_ref().is_some_and(|batch| !batch.done);
         if ui
             .add_enabled(
-                self.model.review.is_some() && self.model.export_receiver.is_none() && axes_ok,
+                single_ok && !exporting,
                 egui::Button::new(RichText::new("Export CE Model").strong().size(16.0))
                     .min_size([ui.available_width(), 36.0].into()),
             )
+            .on_hover_text("Convert → RC → CGF for the selected model")
             .clicked()
         {
             self.save_preferences();
             self.start_model_export();
         }
+        if ui
+            .add_enabled(
+                !self.model.entries.is_empty() && !exporting,
+                egui::Button::new(RichText::new("Export All").strong().size(16.0))
+                    .min_size([ui.available_width(), 34.0].into()),
+            )
+            .on_hover_text("Export every loaded model in sequence")
+            .clicked()
+        {
+            self.save_preferences();
+            self.start_batch_export();
+        }
         if self.model.export_receiver.is_some() && ui.button("Show export progress").clicked() {
             self.model.export_modal_open = true;
+        }
+        if self.model.batch.is_some() && ui.button("Show batch progress").clicked() {
+            if let Some(batch) = self.model.batch.as_mut() {
+                batch.modal_open = true;
+            }
         }
     }
 
@@ -2616,220 +2999,237 @@ impl WorkflowApp {
     }
 
     fn model_workspace(&mut self, ui: &mut egui::Ui) {
-        let Some(review) = &self.model.review else {
+        let Some(index) = self.selected_entry_index() else {
             ui.centered_and_justified(|ui| {
                 ui.vertical_centered(|ui| {
                     ui.heading("FBX Material Review");
-                    ui.label("Enter an FBX path on the left, or drop an FBX into the window.");
+                    if self.model.entries.is_empty() {
+                        ui.label("Add FBX files on the left, or drop an FBX into the window.");
+                    } else {
+                        ui.label("Select a single model on the left to review its materials.");
+                    }
                 });
             });
             return;
         };
-        ui.horizontal(|ui| {
-            ui.heading(
-                review
-                    .path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("FBX"),
-            );
-            ui.separator();
-            ui.label(format!("{} material slots", review.material_slots.len()));
-            ui.separator();
-            ui.label(format!("{} diagnostics", review.diagnostics.len()));
-        });
-        ui.separator();
         let manifest_configured = !self.preferences.manifest_path.trim().is_empty();
         let modifiers = ui.input(|input| input.modifiers);
-        ScrollArea::vertical().show(ui, |ui| {
-            ui.group(|ui| {
-                ui.set_width(ui.available_width());
-                ui.strong("RC Material Slots");
-                ui.weak("Click, Ctrl+click, Shift+click the FBX column to multi-select rows.");
-                let selected_count = self.model.selected_materials.len();
-                if selected_count > 0 {
-                    ui.horizontal(|ui| {
-                        ComboBox::from_id_salt("bulk_physicalize")
-                            .selected_text(&self.model.bulk_physicalize)
-                            .show_ui(ui, |ui| {
-                                for value in PHYSICALIZE_VALUES {
-                                    ui.selectable_value(
-                                        &mut self.model.bulk_physicalize,
-                                        value.to_owned(),
-                                        value,
-                                    );
-                                }
-                            });
-                        if ui
-                            .button(format!("Set physicalize for {selected_count} selected"))
-                            .clicked()
-                        {
-                            let names: Vec<&str> = review
-                                .material_slots
-                                .iter()
-                                .map(|slot| slot.name.as_str())
-                                .collect();
-                            let value = self.model.bulk_physicalize.clone();
-                            apply_bulk_physicalize(
-                                &mut self.model.physicalize_overrides,
-                                &names,
-                                &self.model.selected_materials,
-                                &value,
-                            );
-                        }
-                    });
-                }
-                Grid::new("model_materials")
-                    .num_columns(6)
-                    .striped(true)
-                    .spacing([12.0, 5.0])
-                    .show(ui, |ui| {
-                        ui.strong("FBX");
-                        ui.strong("Sub");
-                        ui.strong("Material");
-                        ui.strong("Physicalize");
-                        ui.strong("Polygons");
-                        ui.strong("Textures");
-                        ui.end_row();
-                        for (index, slot) in review.material_slots.iter().enumerate() {
-                            let selected = self.model.selected_materials.contains(&index);
-                            if ui
-                                .selectable_label(
-                                    selected,
-                                    slot.fbx_material_id
-                                        .and_then(|id| id.checked_sub(1))
-                                        .map_or_else(|| "—".to_owned(), |value| value.to_string()),
-                                )
-                                .clicked()
-                            {
-                                apply_click_selection(
-                                    &mut self.model.selected_materials,
-                                    &mut self.model.material_selection_anchor,
-                                    index,
-                                    modifiers.ctrl,
-                                    modifiers.shift,
-                                );
-                                self.model.selected_material = Some(index);
-                            }
-                            ui.label(slot.sub_index.to_string());
-                            ui.label(&slot.name);
-                            // Default physicalize is "no" (item 1). A configured
-                            // manifest still wins, so with a manifest the default
-                            // is the policy-inferred value and only user changes
-                            // become overrides; without a manifest every material
-                            // carries an explicit seeded value.
-                            let default_value = if manifest_configured {
-                                resolve_physicalize(
-                                    slot.physicalize
-                                        .as_deref()
-                                        .map(|value| ("physicalize", value)),
-                                    &slot.name,
-                                )
-                                .value
-                                .as_str()
-                                .to_owned()
-                            } else {
-                                DEFAULT_PHYSICALIZE.to_owned()
-                            };
-                            let mut physicalize = self
-                                .model
-                                .physicalize_overrides
-                                .get(&slot.name)
-                                .cloned()
-                                .unwrap_or_else(|| default_value.clone());
-                            ComboBox::from_id_salt(("physicalize", index))
-                                .selected_text(&physicalize)
+        // Take the entry's mutable working state out so we can borrow `review`
+        // immutably for the whole render without a self.model borrow conflict.
+        let mut phys = std::mem::take(&mut self.model.entries[index].physicalize_overrides);
+        let mut selected_material = self.model.entries[index].selected_material;
+        let mut selected_materials =
+            std::mem::take(&mut self.model.entries[index].selected_materials);
+        let mut selection_anchor = self.model.entries[index].material_selection_anchor;
+        let mut bulk = std::mem::take(&mut self.model.entries[index].bulk_physicalize);
+        {
+            let review = &self.model.entries[index].review;
+            ui.horizontal(|ui| {
+                ui.heading(
+                    review
+                        .path
+                        .file_name()
+                        .and_then(|name| name.to_str())
+                        .unwrap_or("FBX"),
+                );
+                ui.separator();
+                ui.label(format!("{} material slots", review.material_slots.len()));
+                ui.separator();
+                ui.label(format!("{} diagnostics", review.diagnostics.len()));
+            });
+            ui.separator();
+            ScrollArea::vertical().show(ui, |ui| {
+                ui.group(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.strong("RC Material Slots");
+                    ui.weak("Click, Ctrl+click, Shift+click the FBX column to multi-select rows.");
+                    let selected_count = selected_materials.len();
+                    if selected_count > 0 {
+                        ui.horizontal(|ui| {
+                            ComboBox::from_id_salt("bulk_physicalize")
+                                .selected_text(&bulk)
                                 .show_ui(ui, |ui| {
                                     for value in PHYSICALIZE_VALUES {
-                                        ui.selectable_value(
-                                            &mut physicalize,
-                                            value.to_owned(),
-                                            value,
-                                        );
+                                        ui.selectable_value(&mut bulk, value.to_owned(), value);
                                     }
                                 });
-                            if manifest_configured && physicalize == default_value {
-                                self.model.physicalize_overrides.remove(&slot.name);
-                            } else {
-                                self.model
-                                    .physicalize_overrides
-                                    .insert(slot.name.clone(), physicalize);
-                            }
-                            let assignment = slot.source_order.and_then(|source_order| {
-                                review
-                                    .assignments
+                            if ui
+                                .button(format!("Set physicalize for {selected_count} selected"))
+                                .clicked()
+                            {
+                                let names: Vec<&str> = review
+                                    .material_slots
                                     .iter()
-                                    .find(|assignment| assignment.source_order == source_order)
-                            });
-                            ui.label(
-                                assignment
-                                    .and_then(|assignment| assignment.polygon_count)
-                                    .unwrap_or(0)
-                                    .to_string(),
-                            );
-                            let textures = slot
+                                    .map(|slot| slot.name.as_str())
+                                    .collect();
+                                apply_bulk_physicalize(
+                                    &mut phys,
+                                    &names,
+                                    &selected_materials,
+                                    &bulk,
+                                );
+                            }
+                        });
+                    }
+                    Grid::new("model_materials")
+                        .num_columns(6)
+                        .striped(true)
+                        .spacing([12.0, 5.0])
+                        .show(ui, |ui| {
+                            ui.strong("FBX");
+                            ui.strong("Sub");
+                            ui.strong("Material");
+                            ui.strong("Physicalize");
+                            ui.strong("Polygons");
+                            ui.strong("Textures");
+                            ui.end_row();
+                            for (row, slot) in review.material_slots.iter().enumerate() {
+                                let selected = selected_materials.contains(&row);
+                                if ui
+                                    .selectable_label(
+                                        selected,
+                                        slot.fbx_material_id
+                                            .and_then(|id| id.checked_sub(1))
+                                            .map_or_else(
+                                                || "—".to_owned(),
+                                                |value| value.to_string(),
+                                            ),
+                                    )
+                                    .clicked()
+                                {
+                                    apply_click_selection(
+                                        &mut selected_materials,
+                                        &mut selection_anchor,
+                                        row,
+                                        modifiers.ctrl,
+                                        modifiers.shift,
+                                    );
+                                    selected_material = Some(row);
+                                }
+                                ui.label(slot.sub_index.to_string());
+                                ui.label(&slot.name);
+                                // Default physicalize is "no" (item 1). A configured
+                                // manifest still wins, so with a manifest the default
+                                // is the policy-inferred value and only user changes
+                                // become overrides; without a manifest every material
+                                // carries an explicit seeded value.
+                                let default_value = if manifest_configured {
+                                    resolve_physicalize(
+                                        slot.physicalize
+                                            .as_deref()
+                                            .map(|value| ("physicalize", value)),
+                                        &slot.name,
+                                    )
+                                    .value
+                                    .as_str()
+                                    .to_owned()
+                                } else {
+                                    DEFAULT_PHYSICALIZE.to_owned()
+                                };
+                                let mut physicalize = phys
+                                    .get(&slot.name)
+                                    .cloned()
+                                    .unwrap_or_else(|| default_value.clone());
+                                ComboBox::from_id_salt(("physicalize", row))
+                                    .selected_text(&physicalize)
+                                    .show_ui(ui, |ui| {
+                                        for value in PHYSICALIZE_VALUES {
+                                            ui.selectable_value(
+                                                &mut physicalize,
+                                                value.to_owned(),
+                                                value,
+                                            );
+                                        }
+                                    });
+                                if manifest_configured && physicalize == default_value {
+                                    phys.remove(&slot.name);
+                                } else {
+                                    phys.insert(slot.name.clone(), physicalize);
+                                }
+                                let assignment = slot.source_order.and_then(|source_order| {
+                                    review
+                                        .assignments
+                                        .iter()
+                                        .find(|assignment| assignment.source_order == source_order)
+                                });
+                                ui.label(
+                                    assignment
+                                        .and_then(|assignment| assignment.polygon_count)
+                                        .unwrap_or(0)
+                                        .to_string(),
+                                );
+                                let textures = slot
+                                    .source_order
+                                    .and_then(|source_order| {
+                                        review.model.materials.get(source_order)
+                                    })
+                                    .map_or(0, |material| material.textures.len());
+                                ui.label(textures.to_string());
+                                ui.end_row();
+                            }
+                        });
+                });
+                ui.add_space(8.0);
+                if let Some(selected) = selected_material {
+                    if let Some(slot) = review.material_slots.get(selected) {
+                        ui.group(|ui| {
+                            ui.set_width(ui.available_width());
+                            ui.strong(format!("Material Details · {}", slot.name));
+                            ui.label(format!(
+                                "Assignment source: {}",
+                                slot.assignment_reason
+                                    .as_deref()
+                                    .unwrap_or("slot projection")
+                            ));
+                            if let Some(material) = slot
                                 .source_order
                                 .and_then(|source_order| review.model.materials.get(source_order))
-                                .map_or(0, |material| material.textures.len());
-                            ui.label(textures.to_string());
-                            ui.end_row();
-                        }
-                    });
-            });
-            ui.add_space(8.0);
-            if let Some(index) = self.model.selected_material {
-                if let Some(slot) = review.material_slots.get(index) {
-                    ui.group(|ui| {
-                        ui.set_width(ui.available_width());
-                        ui.strong(format!("Material Details · {}", slot.name));
-                        ui.label(format!(
-                            "Assignment source: {}",
-                            slot.assignment_reason
-                                .as_deref()
-                                .unwrap_or("slot projection")
-                        ));
-                        if let Some(material) = slot
-                            .source_order
-                            .and_then(|source_order| review.model.materials.get(source_order))
-                        {
-                            if material.textures.is_empty() {
-                                ui.weak("No texture references");
-                            }
-                            for texture in &material.textures {
-                                ui.horizontal_wrapped(|ui| {
-                                    ui.label(RichText::new(&texture.shader_prop).strong());
-                                    ui.label(if texture.embedded {
-                                        format!(
-                                            "{} (embedded, {} bytes)",
-                                            texture.filename, texture.content_size
-                                        )
-                                    } else {
-                                        texture.absolute_filename.clone()
+                            {
+                                if material.textures.is_empty() {
+                                    ui.weak("No texture references");
+                                }
+                                for texture in &material.textures {
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.label(RichText::new(&texture.shader_prop).strong());
+                                        ui.label(if texture.embedded {
+                                            format!(
+                                                "{} (embedded, {} bytes)",
+                                                texture.filename, texture.content_size
+                                            )
+                                        } else {
+                                            texture.absolute_filename.clone()
+                                        });
                                     });
-                                });
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
-            }
-            ui.add_space(8.0);
-            ui.group(|ui| {
-                ui.set_width(ui.available_width());
-                ui.strong("Material Slot Diagnostics");
-                if review.diagnostics.is_empty() {
-                    ui.label(
-                        RichText::new("No material slot diagnostics require attention.")
-                            .color(Color32::from_rgb(70, 165, 95)),
-                    );
-                }
-                for diagnostic in &review.diagnostics {
-                    ui.label(format!(
-                        "[{}] {} · {}",
-                        diagnostic.severity, diagnostic.material, diagnostic.message
-                    ));
-                }
+                ui.add_space(8.0);
+                ui.group(|ui| {
+                    ui.set_width(ui.available_width());
+                    ui.strong("Material Slot Diagnostics");
+                    if review.diagnostics.is_empty() {
+                        ui.label(
+                            RichText::new("No material slot diagnostics require attention.")
+                                .color(Color32::from_rgb(70, 165, 95)),
+                        );
+                    }
+                    for diagnostic in &review.diagnostics {
+                        ui.label(format!(
+                            "[{}] {} · {}",
+                            diagnostic.severity, diagnostic.material, diagnostic.message
+                        ));
+                    }
+                });
             });
-        });
+        }
+        let entry = &mut self.model.entries[index];
+        entry.physicalize_overrides = phys;
+        entry.selected_material = selected_material;
+        entry.selected_materials = selected_materials;
+        entry.material_selection_anchor = selection_anchor;
+        entry.bulk_physicalize = bulk;
     }
 }
 
@@ -2852,6 +3252,7 @@ impl eframe::App for WorkflowApp {
         self.diagnostics_popover(context);
         self.process_modal(context);
         self.export_modal(context);
+        self.batch_modal(context);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
@@ -2900,6 +3301,32 @@ fn fixed_cell(
     })
     .response
     .rect
+}
+
+fn is_fbx(path: &Path) -> bool {
+    path.extension()
+        .and_then(|value| value.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("fbx"))
+}
+
+fn entry_name(entry: &ModelEntry) -> String {
+    entry
+        .review
+        .path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("FBX")
+        .to_owned()
+}
+
+/// A small colored pill label, matching the badges used for texture map types.
+fn badge(ui: &mut egui::Ui, text: impl Into<String>, color: Color32) {
+    ui.label(
+        RichText::new(text.into())
+            .small()
+            .color(Color32::WHITE)
+            .background_color(color),
+    );
 }
 
 fn split_paths(text: &str) -> Vec<PathBuf> {
@@ -3193,6 +3620,26 @@ mod physicalize_tests {
         );
         assert_eq!(overrides.len(), 1);
         assert_eq!(overrides.get("A").map(String::as_str), Some("obstruct"));
+    }
+
+    #[test]
+    fn per_model_physicalize_edits_do_not_leak_between_models() {
+        // Each model-list entry owns its own physicalize map (R10 per-model state
+        // isolation). Editing one model's map must never touch another's.
+        let mut model_a = seed_default_physicalize(["Body", "Glass"]);
+        let model_b = seed_default_physicalize(["Body", "Glass"]);
+        apply_bulk_physicalize(
+            &mut model_a,
+            &["Body", "Glass"],
+            &BTreeSet::from([0usize]),
+            "proxy_only",
+        );
+        assert_eq!(model_a.get("Body").map(String::as_str), Some("proxy_only"));
+        assert_eq!(
+            model_b.get("Body").map(String::as_str),
+            Some("no"),
+            "the other model's physicalize is untouched"
+        );
     }
 }
 

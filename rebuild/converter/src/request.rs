@@ -190,7 +190,6 @@ pub struct Gate {
 pub struct NodeType {
     pub is_lod: bool,
     pub is_proxy: bool,
-    pub is_helper: bool,
     pub lod_level: Option<u32>,
 }
 
@@ -204,13 +203,12 @@ pub fn detect_node_type(name: &str) -> NodeType {
         || ["_proxy", "_physics", "_phys"]
             .iter()
             .any(|suffix| lower.ends_with(suffix));
-    let is_helper = ["_helper", "_control", "_pivot", "_locator", "_target"]
-        .iter()
-        .any(|part| lower.contains(part));
+    // Name-pattern helper detection was removed: research (helper-node-research.md)
+    // proved RC decides helpers purely by mesh-presence, not names, so the old
+    // `is_helper` flag was dead — never written into the request, never consumed.
     NodeType {
         is_lod: lod_level.is_some(),
         is_proxy,
-        is_helper,
         lod_level,
     }
 }
@@ -653,7 +651,6 @@ mod tests {
         assert_eq!(detect_node_type("$lod2_body").lod_level, Some(2));
         assert_eq!(detect_node_type("body_lod3").lod_level, Some(3));
         assert!(detect_node_type("Chair_proxy").is_proxy);
-        assert!(detect_node_type("wheel_pivot").is_helper);
         assert!(!detect_node_type("ChairMesh").is_proxy);
     }
 
