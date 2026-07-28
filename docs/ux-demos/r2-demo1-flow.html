@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flow — CryEngine Texture Processor (R2-1)</title>
+<!--
+  ============================================================================
+  R2-1 "FLOW" — feature inventory placement checklist (self-certification)
+  Philosophy: work-as-pipeline. Import → Review → Convert → Export.
+  Two parallel swimlanes (Textures / Models), each can sit at a different
+  stage. Each page shows ONLY that stage's controls (anti-cockpit).
+  ----------------------------------------------------------------------------
+  TEXTURE SIDE
+   - Import (files / folder / drag-drop) ....... Textures › Import  (#pane-tex-import: dropzone + Add Files/Folder)
+   - Group review table (type columns) ......... Textures › Review  (#pane-tex-review: table.grp)
+   - Group-level settings ...................... Textures › Review  (#pane-tex-review: .group-settings drawer)
+   - Conversion settings (res / diffuse fmt /
+       normal flip / metal-gate advanced) ...... Textures › Convert (#pane-tex-convert)
+   - RC/DDS (path / adaptive pool progress /
+       post-export cleanup options) ............ Textures › Export  (#pane-tex-export)
+   - Related textures .......................... Textures › Review  (#pane-tex-review: .related drawer)
+   - Multi-select delete ....................... Textures › Import + Review (.multi-toolbar)
+   - NEW material preview ...................... Textures › Review  (#pane-tex-review: .mat-preview)
+   - NEW diffuse→PBR converter (params + run) .. Textures › Import  (optional station #pbr-station)
+  MODEL SIDE
+   - FBX list (batch) .......................... Models › Import   (#pane-mdl-import: .fbx-list)
+   - Material slots (physicalize multi-select) . Models › Review   (#pane-mdl-review: table.mat)
+   - Axis (detect + override) .................. Models › Convert  (#pane-mdl-convert: axis block)
+   - Units / scale ............................. Models › Convert  (#pane-mdl-convert)
+   - Merge nodes ............................... Models › Convert  (#pane-mdl-convert)
+   - Scene origin .............................. Models › Convert  (#pane-mdl-convert)
+   - Export options (textures-with-model /
+       delete json) ............................ Models › Export   (#pane-mdl-export)
+   - NEW model preview ......................... Models › Review   (#pane-mdl-review: .mdl-preview)
+   - NEW proxy generation (algo params +
+       generate / preview / accept) ............ Models › Review   (station #proxy-station)
+  GLOBAL
+   - Language .................................. titlebar (#langSel)
+   - Output directory .......................... titlebar (#outDir)
+   - Work / progress center .................... bottom dock (#progressCenter)
+   - Diagnostics ............................... bottom dock (#diagChip + popover)
+   - Settings / profile access ................. titlebar menu (#settingsMenu: Save/Load Preset, Preferences)
+  ============================================================================
+-->
+<style>
+  :root{
+    --bg:#1b1c1f; --bg2:#202226; --panel:#26282d; --panel2:#2c2f35; --panel3:#33363d;
+    --border:#3a3d44; --border-strong:#4a4e57; --ink:#e6e8ec; --muted:#9aa0ab; --muted2:#727783;
+    --accent:#4c8bf5; --accent-weak:#1e3252; --accent-line:#3c6fd0;
+    --ok:#4ade80; --ok-weak:#173226; --warn:#f0a838; --warn-weak:#332813; --warn-line:#7a5a1e;
+    --hazard:#ef5350; --hazard-weak:#331a1a;
+    --radius:8px;
+    font-family:"Segoe UI","Inter","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); font-size:13px; overflow:hidden; min-width:1280px}
+  button{font-family:inherit; cursor:pointer; color:inherit}
+  select,input{font-family:inherit; font-size:12.5px}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-thumb{background:#41454d;border-radius:6px;border:2px solid var(--bg2)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  #app{display:flex; flex-direction:column; height:100vh}
+
+  /* ---------- titlebar (GLOBAL controls) ---------- */
+  .titlebar{
+    height:44px; flex:0 0 44px; display:flex; align-items:center; gap:12px;
+    padding:0 14px; background:linear-gradient(180deg,#2a2d33,#212327);
+    border-bottom:1px solid var(--border);
+  }
+  .titlebar .logo{width:22px;height:22px;border-radius:6px;
+    background:linear-gradient(135deg,var(--accent),#9333ea)}
+  .titlebar b{font-size:13.5px; font-weight:600}
+  .titlebar .ver{color:var(--muted2); font-size:11px}
+  .titlebar .spacer{flex:1}
+  .gctl{display:flex; align-items:center; gap:7px}
+  .gctl label{color:var(--muted); font-size:11px; font-weight:600}
+  .gctl select,.gctl input{background:var(--panel); border:1px solid var(--border-strong);
+    color:var(--ink); border-radius:6px; padding:5px 8px}
+  .outdir{width:250px}
+  .menuwrap{position:relative}
+  .iconbtn{background:var(--panel); border:1px solid var(--border-strong); border-radius:6px;
+    padding:6px 11px; font-size:12px; font-weight:600}
+  .iconbtn:hover{background:var(--panel3)}
+  .dropdown{position:absolute; right:0; top:38px; width:210px; background:var(--panel2);
+    border:1px solid var(--border-strong); border-radius:8px; box-shadow:0 14px 40px #000a;
+    padding:5px; display:none; z-index:40}
+  .dropdown.show{display:block}
+  .dropdown .mi{padding:8px 10px; border-radius:5px; font-size:12.5px; color:var(--ink)}
+  .dropdown .mi:hover{background:var(--accent-weak)}
+  .dropdown .sep{height:1px; background:var(--border); margin:5px 4px}
+
+  /* ---------- flow map (stepper × swimlanes) ---------- */
+  .flowmap{flex:0 0 auto; padding:12px 16px 4px; background:var(--bg2); border-bottom:1px solid var(--border)}
+  .lane{display:grid; grid-template-columns:150px 1fr; align-items:center; gap:14px; margin-bottom:9px}
+  .lane-label{display:flex; flex-direction:column; gap:2px}
+  .lane-label .ln{display:flex; align-items:center; gap:8px; font-weight:700; font-size:13px}
+  .lane-label .ln .swatch{width:13px;height:13px;border-radius:4px}
+  .swatch.tex{background:linear-gradient(135deg,#4c8bf5,#7c3aed)}
+  .swatch.mdl{background:linear-gradient(135deg,#e0803a,#b8532a)}
+  .lane-label em{font-style:normal; color:var(--muted2); font-size:10.5px; padding-left:21px}
+  .track{display:flex; align-items:stretch}
+  .node{flex:1; display:flex; align-items:center; gap:9px; background:var(--panel);
+    border:1px solid var(--border); border-radius:8px; padding:7px 11px; text-align:left;
+    transition:.14s; min-width:0}
+  .node:hover{border-color:var(--border-strong); background:var(--panel2)}
+  .node .ndx{width:20px;height:20px;flex:0 0 20px; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:700; background:var(--panel3); color:var(--muted)}
+  .node .ninfo{min-width:0}
+  .node .nlabel{font-size:12.5px; font-weight:600; white-space:nowrap}
+  .node .nstat{font-size:10px; color:var(--muted2); white-space:nowrap}
+  .conn{flex:0 0 26px; align-self:center; height:2px; background:var(--border)}
+  .node.done{border-color:#2f5a41; background:#1c2a22}
+  .node.done .ndx{background:var(--ok); color:#07301b}
+  .node.done .nstat{color:var(--ok)}
+  .conn.done{background:var(--ok)}
+  .node.current{border-color:var(--accent); background:var(--accent-weak); box-shadow:0 0 0 1px var(--accent) inset}
+  .node.current .ndx{background:var(--accent); color:#fff}
+  .node.current .nstat{color:#9cc0ff}
+  .node.active{outline:2px solid #cfe0ff; outline-offset:1px}
+  .node.warn .ndx{background:var(--warn); color:#3a2a08}
+  .node.warn .nstat{color:var(--warn)}
+
+  /* ---------- stage area ---------- */
+  .stagearea{flex:1; min-height:0; position:relative; overflow:hidden; background:var(--bg)}
+  .pane{position:absolute; inset:0; display:none; flex-direction:column; overflow:hidden}
+  .pane.on{display:flex}
+  .pane-head{flex:0 0 auto; padding:12px 18px 10px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px; background:var(--bg2)}
+  .pane-head .htext h2{font-size:15px; font-weight:600}
+  .pane-head .htext h2 span{color:var(--muted2); font-weight:500}
+  .pane-head .htext p{color:var(--muted); font-size:11.5px; margin-top:2px}
+  .pane-head .hactions{margin-left:auto; display:flex; gap:8px}
+  .pane-body{flex:1; min-height:0; overflow:auto; padding:16px 18px}
+  .cols{display:grid; gap:16px}
+  .cols.c-6-4{grid-template-columns:1.4fr 1fr}
+  .cols.c-5-5{grid-template-columns:1fr 1fr}
+
+  /* ---------- generic panel bits ---------- */
+  .btn{border:1px solid var(--border-strong); background:var(--panel); color:var(--ink);
+    padding:7px 13px; border-radius:6px; font-size:12.5px; font-weight:500; transition:.12s}
+  .btn:hover{background:var(--panel3); border-color:#565b64}
+  .btn:active{background:#3a3e46}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#3f79db}
+  .btn.ghost{background:transparent}
+  .btn:disabled{opacity:.42; cursor:default}
+  .btn.sm{padding:5px 9px; font-size:11.5px}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 15px; margin-bottom:14px}
+  .card > .sec{font-size:11px; font-weight:700; letter-spacing:.5px; color:var(--muted);
+    text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:8px}
+  .card > .sec .tag{margin-left:auto; font-size:10px; padding:2px 8px; border-radius:9px; letter-spacing:.3px}
+  .tag.new{background:var(--accent-weak); color:#9cc0ff; border:1px solid var(--accent-line)}
+  .tag.opt{background:var(--warn-weak); color:var(--warn); border:1px solid var(--warn-line)}
+  .field{margin-bottom:13px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block; font-size:11.5px; font-weight:600; color:#c3c8d0; margin-bottom:5px}
+  .field .row{display:flex; gap:6px}
+  .field input[type=text]{flex:1; padding:7px 9px; border:1px solid var(--border-strong);
+    border-radius:6px; background:var(--panel2); color:var(--ink)}
+  .field select{width:100%; padding:7px 9px; border:1px solid var(--border-strong);
+    border-radius:6px; background:var(--panel2); color:var(--ink)}
+  .field .status{font-size:11px; color:var(--muted2); margin-top:5px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+  .check{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:12.5px; color:#cfd3db}
+  .check input{width:15px;height:15px; accent-color:var(--accent)}
+  .slider{display:flex; align-items:center; gap:11px; margin-bottom:11px}
+  .slider label{flex:0 0 148px; font-size:12px; color:#c3c8d0}
+  .slider input[type=range]{flex:1; accent-color:var(--accent)}
+  .slider .val{flex:0 0 44px; text-align:right; font-size:11.5px; color:var(--muted);
+    font-variant-numeric:tabular-nums}
+  details.drawer{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:14px}
+  details.drawer>summary{list-style:none; cursor:pointer; padding:12px 14px; font-size:12.5px; font-weight:600;
+    display:flex; align-items:center; gap:9px; color:#cfd3db}
+  details.drawer>summary::-webkit-details-marker{display:none}
+  details.drawer>summary .chev{transition:transform .15s; color:var(--muted2); font-size:11px}
+  details.drawer[open]>summary .chev{transform:rotate(90deg)}
+  details.drawer>summary .cnt{margin-left:auto; color:var(--muted2); font-size:11px; font-weight:500}
+  details.drawer .body{padding:2px 14px 14px}
+  .hint{color:var(--muted2); font-size:11.5px; line-height:1.6}
+
+  /* dropzone */
+  .dropzone{border:2px dashed var(--border-strong); border-radius:10px; padding:26px; text-align:center;
+    background:var(--panel2); margin-bottom:14px}
+  .dropzone .big{font-size:14px; font-weight:600; margin-bottom:4px}
+  .dropzone .sub{color:var(--muted); font-size:12px; margin-bottom:14px}
+  .dropzone .btns{display:flex; gap:9px; justify-content:center}
+
+  /* file / fbx lists */
+  .multi-toolbar{display:flex; align-items:center; gap:9px; padding:8px 11px; background:var(--panel2);
+    border:1px solid var(--border); border-radius:7px 7px 0 0; border-bottom:none; font-size:12px; color:var(--muted)}
+  .multi-toolbar .sel-count{color:var(--ink); font-weight:600}
+  .multi-toolbar .grow{flex:1}
+  .list{border:1px solid var(--border); border-radius:0 0 7px 7px; max-height:270px; overflow:auto}
+  .lrow{display:flex; align-items:center; gap:10px; padding:7px 11px; border-bottom:1px solid #2f3238; font-size:12px}
+  .lrow:last-child{border-bottom:none}
+  .lrow:hover{background:var(--panel2)}
+  .lrow input{accent-color:var(--accent)}
+  .lrow .ic{width:15px;height:15px;border-radius:4px;flex:0 0 15px}
+  .lrow .fn{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#d4d8df}
+  .lrow .meta{color:var(--muted2); font-size:10.5px}
+
+  /* group table */
+  .gt-wrap{border:1px solid var(--border); border-radius:8px; overflow:auto; max-height:360px}
+  table.grp{border-collapse:collapse; width:100%; font-size:12px}
+  table.grp th{position:sticky; top:0; z-index:1; background:var(--panel2); color:var(--muted);
+    font-weight:600; padding:8px 6px; border-bottom:1px solid var(--border); font-size:10.5px; text-align:center}
+  table.grp th.name-col{text-align:left; padding-left:13px}
+  table.grp td{border-bottom:1px solid #2c2f35; padding:0 6px; height:34px; text-align:center; color:#cfd3db}
+  table.grp td.name-col{text-align:left; padding-left:13px; max-width:200px}
+  table.grp td.name-col .nm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500}
+  table.grp tbody tr{cursor:pointer}
+  table.grp tbody tr:hover td{background:var(--panel2)}
+  table.grp tbody tr.sel td{background:var(--accent-weak)}
+  table.grp tbody tr.unknown td{background:var(--warn-weak)}
+  table.grp tbody tr.unknown td.name-col{box-shadow:inset 3px 0 0 var(--warn-line)}
+  .cell{display:inline-block; width:15px; height:15px; border-radius:4px; vertical-align:middle}
+  .cell.on{background:var(--ok)}
+  .cell.off{background:#33363d; box-shadow:inset 0 0 0 1px #45484f}
+  td.uk select{background:#3a2f16; color:var(--warn); border:1px solid var(--warn-line); border-radius:5px;
+    padding:3px 5px; font-weight:600; font-size:11px}
+  td.uk .done{color:var(--ok); font-weight:600; font-size:11px}
+  td.uk .dash{color:var(--muted2)}
+
+  /* material slots table */
+  table.mat{width:100%; border-collapse:collapse; font-size:11.5px}
+  table.mat th{position:sticky; top:0; background:var(--panel2); color:var(--muted); font-weight:600;
+    text-align:left; padding:7px 9px; border-bottom:1px solid var(--border); font-size:10.5px}
+  table.mat td{padding:5px 9px; border-bottom:1px solid #2c2f35; white-space:nowrap; color:#cfd3db}
+  table.mat tr.unassigned td{color:var(--warn); background:var(--warn-weak); font-style:italic}
+  table.mat select{background:var(--panel2); color:var(--ink); border:1px solid var(--border-strong);
+    border-radius:5px; padding:3px 6px; font-size:11px}
+  .mat-wrap{border:1px solid var(--border); border-radius:8px; overflow:auto; max-height:330px}
+
+  /* previews */
+  .preview-box{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden}
+  .preview-box .pv-head{display:flex; align-items:center; gap:8px; padding:9px 12px; border-bottom:1px solid var(--border);
+    font-size:11px; font-weight:700; letter-spacing:.4px; color:var(--muted); text-transform:uppercase}
+  .preview-box .pv-head .tag{margin-left:auto}
+  .mat-preview .stage{height:210px; display:flex; align-items:center; justify-content:center; position:relative;
+    background:repeating-conic-gradient(#26282d 0% 25%, #2f3237 0% 50%) 0/24px 24px}
+  .mat-sphere{width:150px;height:150px;border-radius:50%; position:relative;
+    background:radial-gradient(circle at 34% 30%, #cfae86 0%, #8a6a4a 40%, #3a2a1c 100%);
+    box-shadow:inset -14px -18px 34px #0009, 0 8px 26px #0007}
+  .mat-sphere::after{content:""; position:absolute; top:20px; left:34px; width:34px; height:22px;
+    border-radius:50%; background:radial-gradient(circle,#fff8 0%,#fff0 70%); transform:rotate(-18deg)}
+  .pv-strip{display:flex; gap:2px; padding:8px 10px; border-top:1px solid var(--border); background:var(--panel2)}
+  .pv-swatch{flex:1; height:32px; border-radius:4px; position:relative}
+  .pv-swatch span{position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:8.5px; color:#fffc;
+    text-shadow:0 1px 2px #000}
+  .mdl-preview .stage{height:230px; position:relative; overflow:hidden;
+    background:
+      linear-gradient(0deg,transparent 24px,#2e3138 25px) 0 0/28px 28px,
+      linear-gradient(90deg,transparent 24px,#2e3138 25px) 0 0/28px 28px,
+      radial-gradient(circle at 50% 120%, #23262c, #191a1e)}
+  .wire{position:absolute; inset:0; display:flex; align-items:center; justify-content:center}
+  .wire svg{filter:drop-shadow(0 6px 18px #000a)}
+  .wire .lbl{position:absolute; bottom:10px; left:12px; font-size:10.5px; color:var(--muted2)}
+  .gizmo{position:absolute; top:10px; right:12px; font-size:10px; color:var(--muted); line-height:1.5;
+    background:#0006; padding:5px 8px; border-radius:6px; border:1px solid var(--border)}
+  .gizmo b{color:#9cc0ff}
+
+  /* station callout */
+  .station{border:1px solid var(--accent-line); border-radius:var(--radius); overflow:hidden; margin-bottom:14px;
+    background:linear-gradient(180deg,#1e2839,#1c1e23)}
+  .station .st-head{display:flex; align-items:center; gap:10px; padding:12px 15px; border-bottom:1px solid var(--border)}
+  .station .st-head .icn{width:30px;height:30px;border-radius:8px;background:var(--accent-weak);
+    border:1px solid var(--accent-line); display:flex; align-items:center; justify-content:center; font-size:15px}
+  .station .st-head h3{font-size:13.5px}
+  .station .st-head p{color:var(--muted); font-size:11px; margin-top:1px}
+  .station .st-body{padding:14px 15px}
+  .station .st-actions{display:flex; gap:9px; padding:0 15px 14px; align-items:center}
+  .progress{height:8px; border-radius:5px; background:#33363d; overflow:hidden; margin:6px 0}
+  .progress i{display:block; height:100%; width:0; border-radius:5px;
+    background:linear-gradient(90deg,var(--accent),#7ba9f7); transition:width .25s}
+
+  .badge{padding:3px 9px; border-radius:12px; font-size:11px; font-weight:500;
+    background:var(--accent-weak); color:#9cc0ff; border:1px solid var(--accent-line)}
+  .pill{display:inline-block; padding:1px 8px; border-radius:9px; background:#33363d; color:#b6bcc6; font-size:10px}
+
+  /* ---------- bottom dock (GLOBAL progress + diagnostics) ---------- */
+  .dock{flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:8px 14px;
+    background:linear-gradient(180deg,#212327,#1a1b1f); border-top:1px solid var(--border)}
+  .dock .pc{flex:1; display:flex; align-items:center; gap:12px; min-width:0}
+  .dock .pc .pc-title{font-size:11px; font-weight:700; letter-spacing:.4px; color:var(--muted);
+    text-transform:uppercase; flex:0 0 auto}
+  .dock .job{display:flex; align-items:center; gap:8px; padding:4px 10px; background:var(--panel);
+    border:1px solid var(--border); border-radius:20px; font-size:11px; white-space:nowrap}
+  .dock .job .jbar{width:60px;height:5px;border-radius:3px;background:#33363d;overflow:hidden}
+  .dock .job .jbar i{display:block;height:100%;background:var(--accent)}
+  .dock .job.done .dotj{color:var(--ok)} .dock .job .dotj{font-weight:700}
+  .dock .diag{display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:20px;
+    background:var(--warn-weak); color:var(--warn); border:1px solid var(--warn-line); font-weight:600; font-size:11.5px}
+  .dock .diag.clean{background:var(--ok-weak); color:var(--ok); border-color:#2f5a41}
+  .dock .diag:hover{filter:brightness(1.15)}
+  .dock .diag .dotw{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+  .popover{position:fixed; z-index:60; width:440px; background:var(--panel2); border:1px solid var(--border-strong);
+    border-radius:10px; box-shadow:0 16px 44px #000b; overflow:hidden; display:none}
+  .popover.show{display:block}
+  .popover .ph{padding:11px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:12.5px}
+  .popover .plist2{max-height:300px; overflow-y:auto}
+  .popover .dg{display:flex; gap:10px; padding:11px 14px; border-bottom:1px solid #2c2f35; font-size:12px}
+  .popover .dg:last-child{border-bottom:none}
+  .popover .dg .sev{flex:0 0 auto; font-size:10px; font-weight:700; padding:2px 7px; border-radius:9px; height:fit-content}
+  .sev.warn{background:var(--warn-weak); color:var(--warn)}
+  .sev.info{background:var(--accent-weak); color:#9cc0ff}
+  .popover .dg .txt b{display:block; font-size:11px; color:var(--muted); font-weight:600; margin-bottom:2px}
+  .popover .dg .txt span{color:#cfd3db; line-height:1.5}
+
+  .toast{position:fixed; right:20px; bottom:56px; z-index:70; display:flex; align-items:center; gap:13px;
+    padding:13px 16px; min-width:300px; background:var(--panel2); border:1px solid var(--border-strong);
+    border-left:4px solid var(--ok); border-radius:10px; box-shadow:0 14px 40px #000a;
+    transform:translateX(150%); transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{transform:none}
+  .toast .tk{width:26px;height:26px;border-radius:50%;background:var(--ok-weak);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 26px}
+  .toast b{font-size:13px}
+  .toast span{display:block; color:var(--muted); font-size:11.5px; margin-top:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ TITLEBAR (global) ============ -->
+  <div class="titlebar">
+    <div class="logo"></div>
+    <b>CryEngine Texture Processor</b><span class="ver">Flow · v2.1.0</span>
+    <div class="spacer"></div>
+    <div class="gctl">
+      <label>Language</label>
+      <select id="langSel">
+        <option>English</option>
+        <option>繁體中文</option>
+        <option>日本語</option>
+      </select>
+    </div>
+    <div class="gctl">
+      <label>Output</label>
+      <input class="outdir" id="outDir" type="text" value="D:\Assets\KB3D\_cryengine">
+    </div>
+    <div class="menuwrap">
+      <button class="iconbtn" id="settingsBtn">Settings ▾</button>
+      <div class="dropdown" id="settingsMenu">
+        <div class="mi" data-act="save">Save preset…</div>
+        <div class="mi" data-act="load">Load preset…</div>
+        <div class="sep"></div>
+        <div class="mi" data-act="prefs">Preferences…</div>
+        <div class="mi" data-act="reset">Reset workspace</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FLOW MAP (stepper × swimlanes) ============ -->
+  <div class="flowmap">
+    <div class="lane" data-lane="tex">
+      <div class="lane-label">
+        <div class="ln"><span class="swatch tex"></span>Textures</div>
+        <em id="texSub">132 groups · 418 files</em>
+      </div>
+      <div class="track" id="track-tex">
+        <button class="node done active" data-lane="tex" data-stage="import">
+          <span class="ndx">✓</span><span class="ninfo"><span class="nlabel">Import</span><span class="nstat">418 files loaded</span></span>
+        </button>
+        <div class="conn done"></div>
+        <button class="node current" data-lane="tex" data-stage="review">
+          <span class="ndx">2</span><span class="ninfo"><span class="nlabel">Review</span><span class="nstat">5 groups need type</span></span>
+        </button>
+        <div class="conn"></div>
+        <button class="node" data-lane="tex" data-stage="convert">
+          <span class="ndx">3</span><span class="ninfo"><span class="nlabel">Convert</span><span class="nstat">Not started</span></span>
+        </button>
+        <div class="conn"></div>
+        <button class="node" data-lane="tex" data-stage="export">
+          <span class="ndx">4</span><span class="ninfo"><span class="nlabel">Export</span><span class="nstat">RC · DDS</span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="lane" data-lane="mdl">
+      <div class="lane-label">
+        <div class="ln"><span class="swatch mdl"></span>Models</div>
+        <em id="mdlSub">3 FBX · KB3D_HAV kit</em>
+      </div>
+      <div class="track" id="track-mdl">
+        <button class="node done" data-lane="mdl" data-stage="import">
+          <span class="ndx">✓</span><span class="ninfo"><span class="nlabel">Import</span><span class="nstat">3 FBX loaded</span></span>
+        </button>
+        <div class="conn done"></div>
+        <button class="node warn current" data-lane="mdl" data-stage="review">
+          <span class="ndx">2</span><span class="ninfo"><span class="nlabel">Review</span><span class="nstat">Proxy pending · 1 slot</span></span>
+        </button>
+        <div class="conn"></div>
+        <button class="node" data-lane="mdl" data-stage="convert">
+          <span class="ndx">3</span><span class="ninfo"><span class="nlabel">Convert</span><span class="nstat">Axis -Z +Y</span></span>
+        </button>
+        <div class="conn"></div>
+        <button class="node" data-lane="mdl" data-stage="export">
+          <span class="ndx">4</span><span class="ninfo"><span class="nlabel">Export</span><span class="nstat">.mtl · textures</span></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ STAGE AREA ============ -->
+  <div class="stagearea" id="stagearea">
+
+    <!-- ===== TEXTURES · IMPORT ===== -->
+    <section class="pane on" id="pane-tex-import">
+      <div class="pane-head">
+        <div class="htext"><h2>Textures <span>· Import</span></h2><p>Load source maps by file, folder or drag-and-drop. Optional PBR synthesis runs here.</p></div>
+        <div class="hactions"><button class="btn primary" data-goto="tex-review">Continue to Review →</button></div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-6-4">
+          <div>
+            <div class="dropzone">
+              <div class="big">Drop textures or folders here</div>
+              <div class="sub">PNG · TGA · TIFF · EXR — grouped automatically by KB3D naming convention</div>
+              <div class="btns">
+                <button class="btn" id="addFiles">Add Files…</button>
+                <button class="btn" id="addFolder">Add Folder…</button>
+              </div>
+            </div>
+
+            <div class="multi-toolbar">
+              <input type="checkbox" id="texSelAll"><span>Select all</span>
+              <span class="sel-count" id="texSelCount">2 selected</span>
+              <span class="grow"></span>
+              <button class="btn sm" id="texDelete">Delete selected</button>
+            </div>
+            <div class="list" id="texFileList"></div>
+          </div>
+
+          <div>
+            <!-- OPTIONAL STATION: diffuse → PBR converter -->
+            <div class="station" id="pbr-station">
+              <div class="st-head">
+                <div class="icn">🎛</div>
+                <div><h3>Diffuse → PBR Converter</h3><p>Optional station · only if you have diffuse-only sources</p></div>
+              </div>
+              <div class="st-body">
+                <div class="slider"><label>Roughness estimation strength</label>
+                  <input type="range" min="0" max="100" value="65" id="pbrRough"><span class="val" id="vPbrRough">65</span></div>
+                <div class="slider"><label>Metallic threshold</label>
+                  <input type="range" min="0" max="100" value="42" id="pbrMetal"><span class="val" id="vPbrMetal">0.42</span></div>
+                <label class="check"><input type="checkbox" id="pbrNormal" checked>Generate normal from luminance</label>
+                <div class="progress"><i id="pbrBar"></i></div>
+                <div class="hint" id="pbrHint">Synthesises normal / roughness / metallic / AO from a base color map.</div>
+              </div>
+              <div class="st-actions">
+                <button class="btn primary" id="pbrRun">Run converter</button>
+                <span class="hint" id="pbrCount">Targets: 6 diffuse-only groups</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TEXTURES · REVIEW ===== -->
+    <section class="pane" id="pane-tex-review">
+      <div class="pane-head">
+        <div class="htext"><h2>Textures <span>· Review</span></h2><p>Confirm auto-detected map types, preview material, resolve unknowns before conversion.</p></div>
+        <div class="hactions">
+          <button class="btn" data-goto="tex-import">← Import</button>
+          <button class="btn primary" data-goto="tex-convert">Continue to Convert →</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-6-4">
+          <div>
+            <div class="multi-toolbar">
+              <span id="grpUnknown" style="color:var(--warn);font-weight:600">5 groups need a type assignment</span>
+              <span class="grow"></span>
+              <button class="btn sm" id="grpDelete">Delete selected</button>
+            </div>
+            <div class="gt-wrap">
+              <table class="grp" id="grpTable"><thead id="grpHead"></thead><tbody id="grpBody"></tbody></table>
+            </div>
+
+            <details class="drawer" style="margin-top:14px">
+              <summary><span class="chev">▶</span>Group-level settings<span class="cnt">KB3D_ENC_GlassClean</span></summary>
+              <div class="body">
+                <div class="grid2">
+                  <div class="field"><label>Resolution override</label>
+                    <select><option>Inherit (2048)</option><option>4096</option><option>1024</option><option>512</option></select></div>
+                  <div class="field"><label>Alpha handling</label>
+                    <select><option>Auto</option><option>Diffuse alpha</option><option>Separate opacity</option></select></div>
+                </div>
+                <label class="check"><input type="checkbox">Exclude this group from batch</label>
+                <label class="check"><input type="checkbox" checked>Treat as decal (premultiplied)</label>
+              </div>
+            </details>
+
+            <details class="drawer">
+              <summary><span class="chev">▶</span>Related textures<span class="cnt">3 linked</span></summary>
+              <div class="body">
+                <div class="hint" style="margin-bottom:8px">Maps sharing this group's base name, linked across sub-folders.</div>
+                <div class="list" style="max-height:150px">
+                  <div class="lrow"><span class="ic" style="background:linear-gradient(135deg,#bfe6ea,#4a7d86)"></span><span class="fn">KB3D_ENC_GlassClean_ddna.png</span><span class="meta">/normal</span></div>
+                  <div class="lrow"><span class="ic" style="background:linear-gradient(135deg,#7d8890,#3a4046)"></span><span class="fn">KB3D_ENC_GlassClean_gloss.png</span><span class="meta">/gloss</span></div>
+                  <div class="lrow"><span class="ic" style="background:linear-gradient(135deg,#d0d6da,#6a7076)"></span><span class="fn">KB3D_ENC_GlassClean_opacity.png</span><span class="meta">/alpha (linked)</span></div>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div>
+            <!-- NEW: material preview -->
+            <div class="preview-box mat-preview">
+              <div class="pv-head">Material Preview<span class="tag new">NEW</span></div>
+              <div class="stage"><div class="mat-sphere" id="matSphere"></div></div>
+              <div class="pv-strip">
+                <div class="pv-swatch" style="background:linear-gradient(135deg,#8a6a4a,#3a2a1c)"><span>albedo</span></div>
+                <div class="pv-swatch" style="background:linear-gradient(135deg,#8390c4,#41497a)"><span>normal</span></div>
+                <div class="pv-swatch" style="background:linear-gradient(135deg,#c9c9c9,#4a4a4a)"><span>gloss</span></div>
+                <div class="pv-swatch" style="background:linear-gradient(135deg,#2a2a2a,#0a0a0a)"><span>metal</span></div>
+              </div>
+            </div>
+            <div class="card" style="margin-top:14px">
+              <div class="sec">Selected group</div>
+              <div style="font-size:14px;font-weight:600" id="pvName">KB3D_ENC_AtlasA</div>
+              <div class="hint" id="pvMeta">7 channels · complete · 2048×2048</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px" id="pvBadges"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TEXTURES · CONVERT ===== -->
+    <section class="pane" id="pane-tex-convert">
+      <div class="pane-head">
+        <div class="htext"><h2>Textures <span>· Convert</span></h2><p>Conversion rules applied to every reviewed group. No files are written yet.</p></div>
+        <div class="hactions">
+          <button class="btn" data-goto="tex-review">← Review</button>
+          <button class="btn primary" data-goto="tex-export">Continue to Export →</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-5-5">
+          <div>
+            <div class="card">
+              <div class="sec">Core settings</div>
+              <div class="grid2">
+                <div class="field"><label>Output resolution</label>
+                  <select><option>Original</option><option>4096</option><option selected>2048</option><option>1024</option><option>512</option></select></div>
+                <div class="field"><label>Diffuse format</label>
+                  <select><option>albedo</option><option>diffuse_ao</option></select></div>
+              </div>
+              <label class="check"><input type="checkbox">Flip normal G channel (DirectX → OpenGL)</label>
+              <label class="check"><input type="checkbox" checked>Generate missing Spec maps</label>
+            </div>
+            <details class="drawer" open>
+              <summary><span class="chev">▶</span>Metal Gate (advanced)<span class="cnt">metallic workflow</span></summary>
+              <div class="body">
+                <label class="check"><input type="checkbox" checked>Enable Metal Gate (Metallic → Albedo + Reflection split)</label>
+                <div class="field" style="margin-top:10px"><label>ARM channel order</label>
+                  <select><option>AO / Roughness / Metallic</option><option>Roughness / Metallic / AO</option><option>Metallic / AO / Roughness</option></select></div>
+                <div class="slider"><label>Reflection floor</label><input type="range" min="0" max="100" value="4" id="mgFloor"><span class="val" id="vMgFloor">0.04</span></div>
+                <div class="slider"><label>Dielectric spec</label><input type="range" min="0" max="100" value="50" id="mgSpec"><span class="val" id="vMgSpec">0.50</span></div>
+              </div>
+            </details>
+          </div>
+          <div>
+            <div class="card">
+              <div class="sec">Output map types</div>
+              <div class="grid2">
+                <label class="check"><input type="checkbox" checked>Diffuse (_diff)</label>
+                <label class="check"><input type="checkbox" checked>Specular (_spec)</label>
+                <label class="check"><input type="checkbox" checked>Normal+Gloss (_ddna)</label>
+                <label class="check"><input type="checkbox" checked>Displacement (_displ)</label>
+                <label class="check"><input type="checkbox" checked>Emissive (_em)</label>
+                <label class="check"><input type="checkbox">SSS (_sss)</label>
+              </div>
+            </div>
+            <div class="card">
+              <div class="sec">Scope</div>
+              <div class="hint">These rules apply to <b>132 groups</b>. Per-group overrides set in Review take precedence. 5 unassigned groups will be skipped until resolved.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== TEXTURES · EXPORT ===== -->
+    <section class="pane" id="pane-tex-export">
+      <div class="pane-head">
+        <div class="htext"><h2>Textures <span>· Export</span></h2><p>Run Resource Compiler, write DDS, and clean up intermediates.</p></div>
+        <div class="hactions"><button class="btn" data-goto="tex-convert">← Convert</button></div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-5-5">
+          <div>
+            <div class="card">
+              <div class="sec">Resource Compiler</div>
+              <div class="field"><label>RC executable</label>
+                <div class="row"><input type="text" value="C:\CRYENGINE\Tools\rc\rc.exe"><button class="btn">Browse…</button></div></div>
+              <div class="field"><label>DDS output directory</label>
+                <div class="row"><input type="text" value="D:\Assets\KB3D\_cryengine\Textures"><button class="btn">Browse…</button></div>
+                <div class="status">Directory is valid and writable.</div></div>
+            </div>
+            <details class="drawer" open>
+              <summary><span class="chev">▶</span>Post-export cleanup<span class="cnt">3 enabled</span></summary>
+              <div class="body">
+                <label class="check"><input type="checkbox" checked>Delete intermediate PNG after DDS</label>
+                <label class="check"><input type="checkbox" checked>Delete .tif temp files</label>
+                <label class="check"><input type="checkbox" checked>Remove empty source folders</label>
+                <label class="check"><input type="checkbox">Keep RC log files</label>
+              </div>
+            </details>
+          </div>
+          <div>
+            <div class="card">
+              <div class="sec">Adaptive worker pool <span class="tag new" id="poolTag">idle</span></div>
+              <div class="hint" style="margin-bottom:10px">Pool auto-scales to CPU load. Current: <b>6 workers</b>.</div>
+              <div id="poolBars"></div>
+              <div class="progress" style="height:10px;margin-top:12px"><i id="exportBar"></i></div>
+              <div class="hint" id="exportStat" style="margin-top:6px">Ready — 132 groups queued.</div>
+            </div>
+            <button class="btn primary" id="exportRun" style="width:100%;padding:11px">Export textures to DDS</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MODELS · IMPORT ===== -->
+    <section class="pane" id="pane-mdl-import">
+      <div class="pane-head">
+        <div class="htext"><h2>Models <span>· Import</span></h2><p>Batch-load FBX files. Material slots and transforms are handled in later stages.</p></div>
+        <div class="hactions"><button class="btn primary" data-goto="mdl-review">Continue to Review →</button></div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-6-4">
+          <div>
+            <div class="dropzone">
+              <div class="big">Drop FBX files here</div>
+              <div class="sub">Batch import supported — each FBX keeps its own material and transform state</div>
+              <div class="btns"><button class="btn" id="addModel">Add Models…</button></div>
+            </div>
+            <div class="multi-toolbar">
+              <input type="checkbox"><span>Select all</span>
+              <span class="sel-count">1 selected</span>
+              <span class="grow"></span>
+              <button class="btn sm">Remove selected</button>
+            </div>
+            <div class="list fbx-list">
+              <div class="lrow"><input type="checkbox" checked><span class="ic" style="background:linear-gradient(135deg,#e0803a,#b8532a)"></span><span class="fn">KB3D_HAV_MetalGate_A.fbx</span><span class="meta">16 mtl · 12.4 MB</span></div>
+              <div class="lrow"><input type="checkbox"><span class="ic" style="background:linear-gradient(135deg,#e0803a,#b8532a)"></span><span class="fn">KB3D_HAV_MetalGate_B.fbx</span><span class="meta">14 mtl · 9.1 MB</span></div>
+              <div class="lrow"><input type="checkbox"><span class="ic" style="background:linear-gradient(135deg,#e0803a,#b8532a)"></span><span class="fn">KB3D_HAV_Pylon_A.fbx</span><span class="meta">8 mtl · 5.7 MB</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="sec">Batch summary</div>
+              <div class="hint">3 FBX · 38 material slots · 1 unassigned slot. Detected up axis <b>+Y</b>, forward <b>-Z</b> — confirm in Convert.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MODELS · REVIEW ===== -->
+    <section class="pane" id="pane-mdl-review">
+      <div class="pane-head">
+        <div class="htext"><h2>Models <span>· Review</span></h2><p>Assign physicalize types, preview geometry, and generate collision proxies.</p></div>
+        <div class="hactions">
+          <button class="btn" data-goto="mdl-import">← Import</button>
+          <button class="btn primary" data-goto="mdl-convert">Continue to Convert →</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-6-4">
+          <div>
+            <div style="font-weight:600;margin-bottom:8px">KB3D_HAV_MetalGate_A.fbx <span class="pill">16 material slots</span></div>
+            <div class="mat-wrap">
+              <table class="mat">
+                <thead><tr><th>Slot</th><th>Material</th><th>sub_index</th><th>physicalize</th></tr></thead>
+                <tbody id="matBody"></tbody>
+              </table>
+            </div>
+
+            <!-- STATION: proxy generation -->
+            <div class="station" id="proxy-station" style="margin-top:14px">
+              <div class="st-head">
+                <div class="icn">🧱</div>
+                <div><h3>Proxy Generation</h3><p>Station · builds a physics collision hull for the gate frame</p></div>
+                <span class="tag new" style="margin-left:auto">NEW</span>
+              </div>
+              <div class="st-body">
+                <div class="grid2">
+                  <div class="field"><label>Voxel resolution</label>
+                    <select id="pxVoxel"><option>64³</option><option selected>128³</option><option>256³</option></select></div>
+                  <div class="field"><label>Convex hull count</label>
+                    <select id="pxHull"><option>1</option><option>4</option><option selected>8</option><option>16</option></select></div>
+                </div>
+                <div class="slider"><label>Shrink-wrap iterations</label>
+                  <input type="range" min="0" max="20" value="6" id="pxIter"><span class="val" id="vPxIter">6</span></div>
+                <div class="progress"><i id="pxBar"></i></div>
+                <div class="hint" id="pxHint">Target slot <b>Gate_Frame</b> → physicalize <b>proxy_only</b>.</div>
+              </div>
+              <div class="st-actions">
+                <button class="btn primary" id="pxGenerate">Generate</button>
+                <button class="btn" id="pxPreview" disabled>Preview</button>
+                <button class="btn" id="pxAccept" disabled>Accept</button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <!-- NEW: model preview -->
+            <div class="preview-box mdl-preview">
+              <div class="pv-head">Model Preview<span class="tag new">NEW</span></div>
+              <div class="stage">
+                <div class="gizmo">up <b>+Y</b><br>fwd <b>-Z</b></div>
+                <div class="wire">
+                  <svg width="200" height="150" viewBox="0 0 200 150" fill="none" stroke="#6fa0ef" stroke-width="1">
+                    <rect x="40" y="20" width="120" height="110" stroke="#8fb6f5"/>
+                    <line x1="40" y1="20" x2="70" y2="6"/><line x1="160" y1="20" x2="190" y2="6"/>
+                    <line x1="40" y1="130" x2="70" y2="116"/><line x1="160" y1="130" x2="190" y2="116"/>
+                    <path d="M70 6 H190 V116" stroke="#5a7fc0"/>
+                    <line x1="100" y1="20" x2="100" y2="130" stroke="#4f6da8"/>
+                    <line x1="40" y1="75" x2="160" y2="75" stroke="#4f6da8"/>
+                    <circle cx="100" cy="75" r="16" stroke="#a9c6f7"/>
+                  </svg>
+                  <span class="lbl" id="wireLbl">KB3D_HAV_MetalGate_A · 24.6k tris</span>
+                </div>
+              </div>
+              <div class="pv-strip" style="justify-content:space-between">
+                <span class="hint">Shaded · Wireframe · <b id="proxyToggle" style="color:var(--muted2)">Proxy overlay (off)</b></span>
+                <span class="pill">1 mesh · 16 mtl</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MODELS · CONVERT ===== -->
+    <section class="pane" id="pane-mdl-convert">
+      <div class="pane-head">
+        <div class="htext"><h2>Models <span>· Convert</span></h2><p>Fix orientation, units and scene structure before export.</p></div>
+        <div class="hactions">
+          <button class="btn" data-goto="mdl-review">← Review</button>
+          <button class="btn primary" data-goto="mdl-export">Continue to Export →</button>
+        </div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-5-5">
+          <div>
+            <div class="card">
+              <div class="sec">Axis <span class="tag opt">detected</span></div>
+              <div class="hint" style="margin-bottom:10px">Auto-detected from FBX header. Override if the gate imports rotated.</div>
+              <div class="grid2">
+                <div class="field"><label>Forward axis</label>
+                  <select><option>+X</option><option>-X</option><option>+Z</option><option selected>-Z</option></select></div>
+                <div class="field"><label>Up axis</label>
+                  <select><option selected>+Y</option><option>-Y</option><option>+Z</option></select></div>
+              </div>
+              <label class="check"><input type="checkbox">Flip forward (180° yaw)</label>
+            </div>
+            <div class="card">
+              <div class="sec">Units &amp; scale</div>
+              <div class="grid2">
+                <div class="field"><label>Source unit</label>
+                  <select><option selected>Centimeters</option><option>Meters</option><option>Inches</option></select></div>
+                <div class="field"><label>Scale factor</label>
+                  <div class="row"><input type="text" value="1.0"></div></div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="sec">Scene structure</div>
+              <label class="check"><input type="checkbox" checked>Merge nodes into single mesh</label>
+              <label class="check"><input type="checkbox">Keep node hierarchy</label>
+              <div class="field" style="margin-top:11px"><label>Scene origin</label>
+                <select><option selected>Bounding-box center (floor)</option><option>World origin (0,0,0)</option><option>First node pivot</option></select></div>
+              <label class="check"><input type="checkbox" checked>Recenter pivot to origin</label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== MODELS · EXPORT ===== -->
+    <section class="pane" id="pane-mdl-export">
+      <div class="pane-head">
+        <div class="htext"><h2>Models <span>· Export</span></h2><p>Write CGF/MTL and optionally bundle the converted textures.</p></div>
+        <div class="hactions"><button class="btn" data-goto="mdl-convert">← Convert</button></div>
+      </div>
+      <div class="pane-body">
+        <div class="cols c-5-5">
+          <div>
+            <div class="card">
+              <div class="sec">Export options</div>
+              <label class="check"><input type="checkbox" checked>Export textures alongside model</label>
+              <label class="check"><input type="checkbox" checked>Write .mtl material library</label>
+              <label class="check"><input type="checkbox" checked>Delete intermediate .json after CGF</label>
+              <label class="check"><input type="checkbox">Generate LOD placeholders</label>
+            </div>
+            <div class="card">
+              <div class="sec">Target</div>
+              <div class="field"><label>Model output directory</label>
+                <div class="row"><input type="text" value="D:\Assets\KB3D\_cryengine\Objects"><button class="btn">Browse…</button></div></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="sec">Ready to export</div>
+              <div class="hint">3 FBX · 38 slots · proxy generated for 1 slot. Axis <b>-Z / +Y</b>, merged, unit cm.</div>
+              <div class="progress" style="height:10px;margin-top:12px"><i id="mdlExportBar"></i></div>
+              <div class="hint" id="mdlExportStat" style="margin-top:6px">Idle.</div>
+            </div>
+            <button class="btn primary" id="mdlExportRun" style="width:100%;padding:11px">Export models</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ BOTTOM DOCK (global progress + diagnostics) ============ -->
+  <div class="dock">
+    <div class="pc" id="progressCenter">
+      <span class="pc-title">Work Center</span>
+      <div class="job done"><span class="dotj">✓</span>PBR synth · 6 groups</div>
+      <div class="job"><span class="dotj" style="color:var(--accent)">◐</span>Proxy · Gate_Frame<div class="jbar"><i style="width:0%" id="dockProxyBar"></i></div></div>
+      <div class="job"><span class="dotj" style="color:var(--muted2)">○</span>DDS export · queued</div>
+    </div>
+    <div class="diag" id="diagChip"><span class="dotw"></span><span id="diagLabel">6 diagnostics</span></div>
+  </div>
+</div>
+
+<!-- diagnostics popover -->
+<div class="popover" id="diagPop">
+  <div class="ph">Processing diagnostics <span id="diagPopCount" style="color:var(--muted);font-weight:400"></span></div>
+  <div class="plist2" id="diagPopList"></div>
+</div>
+
+<div class="toast" id="toast">
+  <div class="tk">✓</div>
+  <div><b id="toastTitle">Done</b><span id="toastSub"></span></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const $$=s=>document.querySelectorAll(s);
+const el=(t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e;};
+
+/* ---------- flow-map navigation (lane × stage) ---------- */
+function goto(id){
+  $$('.pane').forEach(p=>p.classList.toggle('on', p.id==='pane-'+id));
+  const [lane,stage]=id.split('-');
+  $$('.node').forEach(n=>n.classList.toggle('active', n.dataset.lane===lane && n.dataset.stage===stage));
+}
+$$('.node').forEach(n=>n.onclick=()=>goto(n.dataset.lane+'-'+n.dataset.stage));
+$$('[data-goto]').forEach(b=>b.onclick=()=>goto(b.dataset.goto));
+
+/* ---------- texture file list + multi-select ---------- */
+const TEXFILES=[
+  ['KB3D_ENC_AtlasA_diff.png','#8a6a4a','#3a2a1c'],
+  ['KB3D_ENC_AtlasA_ddna.png','#8390c4','#41497a'],
+  ['KB3D_ENC_GlassClean_diff.png','#bfe6ea','#4a7d86'],
+  ['KB3D_ENC_GlassClean_opacity.png','#d0d6da','#6a7076'],
+  ['KB3D_ENC_ConcreteWall_diff.png','#9a938a','#3f3b36'],
+  ['KB3D_ENC_MetalPanel_metal.png','#b8bcc2','#43484f'],
+  ['KB3D_ENC_RustedPipe_diff.png','#a5623a','#3a251a'],
+  ['KB3D_ENC_NeonSign_em.png','#ff5ea8','#2a0f3a'],
+];
+const tfl=$('#texFileList');
+TEXFILES.forEach((f,i)=>{
+  const r=el('div','lrow');
+  r.innerHTML=`<input type="checkbox" ${i<2?'checked':''}><span class="ic" style="background:linear-gradient(135deg,${f[1]},${f[2]})"></span>
+    <span class="fn">${f[0]}</span><span class="meta">2048² · PNG</span>`;
+  tfl.appendChild(r);
+});
+function texSelCount(){
+  const n=[...tfl.querySelectorAll('input:checked')].length;
+  $('#texSelCount').textContent=n+' selected';
+}
+tfl.addEventListener('change',texSelCount);
+$('#texSelAll').onclick=e=>{ tfl.querySelectorAll('input').forEach(c=>c.checked=e.target.checked); texSelCount(); };
+$('#texDelete').onclick=()=>{
+  tfl.querySelectorAll('input:checked').forEach(c=>c.closest('.lrow').remove());
+  texSelCount(); toast('Removed','Selected source files removed from import');
+};
+
+/* ---------- group review table ---------- */
+const TYPES=[['diff','Color'],['normal','Normal'],['spec','Spec'],['gloss','Gloss'],
+  ['metal','Metal'],['height','Height'],['ao','AO'],['em','Emiss']];
+const P=(...k)=>{const o={}; k.forEach(x=>o[x]=true); return o;};
+const groups=[
+  {n:'KB3D_ENC_AtlasA',    t:P('diff','normal','spec','gloss','metal','height','ao')},
+  {n:'KB3D_ENC_GlassClean',t:P('diff','normal','gloss','spec'), uk:'refraction'},
+  {n:'KB3D_ENC_Water',     t:P('diff','normal','gloss'), uk:'refraction'},
+  {n:'KB3D_ENC_StainedGlassGreen',t:P('diff','normal','em'), uk:'refraction'},
+  {n:'KB3D_ENC_StainedGlassMulti',t:P('diff','normal','spec','em'), uk:'refraction'},
+  {n:'KB3D_ENC_GlassFrosted',t:P('diff','normal','gloss'), uk:'refraction'},
+  {n:'KB3D_ENC_ConcreteWall',t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_MetalPanel',t:P('diff','normal','spec','gloss','metal','ao')},
+  {n:'KB3D_ENC_BrickWall', t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_RustedPipe',t:P('diff','normal','spec','gloss','metal','ao')},
+  {n:'KB3D_ENC_NeonSign',  t:P('diff','normal','em')},
+  {n:'KB3D_ENC_MarbleFloor',t:P('diff','normal','spec','gloss','height')},
+];
+const ASSIGN=[['diff','Color'],['normal','Normal'],['spec','Spec'],['gloss','Gloss'],
+  ['metal','Metal'],['ao','AO'],['em','Emissive'],['alpha','Alpha']];
+const hr=el('tr'); hr.appendChild(el('th','name-col','Group'));
+TYPES.forEach(t=>hr.appendChild(el('th',null,t[1]))); hr.appendChild(el('th',null,'Unassigned'));
+$('#grpHead').appendChild(hr);
+const gb=$('#grpBody');
+groups.forEach((g,i)=>{
+  const tr=el('tr'); tr.dataset.i=i; if(g.uk)tr.classList.add('unknown');
+  tr.appendChild(el('td','name-col',`<div class="nm">${g.n}</div>`));
+  TYPES.forEach(t=>{const td=el('td'); td.dataset.k=t[0];
+    td.innerHTML=`<span class="cell ${g.t[t[0]]?'on':'off'}"></span>`; tr.appendChild(td);});
+  const uk=el('td','uk');
+  uk.innerHTML=g.uk?`<select data-i="${i}"><option value="">${g.uk} → …</option>${ASSIGN.map(a=>`<option value="${a[0]}">${a[1]}</option>`).join('')}</select>`:'<span class="dash">—</span>';
+  tr.appendChild(uk);
+  tr.onclick=e=>{ if(e.target.tagName==='SELECT')return; selectGroup(i); };
+  gb.appendChild(tr);
+});
+function selectGroup(i){
+  const g=groups[i];
+  gb.querySelectorAll('tr').forEach(tr=>tr.classList.toggle('sel',+tr.dataset.i===i));
+  $('#pvName').textContent=g.n;
+  const cnt=Object.keys(g.t).length;
+  $('#pvMeta').textContent=`${cnt} channels · ${g.uk?'1 unassigned':'complete'} · 2048×2048`;
+  const bg=$('#pvBadges'); bg.innerHTML='';
+  TYPES.forEach(t=>{ if(g.t[t[0]]) bg.appendChild(el('span','badge',t[1])); });
+  if(g.uk){const b=el('span','badge',g.uk+' ?'); b.style.cssText='background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line)'; bg.appendChild(b);}
+}
+gb.addEventListener('change',e=>{
+  const s=e.target; if(s.tagName!=='SELECT'||!s.value)return;
+  const i=+s.dataset.i, g=groups[i], k=s.value;
+  const tr=gb.querySelector(`tr[data-i="${i}"]`);
+  const cell=tr.querySelector(`td[data-k="${k}"] .cell`);
+  if(cell){cell.classList.remove('off');cell.classList.add('on'); g.t[k]=true;}
+  delete g.uk; tr.classList.remove('unknown');
+  tr.querySelector('td.uk').innerHTML='<span class="done">✓ set</span>';
+  const left=groups.filter(x=>x.uk).length;
+  $('#grpUnknown').textContent=left?`${left} groups need a type assignment`:'All groups assigned ✓';
+  $('#grpUnknown').style.color=left?'var(--warn)':'var(--ok)';
+  const node=$('.node[data-lane="tex"][data-stage="review"] .nstat');
+  node.textContent=left?`${left} groups need type`:'All assigned';
+  refreshDiags();
+});
+selectGroup(0);
+
+/* ---------- material slots (models) ---------- */
+const MATS=['Gate_Frame','Gate_Panel','Chrome_Trim','Bolt_Steel','Rust_Overlay','Hinge_Metal',
+  'Warning_Sign','Emissive_Strip','Concrete_Base','Rebar','Grate_Mesh','Paint_Chipped',
+  'Rubber_Seal','Cable','Lamp_Glass','Placard'];
+const PHYS=['proxy_only','default','no_collide','obstruct'];
+const mb=$('#matBody');
+MATS.forEach((m,i)=>{
+  const tr=el('tr');
+  const chosen=i===0?0:i%4;
+  const sel=`<select>${PHYS.map((p,pi)=>`<option ${pi===chosen?'selected':''}>${p}</option>`).join('')}</select>`;
+  tr.innerHTML=`<td>${i}</td><td>${m}</td><td>${i}</td><td>${sel}</td>`;
+  mb.appendChild(tr);
+});
+mb.appendChild((()=>{const tr=el('tr','unassigned');
+  tr.innerHTML=`<td>16</td><td>&lt;unassigned&gt;</td><td>—</td><td>—</td>`; return tr;})());
+
+/* ---------- slider readouts ---------- */
+[['pbrRough','vPbrRough',v=>v],['pxIter','vPxIter',v=>v],['mgFloor','vMgFloor',v=>(v/100).toFixed(2)],
+ ['mgSpec','vMgSpec',v=>(v/100).toFixed(2)],['pbrMetal','vPbrMetal',v=>(v/100).toFixed(2)]]
+.forEach(([r,o,f])=>{const e=$('#'+r); if(e)e.addEventListener('input',()=>$('#'+o).textContent=f(e.target.value));});
+
+/* ---------- animated bar helper ---------- */
+function animate(bar,done,ms=1400){
+  let p=0; const step=Math.max(2,Math.round(100/(ms/40)));
+  const t=setInterval(()=>{ p=Math.min(100,p+step); bar.style.width=p+'%';
+    if(p>=100){clearInterval(t); done&&done();} },40);
+}
+
+/* ---------- PBR converter station ---------- */
+$('#pbrRun').onclick=()=>{
+  $('#pbrRun').disabled=true; $('#pbrHint').textContent='Synthesising PBR maps for 6 groups…';
+  animate($('#pbrBar'),()=>{ $('#pbrHint').innerHTML='<b style="color:var(--ok)">✓ Done</b> — normal / roughness / metallic / AO written to 6 groups.';
+    $('#pbrRun').disabled=false; toast('PBR synthesis complete','6 diffuse-only groups now have full map sets'); });
+};
+
+/* ---------- proxy station: generate → preview → accept ---------- */
+$('#pxGenerate').onclick=()=>{
+  $('#pxGenerate').disabled=true; $('#pxHint').textContent='Voxelising & decomposing hull…';
+  animate($('#pxBar'),()=>{
+    $('#pxHint').innerHTML='<b style="color:var(--ok)">✓ Generated</b> — 8 hulls, 1.9k tris. Preview or accept.';
+    $('#pxPreview').disabled=false; $('#pxAccept').disabled=false; $('#pxGenerate').disabled=false;
+  },1600);
+  animate($('#dockProxyBar'),null,1600);
+};
+$('#pxPreview').onclick=()=>{
+  $('#proxyToggle').textContent='Proxy overlay (on)'; $('#proxyToggle').style.color='var(--ok)';
+  $('#wireLbl').textContent='KB3D_HAV_MetalGate_A + proxy hull · 1.9k tris';
+  toast('Proxy preview','Collision hull overlaid on model preview');
+};
+$('#pxAccept').onclick=()=>{
+  $('#pxHint').innerHTML='<b style="color:var(--ok)">✓ Accepted</b> — Gate_Frame now physicalize proxy_only.';
+  const node=$('.node[data-lane="mdl"][data-stage="review"]');
+  node.classList.remove('warn'); node.querySelector('.nstat').textContent='Proxy accepted';
+  const job=$$('#progressCenter .job')[1]; job.classList.add('done'); job.querySelector('.dotj').textContent='✓';
+  toast('Proxy accepted','Assigned to Gate_Frame · physicalize proxy_only');
+};
+
+/* ---------- texture export: adaptive pool ---------- */
+const pb=$('#poolBars');
+for(let i=0;i<6;i++){const d=el('div','progress'); d.innerHTML='<i></i>'; d.style.margin='5px 0'; pb.appendChild(d);}
+$('#exportRun').onclick=()=>{
+  $('#exportRun').disabled=true; $('#poolTag').textContent='running'; $('#exportStat').textContent='Compiling DDS via RC…';
+  pb.querySelectorAll('i').forEach((bar,i)=>setTimeout(()=>animate(bar,null,900+i*130),i*90));
+  animate($('#exportBar'),()=>{ $('#poolTag').textContent='done'; $('#poolTag').style.borderColor='#2f5a41';
+    $('#exportStat').innerHTML='<b style="color:var(--ok)">✓ 132 groups → DDS</b> · 5 skipped (unassigned) · intermediates cleaned.';
+    $('#exportRun').disabled=false;
+    const n=$('.node[data-lane="tex"][data-stage="export"]'); n.classList.add('done'); n.querySelector('.ndx').textContent='✓'; n.querySelector('.nstat').textContent='DDS written';
+    toast('Textures exported','132 groups compiled to DDS'); },2600);
+};
+
+/* ---------- model export ---------- */
+$('#mdlExportRun').onclick=()=>{
+  $('#mdlExportRun').disabled=true; $('#mdlExportStat').textContent='Writing CGF + MTL…';
+  animate($('#mdlExportBar'),()=>{ $('#mdlExportStat').innerHTML='<b style="color:var(--ok)">✓ 3 models exported</b> · textures bundled · .json removed.';
+    $('#mdlExportRun').disabled=false;
+    const n=$('.node[data-lane="mdl"][data-stage="export"]'); n.classList.add('done'); n.querySelector('.ndx').textContent='✓'; n.querySelector('.nstat').textContent='CGF written';
+    toast('Models exported','3 FBX → CGF/MTL with bundled textures'); });
+};
+
+/* ---------- settings menu ---------- */
+$('#settingsBtn').onclick=e=>{ e.stopPropagation(); $('#settingsMenu').classList.toggle('show'); };
+$('#settingsMenu').querySelectorAll('.mi').forEach(mi=>mi.onclick=()=>{
+  $('#settingsMenu').classList.remove('show');
+  const a=mi.dataset.act;
+  toast(a==='save'?'Preset saved':a==='load'?'Preset loaded':a==='prefs'?'Preferences':'Workspace reset',
+        a==='save'?'Written to settings.json':a==='load'?'Restored kb3d_default.json':a==='prefs'?'Language, paths, RC options':'Lanes reset to Import');
+});
+
+/* ---------- diagnostics ---------- */
+function activeDiags(){
+  const d=groups.filter(g=>g.uk).map(g=>({sev:'warn',t:`DEF-19 · ${g.n}`,
+    m:`Type "${g.uk}" has no CryEngine output channel; this map is skipped at export. Assign it as alpha or diffuse in Review.`}));
+  d.push({sev:'info',t:'DEF-07 · KB3D_ENC_NeonSign',m:'Emissive present but no spec/gloss; a default Spec map will be generated.'});
+  d.push({sev:'warn',t:'PHY-03 · KB3D_HAV_MetalGate_A',m:'Slot Gate_Frame is proxy_only but no collision proxy exists yet. Generate one in Models › Review.'});
+  return d;
+}
+function refreshDiags(){
+  const n=activeDiags().length, chip=$('#diagChip');
+  $('#diagLabel').textContent=n?`${n} diagnostics`:'No diagnostics';
+  chip.classList.toggle('clean',n===0);
+}
+$('#diagChip').onclick=()=>{
+  const pop=$('#diagPop');
+  if(pop.classList.contains('show')){pop.classList.remove('show');return;}
+  const list=$('#diagPopList'); list.innerHTML=''; const a=activeDiags();
+  $('#diagPopCount').textContent=`(${a.length})`;
+  if(!a.length)list.innerHTML='<div class="dg"><div class="txt"><span>No diagnostics.</span></div></div>';
+  a.forEach(d=>list.appendChild(el('div','dg',`<span class="sev ${d.sev}">${d.sev==='warn'?'WARN':'INFO'}</span><div class="txt"><b>${d.t}</b><span>${d.m}</span></div>`)));
+  const r=$('#diagChip').getBoundingClientRect();
+  pop.style.left=Math.min(r.left,window.innerWidth-460)+'px';
+  pop.style.top=(r.top-Math.min(a.length*70+52,360)-8)+'px';
+  pop.classList.add('show');
+};
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#diagPop')&&!e.target.closest('#diagChip'))$('#diagPop').classList.remove('show');
+  if(!e.target.closest('.menuwrap'))$('#settingsMenu').classList.remove('show');
+});
+refreshDiags();
+
+/* ---------- toast ---------- */
+function toast(title,sub){
+  $('#toastTitle').textContent=title; $('#toastSub').textContent=sub;
+  const t=$('#toast'); t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Selection + Pins — CryEngine Texture Processor (R2-3b)</title>
+<!--
+========================================================================
+  R2-3b "SELECTION + PINS"  —  philosophy: 選中即上下文 (Select = Context)
+  Iterates on R2-3 "Selection". Same constant columns: Left = asset
+  navigator, Center = preview follows the selection, Right = LIVE inspector
+  shows ONLY the selected object. Proxy params & PBR Builder are inspector
+  TABS that appear only for the matching asset type.
+
+  FIX for R2-3's weakness (inspector amnesia — changing selection wiped
+  whatever you were comparing):
+   * Any inspector tab can be PINNED via the 📌 icon in its tab header.
+   * A pinned tab freezes to ITS asset ("📌 KB3D_ENC_MetalGate · Conversion")
+     and docks as a persistent panel in a SECOND right-side column, while the
+     live inspector keeps following new selections.
+   * Max 2 pins; pinning a 3rd replaces the OLDEST (mechanic shown + toast).
+   * Un-pin returns the panel; empty pins column collapses (user-chosen density).
+   * Slim persistent status strip at the bottom keeps global state (live job
+     progress bar + diagnostics count) visible during pinned compare workflows.
+  Scenario on load: Conversion Settings pinned for group KB3D_ENC_MetalGate
+  while a DIFFERENT model (KB3D_ENC_Gate_A.fbx) is live in the inspector.
+
+  ---- SHARED FEATURE INVENTORY CHECKLIST (every item placed) -----------
+  TEXTURE SIDE
+   [T1] Import (files/folder/drag-drop) .... LEFT navigator toolbar + dropzone hint
+   [T2] Group review table (type cols) ..... CENTER view when "Review all groups" node selected
+   [T3] Group-level settings ............... RIGHT inspector, Texture > "Conversion" tab (per-group res/format override)
+   [T4] Conversion settings (res, diffuse
+        format, normal flip, Metal Gate adv) RIGHT inspector, Texture > "Conversion" tab (+ <details> Advanced = Metal Gate) — PINNABLE
+   [T5] RC/DDS (path, adaptive pool
+        progress, post-export cleanup) ..... path+cleanup in GEAR drawer (RC/DDS section); adaptive-pool progress in PROGRESS center
+   [T6] Related textures ................... RIGHT inspector, Texture > "Group" tab (Related maps list)
+   [T7] Multi-select delete ................ LEFT navigator toolbar (checkbox mode + trash button)
+   [T8] NEW Material preview ............... CENTER view (sphere + tiled swatch) when texture group selected
+   [T9] NEW diffuse->PBR converter ......... RIGHT inspector, Texture > "PBR Builder" tab (params + Run)
+  MODEL SIDE
+   [M1] FBX list (batch) ................... LEFT navigator, Models section
+   [M2] Material slots (physicalize multi) . RIGHT inspector, Model > "Model" tab (slots table, physicalize select)
+   [M3] Axis (detect + override) ........... RIGHT inspector, Model > "Model" tab (forward/up -Z/+Y)
+   [M4] Units / scale ...................... RIGHT inspector, Model > "Model" tab
+   [M5] Merge nodes ....................... RIGHT inspector, Model > "Model" tab (checkbox)
+   [M6] Scene origin ...................... RIGHT inspector, Model > "Model" tab (select)
+   [M7] Export options (tex w/ model,
+        delete json) ...................... RIGHT inspector, Model > "Model" tab (Export section)
+   [M8] NEW Model preview ................. CENTER view (3D wireframe) when model selected
+   [M9] NEW proxy generation params ....... RIGHT inspector, Model > "Proxy" tab (voxel/hull/shrink + Generate/Preview/Accept); proxy node -> wireframe overlay
+  GLOBAL
+   [G1] Language .......................... GEAR drawer
+   [G2] Output directory .................. GEAR drawer
+   [G3] Work / progress center ........... STATUS bar "Queue" button -> progress panel (adaptive RC pool)
+   [G4] Diagnostics ...................... STATUS bar diagnostics chip -> popover (count always visible in strip)
+   [G5] Settings file access ............. GEAR drawer (Load / Save settings.json)
+  NEW IN R2-3b
+   [P1] Pin any inspector tab ............ 📌 icon in each tab header
+   [P2] Pinned panels (max 2) ............ SECOND right column, frozen to their asset
+   [P3] Max-2 replacement ................ 3rd pin drops the oldest (toast)
+   [P4] Persistent status strip .......... bottom bar: live job progress bar + diagnostics count
+  -----------------------------------------------------------------------
+-->
+<style>
+  :root{
+    --bg:#15181d; --panel:#1e222a; --panel2:#252a33; --panel3:#2c323d;
+    --border:#333a45; --border-strong:#434b58; --ink:#e5e8ee; --muted:#9aa3b2;
+    --muted2:#6a727f; --accent:#4f8cff; --accent-weak:#1c2c46; --accent-line:#2f5aa8;
+    --ok:#43c07a; --ok-weak:#16301f; --warn:#e0a33a; --warn-weak:#332a12;
+    --warn-line:#7a5c1e; --hazard:#e5574c; --radius:8px;
+    font-family:"Segoe UI","Inter","Noto Sans",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); font-size:13px; overflow:hidden; min-width:1280px}
+  button{font-family:inherit; cursor:pointer; color:inherit}
+  select,input{font-family:inherit; font-size:12.5px}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#39414d;border-radius:6px;border:2px solid var(--panel)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  #app{display:flex; flex-direction:column; height:100vh}
+
+  /* ---------- titlebar ---------- */
+  .titlebar{height:40px; flex:0 0 40px; display:flex; align-items:center; gap:11px;
+    padding:0 14px; background:linear-gradient(180deg,#232833,#1a1e25); border-bottom:1px solid var(--border)}
+  .titlebar .logo{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--accent),#8a5cf6)}
+  .titlebar b{font-size:13.5px;font-weight:600}
+  .titlebar .ver{color:var(--muted2);font-size:11.5px}
+  .titlebar .menu{margin-left:12px;display:flex;gap:2px}
+  .titlebar .menu span{padding:5px 9px;border-radius:6px;color:#aab2c0;font-size:12.5px}
+  .titlebar .menu span:hover{background:#2c323d}
+  .titlebar .spacer{flex:1}
+  .iconbtn{width:30px;height:30px;border-radius:7px;border:1px solid transparent;background:transparent;
+    display:flex;align-items:center;justify-content:center;color:#aab2c0;font-size:15px}
+  .iconbtn:hover{background:#2c323d;border-color:var(--border)}
+
+  .workbench{flex:1; display:grid; grid-template-columns:300px 1fr 366px; min-height:0}
+  .workbench.has-pins{grid-template-columns:300px 1fr 302px 352px}
+  .col{min-height:0; display:flex; flex-direction:column; overflow:hidden}
+  .col.left{border-right:1px solid var(--border); background:var(--panel)}
+  .col.right{border-left:1px solid var(--border); background:var(--panel)}
+  .col.center{background:var(--bg)}
+
+  /* ---------- PINS : second right column ---------- */
+  .col.pins{border-left:1px solid var(--accent-line); background:var(--panel); display:none}
+  .workbench.has-pins .col.pins{display:flex}
+  .pins-head{height:38px;flex:0 0 38px;display:flex;align-items:center;gap:8px;padding:0 13px;
+    border-bottom:1px solid var(--border);background:linear-gradient(180deg,#232a37,#1d222b);
+    font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#a9c6ff}
+  .pins-head .pcount{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted2);letter-spacing:0;text-transform:none}
+  .pins-scroll{flex:1;overflow-y:auto;padding:10px}
+  .pins-empty{color:var(--muted2);font-size:11.5px;line-height:1.7;text-align:center;padding:26px 12px}
+  .pins-empty .pk{font-size:26px;display:block;margin-bottom:8px;color:#3d4552}
+  .pinpanel{border:1px solid var(--accent-line);border-radius:9px;margin-bottom:11px;overflow:hidden;
+    background:var(--panel2);box-shadow:0 4px 14px rgba(0,0,0,.28)}
+  .pinhead{display:flex;align-items:center;gap:7px;padding:8px 10px;background:var(--accent-weak);
+    border-bottom:1px solid var(--accent-line);font-size:12px}
+  .pinhead .pk{flex:0 0 auto;font-size:12px}
+  .pinhead .pinlbl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#c6cdd8}
+  .pinhead .pinlbl b{color:#cddaff;font-weight:600}
+  .pinhead .frozen{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.4px;color:var(--muted2);
+    border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px;text-transform:uppercase}
+  .pinhead .pinx{flex:0 0 auto;width:22px;height:22px;border:1px solid transparent;border-radius:6px;background:transparent;
+    color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px}
+  .pinhead .pinx:hover{background:#3a1f1d;border-color:var(--hazard);color:#f0a49d}
+  .pinbody{padding:11px 11px 4px;max-height:340px;overflow-y:auto}
+  .pinbody .card{margin-bottom:10px}
+
+  /* ---------- LEFT : navigator ---------- */
+  .navtool{display:flex; gap:6px; padding:9px 10px; border-bottom:1px solid var(--border); background:var(--panel2)}
+  .btn{border:1px solid var(--border-strong); background:var(--panel3); color:#d3d9e2; padding:6px 10px;
+    border-radius:6px; font-size:12px; font-weight:500; transition:background .12s,border-color .12s; white-space:nowrap}
+  .btn:hover{background:#333a46; border-color:#525b69}
+  .btn:active{background:#2a303a}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#3f79e8}
+  .btn.sm{padding:5px 8px; font-size:11.5px}
+  .btn.danger:hover{background:#3a1f1d; border-color:var(--hazard); color:#f0a49d}
+  .btn:disabled{opacity:.42; cursor:default}
+  .btn.mini{padding:4px 7px; font-size:11px}
+
+  .navtool .grow{flex:1}
+  .navtool .iconsq{width:30px;height:30px;flex:0 0 30px;border:1px solid var(--border-strong);background:var(--panel3);
+    border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;color:#c1c8d3}
+  .navtool .iconsq:hover{background:#333a46;border-color:#525b69}
+  .navtool .iconsq.on{background:var(--accent-weak);border-color:var(--accent-line);color:#a9c6ff}
+
+  .navscroll{flex:1; overflow-y:auto}
+  .dropzone{margin:8px 10px 4px; border:1px dashed #3d4552; border-radius:7px; color:var(--muted2);
+    font-size:11px; text-align:center; padding:7px; background:#1b1f27}
+
+  .navsec{border-bottom:1px solid var(--border)}
+  .sechead{display:flex; align-items:center; gap:8px; padding:9px 11px; cursor:pointer; user-select:none;
+    background:var(--panel2); position:sticky; top:0; z-index:2}
+  .sechead:hover{background:#2a303a}
+  .sechead .chev{color:var(--muted2); transition:transform .15s; font-size:10px}
+  .navsec.closed .sechead .chev{transform:rotate(-90deg)}
+  .sechead .lbl{font-size:11px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted)}
+  .sechead .cnt{margin-left:auto; color:var(--muted2); font-size:11px}
+  .sechead .cnt em{font-style:normal; color:var(--warn); font-weight:700}
+  .secbody{padding:4px 0 6px}
+  .navsec.closed .secbody{display:none}
+
+  .node{display:flex; align-items:center; gap:8px; padding:5px 11px 5px 14px; cursor:pointer; font-size:12.5px; color:#c6cdd8}
+  .node:hover{background:var(--panel2)}
+  .node.sel{background:var(--accent-weak); box-shadow:inset 3px 0 0 var(--accent)}
+  .node .chk{width:14px;height:14px;flex:0 0 14px;border-radius:3px;border:1px solid #4a525f;background:#20252e;display:none}
+  .navsec.multi .node .chk{display:inline-block}
+  .navsec.multi .node .chk.on{background:var(--accent);border-color:var(--accent);
+    box-shadow:inset 0 0 0 2px var(--panel)}
+  .node .sw{width:15px;height:15px;flex:0 0 15px;border-radius:4px}
+  .node .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+  .node .tag{font-size:9.5px;font-weight:700;padding:1px 6px;border-radius:9px;flex:0 0 auto}
+  .tag.warn{background:var(--warn-weak);color:var(--warn)}
+  .tag.ok{background:var(--ok-weak);color:var(--ok)}
+  .tag.dim{background:#2a303a;color:var(--muted2)}
+  .node.child{padding-left:30px; font-size:12px; color:var(--muted)}
+  .node.child .sw{width:11px;height:11px;border-radius:3px}
+  .node.reviewrow{color:#a9c6ff; font-weight:600}
+  .node.reviewrow .ic{font-size:13px}
+
+  /* ---------- CENTER ---------- */
+  .center-head{height:38px;flex:0 0 38px;display:flex;align-items:center;gap:10px;padding:0 16px;
+    border-bottom:1px solid var(--border);background:var(--panel)}
+  .center-head .crumb{font-size:12px;color:var(--muted)}
+  .center-head .crumb b{color:var(--ink);font-weight:600}
+  .center-head .rspacer{flex:1}
+  .center-head .seg{display:flex;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden}
+  .center-head .seg button{padding:4px 10px;font-size:11.5px;background:var(--panel3);border:none;color:#b7bfca}
+  .center-head .seg button+button{border-left:1px solid var(--border-strong)}
+  .center-head .seg button.on{background:var(--accent-weak);color:#a9c6ff}
+
+  .stage{flex:1; min-height:0; position:relative; overflow:auto; padding:16px}
+  .view{display:none; height:100%; flex-direction:column}
+  .view.on{display:flex}
+
+  /* empty */
+  .cempty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted2);gap:14px}
+  .cempty .ring{width:96px;height:96px;border-radius:50%;border:2px dashed #39414d;display:flex;align-items:center;
+    justify-content:center;font-size:34px;color:#3d4552}
+  .cempty h2{font-size:15px;color:var(--muted);font-weight:600}
+  .cempty p{font-size:12.5px;max-width:340px;text-align:center;line-height:1.7}
+
+  /* texture material preview */
+  .matbox{flex:0 0 auto;display:flex;gap:16px}
+  .sphere-wrap{flex:0 0 300px;height:300px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;
+    position:relative;background:
+      repeating-conic-gradient(#20242c 0% 25%,#272c35 0% 50%) 0/26px 26px}
+  .sphere{position:absolute;inset:0;margin:auto;width:190px;height:190px;border-radius:50%;
+    box-shadow:inset -26px -30px 60px rgba(0,0,0,.65), inset 20px 22px 44px rgba(255,255,255,.10), 0 20px 40px rgba(0,0,0,.5)}
+  .sphere::after{content:"";position:absolute;top:30px;left:44px;width:52px;height:38px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.55),transparent 70%);filter:blur(3px)}
+  .sphere-wrap .plabel{position:absolute;left:10px;bottom:8px;font-size:10.5px;color:#cfd6e0;letter-spacing:.5px;
+    background:rgba(10,12,16,.6);padding:2px 7px;border-radius:5px}
+  .tile-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+  .tiled{flex:1;min-height:120px;border:1px solid var(--border);border-radius:var(--radius);position:relative;overflow:hidden}
+  .tiled .plabel{position:absolute;left:10px;bottom:8px;font-size:10.5px;color:#cfd6e0;background:rgba(10,12,16,.55);
+    padding:2px 7px;border-radius:5px}
+  .chanrow{display:flex;flex-wrap:wrap;gap:6px}
+  .chan{font-size:10.5px;padding:3px 9px;border-radius:11px;background:var(--accent-weak);color:#a9c6ff;
+    border:1px solid var(--accent-line)}
+  .chan.miss{background:#2a303a;color:var(--muted2);border-color:var(--border);text-decoration:line-through}
+  .chan.q{background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line)}
+  .metaline{margin-top:14px;color:var(--muted);font-size:12px}
+  .metaline b{color:var(--ink)}
+
+  /* wireframe (model + proxy) */
+  .wireframe{flex:1;min-height:0;border:1px solid var(--border);border-radius:var(--radius);position:relative;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 22%,#232a34,#14171c 80%)}
+  .wireframe svg{position:absolute;inset:0;width:100%;height:100%}
+  .wf-badge{position:absolute;left:12px;top:12px;font-size:10.5px;color:#cfd6e0;background:rgba(10,12,16,.55);
+    padding:3px 9px;border-radius:6px;letter-spacing:.4px}
+  .wf-badge.acc{color:#a9c6ff;background:rgba(28,44,70,.7)}
+  .axis-gizmo{position:absolute;right:14px;bottom:12px;font-size:11px;color:var(--muted);
+    background:rgba(10,12,16,.5);padding:5px 9px;border-radius:6px;line-height:1.5}
+  .axis-gizmo b{color:#a9c6ff}
+
+  /* review table */
+  .review-wrap{flex:1;min-height:0;border:1px solid var(--border);border-radius:var(--radius);overflow:auto;background:var(--panel)}
+  table.grp{border-collapse:collapse;width:100%;font-size:12px}
+  table.grp th{position:sticky;top:0;z-index:1;background:var(--panel2);color:var(--muted);font-weight:600;
+    padding:8px 6px;border-bottom:1px solid var(--border);font-size:10.5px;text-align:center}
+  table.grp th.name-col{text-align:left;padding-left:14px}
+  table.grp td{border-bottom:1px solid #23272f;padding:0 6px;height:34px;text-align:center}
+  table.grp td.name-col{text-align:left;padding-left:14px;max-width:200px}
+  table.grp td.name-col .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+  table.grp tr{cursor:pointer}
+  table.grp tr:hover td{background:var(--panel2)}
+  table.grp tr.unknown td.name-col{box-shadow:inset 3px 0 0 var(--warn-line)}
+  .cell{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:middle}
+  .cell.on{background:var(--ok)}
+  .cell.off{background:#2c323d;box-shadow:inset 0 0 0 1px #3a414d}
+  .uk-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;background:var(--warn-weak);color:var(--warn)}
+
+  /* ---------- RIGHT : inspector ---------- */
+  .insp-head{padding:11px 14px 0}
+  .insp-title{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--muted);text-transform:uppercase}
+  .insp-obj{font-size:14px;font-weight:600;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:8px}
+  .insp-obj .sw{width:15px;height:15px;border-radius:4px;flex:0 0 15px}
+  .itabs{display:flex;gap:4px;padding:10px 12px 0}
+  .itab{position:relative;flex:1;text-align:center;padding:8px 22px 8px 8px;font-size:12.5px;font-weight:600;color:var(--muted);
+    border:1px solid transparent;border-bottom:none;border-radius:7px 7px 0 0;background:transparent}
+  .itab:hover{color:var(--ink)}
+  .itab.on{background:var(--panel2);color:#a9c6ff;border-color:var(--border);box-shadow:0 -1px 0 var(--accent) inset}
+  .tpin{position:absolute;top:4px;right:4px;width:19px;height:19px;border:none;border-radius:5px;background:transparent;
+    color:var(--muted2);font-size:11px;line-height:1;opacity:.4;padding:0;display:flex;align-items:center;justify-content:center}
+  .itab:hover .tpin{opacity:.85}
+  .tpin:hover{opacity:1;background:var(--accent-weak);color:#a9c6ff}
+  .tpin.pinned{opacity:1;color:#a9c6ff}
+  .itabbadge{display:inline-block;font-size:9px;font-weight:700;padding:0 5px;border-radius:8px;margin-left:5px;
+    background:var(--accent-weak);color:#a9c6ff;vertical-align:middle}
+
+  .ipane{display:none}
+  .ipane.on{display:block}
+  .rscroll{flex:1;overflow-y:auto;padding:12px;border-top:1px solid var(--border);background:var(--panel2)}
+  .ivroot{flex:1;min-height:0;display:none;flex-direction:column}
+  .ivroot.on{display:flex}
+
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:11.5px;font-weight:600;color:#aeb6c2;margin-bottom:5px}
+  .field .row{display:flex;gap:6px}
+  .field input[type=text]{flex:1;padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;
+    background:var(--panel);color:var(--ink)}
+  .field select{width:100%;padding:7px 9px;border:1px solid var(--border-strong);border-radius:6px;background:var(--panel);color:var(--ink)}
+  .field .status{font-size:11px;color:var(--muted2);margin-top:5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+  .check{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;color:#c6cdd8}
+  .check input{width:15px;height:15px;accent-color:var(--accent)}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 13px;margin-bottom:12px}
+  .card>.sec{font-size:10.5px;font-weight:700;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;
+    display:flex;align-items:center;gap:7px}
+  .card>.sec .pin{margin-left:auto;font-size:9.5px;font-weight:700;color:var(--muted2)}
+  details.adv{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px}
+  details.adv>summary{list-style:none;cursor:pointer;padding:10px 13px;font-size:12.5px;font-weight:600;
+    display:flex;align-items:center;gap:8px;color:#c6cdd8}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary .chev{transition:transform .15s;color:var(--muted2);font-size:10px}
+  details.adv[open]>summary .chev{transform:rotate(90deg)}
+  details.adv .body{padding:2px 13px 13px}
+  .slider{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .slider label{flex:0 0 110px;font-size:12px;color:#aeb6c2}
+  .slider input[type=range]{flex:1;accent-color:var(--accent)}
+  .slider .val{flex:0 0 38px;text-align:right;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .related{display:flex;flex-direction:column;gap:5px}
+  .related .rel{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#bfc6d1;padding:4px 7px;border-radius:5px;background:var(--panel2)}
+  .related .rel .sw{width:12px;height:12px;border-radius:3px;flex:0 0 12px}
+  .related .rel .sz{margin-left:auto;color:var(--muted2);font-size:10.5px}
+
+  /* material slots table */
+  .slots{width:100%;border-collapse:collapse;font-size:11.5px}
+  .slots th{text-align:left;color:var(--muted);font-weight:600;padding:5px 7px;border-bottom:1px solid var(--border);font-size:10.5px}
+  .slots td{padding:4px 7px;border-bottom:1px solid #23272f;white-space:nowrap}
+  .slots tr.unassigned td{color:var(--warn);background:var(--warn-weak);font-style:italic}
+  .slots select{padding:3px 5px;border:1px solid var(--border-strong);border-radius:5px;background:var(--panel);color:var(--ink);font-size:11px}
+  .slots .idx{color:var(--muted2)}
+
+  .actions{padding:11px 12px;border-top:1px solid var(--border);background:var(--panel);display:grid;
+    grid-template-columns:1fr 1fr;gap:8px}
+  .actions .btn{width:100%}
+  .actions .btn.wide{grid-column:1/-1}
+
+  /* ---------- status bar ---------- */
+  .statusbar{flex:0 0 28px;height:28px;display:flex;align-items:center;gap:12px;padding:0 14px;
+    background:linear-gradient(180deg,#20252e,#181b21);border-top:1px solid var(--border);font-size:11.5px;color:#aeb6c2}
+  .statusbar .msg{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .statusbar .sb{display:flex;align-items:center;gap:6px;padding:2px 9px;border-radius:11px;border:1px solid var(--border);
+    background:var(--panel2)}
+  .statusbar .sb:hover{background:#2c323d}
+  .statusbar .diag{background:var(--warn-weak);color:var(--warn);border-color:var(--warn-line);font-weight:600}
+  .statusbar .diag.clean{background:var(--ok-weak);color:var(--ok);border-color:#265138}
+  .statusbar .dotw{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .statusbar .job .dotw{color:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .statusbar .mini-bar{width:74px;height:5px;border-radius:3px;background:#2a303a;overflow:hidden}
+  .statusbar .mini-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),#7aa6ff)}
+
+  /* ---------- gear drawer / panels ---------- */
+  .backdrop{position:fixed;inset:0;background:rgba(8,10,14,.5);z-index:40;opacity:0;visibility:hidden;transition:opacity .18s}
+  .backdrop.show{opacity:1;visibility:visible}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:380px;background:var(--panel);border-left:1px solid var(--border);
+    z-index:50;transform:translateX(100%);transition:transform .22s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+  .drawer.show{transform:none}
+  .drawer .dh{height:44px;flex:0 0 44px;display:flex;align-items:center;gap:9px;padding:0 15px;border-bottom:1px solid var(--border)}
+  .drawer .dh b{font-size:13.5px}
+  .drawer .dh .x{margin-left:auto}
+  .drawer .db{flex:1;overflow-y:auto;padding:14px}
+
+  .progpanel{position:fixed;left:14px;bottom:36px;width:400px;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;z-index:60;box-shadow:0 16px 44px rgba(0,0,0,.45);opacity:0;visibility:hidden;transform:translateY(8px);transition:.15s}
+  .progpanel.show{opacity:1;visibility:visible;transform:none}
+  .progpanel .ph{padding:11px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:8px}
+  .progpanel .ph .pool{margin-left:auto;font-size:11px;color:var(--muted2);font-weight:500}
+  .progpanel .pb{padding:12px 14px;max-height:260px;overflow-y:auto}
+  .prow{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .prow .pn{flex:0 0 150px;font-size:11.5px;color:#c6cdd8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prow .bar{flex:1;height:7px;border-radius:5px;background:#2a303a;overflow:hidden}
+  .prow .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),#7aa6ff)}
+  .prow .pst{flex:0 0 auto;font-size:10.5px;color:var(--muted2)}
+  .prow.done .pst{color:var(--ok)}
+
+  .popover{position:fixed;z-index:60;width:430px;background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    box-shadow:0 16px 44px rgba(0,0,0,.4);overflow:hidden;opacity:0;visibility:hidden;transform:translateY(6px);transition:.15s}
+  .popover.show{opacity:1;visibility:visible;transform:none}
+  .popover .ph{padding:11px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:12.5px}
+  .popover .plist2{max-height:280px;overflow-y:auto}
+  .dg{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid #23272f;font-size:12px}
+  .dg:last-child{border-bottom:none}
+  .dg .sev{flex:0 0 auto;font-size:10px;font-weight:700;padding:2px 7px;border-radius:9px;height:fit-content}
+  .sev.warn{background:var(--warn-weak);color:var(--warn)}
+  .sev.info{background:var(--accent-weak);color:#a9c6ff}
+  .dg .txt b{display:block;font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px}
+  .dg .txt span{color:#c6cdd8;line-height:1.5}
+
+  .toast{position:fixed;right:22px;bottom:44px;z-index:70;display:flex;align-items:center;gap:12px;padding:12px 15px;
+    min-width:280px;background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--ok);border-radius:10px;
+    box-shadow:0 14px 40px rgba(0,0,0,.4);transform:translateX(150%);transition:transform .4s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{transform:none}
+  .toast .tk{width:24px;height:24px;border-radius:50%;background:var(--ok-weak);color:var(--ok);display:flex;
+    align-items:center;justify-content:center;font-weight:700;flex:0 0 24px}
+  .toast b{font-size:12.5px}
+  .toast span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="titlebar">
+    <div class="logo"></div>
+    <b>CryEngine Texture Processor</b><span class="ver">Selection + Pins · v0.3b</span>
+    <div class="menu"><span>File</span><span>Edit</span><span>Help</span></div>
+    <div class="spacer"></div>
+    <button class="iconbtn" id="gearBtn" title="Global settings">&#9881;</button>
+  </div>
+
+  <div class="workbench" id="wb">
+
+    <!-- ================= LEFT : ASSET NAVIGATOR ================= -->
+    <aside class="col left">
+      <!-- [T1] import + [T7] multi-select delete -->
+      <div class="navtool">
+        <button class="btn sm" id="addFiles">Add Files…</button>
+        <button class="btn sm" id="addFolder">Add Folder…</button>
+        <span class="grow"></span>
+        <button class="iconsq" id="multiBtn" title="Multi-select mode">&#10003;</button>
+        <button class="iconsq" id="delBtn" title="Delete selected" style="display:none">&#128465;</button>
+      </div>
+      <div class="navscroll">
+        <div class="dropzone">Drag &amp; drop textures or .fbx here</div>
+
+        <!-- Texture groups section (collapsible) -->
+        <div class="navsec" id="secTex">
+          <div class="sechead" data-toggle="secTex">
+            <span class="chev">&#9660;</span><span class="lbl">Texture Groups</span>
+            <span class="cnt">132 · <em>3 unknown</em></span>
+          </div>
+          <div class="secbody" id="texNodes">
+            <!-- [T2] review table entry -->
+            <div class="node reviewrow" data-sel="review">
+              <span class="ic">&#9638;</span><span class="nm">Review all 132 groups…</span>
+            </div>
+            <!-- texture group nodes injected by JS -->
+          </div>
+        </div>
+
+        <!-- Models section (collapsible) -->
+        <div class="navsec" id="secMdl">
+          <div class="sechead" data-toggle="secMdl">
+            <span class="chev">&#9660;</span><span class="lbl">Models</span>
+            <span class="cnt">3 fbx</span>
+          </div>
+          <div class="secbody" id="mdlNodes">
+            <!-- model nodes injected by JS -->
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ================= CENTER : PREVIEW FOLLOWS SELECTION ================= -->
+    <main class="col center">
+      <div class="center-head">
+        <div class="crumb" id="crumb">Nothing selected</div>
+        <span class="rspacer"></span>
+        <div class="seg" id="texSeg" style="display:none">
+          <button class="on" data-pv="sphere">Sphere</button>
+          <button data-pv="tiled">Tiled</button>
+        </div>
+      </div>
+
+      <div class="stage">
+        <!-- nothing selected -->
+        <section class="view on" id="cv-empty">
+          <div class="cempty">
+            <div class="ring">&#9673;</div>
+            <h2>Nothing selected</h2>
+            <p>Pick a texture group or a model on the left. The preview shows here and its
+               parameters open in the inspector on the right. Global settings live in the gear menu.</p>
+          </div>
+        </section>
+
+        <!-- [T8] texture material preview -->
+        <section class="view" id="cv-tex">
+          <div class="matbox">
+            <div class="sphere-wrap">
+              <div class="sphere" id="matSphere"></div>
+              <div class="plabel">Material sphere · PBR realtime</div>
+            </div>
+            <div class="tile-wrap">
+              <div class="tiled" id="matTiled"><div class="plabel">basecolor · 2×2 tiled</div></div>
+              <div class="chanrow" id="matChans"></div>
+            </div>
+          </div>
+          <div class="metaline" id="matMeta"></div>
+        </section>
+
+        <!-- [M8] model preview (wireframe) -->
+        <section class="view" id="cv-model">
+          <div class="wireframe">
+            <div class="wf-badge" id="wfName">KB3D_ENC_Gate_A.fbx</div>
+            <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+              <g fill="none" stroke="#5c6b82" stroke-width="1">
+                <path d="M120 70 L280 70 L320 110 L160 110 Z"/>
+                <path d="M120 70 L120 240 L160 280 L160 110"/>
+                <path d="M280 70 L280 240 L320 280 L320 110"/>
+                <path d="M120 240 L280 240 L320 280 L160 280 Z"/>
+                <path d="M150 100 L150 250 M180 100 L180 250 M210 100 L210 250 M240 100 L240 250 M270 100 L270 250" stroke="#3f4a5c"/>
+                <path d="M130 140 L300 140 M130 180 L300 180 M130 220 L300 220" stroke="#3f4a5c"/>
+              </g>
+              <g fill="#4f8cff" opacity=".8">
+                <circle cx="120" cy="70" r="2.5"/><circle cx="280" cy="70" r="2.5"/>
+                <circle cx="320" cy="110" r="2.5"/><circle cx="160" cy="110" r="2.5"/>
+                <circle cx="120" cy="240" r="2.5"/><circle cx="280" cy="240" r="2.5"/>
+              </g>
+            </svg>
+            <div class="axis-gizmo">Forward <b>-Z</b> · Up <b>+Y</b><br>1 unit = 1 m</div>
+          </div>
+        </section>
+
+        <!-- [M9] proxy node selected -> wireframe + convex-hull overlay -->
+        <section class="view" id="cv-proxy">
+          <div class="wireframe">
+            <div class="wf-badge">KB3D_ENC_Gate_A.fbx</div>
+            <div class="wf-badge acc" style="top:36px">Proxy overlay · physicalize proxy_only · 6 hulls</div>
+            <svg viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+              <g fill="none" stroke="#3f4a5c" stroke-width="1">
+                <path d="M120 70 L280 70 L320 110 L160 110 Z"/>
+                <path d="M120 70 L120 240 L160 280 L160 110"/>
+                <path d="M280 70 L280 240 L320 280 L320 110"/>
+                <path d="M120 240 L280 240 L320 280 L160 280 Z"/>
+              </g>
+              <g fill="rgba(79,140,255,.12)" stroke="#4f8cff" stroke-width="1.3" stroke-dasharray="5 3">
+                <path d="M126 78 L172 78 L172 234 L126 234 Z"/>
+                <path d="M228 78 L274 78 L274 234 L228 234 Z"/>
+                <path d="M172 78 L228 78 L228 118 L172 118 Z"/>
+                <path d="M155 250 L285 250 L312 274 L182 274 Z"/>
+              </g>
+            </svg>
+            <div class="axis-gizmo">Voxel 64³ · shrink-wrap ×3<br>hull vol +4.2%</div>
+          </div>
+        </section>
+
+        <!-- [T2] group review table -->
+        <section class="view" id="cv-review">
+          <div class="review-wrap">
+            <table class="grp"><thead id="grpHead"></thead><tbody id="grpBody"></tbody></table>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- ================= PINS : second right column (frozen panels) ================= -->
+    <aside class="col pins" id="pinsCol">
+      <div class="pins-head">&#128204; Pinned <span class="pcount" id="pinCount">0 / 2</span></div>
+      <div class="pins-scroll" id="pinsScroll"></div>
+    </aside>
+
+    <!-- ================= RIGHT : LIVE INSPECTOR (selected object only) ================= -->
+    <aside class="col right">
+
+      <!-- inspector: EMPTY -->
+      <div class="ivroot on" id="iv-empty">
+        <div class="rscroll" style="border-top:none">
+          <div class="cempty" style="padding:40px 10px">
+            <div class="ring" style="width:70px;height:70px;font-size:24px">&#9998;</div>
+            <h2>Inspector</h2>
+            <p>Nothing selected. Choose an asset to edit its parameters here — only the selected
+               object's settings appear, never everyone's at once.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- inspector: TEXTURE GROUP -->
+      <div class="ivroot" id="iv-tex">
+        <div class="insp-head">
+          <div class="insp-title">Texture Group</div>
+          <div class="insp-obj"><span class="sw" id="itSw"></span><span id="itName">KB3D_ENC_MetalGate</span></div>
+        </div>
+        <div class="itabs">
+          <button class="itab on" data-itab="tex-group">Conversion<span class="tpin" data-pin="tex-group" title="Pin this tab">&#128204;</span></button>
+          <button class="itab" data-itab="tex-pbr">PBR Builder<span class="itabbadge">new</span><span class="tpin" data-pin="tex-pbr" title="Pin this tab">&#128204;</span></button>
+        </div>
+        <div class="rscroll">
+          <!-- [T3][T4][T6] group tab -->
+          <div class="ipane on" id="tex-group">
+            <div class="card">
+              <div class="sec">Group settings <span class="pin">per-group override</span></div>
+              <!-- [T3] group-level settings + [T4] conversion settings -->
+              <div class="field" style="margin-bottom:10px">
+                <label>Output resolution</label>
+                <select><option>Inherit global (2048)</option><option selected>2048</option><option>4096</option><option>1024</option><option>Original</option></select>
+              </div>
+              <div class="field" style="margin-bottom:8px">
+                <label>Diffuse format</label>
+                <select><option selected>albedo</option><option>diffuse_ao</option></select>
+              </div>
+              <label class="check"><input type="checkbox">Flip normal green channel</label>
+              <label class="check"><input type="checkbox" checked>Metal workflow (Metallic → Albedo + Reflection)</label>
+            </div>
+
+            <!-- [T4] Metal Gate advanced -->
+            <details class="adv">
+              <summary><span class="chev">&#9654;</span>Advanced · Metal Gate</summary>
+              <div class="body">
+                <div class="slider"><label>Metal Gate threshold</label><input type="range" min="0" max="100" value="55" oninput="this.nextElementSibling.textContent=this.value"><span class="val">55</span></div>
+                <div class="slider"><label>Gate softness</label><input type="range" min="0" max="100" value="20" oninput="this.nextElementSibling.textContent=this.value"><span class="val">20</span></div>
+                <div class="field" style="margin-top:8px">
+                  <label>ARM channel order</label>
+                  <select><option>AO / Roughness / Metallic</option><option>Roughness / Metallic / AO</option></select>
+                </div>
+              </div>
+            </details>
+
+            <!-- [T6] related textures -->
+            <div class="card">
+              <div class="sec">Related maps <span class="pin" id="relCount">7 found</span></div>
+              <div class="related" id="relList"></div>
+            </div>
+          </div>
+
+          <!-- [T9] PBR Builder tab -->
+          <div class="ipane" id="tex-pbr">
+            <div class="card">
+              <div class="sec">Diffuse → PBR converter</div>
+              <div class="field" style="margin-bottom:10px">
+                <label>Source map</label>
+                <select><option selected>KB3D_ENC_MetalGate_diff.png</option><option>KB3D_ENC_MetalGate_albedo.png</option></select>
+              </div>
+              <div class="slider"><label>Roughness est. strength</label><input type="range" min="0" max="100" value="70" oninput="this.nextElementSibling.textContent=this.value"><span class="val">70</span></div>
+              <div class="slider"><label>Metallic threshold</label><input type="range" min="0" max="100" value="42" oninput="this.nextElementSibling.textContent=this.value"><span class="val">42</span></div>
+              <label class="check"><input type="checkbox" checked>Normal from luminance</label>
+              <label class="check"><input type="checkbox">AO from cavity</label>
+              <label class="check"><input type="checkbox" checked>Height from luminance (displ)</label>
+            </div>
+            <div class="card" style="color:var(--muted);font-size:11.5px;line-height:1.6">
+              Generates <b>albedo · normal · roughness · metallic · ao</b> from a single diffuse.
+              Estimated maps are written next to the source and re-grouped automatically.
+            </div>
+          </div>
+        </div>
+        <!-- texture actions -->
+        <div class="actions" id="texActions">
+          <button class="btn primary wide" id="pbrRun" style="display:none">Run PBR Builder</button>
+          <button class="btn primary wide" id="texConvert">Convert this group</button>
+          <button class="btn">Export textures</button>
+          <button class="btn danger">Delete group</button>
+        </div>
+      </div>
+
+      <!-- inspector: MODEL -->
+      <div class="ivroot" id="iv-model">
+        <div class="insp-head">
+          <div class="insp-title">Model</div>
+          <div class="insp-obj"><span class="sw" style="background:linear-gradient(135deg,#3a63c0,#1b2a52)"></span><span id="imName">KB3D_ENC_Gate_A.fbx</span></div>
+        </div>
+        <div class="itabs">
+          <button class="itab on" data-itab="mdl-model">Model<span class="tpin" data-pin="mdl-model" title="Pin this tab">&#128204;</span></button>
+          <button class="itab" data-itab="mdl-proxy">Proxy<span class="itabbadge">new</span><span class="tpin" data-pin="mdl-proxy" title="Pin this tab">&#128204;</span></button>
+        </div>
+        <div class="rscroll">
+          <!-- model tab -->
+          <div class="ipane on" id="mdl-model">
+            <!-- [M2] material slots -->
+            <div class="card">
+              <div class="sec">Material slots <span class="pin">6 + 1 unassigned</span></div>
+              <table class="slots">
+                <thead><tr><th>#</th><th>Material</th><th>physicalize</th></tr></thead>
+                <tbody id="slotBody"></tbody>
+              </table>
+            </div>
+            <!-- [M3] axis + [M4] units/scale -->
+            <div class="card">
+              <div class="sec">Orientation &amp; scale</div>
+              <div class="grid2">
+                <div class="field" style="margin-bottom:0">
+                  <label>Forward axis <span style="color:var(--muted2)">(detected)</span></label>
+                  <select><option selected>-Z</option><option>+Z</option><option>-X</option><option>+X</option></select>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Up axis <span style="color:var(--muted2)">(detected)</span></label>
+                  <select><option selected>+Y</option><option>+Z</option><option>-Y</option></select>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Units</label>
+                  <select><option selected>meters (1.0)</option><option>centimeters (0.01)</option><option>inches (0.0254)</option></select>
+                </div>
+                <div class="field" style="margin-bottom:0">
+                  <label>Uniform scale</label>
+                  <input type="text" value="1.000">
+                </div>
+              </div>
+            </div>
+            <!-- [M5] merge nodes + [M6] scene origin -->
+            <div class="card">
+              <div class="sec">Scene</div>
+              <label class="check"><input type="checkbox" checked>Merge nodes into single mesh</label>
+              <div class="field" style="margin:8px 0 0">
+                <label>Scene origin</label>
+                <select><option selected>Keep authored origin</option><option>Recenter to bounding-box floor</option><option>Recenter to pivot node</option></select>
+              </div>
+            </div>
+            <!-- [M7] export options -->
+            <div class="card">
+              <div class="sec">Export options</div>
+              <label class="check"><input type="checkbox" checked>Export textures alongside model</label>
+              <label class="check"><input type="checkbox" checked>Delete intermediate .json after RC</label>
+              <label class="check"><input type="checkbox">Write .cgf + .mtl only (skip .cga)</label>
+            </div>
+          </div>
+
+          <!-- [M9] proxy generation params tab -->
+          <div class="ipane" id="mdl-proxy">
+            <div class="card">
+              <div class="sec">Proxy generation</div>
+              <div class="field" style="margin-bottom:10px">
+                <label>Physicalize target</label>
+                <select><option selected>proxy_only</option><option>proxy_no_draw</option><option>default</option></select>
+              </div>
+              <div class="field" style="margin-bottom:10px">
+                <label>Voxel resolution</label>
+                <select><option>32³</option><option selected>64³</option><option>128³</option><option>256³</option></select>
+              </div>
+              <div class="slider"><label>Hull count</label><input type="range" min="1" max="24" value="6" oninput="this.nextElementSibling.textContent=this.value"><span class="val">6</span></div>
+              <div class="slider"><label>Shrink-wrap iters</label><input type="range" min="0" max="12" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="val">3</span></div>
+              <label class="check"><input type="checkbox" checked>Fill internal cavities</label>
+            </div>
+            <div class="card" style="color:var(--muted);font-size:11.5px;line-height:1.6">
+              Convex-decomposition proxy. <b>Preview</b> shows the hulls over the wireframe;
+              <b>Accept</b> writes them as a <b>proxy_only</b> physics node.
+            </div>
+          </div>
+        </div>
+        <!-- model / proxy actions -->
+        <div class="actions" id="mdlActions">
+          <button class="btn primary" id="proxyGen" style="display:none">Generate</button>
+          <button class="btn" id="proxyPrev" style="display:none">Preview</button>
+          <button class="btn primary wide" id="proxyAccept" style="display:none">Accept proxy</button>
+          <button class="btn primary wide" id="mdlExport">Export model</button>
+          <button class="btn">Export material (.mtl)</button>
+          <button class="btn danger">Remove model</button>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <div class="statusbar">
+    <div class="msg" id="statusMsg">Ready · select an asset to begin</div>
+    <div class="sb job" id="jobMini" title="Live job — open Queue for detail">
+      <span class="dotw"></span><span id="jobTxt">RC pool · 4 of 6</span>
+      <span class="mini-bar"><i id="jobBar" style="width:62%"></i></span>
+    </div>
+    <div class="sb" id="queueChip">&#9203; Queue · running</div>
+    <div class="sb diag clean" id="diagChip"><span class="dotw"></span><span id="diagLabel">No diagnostics</span></div>
+  </div>
+</div>
+
+<!-- ============ GEAR DRAWER : GLOBAL SETTINGS ============ -->
+<div class="backdrop" id="drawerBack"></div>
+<aside class="drawer" id="gearDrawer">
+  <div class="dh"><span>&#9881;</span><b>Global Settings</b><button class="iconbtn x" id="drawerClose">&#10005;</button></div>
+  <div class="db">
+    <!-- [G2] output dir -->
+    <div class="field">
+      <label>Output directory</label>
+      <div class="row"><input type="text" value="D:\Assets\KB3D\_cryengine"><button class="btn sm">Browse…</button></div>
+      <div class="status">Directory is valid and writable.</div>
+    </div>
+    <!-- [G1] language -->
+    <div class="field">
+      <label>Language</label>
+      <select><option selected>English</option><option>繁體中文 (台灣)</option><option>日本語</option></select>
+    </div>
+
+    <!-- [T5] RC / DDS -->
+    <div class="card">
+      <div class="sec">RC / DDS pipeline</div>
+      <div class="field" style="margin-bottom:10px">
+        <label>ResourceCompiler path</label>
+        <div class="row"><input type="text" value="C:\CRYENGINE\Tools\rc\rc.exe"><button class="btn sm">Browse…</button></div>
+      </div>
+      <div class="field" style="margin-bottom:8px">
+        <label>Parallel RC workers (adaptive pool)</label>
+        <select><option>Auto (adaptive)</option><option selected>8</option><option>4</option><option>2</option></select>
+      </div>
+      <label class="check"><input type="checkbox" checked>Delete .tif intermediates after DDS</label>
+      <label class="check"><input type="checkbox" checked>Delete RC .json requests after export</label>
+      <label class="check"><input type="checkbox">Clear RC cache on finish</label>
+    </div>
+
+    <!-- [G5] settings file access -->
+    <div class="card">
+      <div class="sec">Settings file</div>
+      <div class="status" style="margin-bottom:9px">settings.json · last saved 2026-07-29 14:02</div>
+      <div class="grid2">
+        <button class="btn sm">Load…</button>
+        <button class="btn sm">Save</button>
+        <button class="btn sm">Import preset…</button>
+        <button class="btn sm">Reset defaults</button>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- [G3] progress center -->
+<div class="progpanel" id="progPanel">
+  <div class="ph">&#9203; Work Queue <span class="pool">adaptive RC pool · 8 workers</span></div>
+  <div class="pb" id="progBody"></div>
+</div>
+
+<!-- [G4] diagnostics popover -->
+<div class="popover" id="diagPop">
+  <div class="ph">&#9888; Diagnostics <span id="diagPopCount" style="color:var(--muted);font-weight:400"></span></div>
+  <div class="plist2">
+    <div class="dg"><span class="sev warn">WARN</span><div class="txt"><b>DEF-19 · KB3D_ENC_GlassClean</b>
+      <span>Type "refraction" has no CryEngine output channel; batch will skip this map. Assign it as alpha or diffuse.</span></div></div>
+    <div class="dg"><span class="sev warn">WARN</span><div class="txt"><b>AX-04 · KB3D_ENC_Barrier.fbx</b>
+      <span>Axis auto-detect low confidence (forward -Z 0.62). Verify override in the Model tab before export.</span></div></div>
+    <div class="dg"><span class="sev info">INFO</span><div class="txt"><b>DEF-07 · KB3D_ENC_NeonSign</b>
+      <span>Emissive detected but no spec/gloss; missing Spec will be auto-generated.</span></div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="tk">&#10003;</div><div><b id="toastTitle">Done</b><span id="toastSub"></span></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+const setStatus=m=>$("#statusMsg").textContent=m;
+
+/* ---------- data ---------- */
+const groups=[
+  {n:'KB3D_ENC_MetalGate',   c:['#b8bcc2','#43484f'], t:{diff:1,normal:1,spec:1,gloss:1,metal:1,ao:1}},
+  {n:'KB3D_ENC_GlassClean',  c:['#bfe6ea','#4a7d86'], t:{diff:1,normal:1,gloss:1,spec:1}, uk:'refraction'},
+  {n:'KB3D_ENC_ConcreteWall',c:['#9a938a','#3f3b36'], t:{diff:1,normal:1,spec:1,gloss:1,height:1,ao:1}},
+  {n:'KB3D_ENC_BrickWall',   c:['#b0563a','#3f1f16'], t:{diff:1,normal:1,spec:1,gloss:1,height:1,ao:1}},
+  {n:'KB3D_ENC_RustedPipe',  c:['#a5623a','#3a251a'], t:{diff:1,normal:1,spec:1,gloss:1,metal:1,ao:1}},
+  {n:'KB3D_ENC_NeonSign',    c:['#ff5ea8','#2a0f3a'], t:{diff:1,normal:1,emissive:1}},
+  {n:'KB3D_ENC_Asphalt',     c:['#4b4d52','#232427'], t:{diff:1,normal:1,gloss:1,height:1,ao:1}},
+  {n:'KB3D_ENC_MarbleFloor', c:['#e7e2d8','#8a8578'], t:{diff:1,normal:1,spec:1,gloss:1,height:1}},
+];
+const TYPES=[['diff','Diffuse'],['normal','Normal'],['spec','Spec'],['gloss','Gloss'],
+  ['metal','Metal'],['height','Height'],['ao','AO'],['emissive','Emissive']];
+const SUFFIX={diff:'diff',normal:'ddna',spec:'spec',gloss:'gloss',metal:'metal',height:'displ',ao:'ao',emissive:'em'};
+
+const models=[
+  {n:'KB3D_ENC_Gate_A.fbx', slots:['Metal_Gate','Gate_Frame','Bolt_Steel','Hinge','Rust_Decal','Concrete_Base'], proxy:true},
+  {n:'KB3D_ENC_Barrier.fbx', slots:['Barrier_Body','Reflective_Strip','Rust'], proxy:true},
+  {n:'KB3D_ENC_Streetlight.fbx', slots:['Pole_Metal','Lamp_Glass','Lamp_Emissive'], proxy:true},
+];
+const PHYS=['proxy_only','proxy_no_draw','default','no_collide'];
+
+/* ---------- build navigator nodes ---------- */
+const texWrap=$("#texNodes"), mdlWrap=$("#mdlNodes");
+groups.forEach((g,i)=>{
+  const nd=el('div','node'); nd.dataset.sel='tex:'+i;
+  nd.innerHTML=`<span class="chk"></span><span class="sw" style="background:linear-gradient(135deg,${g.c[0]},${g.c[1]})"></span>
+    <span class="nm">${g.n}</span>`+(g.uk?`<span class="tag warn">?</span>`:``);
+  texWrap.appendChild(nd);
+});
+models.forEach((m,i)=>{
+  const nd=el('div','node'); nd.dataset.sel='model:'+i;
+  nd.innerHTML=`<span class="chk"></span><span class="sw" style="background:linear-gradient(135deg,#3a63c0,#1b2a52)"></span>
+    <span class="nm">${m.n}</span><span class="tag dim">${m.slots.length}</span>`;
+  mdlWrap.appendChild(nd);
+  if(m.proxy){
+    const pn=el('div','node child'); pn.dataset.sel='proxy:'+i;
+    pn.innerHTML=`<span class="sw" style="background:linear-gradient(135deg,#4f8cff,#2f5aa8)"></span>
+      <span class="nm">Proxy · proxy_only</span><span class="tag ok">6h</span>`;
+    mdlWrap.appendChild(pn);
+  }
+});
+
+/* ---------- section collapse ---------- */
+document.querySelectorAll('.sechead').forEach(h=>h.addEventListener('click',e=>{
+  if(e.target.closest('.iconsq')) return;
+  $("#"+h.dataset.toggle).classList.toggle('closed');
+}));
+
+/* ---------- selection engine ---------- */
+function clearSel(){document.querySelectorAll('.node.sel').forEach(n=>n.classList.remove('sel'));}
+function showView(id){document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id===id));}
+function showInsp(id){document.querySelectorAll('.ivroot').forEach(v=>v.classList.toggle('on',v.id===id));}
+
+function select(sel,node){
+  if($("#secTex").classList.contains('multi')) return; // multi-select mode: clicks toggle checkboxes
+  clearSel(); if(node) node.classList.add('sel');
+  const [kind,idxRaw]=sel.split(':'); const idx=+idxRaw;
+  $("#texSeg").style.display='none';
+
+  if(sel==='review'){
+    showView('cv-review'); showInsp('iv-empty');
+    $("#crumb").innerHTML='Texture Groups · <b>Review all 132 groups</b>';
+    setStatus('Group review — assign unknown types in the type table');
+    return;
+  }
+  if(kind==='tex'){
+    const g=groups[idx]; cur={name:g.n};
+    showView('cv-tex'); showInsp('iv-tex'); $("#texSeg").style.display='flex';
+    $("#crumb").innerHTML='Texture Groups · <b>'+g.n+'</b>';
+    // preview
+    const grad=`linear-gradient(150deg,${g.c[0]},${g.c[1]})`;
+    $("#matSphere").style.background=grad;
+    $("#matTiled").style.background=`repeating-linear-gradient(45deg,${g.c[0]}22 0 14px,${g.c[1]}22 14px 28px),${grad}`;
+    const chans=$("#matChans"); chans.innerHTML='';
+    TYPES.forEach(([k,l])=>{const c=el('span','chan'+(g.t[k]?'':' miss'),l);chans.appendChild(c);});
+    if(g.uk){const q=el('span','chan q',g.uk+' ?');chans.appendChild(q);}
+    const cnt=Object.keys(g.t).length;
+    $("#matMeta").innerHTML=`<b>${g.n}</b> — ${cnt} channels`+(g.uk?` · <span style="color:var(--warn)">1 unknown (${g.uk})</span>`:` · complete`);
+    // inspector
+    $("#itName").textContent=g.n;
+    $("#itSw").style.background=grad;
+    // related maps [T6]
+    const rel=$("#relList"); rel.innerHTML='';
+    Object.keys(g.t).forEach(k=>{
+      const r=el('div','rel');
+      r.innerHTML=`<span class="sw" style="background:${grad}"></span><span>${g.n}_${SUFFIX[k]}.png</span><span class="sz">${(2+Math.random()*6).toFixed(1)} MB</span>`;
+      rel.appendChild(r);
+    });
+    if(g.uk){const r=el('div','rel');r.style.color='var(--warn)';
+      r.innerHTML=`<span class="sw" style="background:var(--warn)"></span><span>${g.n}_${g.uk}.png</span><span class="sz">unknown</span>`;rel.appendChild(r);}
+    $("#relCount").textContent=Object.keys(g.t).length+(g.uk?1:0)+' found';
+    setStatus('Selected texture group '+g.n);
+    return;
+  }
+  if(kind==='model'||kind==='proxy'){
+    const m=models[idx]; cur={name:m.n};
+    showInsp('iv-model');
+    $("#imName").textContent=m.n; $("#wfName").textContent=m.n;
+    // slots [M2]
+    const sb=$("#slotBody"); sb.innerHTML='';
+    m.slots.forEach((s,i)=>{
+      const opts=PHYS.map(p=>`<option ${p==='proxy_only'&&i===0?'selected':(p==='default'&&i!==0?'selected':'')}>${p}</option>`).join('');
+      sb.appendChild(el('tr',null,`<td class="idx">${i}</td><td>${s}</td><td><select>${opts}</select></td>`));
+    });
+    sb.appendChild(el('tr','unassigned',`<td class="idx">${m.slots.length}</td><td>&lt;unassigned&gt;</td><td>—</td>`));
+    if(kind==='proxy'){
+      showView('cv-proxy');
+      $("#crumb").innerHTML='Models · '+m.n+' · <b>Proxy</b>';
+      activateItab('mdl-proxy');
+      setStatus('Selected proxy node — proxy_only, 6 hulls');
+    }else{
+      showView('cv-model');
+      $("#crumb").innerHTML='Models · <b>'+m.n+'</b>';
+      activateItab('mdl-model');
+      setStatus('Selected model '+m.n);
+    }
+    return;
+  }
+}
+document.querySelector('.navscroll').addEventListener('click',e=>{
+  const nd=e.target.closest('.node'); if(!nd) return;
+  const sec=nd.closest('.navsec');
+  if(sec && sec.classList.contains('multi') && nd.querySelector('.chk')){
+    const chk=nd.querySelector('.chk'); chk.classList.toggle('on'); updateDelBtn(); return;
+  }
+  select(nd.dataset.sel,nd);
+});
+
+/* ---------- inspector tabs ---------- */
+function activateItab(pane){
+  const root=$("#"+pane).closest('.rscroll');
+  root.parentElement.querySelectorAll('.itab').forEach(t=>t.classList.toggle('on',t.dataset.itab===pane));
+  root.querySelectorAll('.ipane').forEach(p=>p.classList.toggle('on',p.id===pane));
+  // action button visibility
+  $("#pbrRun").style.display   = pane==='tex-pbr'?'block':'none';
+  $("#texConvert").style.display = pane==='tex-group'?'block':'none';
+  const proxy = pane==='mdl-proxy';
+  $("#proxyGen").style.display    = proxy?'block':'none';
+  $("#proxyPrev").style.display   = proxy?'block':'none';
+  $("#proxyAccept").style.display = proxy?'block':'none';
+  $("#mdlExport").style.display   = proxy?'none':'block';
+}
+document.querySelectorAll('.itab').forEach(t=>t.addEventListener('click',()=>activateItab(t.dataset.itab)));
+
+/* ---------- center sphere/tiled segmented ---------- */
+document.querySelectorAll('#texSeg button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#texSeg button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  const t=b.dataset.pv==='tiled';
+  $("#matSphere").parentElement.style.display=t?'none':'block';
+  $("#matTiled").parentElement.style.flex=t?'1':'';
+}));
+
+/* ---------- multi-select delete [T7] ---------- */
+function updateDelBtn(){
+  const any=document.querySelectorAll('.node .chk.on').length;
+  $("#delBtn").style.display=any?'flex':'none';
+  setStatus(any?any+' item(s) selected':'Multi-select mode — tick items to delete');
+}
+$("#multiBtn").onclick=()=>{
+  const on=$("#multiBtn").classList.toggle('on');
+  document.querySelectorAll('.navsec').forEach(s=>s.classList.toggle('multi',on));
+  $("#delBtn").style.display='none';
+  document.querySelectorAll('.node .chk.on').forEach(c=>c.classList.remove('on'));
+  setStatus(on?'Multi-select mode on':'Multi-select mode off');
+};
+$("#delBtn").onclick=()=>{
+  const sel=[...document.querySelectorAll('.node .chk.on')];
+  sel.forEach(c=>c.closest('.node').remove());
+  $("#delBtn").style.display='none';
+  toast('Deleted',sel.length+' asset(s) removed'); setStatus(sel.length+' asset(s) deleted');
+};
+
+/* ---------- gear drawer ---------- */
+const openDrawer=()=>{$("#gearDrawer").classList.add('show');$("#drawerBack").classList.add('show');};
+const closeDrawer=()=>{$("#gearDrawer").classList.remove('show');$("#drawerBack").classList.remove('show');};
+$("#gearBtn").onclick=openDrawer; $("#drawerClose").onclick=closeDrawer; $("#drawerBack").onclick=closeDrawer;
+
+/* ---------- review table [T2] ---------- */
+(function buildReview(){
+  const head=$("#grpHead"); const hr=el('tr'); hr.appendChild(el('th','name-col','Group'));
+  TYPES.forEach(([k,l])=>hr.appendChild(el('th',null,l))); hr.appendChild(el('th',null,'Unknown'));
+  head.appendChild(hr);
+  const body=$("#grpBody");
+  groups.forEach((g,i)=>{
+    const tr=el('tr'); if(g.uk)tr.classList.add('unknown');
+    tr.appendChild(el('td','name-col',`<div class="nm">${g.n}</div>`));
+    TYPES.forEach(([k])=>tr.appendChild(el('td',null,`<span class="cell ${g.t[k]?'on':'off'}"></span>`)));
+    tr.appendChild(el('td',null,g.uk?`<span class="uk-pill">${g.uk}</span>`:'—'));
+    tr.onclick=()=>{const nd=document.querySelector(`.node[data-sel="tex:${i}"]`); if(nd) select('tex:'+i,nd);};
+    body.appendChild(tr);
+  });
+})();
+
+/* ---------- progress center [G3] ---------- */
+$("#queueChip").onclick=()=>{
+  const p=$("#progPanel");
+  if(p.classList.contains('show')){p.classList.remove('show');return;}
+  const body=$("#progBody"); body.innerHTML='';
+  const jobs=[['KB3D_ENC_MetalGate',100],['KB3D_ENC_ConcreteWall',100],['KB3D_ENC_BrickWall',72],
+    ['KB3D_ENC_RustedPipe',40],['KB3D_ENC_Gate_A.fbx · proxy',15],['KB3D_ENC_Asphalt',0]];
+  jobs.forEach(([n,v])=>{
+    const r=el('div','prow'+(v>=100?' done':''));
+    r.innerHTML=`<span class="pn">${n}</span><span class="bar"><i style="width:${v}%"></i></span>
+      <span class="pst">${v>=100?'✓':v>0?v+'%':'queued'}</span>`;
+    body.appendChild(r);
+  });
+  p.classList.add('show');
+};
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#progPanel')&&!e.target.closest('#queueChip'))$("#progPanel").classList.remove('show');
+});
+
+/* ---------- diagnostics [G4] ---------- */
+$("#diagChip").classList.remove('clean');
+$("#diagLabel").textContent='3 diagnostics';
+$("#diagChip").onclick=()=>{
+  const pop=$("#diagPop");
+  if(pop.classList.contains('show')){pop.classList.remove('show');return;}
+  $("#diagPopCount").textContent='(3)';
+  const r=$("#diagChip").getBoundingClientRect();
+  pop.style.left=Math.min(r.left-200,window.innerWidth-450)+'px';
+  pop.style.top=(r.top-260)+'px'; pop.classList.add('show');
+};
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#diagPop')&&!e.target.closest('#diagChip'))$("#diagPop").classList.remove('show');
+});
+
+/* ---------- toasts + action buttons ---------- */
+function toast(t,s){$("#toastTitle").textContent=t;$("#toastSub").textContent=s;
+  const el=$("#toast");el.classList.add('show');clearTimeout(el._h);el._h=setTimeout(()=>el.classList.remove('show'),3200);}
+$("#addFiles").onclick=$("#addFolder").onclick=()=>{setStatus('Rescanned — 132 groups, 3 unknown');toast('Import complete','132 texture groups detected');};
+$("#texConvert").onclick=()=>{toast('Queued','Group sent to RC pool');$("#queueChip").click&&setStatus('Converting group…');};
+$("#pbrRun").onclick=()=>{toast('PBR Builder','Generated albedo · normal · roughness · metallic · ao');setStatus('PBR maps written and re-grouped');};
+$("#mdlExport").onclick=()=>{toast('Model exported','Wrote .cgf + .mtl (7 slots)');setStatus('Model exported to output directory');};
+$("#proxyGen").onclick=()=>{toast('Proxy generated','6 hulls · voxel 64³ · shrink-wrap ×3');setStatus('Proxy generated — Preview to inspect');};
+$("#proxyPrev").onclick=()=>{const nd=document.querySelector('.node[data-sel="proxy:0"]');if(nd)select('proxy:0',nd);setStatus('Previewing proxy hulls over wireframe');};
+$("#proxyAccept").onclick=()=>{toast('Proxy accepted','Written as proxy_only physics node');setStatus('Proxy accepted');};
+
+/* ================= PIN ENGINE [P1-P3] =================
+   Any inspector tab can be frozen to its current asset and docked in the
+   second right column. Max 2; a 3rd pin drops the oldest. */
+let cur=null;                       // {name} of the live-selected asset
+let pins=[];                        // up to 2 frozen panels
+const TABLBL={'tex-group':'Conversion','tex-pbr':'PBR Builder','mdl-model':'Model','mdl-proxy':'Proxy'};
+
+function addPin(pane){
+  const live=$("#"+pane); if(!live||!cur) return;
+  const clone=live.cloneNode(true);            // freeze current asset's params
+  clone.removeAttribute('id'); clone.classList.add('on');
+  clone.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));   // no dup ids
+  const p={name:cur.name, tab:TABLBL[pane]||pane, node:clone};
+  pins.push(p);
+  let replaced=false;
+  if(pins.length>2){ pins.shift(); replaced=true; }   // max-2 replacement
+  renderPins();
+  toast(replaced?'Pin replaced (max 2)':'Pinned',
+        (replaced?'Oldest pin dropped · ':'')+p.name+' · '+p.tab+' frozen');
+  setStatus((replaced?'Replaced oldest pin — ':'Pinned ')+p.name+' · '+p.tab);
+}
+
+function renderPins(){
+  const sc=$("#pinsScroll"); sc.innerHTML='';
+  if(!pins.length){
+    sc.innerHTML='<div class="pins-empty"><span class="pk">&#128204;</span>No pinned panels.<br>'
+      +'Pin an inspector tab to keep its params here while you select other assets.</div>';
+  } else {
+    pins.forEach(p=>{
+      const panel=el('div','pinpanel');
+      const head=el('div','pinhead',
+        `<span class="pk">&#128204;</span><span class="pinlbl"><b>${p.name}</b> · ${p.tab}</span>`
+        +`<span class="frozen">frozen</span><button class="pinx" title="Un-pin">&#10005;</button>`);
+      const body=el('div','pinbody'); body.appendChild(p.node);
+      head.querySelector('.pinx').onclick=()=>{ pins=pins.filter(x=>x!==p); renderPins();
+        setStatus('Un-pinned '+p.name+' · '+p.tab); };
+      panel.appendChild(head); panel.appendChild(body); sc.appendChild(panel);
+    });
+  }
+  $("#pinCount").textContent=pins.length+' / 2';
+  $("#wb").classList.toggle('has-pins',pins.length>0);
+}
+
+document.querySelectorAll('.tpin').forEach(b=>b.addEventListener('click',e=>{
+  e.stopPropagation();
+  const pane=b.dataset.pin;
+  activateItab(pane);   // ensure the live inspector is on this tab, then freeze it
+  addPin(pane);
+}));
+
+/* ---------- SCENARIO: Conversion pinned for a group, a model live ---------- */
+renderPins();
+select('tex:0', document.querySelector('.node[data-sel="tex:0"]'));   // KB3D_ENC_MetalGate
+addPin('tex-group');                                                  // 📌 …·Conversion
+select('model:0', document.querySelector('.node[data-sel="model:0"]')); // live: KB3D_ENC_Gate_A.fbx
+setStatus('Conversion pinned for KB3D_ENC_MetalGate · live inspector on KB3D_ENC_Gate_A.fbx');
+</script>
+</body>
+</html>

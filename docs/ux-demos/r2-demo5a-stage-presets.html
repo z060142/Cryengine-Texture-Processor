@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stage + Memory &amp; Presets — CryEngine Texture Processor (R2-5a)</title>
+<!--
+================================================================================
+  R2-5a "STAGE + MEMORY & PRESETS" — iterates on R2-5 "Stage" (round-1 winner)
+  Same DNA: dominant central viewport; slim LEFT RAIL switches working mode
+  (Textures / Models / Proxy / PBR); ALL parameters live in a RIGHT stack of
+  collapsible panels that swaps per mode; bottom = timeline progress strip.
+
+  WHAT THIS VARIANT FIXES — round-1 weakness was "collapsed by default" meaning
+  the user re-hunts and re-expands panels every session. Deliberate state now:
+   (A) PER-MODE MEMORY — each mode's stack keeps which panels are open; switch
+       rail modes and back, the same panels are still expanded (mock in DOM).
+   (B) WORKSPACE PRESETS — a row atop the panel stack: [Minimal][Review][Export]
+       [Custom●]. A preset expands a predefined panel set for a working intent
+       (Review = review + preview panels; Export = convert/RC + cleanup + output;
+       Minimal = all collapsed). ANY manual panel toggle flips to Custom● and
+       that hand-tuned layout is what Custom remembers per mode.
+   (C) SPLIT VIEW — viewport toggle showing 2D material + 3D model side-by-side,
+       each half with its own mode chip; proxy wireframe can overlay the 3D half.
+
+  ---- SHARED FEATURE INVENTORY CHECKLIST (every item placed, none omitted) ----
+  TEXTURE SIDE
+   [1]  Import (files / folder / drag-drop) ....... Textures mode > panel "Import"
+   [2]  Group review table (type columns) ......... Textures mode > panel "Group Review"
+   [3]  Group-level settings ....................... Textures mode > panel "Group Review" > "Group Overrides" subsection
+   [4]  Conversion settings (res / diffuse fmt /
+        normal flip / metal-gate advanced) ........ Textures mode > panel "Conversion Settings" (+ nested <details> "Metal Gate")
+   [5]  RC / DDS (path / adaptive pool progress /
+        post-export cleanup options) .............. Textures mode > panel "RC / DDS Export"
+   [6]  Related textures .......................... Textures mode > panel "Group Review" (per-row "linked" sub-line)
+   [7]  Multi-select delete ....................... Textures mode > panel "Group Review" (row checkboxes + "Delete Selected")
+   [8]  NEW: Material preview ..................... Central viewport "2D" view + SPLIT left half + Textures mode > panel "Material Preview"
+   [9]  NEW: diffuse->PBR converter (params+run) .. PBR mode > panel "Diffuse -> PBR Converter"
+  MODEL SIDE
+   [10] FBX list (batch) .......................... Models mode > panel "FBX List"
+   [11] Material slots (physicalize multi-select) . Models mode > panel "Material Slots"
+   [12] Axis (detect + override) .................. Models mode > panel "Transform" (Forward/Up)
+   [13] Units / scale ............................. Models mode > panel "Transform"
+   [14] Merge nodes ............................... Models mode > panel "Transform"
+   [15] Scene origin ............................... Models mode > panel "Transform"
+   [16] Export options (textures w/ model, del json) Models mode > panel "Export Options"
+   [17] NEW: Model preview ....................... Central viewport "3D" view + SPLIT right half + Models mode > panel "Model Preview"
+   [18] NEW: proxy generation params (algo params
+        + generate / preview / accept) ............ Proxy mode > panel "Proxy Generation" + viewport "Proxy" view + SPLIT 3D-half overlay
+  GLOBAL
+   [19] Language .................................. Top bar language selector
+   [20] Output directory .......................... Top bar output-dir field
+   [21] Work / progress center ................... Bottom timeline strip
+   [22] Diagnostics ............................... Top bar diagnostics chip + popover
+   [23] Settings profile access .................. Top bar "Profile" Save / Load
+  VARIANT-SPECIFIC (this is R2-5a)
+   [A]  Per-mode panel memory .................... right stack keeps open state per rail mode
+   [B]  Workspace presets + Custom .............. preset row atop the panel stack
+   [C]  Split view + per-half chips + proxy ..... stagebar "Split" toggle
+================================================================================
+-->
+<style>
+  :root{
+    --bg:#181b21; --stage:#101216; --panel:#22262e; --panel2:#292e37;
+    --panel3:#2f353f; --border:#363c47; --border2:#434b58;
+    --ink:#e6e9ef; --muted:#9aa3b2; --muted2:#6c7480;
+    --accent:#4d8dff; --accent2:#7c5cff; --accent-weak:rgba(77,141,255,.16);
+    --ok:#41c072; --ok-weak:rgba(65,192,114,.15);
+    --warn:#e2a13c; --warn-weak:rgba(226,161,60,.15);
+    --hazard:#e5564c;
+    --radius:8px;
+    font-family:"Segoe UI","Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); font-size:13px; overflow:hidden; min-width:1280px}
+  button{font-family:inherit; cursor:pointer; color:inherit}
+  select,input{font-family:inherit; font-size:12px; color:var(--ink)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#3a414d;border-radius:6px;border:2px solid var(--panel)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  /* ================= app frame ================= */
+  #app{display:flex; flex-direction:column; height:100vh}
+
+  /* ---- top global bar ---- */
+  .topbar{
+    height:44px; flex:0 0 44px; display:flex; align-items:center; gap:14px; padding:0 14px;
+    background:linear-gradient(180deg,#232732,#1b1e25); border-bottom:1px solid var(--border);
+  }
+  .brand{display:flex; align-items:center; gap:9px}
+  .brand .logo{width:22px;height:22px;border-radius:6px;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    box-shadow:0 2px 8px rgba(77,141,255,.35)}
+  .brand b{font-size:13.5px; font-weight:600}
+  .brand .ver{color:var(--muted2); font-size:11px}
+  .topspacer{flex:1}
+  .gctl{display:flex; align-items:center; gap:7px}
+  .gctl label{font-size:11px; color:var(--muted2); text-transform:uppercase; letter-spacing:.4px}
+  .gctl select,.gctl input{
+    background:var(--stage); border:1px solid var(--border); border-radius:6px;
+    padding:5px 8px; font-size:12px;
+  }
+  .gctl input.dir{width:210px; color:var(--muted)}
+  .tbtn{
+    background:var(--panel2); border:1px solid var(--border2); border-radius:6px;
+    padding:6px 10px; font-size:12px; font-weight:500; display:flex; align-items:center; gap:6px;
+  }
+  .tbtn:hover{background:var(--panel3); border-color:#525b6a}
+  .diagchip{
+    display:flex; align-items:center; gap:7px; padding:5px 11px; border-radius:14px; font-weight:600;
+    font-size:11.5px; background:var(--warn-weak); color:var(--warn); border:1px solid #5a4620; cursor:pointer;
+  }
+  .diagchip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .diagchip.clean{background:var(--ok-weak); color:var(--ok); border-color:#2c4a37}
+  .sep{width:1px;height:22px;background:var(--border)}
+
+  /* ---- main body: rail | viewport | right stack ---- */
+  .body{flex:1; display:grid; grid-template-columns:76px 1fr 344px; min-height:0}
+
+  /* ================= LEFT MODE RAIL ================= */
+  .rail{background:linear-gradient(180deg,#1d2129,#191c22); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; align-items:center; padding-top:10px; gap:6px}
+  .railbtn{
+    width:60px; height:60px; border:1px solid transparent; border-radius:10px; background:transparent;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    color:var(--muted); transition:.13s; position:relative;
+  }
+  .railbtn:hover{background:var(--panel2); color:var(--ink)}
+  .railbtn.on{background:var(--accent-weak); color:#8fb6ff; border-color:#31508c}
+  .railbtn .ri{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+  .railbtn .ri svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.7;fill:none}
+  .railbtn .rl{font-size:10px; font-weight:600; letter-spacing:.2px}
+  /* [A] tiny memory dot: this mode currently has expanded panels remembered */
+  .railbtn .memdot{position:absolute; top:7px; right:9px; width:6px; height:6px; border-radius:50%;
+    background:var(--ok); box-shadow:0 0 0 2px #191c22; display:none}
+  .railbtn.hasopen .memdot{display:block}
+  .railfoot{margin-top:auto; margin-bottom:10px; display:flex; flex-direction:column; gap:6px}
+
+  /* ================= CENTER VIEWPORT ================= */
+  .stage{background:var(--stage); position:relative; display:flex; flex-direction:column; min-width:0; overflow:hidden}
+  .stagebar{
+    height:40px; flex:0 0 40px; display:flex; align-items:center; gap:10px; padding:0 12px;
+    border-bottom:1px solid #23272f; background:rgba(24,27,33,.7); position:relative; z-index:3;
+  }
+  .stagebar .modeon{font-size:12.5px; font-weight:600; color:var(--ink)}
+  .stagebar .modeon em{color:var(--muted2); font-style:normal; font-weight:400; margin-left:6px}
+  .vswitch{margin-left:auto; display:flex; background:var(--stage); border:1px solid var(--border); border-radius:7px; padding:2px}
+  .vtab{padding:5px 12px; border-radius:5px; font-size:11.5px; font-weight:600; color:var(--muted); background:transparent; border:none}
+  .vtab:hover{color:var(--ink)}
+  .vtab.on{background:var(--accent); color:#fff}
+  /* [C] split toggle */
+  .splitbtn{display:flex; align-items:center; gap:6px; padding:5px 11px; border-radius:6px; font-size:11.5px;
+    font-weight:600; color:var(--muted); background:var(--stage); border:1px solid var(--border)}
+  .splitbtn:hover{color:var(--ink); background:var(--panel2)}
+  .splitbtn.on{background:var(--accent-weak); border-color:#31508c; color:#8fb6ff}
+  .splitbtn svg{width:14px;height:14px;stroke:currentColor;stroke-width:1.8;fill:none}
+  .vgadget{display:flex; align-items:center; gap:6px}
+  .vgadget button{width:28px;height:26px;border-radius:5px;background:var(--panel2);border:1px solid var(--border);
+    color:var(--muted);font-size:13px;display:flex;align-items:center;justify-content:center}
+  .vgadget button:hover{color:var(--ink);background:var(--panel3)}
+
+  .viewport{flex:1; position:relative; overflow:hidden;
+    background:
+      radial-gradient(120% 120% at 50% 0%, #1a1e26 0%, #0d0f13 70%);
+  }
+  /* subtle floor grid */
+  .viewport::before{content:""; position:absolute; inset:0;
+    background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);
+    background-size:44px 44px; mask-image:radial-gradient(80% 70% at 50% 55%,#000 30%,transparent 90%)}
+  .vlayer{position:absolute; inset:0; display:none; align-items:center; justify-content:center}
+  .stage[data-view="2d"]    .vlayer.v2d{display:flex}
+  .stage[data-view="3d"]    .vlayer.v3d{display:flex}
+  .stage[data-view="proxy"] .vlayer.vproxy{display:flex}
+  .stage[data-view="split"] .vlayer.vsplit{display:flex}
+
+  /* ---- 2D material preview ---- */
+  .matwrap{display:flex; flex-direction:column; align-items:center; gap:18px}
+  .tileboard{
+    width:360px; height:360px; border-radius:12px; position:relative; overflow:hidden; flex:0 0 auto;
+    box-shadow:0 24px 60px rgba(0,0,0,.5), inset 0 0 0 1px #ffffff12;
+    background:
+      repeating-linear-gradient(45deg,#3a4048 0 14px,#2c3138 14px 28px),
+      repeating-linear-gradient(-45deg,#2f353d55 0 20px,transparent 20px 40px);
+    background-blend-mode:overlay;
+  }
+  .tileboard .plate{position:absolute; border-radius:3px;
+    background:linear-gradient(150deg,#9aa0a8,#4b525c 60%,#30353d);
+    box-shadow:inset 0 1px 0 #ffffff30, inset 0 -2px 4px #0006, 0 0 0 1px #00000040}
+  .tileboard .rivet{position:absolute;width:6px;height:6px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#d7dbe0,#4a4f57);box-shadow:0 1px 1px #000}
+  .sphere{
+    width:118px;height:118px;border-radius:50%; position:absolute; right:-30px; bottom:-30px;
+    background:
+      radial-gradient(circle at 34% 30%, #eef1f5 0%, #aab0b8 22%, #6c7078 52%, #33373d 80%, #202329 100%);
+    box-shadow:0 10px 26px rgba(0,0,0,.55), inset 0 0 0 1px #ffffff18;
+  }
+  .matcaption{display:flex; gap:10px; align-items:center; color:var(--muted); font-size:12px}
+  .matcaption b{color:var(--ink); font-weight:600}
+  .pill{padding:2px 9px; border-radius:11px; background:var(--panel2); border:1px solid var(--border); font-size:10.5px}
+
+  /* ---- 3D + proxy wireframe ---- */
+  .modelsvg{width:560px; height:420px; overflow:visible}
+  .modelsvg .wire{fill:none; stroke:#5f9dff; stroke-width:1.3; opacity:.9}
+  .modelsvg .wire.dim{stroke:#39506f; opacity:.6}
+  .modelsvg .facet{fill:#2a4a7a22; stroke:#4d8dff; stroke-width:1}
+  .modelsvg .floor{stroke:#2a2f38; stroke-width:1}
+  .modelsvg .hull{fill:none; stroke:#41c072; stroke-width:1.6; stroke-dasharray:6 4}
+  .modelsvg .hull2{fill:none; stroke:#e2a13c; stroke-width:1.5; stroke-dasharray:5 4}
+  .modelsvg .lbl{fill:#8b93a1; font-size:11px; font-family:inherit}
+  .modelsvg .lbl.g{fill:#41c072}
+  .modelsvg .lbl.o{fill:#e2a13c}
+  .axisgz{position:absolute; left:20px; bottom:16px; font-size:11px; color:var(--muted2); line-height:1.6}
+  .axisgz b{color:#e5564c} .axisgz i{color:#41c072;font-style:normal} .axisgz u{color:#4d8dff;text-decoration:none}
+
+  .vhud{position:absolute; left:16px; top:14px; display:flex; flex-direction:column; gap:4px}
+  .vchip{padding:3px 9px; border-radius:6px; background:rgba(20,23,29,.72); border:1px solid var(--border);
+    font-size:10.5px; color:var(--muted); backdrop-filter:blur(2px)}
+  .vchip b{color:var(--ink)}
+
+  /* ---- [C] SPLIT VIEW ---- */
+  .vsplit{padding:0}
+  .shalf{flex:1; position:relative; height:100%; display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden}
+  .shalf .modelsvg{width:100%; max-width:430px; height:auto}
+  .shalf .tileboard{transform:scale(.82)}
+  .sdivider{flex:0 0 1px; align-self:stretch; background:linear-gradient(180deg,transparent,var(--border2) 20%,var(--border2) 80%,transparent)}
+  .schip{position:absolute; top:12px; left:12px; z-index:2; display:flex; align-items:center; gap:7px;
+    padding:4px 10px; border-radius:7px; background:rgba(20,23,29,.8); border:1px solid var(--border);
+    font-size:10.5px; color:var(--muted); backdrop-filter:blur(2px)}
+  .schip b{color:#8fb6ff; font-weight:700; text-transform:uppercase; letter-spacing:.4px}
+  .schip.right{left:auto; right:12px}
+  .proxytog{cursor:pointer; user-select:none}
+  .proxytog input{width:13px;height:13px;accent-color:var(--warn);margin:0}
+  .shalf .proxyover{display:none}
+  .stage[data-proxy="on"] .shalf .proxyover{display:block}
+  .stage[data-proxy="on"] .schip.right{color:var(--warn); border-color:#5a4620}
+  .splithint{position:absolute; bottom:14px; left:50%; transform:translateX(-50%); font-size:10.5px; color:var(--muted2)}
+
+  /* ================= RIGHT PANEL STACK ================= */
+  .stackwrap{background:var(--bg); border-left:1px solid var(--border); display:flex; flex-direction:column; min-height:0}
+  .stackhead{padding:11px 14px 9px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px}
+  .stackhead .st-title{font-size:12.5px; font-weight:700; letter-spacing:.2px}
+  .stackhead .st-sub{font-size:10.5px; color:var(--muted2); margin-left:auto}
+
+  /* [B] workspace preset row */
+  .presetbar{display:flex; align-items:center; gap:6px; padding:9px 12px; border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,#20242c,#1b1e25)}
+  .presetbar .pl{font-size:9.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted2); margin-right:1px}
+  .pbtn{padding:5px 10px; border-radius:6px; font-size:11.5px; font-weight:600; color:var(--muted);
+    background:var(--panel2); border:1px solid var(--border); display:inline-flex; align-items:center; gap:5px}
+  .pbtn:hover{color:var(--ink); background:var(--panel3); border-color:#525b6a}
+  .pbtn.on{background:var(--accent-weak); border-color:#31508c; color:#8fb6ff}
+  .pbtn .cdot{width:6px;height:6px;border-radius:50%;background:var(--muted2)}
+  .pbtn.dirty .cdot{background:var(--warn); box-shadow:0 0 6px var(--warn)}
+  .pbtn.dirty.on{border-color:#5a4620; background:var(--warn-weak); color:var(--warn)}
+
+  .stackscroll{flex:1; overflow-y:auto; padding:10px}
+  .stack{display:none}
+  .stack.on{display:block}
+
+  /* collapsible panel = native <details> */
+  details.panel{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:9px; overflow:hidden}
+  details.panel>summary{
+    list-style:none; cursor:pointer; padding:11px 12px; display:flex; align-items:center; gap:9px;
+    font-size:12.5px; font-weight:600; user-select:none;
+  }
+  details.panel>summary::-webkit-details-marker{display:none}
+  details.panel>summary:hover{background:var(--panel2)}
+  details.panel>summary .chev{color:var(--muted2); transition:transform .15s; flex:0 0 auto; font-size:10px}
+  details.panel[open]>summary .chev{transform:rotate(90deg)}
+  details.panel>summary .picon{width:15px;height:15px;color:var(--muted);flex:0 0 15px}
+  details.panel>summary .picon svg{width:15px;height:15px;stroke:currentColor;stroke-width:1.7;fill:none}
+  details.panel[open]>summary{border-bottom:1px solid var(--border); background:var(--panel2)}
+  details.panel>summary .pcount{margin-left:auto; font-size:10px; color:var(--muted2);
+    background:var(--stage); border:1px solid var(--border); border-radius:9px; padding:1px 7px}
+  details.panel>summary .pcount.hot{color:var(--warn); border-color:#5a4620; background:var(--warn-weak)}
+  details.panel>summary .pcount.new{color:#8fb6ff; border-color:#31508c; background:var(--accent-weak)}
+  .pbody{padding:11px 12px}
+
+  /* form bits */
+  .field{margin-bottom:11px}
+  .field:last-child{margin-bottom:0}
+  .field>label{display:block; font-size:11px; font-weight:600; color:var(--muted); margin-bottom:5px}
+  .field .row{display:flex; gap:6px}
+  .inp,.sel{width:100%; padding:6px 8px; background:var(--stage); border:1px solid var(--border); border-radius:6px}
+  .inp:focus,.sel:focus{outline:none; border-color:var(--accent)}
+  .field .row .inp{flex:1}
+  .hint{font-size:10.5px; color:var(--muted2); margin-top:5px; line-height:1.5}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:9px 10px}
+  .check{display:flex; align-items:center; gap:8px; padding:5px 0; font-size:12px; color:#cfd4dd}
+  .check input{width:15px;height:15px;accent-color:var(--accent)}
+  .btn{
+    border:1px solid var(--border2); background:var(--panel2); padding:7px 11px; border-radius:6px;
+    font-size:12px; font-weight:500; transition:.12s; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn:hover{background:var(--panel3); border-color:#525b6a}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#3f7ce8}
+  .btn.ok{background:var(--ok); border-color:var(--ok); color:#0d1a12}
+  .btn.ok:hover{filter:brightness(1.06)}
+  .btn.block{width:100%}
+  .btnrow{display:flex; gap:7px; margin-top:3px}
+  .btnrow .btn{flex:1}
+  .slider{display:flex; align-items:center; gap:9px; margin-bottom:9px}
+  .slider label{flex:0 0 118px; font-size:11px; color:var(--muted)}
+  .slider input[type=range]{flex:1; accent-color:var(--accent)}
+  .slider .val{flex:0 0 40px; text-align:right; font-size:11px; color:var(--ink); font-variant-numeric:tabular-nums}
+  .subsec{margin-top:11px; padding-top:10px; border-top:1px solid var(--border)}
+  .subsec .sl{font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:var(--muted2); margin-bottom:8px}
+  details.nested{border:1px solid var(--border); border-radius:6px; margin-top:9px; background:var(--panel2)}
+  details.nested>summary{list-style:none; cursor:pointer; padding:8px 10px; font-size:11.5px; font-weight:600; color:var(--muted);
+    display:flex; align-items:center; gap:7px}
+  details.nested>summary::-webkit-details-marker{display:none}
+  details.nested>summary .chev{font-size:9px; transition:transform .15s}
+  details.nested[open]>summary .chev{transform:rotate(90deg)}
+  details.nested .nbody{padding:2px 10px 10px}
+
+  /* group review list */
+  .grptools{display:flex; gap:6px; margin-bottom:9px; align-items:center}
+  .grptools .cnt{font-size:10.5px; color:var(--muted2); margin-left:auto}
+  .grow{display:flex; align-items:center; gap:9px; padding:7px 8px; border-radius:6px; border:1px solid transparent}
+  .grow:hover{background:var(--panel2); border-color:var(--border)}
+  .grow.sel{background:var(--accent-weak); border-color:#31508c}
+  .grow input{width:14px;height:14px;accent-color:var(--accent);flex:0 0 auto}
+  .grow .sw{width:26px;height:26px;border-radius:5px;flex:0 0 26px;box-shadow:inset 0 0 0 1px #0004}
+  .grow .gtext{min-width:0;flex:1}
+  .grow .gname{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grow .gsub{font-size:10px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .grow .gsub.link{color:#6f8fbf}
+  .typedots{display:flex;gap:3px;flex:0 0 auto}
+  .tdot{width:7px;height:7px;border-radius:2px;background:#3b414c}
+  .tdot.on{background:var(--ok)}
+  .tdot.warn{background:var(--warn)}
+  .grow.unk{border-color:#5a4620}
+  .grow.unk .gsub{color:var(--warn)}
+
+  /* mini material slot table */
+  .slottbl{width:100%; border-collapse:collapse; font-size:11px}
+  .slottbl th{text-align:left; color:var(--muted2); font-weight:600; font-size:10px; padding:5px 6px; border-bottom:1px solid var(--border)}
+  .slottbl td{padding:4px 6px; border-bottom:1px solid #2c313a; white-space:nowrap}
+  .slottbl tr:hover td{background:var(--panel2)}
+  .slottbl tr.unassigned td{color:var(--warn); font-style:italic}
+  .slottbl select{background:var(--stage); border:1px solid var(--border); border-radius:5px; padding:2px 4px; font-size:10.5px; width:100%}
+  .slottbl input{accent-color:var(--accent)}
+
+  .poolbar{height:7px;border-radius:4px;background:var(--stage);border:1px solid var(--border);overflow:hidden;margin:6px 0}
+  .poolbar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7aa8ff);width:66%}
+  .kpi{display:flex; gap:8px; margin-top:8px}
+  .kpi .k{flex:1; background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:7px 9px}
+  .kpi .k .n{font-size:15px; font-weight:700; font-variant-numeric:tabular-nums}
+  .kpi .k .l{font-size:9.5px; color:var(--muted2); text-transform:uppercase; letter-spacing:.4px; margin-top:1px}
+  .kpi .k .n.g{color:var(--ok)}
+  .badge{display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600}
+  .badge.new{background:var(--accent-weak); color:#8fb6ff; border:1px solid #31508c}
+
+  /* ================= BOTTOM TIMELINE ================= */
+  .timeline{
+    flex:0 0 64px; height:64px; border-top:1px solid var(--border);
+    background:linear-gradient(180deg,#1b1e25,#16181d); display:flex; align-items:center; gap:12px; padding:0 14px;
+  }
+  .tl-title{display:flex; flex-direction:column; gap:2px; flex:0 0 auto}
+  .tl-title b{font-size:11px; letter-spacing:.3px}
+  .tl-title span{font-size:10px; color:var(--muted2)}
+  .tl-track{flex:1; display:flex; align-items:center; gap:8px; overflow-x:auto; height:44px; padding:0 2px}
+  .task{
+    flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:6px 11px; border-radius:8px;
+    background:var(--panel); border:1px solid var(--border); min-width:150px;
+  }
+  .task .tk-ic{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 auto}
+  .task .tk-tx{min-width:0}
+  .task .tk-n{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .task .tk-s{font-size:9.5px;color:var(--muted2);white-space:nowrap}
+  .task.done{border-color:#2c4a37}
+  .task.done .tk-ic{background:var(--ok-weak);color:var(--ok)}
+  .task.done .tk-s{color:var(--ok)}
+  .task.run{border-color:#31508c; box-shadow:0 0 0 1px #31508c}
+  .task.run .tk-ic{background:var(--accent-weak);color:var(--accent)}
+  .task.run .tk-s{color:#8fb6ff}
+  .task.queued .tk-ic{background:var(--panel2);color:var(--muted2)}
+  .task .tk-bar{width:60px;height:4px;border-radius:3px;background:var(--stage);overflow:hidden;flex:0 0 60px}
+  .task .tk-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7aa8ff);transition:width .25s}
+  .spinner{width:11px;height:11px;border-radius:50%;border:2px solid #3a5a8a;border-top-color:var(--accent);animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .tl-overall{flex:0 0 auto; display:flex; flex-direction:column; gap:3px; width:130px}
+  .tl-overall .lab{display:flex; justify-content:space-between; font-size:10px; color:var(--muted2)}
+  .tl-overall .obar{height:6px; border-radius:4px; background:var(--stage); border:1px solid var(--border); overflow:hidden}
+  .tl-overall .obar i{display:block; height:100%; width:72%; background:linear-gradient(90deg,var(--ok),#63d68f)}
+
+  /* ================= diagnostics popover ================= */
+  .pop{position:fixed; top:50px; right:14px; width:390px; z-index:80; background:var(--panel);
+    border:1px solid var(--border2); border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.5); overflow:hidden;
+    opacity:0; visibility:hidden; transform:translateY(-6px); transition:.15s}
+  .pop.show{opacity:1; visibility:visible; transform:none}
+  .pop .ph{padding:11px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:12.5px; display:flex; gap:8px}
+  .pop .ph span{color:var(--muted2); font-weight:400}
+  .pop .pl{max-height:300px; overflow-y:auto}
+  .dg{display:flex; gap:10px; padding:10px 14px; border-bottom:1px solid #2c313a; font-size:12px}
+  .dg:last-child{border-bottom:none}
+  .dg .sev{flex:0 0 auto; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px; height:fit-content}
+  .sev.warn{background:var(--warn-weak); color:var(--warn)}
+  .sev.info{background:var(--accent-weak); color:#8fb6ff}
+  .dg .tx b{display:block; font-size:10.5px; color:var(--muted); margin-bottom:2px}
+  .dg .tx span{color:#cfd4dd; line-height:1.5; font-size:11.5px}
+
+  /* toast */
+  .toast{position:fixed; right:18px; bottom:78px; z-index:90; display:flex; align-items:center; gap:12px;
+    padding:12px 15px; min-width:280px; background:var(--panel); border:1px solid var(--border2);
+    border-left:3px solid var(--ok); border-radius:9px; box-shadow:0 14px 40px rgba(0,0,0,.45);
+    transform:translateX(150%); transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{transform:none}
+  .toast .tk{width:24px;height:24px;border-radius:50%;background:var(--ok-weak);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 24px}
+  .toast b{font-size:12.5px} .toast span{display:block;color:var(--muted);font-size:11px;margin-top:1px}
+</style>
+</head>
+<body data-mode="textures">
+<div id="app">
+
+  <!-- ============ TOP GLOBAL BAR ============ -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <b>CryEngine Texture Processor</b><span class="ver">Stage · presets · v0.2a</span>
+    </div>
+    <div class="topspacer"></div>
+
+    <div class="gctl" title="[19] Language">
+      <label>Lang</label>
+      <select id="lang"><option>English</option><option>繁體中文</option><option>日本語</option></select>
+    </div>
+    <div class="sep"></div>
+    <div class="gctl" title="[20] Output directory">
+      <label>Out</label>
+      <input class="dir" value="D:\Assets\KB3D\_cryengine" spellcheck="false">
+    </div>
+    <div class="sep"></div>
+    <div class="gctl" title="[23] Settings profile access">
+      <button class="tbtn" id="profSave">Profile ▾</button>
+    </div>
+    <div class="sep"></div>
+    <div class="diagchip" id="diagChip" title="[22] Diagnostics">
+      <span class="dot"></span><span id="diagLabel">3 diagnostics</span>
+    </div>
+  </div>
+
+  <!-- ============ MAIN BODY ============ -->
+  <div class="body">
+
+    <!-- ---------- LEFT MODE RAIL ---------- -->
+    <nav class="rail">
+      <button class="railbtn on" data-mode="textures" data-view="2d">
+        <span class="memdot"></span>
+        <span class="ri"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg></span>
+        <span class="rl">Textures</span>
+      </button>
+      <button class="railbtn" data-mode="models" data-view="3d">
+        <span class="memdot"></span>
+        <span class="ri"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg></span>
+        <span class="rl">Models</span>
+      </button>
+      <button class="railbtn" data-mode="proxy" data-view="proxy">
+        <span class="memdot"></span>
+        <span class="ri"><svg viewBox="0 0 24 24"><path d="M12 3 4 8v8l8 5 8-5V8z" stroke-dasharray="4 3"/><circle cx="12" cy="12" r="3"/></svg></span>
+        <span class="rl">Proxy</span>
+      </button>
+      <button class="railbtn" data-mode="pbr" data-view="2d">
+        <span class="memdot"></span>
+        <span class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18M3 12h9"/></svg></span>
+        <span class="rl">PBR</span>
+      </button>
+      <div class="railfoot">
+        <button class="railbtn" id="railHelp" title="Help">
+          <span class="ri"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3 2.5c-.8.4-1.5 1-1.5 2M12 17h.01"/></svg></span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ---------- CENTER VIEWPORT ---------- -->
+    <main class="stage" id="stage" data-view="2d" data-proxy="off">
+      <div class="stagebar">
+        <span class="modeon" id="stageMode">Textures<em>material tiling preview</em></span>
+        <div class="vswitch" title="Viewport view mode">
+          <button class="vtab on" data-view="2d">2D Material</button>
+          <button class="vtab" data-view="3d">3D Model</button>
+          <button class="vtab" data-view="proxy">Proxy Wire</button>
+        </div>
+        <!-- [C] split view toggle -->
+        <button class="splitbtn" id="splitBtn" title="Split view — 2D material + 3D model side-by-side">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>Split
+        </button>
+        <div class="vgadget">
+          <button title="Frame / reset view">⤢</button>
+          <button title="Toggle grid">▦</button>
+        </div>
+      </div>
+
+      <div class="viewport">
+        <!-- 2D material preview (feature [8]) -->
+        <div class="vlayer v2d">
+          <div class="vhud"><span class="vchip">KB3D_ENC_<b>MetalPanel</b></span><span class="vchip">tiling <b>2×2</b> · 2048px</span></div>
+          <div class="matwrap">
+            <div class="tileboard" id="tileboard"></div>
+            <div class="matcaption">
+              <b>KB3D_ENC_MetalPanel</b>
+              <span class="pill">basecolor</span><span class="pill">+normal</span><span class="pill">+ARM</span>
+              <span class="pill">sphere · point light</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D model preview (feature [17]) -->
+        <div class="vlayer v3d">
+          <div class="vhud"><span class="vchip">KB3D_ENC_<b>Sedan_A.fbx</b></span><span class="vchip">wireframe · <b>84,210</b> tris · 16 mtl</span></div>
+          <svg class="modelsvg" viewBox="0 0 560 420">
+            <g class="floor">
+              <path d="M60 330 L500 330 M110 360 L470 360 M150 300 L430 300"/>
+              <path d="M120 360 L200 260 M280 375 L280 255 M440 360 L360 260"/>
+            </g>
+            <g class="wire">
+              <path d="M120 300 L180 300 L215 250 L360 245 L410 285 L455 292 L455 320 L120 320 Z"/>
+              <path d="M215 250 L245 215 L345 212 L360 245"/>
+              <path d="M245 215 L285 215 L285 250 M330 213 L330 245"/>
+              <path d="M120 300 L120 320 M410 285 L410 320"/>
+            </g>
+            <g class="wire dim">
+              <path d="M138 300 L198 300 L233 250 L378 245 L428 285 L455 292"/>
+              <path d="M120 300 L138 300 M180 300 L198 300"/>
+            </g>
+            <circle class="wire" cx="185" cy="320" r="26"/><circle class="wire dim" cx="185" cy="320" r="12"/>
+            <circle class="wire" cx="400" cy="320" r="26"/><circle class="wire dim" cx="400" cy="320" r="12"/>
+            <text class="lbl" x="250" y="200">Body_Paint · sub_index 0</text>
+          </svg>
+          <div class="axisgz">Forward <u>-Z</u> · Up <i>+Y</i> · <b>X</b> right &nbsp;|&nbsp; scale 1.0 · units cm</div>
+        </div>
+
+        <!-- proxy wireframe overlay (feature [18]) -->
+        <div class="vlayer vproxy">
+          <div class="vhud"><span class="vchip">proxy for <b>Sedan_A</b></span><span class="vchip">physicalize <b>proxy_only</b></span></div>
+          <svg class="modelsvg" viewBox="0 0 560 420">
+            <g class="wire dim">
+              <path d="M120 300 L180 300 L215 250 L360 245 L410 285 L455 292 L455 320 L120 320 Z"/>
+              <path d="M215 250 L245 215 L345 212 L360 245"/>
+              <circle cx="185" cy="320" r="26"/><circle cx="400" cy="320" r="26"/>
+            </g>
+            <polygon class="hull" points="122,320 178,300 216,252 356,247 410,286 452,318 452,322 122,322"/>
+            <polygon class="hull2" points="215,252 246,216 344,214 358,247"/>
+            <polygon class="hull2" points="160,346 210,346 205,294 165,294"/>
+            <polygon class="hull2" points="375,346 425,346 420,294 380,294"/>
+            <text class="lbl g" x="120" y="345">hull_0 (body)</text>
+            <text class="lbl o" x="250" y="205">hull_1 (cabin)</text>
+          </svg>
+          <div class="axisgz"><i>4 hulls</i> · 96 tris · shrink-wrap 3 · voxel 64³ &nbsp;|&nbsp; preview (not yet accepted)</div>
+        </div>
+
+        <!-- [C] SPLIT VIEW: 2D material (left) + 3D model (right), proxy overlay on 3D half -->
+        <div class="vlayer vsplit">
+          <div class="shalf">
+            <div class="schip"><b>2D</b> Material · MetalPanel</div>
+            <div class="tileboard" id="tileboard2"></div>
+          </div>
+          <div class="sdivider"></div>
+          <div class="shalf">
+            <div class="schip"><b>3D</b> Model · Sedan_A.fbx</div>
+            <label class="schip right proxytog"><input type="checkbox" id="proxyOverlay"> proxy hull overlay</label>
+            <svg class="modelsvg" viewBox="0 0 560 420">
+              <g class="floor">
+                <path d="M60 330 L500 330 M110 360 L470 360 M150 300 L430 300"/>
+                <path d="M120 360 L200 260 M280 375 L280 255 M440 360 L360 260"/>
+              </g>
+              <g class="wire">
+                <path d="M120 300 L180 300 L215 250 L360 245 L410 285 L455 292 L455 320 L120 320 Z"/>
+                <path d="M215 250 L245 215 L345 212 L360 245"/>
+                <path d="M245 215 L285 215 L285 250 M330 213 L330 245"/>
+              </g>
+              <circle class="wire" cx="185" cy="320" r="26"/><circle class="wire" cx="400" cy="320" r="26"/>
+              <!-- proxy hulls, toggled by the right-half chip -->
+              <g class="proxyover">
+                <polygon class="hull" points="122,320 178,300 216,252 356,247 410,286 452,318 452,322 122,322"/>
+                <polygon class="hull2" points="215,252 246,216 344,214 358,247"/>
+                <text class="lbl g" x="120" y="345">hull_0</text>
+                <text class="lbl o" x="250" y="205">hull_1</text>
+              </g>
+            </svg>
+          </div>
+          <div class="splithint">Split view — model-with-textures workflow · left drives Material Preview · right drives Model Preview</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ---------- RIGHT PANEL STACK ---------- -->
+    <aside class="stackwrap">
+      <div class="stackhead">
+        <span class="st-title" id="stackTitle">Texture Parameters</span>
+        <span class="st-sub" id="stackSub">remembers layout per mode</span>
+      </div>
+
+      <!-- [B] workspace preset row (operates on the current mode's stack) -->
+      <div class="presetbar" id="presetBar">
+        <span class="pl">Workspace</span>
+        <button class="pbtn" data-preset="minimal">Minimal</button>
+        <button class="pbtn" data-preset="review">Review</button>
+        <button class="pbtn" data-preset="export">Export</button>
+        <button class="pbtn" data-preset="custom" title="Your hand-tuned layout — set by any manual panel toggle">Custom<span class="cdot"></span></button>
+      </div>
+
+      <div class="stackscroll">
+
+        <!-- ===== TEXTURES STACK ===== -->
+        <div class="stack on" data-mode="textures">
+
+          <!-- [1] Import -->
+          <details class="panel" data-preset="">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>Import<span class="pcount">132 files</span></summary>
+            <div class="pbody">
+              <div class="btnrow"><button class="btn">Add Files…</button><button class="btn">Add Folder…</button></div>
+              <div style="margin-top:9px;border:1.5px dashed var(--border2);border-radius:7px;padding:14px;text-align:center;color:var(--muted2);font-size:11px">
+                Drag &amp; drop textures here<br>132 imported · 132 auto-grouped
+              </div>
+            </div>
+          </details>
+
+          <!-- [2][3][6][7] Group Review -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>Group Review<span class="pcount hot">5 unassigned</span></summary>
+            <div class="pbody">
+              <div class="grptools">
+                <button class="btn" style="padding:5px 9px" id="delSel" disabled>Delete Selected (0)</button>
+                <span class="cnt" title="[2] type columns: Diff·Normal·Spec·Gloss·Metal·Height·AO·Emissive">14 of 132 groups</span>
+              </div>
+              <div id="grpList"></div>
+
+              <!-- [3] group-level settings -->
+              <div class="subsec">
+                <div class="sl">Group Overrides — KB3D_ENC_MetalPanel</div>
+                <div class="grid2">
+                  <div class="field"><label>Resolution</label>
+                    <select class="sel"><option>Inherit (2048)</option><option>4096</option><option>1024</option></select></div>
+                  <div class="field"><label>Normal Flip</label>
+                    <select class="sel"><option>Inherit (off)</option><option>Flip G</option></select></div>
+                </div>
+                <label class="check"><input type="checkbox" checked>Treat as metal (metal-gate on)</label>
+              </div>
+            </div>
+          </details>
+
+          <!-- [4] Conversion Settings -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 0 0-1.7-1l-.4-2.5H10l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.4L3.6 11a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5"/></svg></span>Conversion Settings</summary>
+            <div class="pbody">
+              <div class="grid2">
+                <div class="field"><label>Output Resolution</label>
+                  <select class="sel"><option>Original</option><option>4096</option><option selected>2048</option><option>1024</option><option>512</option></select></div>
+                <div class="field"><label>Diffuse Format</label>
+                  <select class="sel"><option>albedo</option><option>diffuse_ao</option></select></div>
+              </div>
+              <label class="check"><input type="checkbox">Flip normal-map G channel</label>
+              <label class="check"><input type="checkbox" checked>Auto-generate missing Spec</label>
+              <details class="nested">
+                <summary><span class="chev">▶</span>Metal Gate (Advanced)</summary>
+                <div class="nbody">
+                  <div class="slider"><label>Metal gate threshold</label><input type="range" min="0" max="100" value="38" oninput="this.nextElementSibling.textContent=this.value"><span class="val">38</span></div>
+                  <div class="slider"><label>Reflection floor</label><input type="range" min="0" max="100" value="20" oninput="this.nextElementSibling.textContent=this.value"><span class="val">20</span></div>
+                  <div class="field" style="margin-top:6px"><label>Metallic → Albedo + Reflection</label>
+                    <select class="sel"><option>Enabled (gate)</option><option>Disabled</option></select></div>
+                </div>
+              </details>
+            </div>
+          </details>
+
+          <!-- [8] Material Preview -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg></span>Material Preview<span class="pcount new">2D view</span></summary>
+            <div class="pbody">
+              <div class="hint" style="margin-top:0;margin-bottom:9px">Drives the central <b>2D Material</b> viewport (and the left half of Split view).</div>
+              <div class="grid2">
+                <div class="field"><label>Tiling</label><select class="sel"><option>1×1</option><option selected>2×2</option><option>4×4</option></select></div>
+                <div class="field"><label>Show Channel</label><select class="sel"><option>Composite</option><option>Basecolor</option><option>Normal</option><option>Roughness</option><option>Metallic</option></select></div>
+              </div>
+              <div class="field"><label>Preview Shape / Light</label>
+                <select class="sel"><option>Sphere · point light</option><option>Plane · studio</option><option>Cube · sun</option></select></div>
+            </div>
+          </details>
+
+          <!-- [5] RC / DDS Export -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M4 4h16v6H4zM4 14h16v6H4z"/><path d="M8 7h.01M8 17h.01"/></svg></span>RC / DDS Export<span class="pcount">8/12 pool</span></summary>
+            <div class="pbody">
+              <div class="field"><label>RC.exe Path</label>
+                <div class="row"><input class="inp" value="C:\CRYENGINE\Tools\rc\rc.exe" spellcheck="false"><button class="btn">…</button></div></div>
+              <div class="field" style="margin-bottom:6px"><label>Adaptive Worker Pool</label>
+                <div class="poolbar"><i></i></div>
+                <div class="hint" style="margin-top:2px">8 / 12 workers active · 61 DDS queued · auto-throttling</div>
+              </div>
+              <div class="subsec">
+                <div class="sl">Post-export cleanup</div>
+                <label class="check"><input type="checkbox" checked>Delete intermediate .tif</label>
+                <label class="check"><input type="checkbox">Delete .rcjob logs</label>
+                <label class="check"><input type="checkbox" checked>Keep source .png</label>
+              </div>
+              <button class="btn primary block" style="margin-top:10px" data-run="RC/DDS Export" data-count="61">Export DDS via RC</button>
+            </div>
+          </details>
+        </div>
+
+        <!-- ===== MODELS STACK ===== -->
+        <div class="stack" data-mode="models">
+
+          <!-- [10] FBX List -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/></svg></span>FBX List<span class="pcount">3 batch</span></summary>
+            <div class="pbody">
+              <div class="btnrow" style="margin-bottom:9px"><button class="btn block">Add Models…</button></div>
+              <div class="grow sel"><input type="checkbox" checked><div class="sw" style="background:linear-gradient(135deg,#3a63c0,#1b2a52)"></div>
+                <div class="gtext"><div class="gname">KB3D_ENC_Sedan_A.fbx</div><div class="gsub">16 materials · 84,210 tris</div></div></div>
+              <div class="grow"><input type="checkbox" checked><div class="sw" style="background:linear-gradient(135deg,#7a6a3a,#3a2f18)"></div>
+                <div class="gtext"><div class="gname">KB3D_ENC_MetalGate.fbx</div><div class="gsub">4 materials · 12,880 tris</div></div></div>
+              <div class="grow"><input type="checkbox"><div class="sw" style="background:linear-gradient(135deg,#4a7a5a,#1c3a26)"></div>
+                <div class="gtext"><div class="gname">KB3D_ENC_Dumpster.fbx</div><div class="gsub">6 materials · 9,340 tris</div></div></div>
+            </div>
+          </details>
+
+          <!-- [11] Material Slots -->
+          <details class="panel" data-preset="">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>Material Slots<span class="pcount hot">1 unassigned</span></summary>
+            <div class="pbody">
+              <div class="hint" style="margin-top:0;margin-bottom:8px">physicalize is multi-select per slot.</div>
+              <table class="slottbl">
+                <thead><tr><th style="width:18px"></th><th>#</th><th>Material</th><th>physicalize</th></tr></thead>
+                <tbody>
+                  <tr><td><input type="checkbox" checked></td><td>0</td><td>Body_Paint</td><td><select><option>default</option><option>proxy_only</option><option>no_collide</option></select></td></tr>
+                  <tr><td><input type="checkbox" checked></td><td>1</td><td>Glass</td><td><select><option>no_collide</option><option>default</option></select></td></tr>
+                  <tr><td><input type="checkbox"></td><td>2</td><td>Chrome_Trim</td><td><select><option>default</option><option>proxy_only</option></select></td></tr>
+                  <tr><td><input type="checkbox"></td><td>3</td><td>Tire_Rubber</td><td><select><option>proxy_only</option><option>default</option></select></td></tr>
+                  <tr class="unassigned"><td>—</td><td>16</td><td>&lt;unassigned&gt;</td><td>—</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </details>
+
+          <!-- [12][13][14][15] Transform -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><path d="m5 9-3 3 3 3M19 9l3 3-3 3M9 5l3-3 3 3"/></svg></span>Transform</summary>
+            <div class="pbody">
+              <div class="subsec" style="margin-top:0;padding-top:0;border-top:none">
+                <div class="sl">Axis — detected, override below</div>
+                <div class="grid2">
+                  <div class="field"><label>Forward</label><select class="sel"><option selected>-Z (detected)</option><option>+Z</option><option>-X</option><option>+X</option></select></div>
+                  <div class="field"><label>Up</label><select class="sel"><option selected>+Y (detected)</option><option>+Z</option><option>-Y</option></select></div>
+                </div>
+              </div>
+              <div class="grid2">
+                <div class="field"><label>Units</label><select class="sel"><option selected>Centimeters</option><option>Meters</option><option>Inches</option></select></div>
+                <div class="field"><label>Scale</label><input class="inp" value="1.0"></div>
+              </div>
+              <div class="field"><label>Scene Origin</label>
+                <select class="sel"><option selected>Keep authored</option><option>Recenter to bounds</option><option>Snap to floor (min Y)</option></select></div>
+              <label class="check"><input type="checkbox" checked>Merge child nodes into single mesh</label>
+              <label class="check"><input type="checkbox">Keep node hierarchy names</label>
+            </div>
+          </details>
+
+          <!-- [17] Model Preview -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M12 12v10M3 7l9 5 9-5"/></svg></span>Model Preview<span class="pcount new">3D view</span></summary>
+            <div class="pbody">
+              <div class="hint" style="margin-top:0;margin-bottom:9px">Drives the central <b>3D Model</b> viewport (and the right half of Split view).</div>
+              <label class="check"><input type="checkbox" checked>Wireframe overlay</label>
+              <label class="check"><input type="checkbox">Show normals</label>
+              <label class="check"><input type="checkbox" checked>Show ground grid + axis gizmo</label>
+              <div class="field" style="margin-top:8px"><label>Highlight material</label>
+                <select class="sel"><option>None</option><option selected>Body_Paint (sub 0)</option><option>Glass (sub 1)</option></select></div>
+            </div>
+          </details>
+
+          <!-- [16] Export Options -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span>Export Options</summary>
+            <div class="pbody">
+              <label class="check"><input type="checkbox" checked>Export textures alongside model</label>
+              <label class="check"><input type="checkbox" checked>Write .mtl + RC material request</label>
+              <label class="check"><input type="checkbox">Delete intermediate .json after export</label>
+              <div class="field" style="margin-top:8px"><label>Target subfolder</label><input class="inp" value="Objects\KB3D\vehicles" spellcheck="false"></div>
+              <button class="btn primary block" style="margin-top:10px" data-run="Export Sedan_A.cgf" data-count="3">Export CGF + Materials</button>
+            </div>
+          </details>
+        </div>
+
+        <!-- ===== PROXY STACK ===== -->
+        <div class="stack" data-mode="proxy">
+          <!-- source -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 2 3 7v10l9 5 9-5V7z"/></svg></span>Proxy Source</summary>
+            <div class="pbody">
+              <div class="field"><label>Source mesh</label><select class="sel"><option selected>KB3D_ENC_Sedan_A — merged</option><option>Body_Paint (sub 0)</option><option>whole scene</option></select></div>
+              <div class="hint" style="margin-top:0">Generated proxy gets physicalize <b>proxy_only</b> and joins the .cgf as a $physics node.</div>
+            </div>
+          </details>
+
+          <!-- [18] Proxy Generation (NEW TOOL) -->
+          <details class="panel" data-preset="review export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M12 3 4 8v8l8 5 8-5V8z" stroke-dasharray="4 3"/><circle cx="12" cy="12" r="3"/></svg></span>Proxy Generation<span class="pcount new">new</span></summary>
+            <div class="pbody">
+              <span class="badge new">NEW TOOL</span>
+              <div class="field" style="margin-top:10px"><label>Algorithm</label>
+                <select class="sel"><option selected>V-HACD (convex decomposition)</option><option>Single convex hull</option><option>Voxel box cluster</option></select></div>
+              <div class="slider"><label>Voxel resolution</label><input type="range" min="16" max="256" value="64" oninput="this.nextElementSibling.textContent=this.value+'³'"><span class="val">64³</span></div>
+              <div class="slider"><label>Max hull count</label><input type="range" min="1" max="32" value="4" oninput="this.nextElementSibling.textContent=this.value"><span class="val">4</span></div>
+              <div class="slider"><label>Shrink-wrap iters</label><input type="range" min="0" max="10" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="val">3</span></div>
+              <div class="slider"><label>Concavity</label><input type="range" min="0" max="100" value="25" oninput="this.nextElementSibling.textContent='0.'+('0'+this.value).slice(-2)"><span class="val">0.25</span></div>
+              <label class="check"><input type="checkbox" checked>Set physicalize = proxy_only</label>
+              <div class="btnrow" style="margin-top:10px">
+                <button class="btn primary" data-run="Generate proxy" data-count="1">Generate</button>
+                <button class="btn" onclick="setView('proxy')">Preview</button>
+                <button class="btn ok">Accept</button>
+              </div>
+            </div>
+          </details>
+
+          <!-- result -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>Proxy Result</summary>
+            <div class="pbody">
+              <div class="kpi">
+                <div class="k"><div class="n">84,210</div><div class="l">Src tris</div></div>
+                <div class="k"><div class="n g">96</div><div class="l">Proxy tris</div></div>
+                <div class="k"><div class="n g">4</div><div class="l">Hulls</div></div>
+              </div>
+              <div class="hint">Preview shown in viewport (dashed). Not yet accepted — press <b>Accept</b> to bake into the .cgf.</div>
+            </div>
+          </details>
+        </div>
+
+        <!-- ===== PBR STACK ===== -->
+        <div class="stack" data-mode="pbr">
+          <!-- source -->
+          <details class="panel" data-preset="review">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg></span>Source Diffuse</summary>
+            <div class="pbody">
+              <div class="field"><label>Input map</label><select class="sel"><option selected>KB3D_ENC_MetalPanel_diff.png</option><option>KB3D_ENC_ConcreteWall_diff.png</option><option>KB3D_ENC_BrickWall_diff.png</option></select></div>
+              <div class="hint" style="margin-top:0">Legacy diffuse-only asset → synthesise a full PBR set. Preview in the <b>2D Material</b> viewport.</div>
+            </div>
+          </details>
+
+          <!-- [9] Diffuse -> PBR Converter (NEW TOOL) -->
+          <details class="panel" data-preset="review export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18M3 12h9"/></svg></span>Diffuse → PBR Converter<span class="pcount new">new</span></summary>
+            <div class="pbody">
+              <span class="badge new">NEW TOOL</span>
+              <div class="slider" style="margin-top:10px"><label>Roughness est. strength</label><input type="range" min="0" max="100" value="65" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="val">65%</span></div>
+              <div class="slider"><label>Metallic threshold</label><input type="range" min="0" max="100" value="72" oninput="this.nextElementSibling.textContent='0.'+this.value"><span class="val">0.72</span></div>
+              <div class="slider"><label>Normal strength</label><input type="range" min="0" max="200" value="100" oninput="this.nextElementSibling.textContent=this.value+'%'"><span class="val">100%</span></div>
+              <label class="check"><input type="checkbox" checked>Normal from luminance</label>
+              <label class="check"><input type="checkbox" checked>AO from cavity estimation</label>
+              <label class="check"><input type="checkbox">Height from luminance</label>
+              <div class="field" style="margin-top:8px"><label>Output set</label>
+                <select class="sel"><option selected>diff + ddna + spec + displ</option><option>diff + ddna only</option></select></div>
+              <button class="btn primary block" style="margin-top:10px" data-run="Diffuse→PBR: MetalPanel" data-count="1">Run Conversion</button>
+            </div>
+          </details>
+
+          <!-- output -->
+          <details class="panel" data-preset="export">
+            <summary><span class="chev">▶</span><span class="picon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>PBR Output</summary>
+            <div class="pbody">
+              <label class="check"><input type="checkbox" checked disabled>KB3D_ENC_MetalPanel_ddna.png (normal+gloss)</label>
+              <label class="check"><input type="checkbox" checked disabled>KB3D_ENC_MetalPanel_spec.png</label>
+              <label class="check"><input type="checkbox" checked disabled>KB3D_ENC_MetalPanel_displ.png</label>
+              <div class="hint">3 maps synthesised · added back to the group in Textures mode.</div>
+            </div>
+          </details>
+        </div>
+
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ BOTTOM TIMELINE (work / progress center) ============ -->
+  <div class="timeline">
+    <div class="tl-title"><b>WORK CENTER</b><span>[21] progress</span></div>
+    <div class="tl-track" id="track">
+      <div class="task done"><div class="tk-ic">✓</div><div class="tk-tx"><div class="tk-n">Import 132 textures</div><div class="tk-s">14:02 · grouped</div></div></div>
+      <div class="task done"><div class="tk-ic">✓</div><div class="tk-tx"><div class="tk-n">Convert 132 groups</div><div class="tk-s">14:05 · 5 skipped</div></div></div>
+      <div class="task run"><div class="tk-ic"><span class="spinner"></span></div><div class="tk-tx"><div class="tk-n">RC / DDS pool</div><div class="tk-s">61 → 40 left</div></div><div class="tk-bar"><i style="width:34%"></i></div></div>
+      <div class="task queued"><div class="tk-ic">·</div><div class="tk-tx"><div class="tk-n">Export Sedan_A.cgf</div><div class="tk-s">queued</div></div></div>
+    </div>
+    <div class="tl-overall"><div class="lab"><span>Session</span><span>72%</span></div><div class="obar"><i></i></div></div>
+  </div>
+</div>
+
+<!-- diagnostics popover [22] -->
+<div class="pop" id="diagPop">
+  <div class="ph">Diagnostics <span id="diagPopCnt">(3)</span></div>
+  <div class="pl">
+    <div class="dg"><span class="sev warn">WARN</span><div class="tx"><b>DEF-19 · KB3D_ENC_GlassClean</b><span>Type “refraction” has no CryEngine output channel; skipped in batch. Assign as alpha or diffuse in Group Review.</span></div></div>
+    <div class="dg"><span class="sev warn">WARN</span><div class="tx"><b>MDL-04 · Sedan_A.fbx</b><span>Slot 16 is unassigned. It will export as &lt;default&gt; unless a material is set in Material Slots.</span></div></div>
+    <div class="dg"><span class="sev info">INFO</span><div class="tx"><b>DEF-07 · KB3D_ENC_NeonSign</b><span>Emissive detected without spec/gloss; auto-generate Spec is on — a default spec map will be produced.</span></div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="tk">✓</div><div><b id="toastT">Done</b><span id="toastS"></span></div></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+
+/* fake texture groups for the Group Review mini-list [2][6][7] */
+const GROUPS=[
+  {n:'KB3D_ENC_MetalPanel', c:['#b8bcc2','#43484f'], t:'GGGGGoGo', link:'linked: _diff _ddna _spec (3)'},
+  {n:'KB3D_ENC_ConcreteWall',c:['#9a938a','#3f3b36'], t:'GGGGoGGo', link:'linked: _diff _ddna _displ (4)'},
+  {n:'KB3D_ENC_BrickWall',  c:['#b0563a','#3f1f16'], t:'GGGGoGGo', link:'linked: _diff _ddna (2)'},
+  {n:'KB3D_ENC_GlassClean', c:['#bfe6ea','#4a7d86'], t:'GGGGooow', link:'unassigned: refraction', unk:1},
+  {n:'KB3D_ENC_RustedPipe', c:['#a5623a','#3a251a'], t:'GGGGGoGo', link:'linked: _diff _ddna _spec (3)'},
+  {n:'KB3D_ENC_NeonSign',   c:['#ff5ea8','#2a0f3a'], t:'GGoooooG', link:'linked: _diff _em (2)'},
+];
+function dots(t){return '<div class="typedots">'+[...t].map(ch=>{
+  const cl = ch==='G'?'tdot on':ch==='w'?'tdot warn':'tdot'; return `<span class="${cl}"></span>`;}).join('')+'</div>';}
+const gl=$('#grpList');
+gl.innerHTML=GROUPS.map((g,i)=>`
+  <label class="grow ${g.unk?'unk':''}" data-i="${i}">
+    <input type="checkbox" class="gchk">
+    <div class="sw" style="background:linear-gradient(135deg,${g.c[0]},${g.c[1]})"></div>
+    <div class="gtext"><div class="gname">${g.n}</div><div class="gsub ${g.unk?'':'link'}">${g.link}</div></div>
+    ${dots(g.t)}
+  </label>`).join('');
+
+/* multi-select delete [7] */
+function refreshDel(){
+  const n=$$('.gchk:checked').length, b=$('#delSel');
+  b.textContent=`Delete Selected (${n})`; b.disabled=!n;
+  $$('.grow').forEach(r=>r.classList.toggle('sel',r.querySelector('.gchk').checked));
+}
+gl.addEventListener('change',e=>{ if(e.target.classList.contains('gchk')) refreshDel(); });
+$('#delSel').onclick=()=>{ const n=$$('.gchk:checked').length; toast('Removed from queue',`${n} group(s) dropped from this batch`);
+  $$('.gchk:checked').forEach(c=>{c.checked=false;}); refreshDel(); };
+
+/* ============================================================================
+   [A][B] PER-MODE MEMORY + WORKSPACE PRESETS
+   - each mode's stack lives in the DOM permanently, so its <details open> state
+     survives mode switches (that IS the per-mode memory).
+   - presets set which panels are open by their data-preset membership.
+   - any MANUAL summary click snapshots the layout into "custom" for that mode.
+   ============================================================================ */
+const MODE_META={
+  textures:{title:'Texture Parameters', stage:'Textures', sub:'material tiling preview'},
+  models:  {title:'Model Parameters',   stage:'Models',   sub:'wireframe model preview'},
+  proxy:   {title:'Proxy Parameters',   stage:'Proxy',    sub:'collision hull preview'},
+  pbr:     {title:'PBR Parameters',     stage:'PBR',      sub:'synthesised material preview'},
+};
+/* remembered active preset per mode (+ custom snapshot filled on manual edit) */
+const modeState={
+  textures:{active:'review', custom:null},
+  models:  {active:'review', custom:null},
+  proxy:   {active:'review', custom:null},
+  pbr:     {active:'review', custom:null},
+};
+const stackOf=m=>document.querySelector(`.stack[data-mode="${m}"]`);
+const panelsOf=m=>[...stackOf(m).querySelectorAll('details.panel')];
+
+function applyPreset(preset){
+  const m=document.body.dataset.mode;
+  if(preset==='custom'){
+    const snap=modeState[m].custom;
+    if(snap) panelsOf(m).forEach((p,i)=>{ p.open=!!snap[i]; });
+  }else{
+    panelsOf(m).forEach(p=>{
+      const set=(p.dataset.preset||'').split(' ').filter(Boolean);
+      p.open = preset!=='minimal' && set.includes(preset);
+    });
+  }
+  modeState[m].active=preset;
+  syncPresetBar(); syncMemDots();
+}
+/* manual toggle -> this mode is now "custom", remember its exact layout */
+function markCustom(){
+  const m=document.body.dataset.mode;
+  modeState[m].custom=panelsOf(m).map(p=>p.open);
+  modeState[m].active='custom';
+  syncPresetBar(); syncMemDots();
+}
+/* a summary click is user intent; defer so the <details> has flipped first */
+$('.stackscroll').addEventListener('click',e=>{
+  if(e.target.closest('details.panel>summary')) queueMicrotask(markCustom);
+});
+function syncPresetBar(){
+  const a=modeState[document.body.dataset.mode].active;
+  $$('#presetBar .pbtn').forEach(b=>b.classList.toggle('on',b.dataset.preset===a));
+  $('#presetBar .pbtn[data-preset="custom"]').classList.toggle('dirty', a==='custom');
+}
+/* rail memory dot lights when a mode has any expanded panel remembered */
+function syncMemDots(){
+  $$('.railbtn[data-mode]').forEach(b=>{
+    const open=panelsOf(b.dataset.mode).some(p=>p.open);
+    b.classList.toggle('hasopen',open);
+  });
+}
+$$('#presetBar .pbtn').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));
+
+/* ---- LEFT RAIL: swap mode = swap right stack + restore that mode's memory ---- */
+$$('.railbtn[data-mode]').forEach(b=>b.onclick=()=>{
+  const m=b.dataset.mode;
+  document.body.dataset.mode=m;
+  $$('.railbtn[data-mode]').forEach(x=>x.classList.toggle('on',x===b));
+  $$('.stack').forEach(s=>s.classList.toggle('on',s.dataset.mode===m));
+  $('#stackTitle').textContent=MODE_META[m].title;
+  syncPresetBar();                 // reflect this mode's remembered preset
+  if($('#stage').dataset.view!=='split') setView(b.dataset.view);
+});
+
+/* ---- VIEWPORT view switch (2d / 3d / proxy / split) ---- */
+let lastSingleView='2d';
+function setView(v){
+  $('#stage').dataset.view=v;
+  $$('.vtab').forEach(t=>t.classList.toggle('on',t.dataset.view===v));
+  $('#splitBtn').classList.toggle('on', v==='split');
+  if(v!=='split') lastSingleView=v;
+  const m=MODE_META[document.body.dataset.mode];
+  $('#stageMode').innerHTML = v==='split'
+    ? `${m.stage}<em>split · 2D material + 3D model</em>`
+    : `${m.stage}<em>${m.sub}</em>`;
+}
+$$('.vtab').forEach(t=>t.onclick=()=>setView(t.dataset.view));
+/* [C] split toggle: on -> split, off -> back to last single view */
+$('#splitBtn').onclick=()=>setView($('#stage').dataset.view==='split'?lastSingleView:'split');
+$('#proxyOverlay').onchange=e=>{ $('#stage').dataset.proxy=e.target.checked?'on':'off'; };
+
+/* ---- build tiled metal board (2D preview mock) — same builder for both boards ---- */
+function buildBoard(el){
+  if(!el) return;
+  let html='';
+  for(let r=0;r<4;r++)for(let c=0;c<4;c++){
+    const x=6+c*88, y=6+r*88;
+    html+=`<div class="plate" style="left:${x}px;top:${y}px;width:80px;height:80px"></div>`;
+    [[x+8,y+8],[x+64,y+8],[x+8,y+64],[x+64,y+64]].forEach(([px,py])=>{ html+=`<div class="rivet" style="left:${px}px;top:${py}px"></div>`; });
+  }
+  html+='<div class="sphere"></div>';
+  el.innerHTML=html;
+}
+buildBoard($('#tileboard')); buildBoard($('#tileboard2'));
+
+/* ---- run buttons -> push a task into the timeline [21] ---- */
+const track=$('#track');
+function runTask(name,count){
+  const el=document.createElement('div'); el.className='task run';
+  el.innerHTML=`<div class="tk-ic"><span class="spinner"></span></div>
+    <div class="tk-tx"><div class="tk-n">${name}</div><div class="tk-s">starting…</div></div>
+    <div class="tk-bar"><i style="width:0%"></i></div>`;
+  track.appendChild(el); el.scrollIntoView({inline:'end',behavior:'smooth'});
+  const bar=el.querySelector('.tk-bar i'), st=el.querySelector('.tk-s');
+  let p=0; const iv=setInterval(()=>{
+    p=Math.min(100,p+Math.random()*22); bar.style.width=p+'%';
+    st.textContent=count>1?`${Math.round(count*p/100)}/${count}`:`${Math.round(p)}%`;
+    if(p>=100){ clearInterval(iv);
+      el.className='task done'; el.querySelector('.tk-ic').innerHTML='✓'; st.textContent='done';
+      el.querySelector('.tk-bar').remove();
+      toast('Task complete',name);
+    }
+  },300);
+}
+$$('[data-run]').forEach(b=>b.onclick=()=>runTask(b.dataset.run,+(b.dataset.count||1)));
+
+/* ---- diagnostics popover [22] ---- */
+$('#diagChip').onclick=e=>{ e.stopPropagation(); $('#diagPop').classList.toggle('show'); };
+document.addEventListener('click',e=>{ if(!e.target.closest('#diagPop')&&!e.target.closest('#diagChip')) $('#diagPop').classList.remove('show'); });
+
+/* ---- global bits: profile / help / toast ---- */
+$('#profSave').onclick=()=>toast('Profile saved','Layout memory + presets written to settings.json · profile “KB3D-cryengine”');
+$('#railHelp').onclick=()=>toast('Stage help','Presets set the panel layout · manual toggles become Custom · each mode remembers its own');
+function toast(t,s){ $('#toastT').textContent=t; $('#toastS').textContent=s; const el=$('#toast');
+  el.classList.add('show'); clearTimeout(el._h); el._h=setTimeout(()=>el.classList.remove('show'),3000); }
+
+/* ---- init: apply each mode's default preset so open-state = remembered layout ---- */
+Object.keys(modeState).forEach(m=>{
+  const preset=modeState[m].active;
+  panelsOf(m).forEach(p=>{
+    const set=(p.dataset.preset||'').split(' ').filter(Boolean);
+    p.open = preset!=='minimal' && set.includes(preset);
+  });
+});
+syncPresetBar(); syncMemDots();
+
+/* self-check (ponytail): presets must actually change open panels, custom must round-trip */
+;(function selfcheck(){
+  const t=panelsOf('textures');
+  applyPreset('minimal'); console.assert(t.every(p=>!p.open),'minimal should collapse all');
+  applyPreset('review');  console.assert(t.some(p=>p.open),'review should expand some');
+  const before=t.map(p=>p.open);
+  t[0].open=!t[0].open; markCustom();                 // simulate a manual edit
+  console.assert(modeState.textures.active==='custom','manual edit -> custom');
+  applyPreset('minimal'); applyPreset('custom');
+  console.assert(JSON.stringify(t.map(p=>p.open))===JSON.stringify(modeState.textures.custom),'custom round-trips');
+  // restore a clean default for the demo
+  applyPreset('review'); void before;
+})();
+</script>
+</body>
+</html>

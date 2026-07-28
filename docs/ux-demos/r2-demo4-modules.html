@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modules — CryEngine Texture Processor</title>
+<!--
+================================================================================
+  R2-4 "MODULES" (模組即卡片) — feature-inventory placement checklist
+  Every shared-inventory item from DESIGNS-R2.md is placed. Nothing omitted.
+--------------------------------------------------------------------------------
+  TEXTURE SIDE
+   1 Import (files / folder / drag-drop) ...... Texture Convert > left import bar + dropzone
+   2 Group review table (type columns) ........ Texture Convert > center review table
+   3 Group-level settings ...................... Texture Convert > right "Group Override" card
+   4 Convert settings (res / diffuse fmt /
+     normal flip / metal gate advanced) ....... Texture Convert > right "Conversion" card + <details> Metal Gate
+   5 RC / DDS (path / adaptive pool progress /
+     post-export cleanup options) ............. Texture Convert > right "RC / DDS" card + <details> Cleanup
+   6 Related textures .......................... Texture Convert > left list "linked" badge + relation note
+   7 Multi-select delete ....................... Texture Convert > left list checkboxes + Delete button
+   8 NEW material preview ...................... Texture Convert > center preview (swatch + sphere)  [also PBR Builder]
+   9 NEW diffuse->PBR converter (params+run) ... PBR BUILDER module (dedicated card)
+  MODEL SIDE
+  10 FBX list (batch) .......................... Model Export > left FBX list (multi)
+  11 Material slots (physicalize multi) ........ Model Export > center material-slot table
+  12 Axis (detect + override) .................. Model Export > right "Orientation" (forward -Z / up +Y)
+  13 Units / scale ............................. Model Export > right "Units & Scale"
+  14 Merge nodes ............................... Model Export > right "Scene" merge nodes toggle
+  15 Scene origin .............................. Model Export > right "Scene" origin control
+  16 Export options (textures w/ model, del json) Model Export > right "Export Options"
+  17 NEW model preview ......................... Model Export > center preview (wireframe)  [also Proxy Generator]
+  18 NEW proxy generation params (algo+gen/prev/accept) PROXY GENERATOR module (dedicated card)
+  GLOBAL
+  19 Language .................................. Settings screen (gear) > Language
+  20 Output dirs ............................... Settings screen (gear) > Texture / Model output dirs
+  21 Job / progress center ..................... Persistent bottom job strip (all screens) + expand tray
+  22 Diagnostics ............................... Bottom strip diagnostics chip -> popover
+  23 Settings profile access ................... Settings screen (gear) > Save / Load profile + RC path
+================================================================================
+-->
+<style>
+  :root{
+    /* egui-style dark workbench */
+    --bg:#1c1d21; --bg2:#202226; --panel:#26282d; --panel2:#2d2f35; --panel3:#33353c;
+    --border:#3a3d44; --border-strong:#494d56; --ink:#e5e7ec; --muted:#a2a8b2; --muted2:#727884;
+    --accent:#5b8def; --accent-weak:#233150; --accent-line:#3b5aa6;
+    --ok:#4ade80; --ok-weak:#1c3226; --warn:#f5b13a; --warn-weak:#3a2e18;
+    --hazard:#f2635a; --hazard-weak:#3a2020;
+    --radius:9px;
+    font-family:"Segoe UI","Microsoft JhengHei","Noto Sans TC",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg); color:var(--ink); font-size:13px; overflow:hidden; min-width:1280px}
+  button{font-family:inherit; cursor:pointer; color:inherit}
+  select,input{font-family:inherit; font-size:12.5px}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-thumb{background:#3f434b;border-radius:6px;border:2px solid var(--bg)}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  #app{display:flex; flex-direction:column; height:100vh}
+
+  /* ---------- global titlebar ---------- */
+  .titlebar{
+    height:42px; flex:0 0 42px; display:flex; align-items:center; gap:12px; padding:0 16px;
+    background:linear-gradient(180deg,#25272c,#1f2125); border-bottom:1px solid var(--border);
+  }
+  .titlebar .logo{width:20px;height:20px;border-radius:6px;
+    background:linear-gradient(135deg,var(--accent),#a568f0)}
+  .titlebar b{font-size:13.5px; font-weight:600}
+  .titlebar .ver{color:var(--muted2); font-size:11.5px}
+  .titlebar .crumb{margin-left:6px; color:var(--muted); font-size:12px; display:flex; align-items:center; gap:8px}
+  .titlebar .crumb .sep{color:var(--muted2)}
+  .titlebar .crumb .cur{color:var(--ink); font-weight:600}
+  .titlebar .spacer{flex:1}
+  .gearbtn{width:30px;height:30px;border-radius:7px; border:1px solid var(--border); background:var(--panel);
+    display:flex;align-items:center;justify-content:center; font-size:15px; color:var(--muted)}
+  .gearbtn:hover{background:var(--panel2); color:var(--ink)}
+
+  /* ---------- screen stack ---------- */
+  .stage{flex:1; min-height:0; position:relative}
+  .screen{position:absolute; inset:0; display:none; flex-direction:column; overflow:hidden}
+  .screen.on{display:flex}
+
+  /* generic buttons */
+  .btn{border:1px solid var(--border-strong); background:var(--panel2); color:var(--ink);
+    padding:7px 13px; border-radius:7px; font-size:12.5px; font-weight:500; transition:.12s}
+  .btn:hover{background:var(--panel3); border-color:#5a5f69}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#0e1830; font-weight:600}
+  .btn.primary:hover{background:#74a0f2}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:#f6928b; border-color:#5a3a38}
+  .btn.danger:hover{background:var(--hazard-weak)}
+  .btn:disabled{opacity:.45; cursor:default}
+  .btn.sm{padding:5px 9px; font-size:11.5px}
+
+  /* ============================================================= DASHBOARD */
+  .dash{flex:1; overflow-y:auto; padding:26px 34px 20px}
+  .dash h1{font-size:19px; font-weight:600; letter-spacing:.2px}
+  .dash .lead{color:var(--muted); font-size:12.5px; margin-top:4px}
+  .dash .lead b{color:var(--ink); font-weight:600}
+  .cardgrid{margin-top:22px; display:grid; grid-template-columns:1fr 1fr; gap:18px; max-width:1120px}
+  .modcard{position:relative; background:linear-gradient(180deg,var(--panel),#232529);
+    border:1px solid var(--border); border-radius:14px; padding:20px 22px 18px; cursor:pointer;
+    transition:.14s; overflow:hidden; min-height:186px; display:flex; flex-direction:column}
+  .modcard:hover{border-color:var(--accent-line); transform:translateY(-2px);
+    box-shadow:0 12px 30px rgba(0,0,0,.35)}
+  .modcard .glow{position:absolute; right:-40px; top:-40px; width:150px; height:150px; border-radius:50%;
+    opacity:.16; filter:blur(6px)}
+  .modcard .chead{display:flex; align-items:center; gap:14px}
+  .modcard .mi{width:46px;height:46px;border-radius:12px; display:flex; align-items:center; justify-content:center;
+    font-size:22px; flex:0 0 46px}
+  .modcard h2{font-size:16px; font-weight:600}
+  .modcard .csub{color:var(--muted); font-size:12px; margin-top:2px}
+  .modcard .stats{margin-top:16px; display:flex; gap:26px}
+  .stat .num{font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1}
+  .stat .lbl{color:var(--muted2); font-size:11px; margin-top:4px; text-transform:uppercase; letter-spacing:.5px}
+  .stat .num.warn{color:var(--warn)} .stat .num.ok{color:var(--ok)}
+  .modcard .foot{margin-top:auto; padding-top:14px; display:flex; align-items:center; gap:10px}
+  .modcard .last{color:var(--muted); font-size:11.5px; flex:1; display:flex; align-items:center; gap:7px}
+  .dotm{width:7px;height:7px;border-radius:50%;flex:0 0 7px}
+  .modcard .enter{color:var(--accent); font-size:12px; font-weight:600}
+  /* live progress inside a card */
+  .cardprog{margin-top:13px}
+  .cardprog .pbar{height:6px; border-radius:4px; background:#1a1c20; overflow:hidden}
+  .cardprog .pbar i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),#8fb4f7); border-radius:4px}
+  .cardprog .pmeta{display:flex; justify-content:space-between; margin-top:6px; color:var(--muted); font-size:11px}
+  .cardprog .pmeta .run{color:var(--accent); font-weight:600}
+
+  /* ============================================================= MODULE PAGES */
+  .modbar{height:46px; flex:0 0 46px; display:flex; align-items:center; gap:14px; padding:0 16px;
+    background:var(--bg2); border-bottom:1px solid var(--border)}
+  .backbtn{display:flex; align-items:center; gap:7px; border:1px solid var(--border-strong);
+    background:var(--panel2); padding:6px 13px 6px 10px; border-radius:8px; font-size:12.5px; font-weight:600}
+  .backbtn:hover{background:var(--panel3)}
+  .backbtn .arr{font-size:14px}
+  .modbar .mtitle{display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600}
+  .modbar .mtitle .ico{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px}
+  .modbar .mstat{margin-left:auto; color:var(--muted); font-size:12px; display:flex; align-items:center; gap:8px}
+  .modbody{flex:1; min-height:0; display:grid}
+  /* per-module column templates */
+  .lay-tex{grid-template-columns:300px 1fr 360px}
+  .lay-mdl{grid-template-columns:280px 1fr 350px}
+  .lay-proxy{grid-template-columns:1fr 380px}
+  .lay-pbr{grid-template-columns:280px 1fr 360px}
+  .col{min-height:0; display:flex; flex-direction:column; overflow:hidden}
+  .col.l{border-right:1px solid var(--border); background:var(--bg2)}
+  .col.r{border-left:1px solid var(--border); background:var(--bg2)}
+  .col.c{background:var(--bg)}
+
+  .ptitle{font-size:10.5px; font-weight:700; letter-spacing:.7px; color:var(--muted2);
+    text-transform:uppercase; padding:12px 15px 7px}
+  .rscroll{flex:1; overflow-y:auto; padding:12px 14px}
+  .lscroll{flex:1; overflow-y:auto; padding:8px}
+  .card2{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:13px 14px; margin-bottom:12px}
+  .card2 .sec{font-size:10.5px; font-weight:700; letter-spacing:.5px; color:var(--muted2);
+    text-transform:uppercase; margin-bottom:11px; display:flex; align-items:center; gap:8px}
+  .card2 .sec .tag{margin-left:auto; font-size:9.5px; padding:2px 7px; border-radius:8px;
+    background:var(--accent-weak); color:#8db2f5; letter-spacing:.3px}
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block; font-size:11.5px; font-weight:600; color:#c3c8d0; margin-bottom:5px}
+  .field .row{display:flex; gap:6px}
+  .field input[type=text]{flex:1; padding:7px 9px; border:1px solid var(--border-strong); border-radius:6px;
+    background:var(--panel2); color:var(--ink)}
+  .field select{width:100%; padding:7px 9px; border:1px solid var(--border-strong); border-radius:6px;
+    background:var(--panel2); color:var(--ink)}
+  .field .hint{font-size:10.5px; color:var(--muted2); margin-top:5px}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px 12px}
+  .check{display:flex; align-items:center; gap:9px; padding:6px 0; font-size:12.5px; color:#c3c8d0}
+  .check input{width:15px;height:15px; accent-color:var(--accent)}
+  .slider{display:flex; align-items:center; gap:10px; margin-bottom:11px}
+  .slider label{flex:0 0 108px; font-size:11.5px; color:#c3c8d0}
+  .slider input[type=range]{flex:1; accent-color:var(--accent)}
+  .slider .val{flex:0 0 40px; text-align:right; font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums}
+  details.adv{background:var(--panel); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px}
+  details.adv>summary{list-style:none; cursor:pointer; padding:11px 14px; font-size:12px; font-weight:600;
+    display:flex; align-items:center; gap:8px; color:#c9ced6}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary .chev{transition:transform .15s; color:var(--muted2); font-size:10px}
+  details.adv[open]>summary .chev{transform:rotate(90deg)}
+  details.adv .body{padding:2px 14px 14px}
+  .actionbar{padding:12px 14px; border-top:1px solid var(--border); background:var(--bg2);
+    display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .actionbar .btn{width:100%}
+  .actionbar .btn.wide{grid-column:1/-1}
+
+  /* left import / list */
+  .toolrow{display:flex; gap:7px; padding:11px 10px; border-bottom:1px solid var(--border)}
+  .toolrow .btn{flex:1}
+  .dropzone{margin:10px; border:1.5px dashed var(--border-strong); border-radius:9px; padding:14px;
+    text-align:center; color:var(--muted2); font-size:11.5px; line-height:1.6; background:#1f2125}
+  .dropzone b{color:var(--muted)}
+  .flist{padding:4px 6px}
+  .frow{display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:6px; font-size:12px; cursor:pointer}
+  .frow:hover{background:var(--panel2)}
+  .frow.sel{background:var(--accent-weak)}
+  .frow input{accent-color:var(--accent); width:14px;height:14px}
+  .frow .ic{width:15px;height:15px;border-radius:4px;flex:0 0 15px}
+  .frow .fn{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#cfd4dc; flex:1}
+  .frow .lk{font-size:9.5px; color:#8db2f5; background:var(--accent-weak); padding:1px 6px; border-radius:7px}
+  .frow .lk.warn{color:var(--warn); background:var(--warn-weak)}
+  .listbar{display:flex; align-items:center; gap:8px; padding:8px 11px; border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border); background:var(--bg2); color:var(--muted); font-size:11.5px}
+  .listbar .grow{flex:1}
+
+  /* center previews */
+  .cscroll{flex:1; overflow-y:auto; padding:14px 16px}
+  .previewbox{background:var(--panel); border:1px solid var(--border); border-radius:11px; overflow:hidden;
+    display:flex; margin-bottom:14px}
+  .pv-visual{flex:0 0 300px; position:relative; height:230px;
+    background:repeating-conic-gradient(#26282d 0% 25%, #303239 0% 50%) 0/26px 26px}
+  .pv-sphere{position:absolute; inset:0; margin:auto; width:158px;height:158px;border-radius:50%;
+    box-shadow:inset -22px -26px 46px rgba(0,0,0,.55), inset 14px 16px 30px rgba(255,255,255,.14),
+      0 10px 26px rgba(0,0,0,.4)}
+  .pv-tag{position:absolute; left:12px; bottom:10px; font-size:10.5px; color:#cfd4dccc;
+    background:#12131699; padding:3px 8px; border-radius:6px; letter-spacing:.4px}
+  .pv-side{flex:1; padding:16px 18px; min-width:0; display:flex; flex-direction:column}
+  .pv-side .gname{font-size:15px; font-weight:600}
+  .pv-side .gmeta{color:var(--muted); font-size:12px; margin-top:3px}
+  .pv-swatches{display:flex; gap:8px; margin-top:14px; flex-wrap:wrap}
+  .sw{width:46px;height:46px;border-radius:7px; border:1px solid var(--border); position:relative}
+  .sw span{position:absolute; left:0; right:0; bottom:-15px; text-align:center; font-size:9px; color:var(--muted2)}
+  .pv-badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:26px}
+  .badge{padding:3px 9px; border-radius:11px; font-size:10.5px; font-weight:500;
+    background:var(--accent-weak); color:#9dbdf7; border:1px solid var(--accent-line)}
+  .badge.warn{background:var(--warn-weak); color:var(--warn); border-color:#6a5320}
+
+  /* wireframe model preview */
+  .wire{flex:1; position:relative; height:230px; background:
+    linear-gradient(180deg,#202227,#191a1e);
+    background-image:
+      linear-gradient(#2a2d33 1px,transparent 1px),
+      linear-gradient(90deg,#2a2d33 1px,transparent 1px);
+    background-size:100% 100%, 34px 34px, 34px 34px; overflow:hidden}
+  .wirebox{position:absolute; left:50%; top:50%; width:150px;height:96px;
+    transform:translate(-50%,-52%) rotateX(58deg) rotateZ(-32deg); transform-style:preserve-3d}
+  .wf{position:absolute; border:1.4px solid #6f9bf0}
+  .wf.top{inset:0; border-color:#7fa8f4}
+  .wf.h{inset:0; transform:translateZ(-60px); border-color:#3f5f9e}
+  .proxyhull{position:absolute; left:50%; top:50%; width:150px;height:96px;
+    transform:translate(-50%,-52%) rotateX(58deg) rotateZ(-32deg); border:1.6px dashed #4ade80;
+    border-radius:20px 8px 26px 10px; box-shadow:0 0 24px #4ade8033}
+  .wire .tag{position:absolute; left:12px; bottom:10px; font-size:10.5px; color:#cfd4dccc;
+    background:#12131699; padding:3px 8px; border-radius:6px}
+  .wire .axis{position:absolute; right:12px; bottom:12px; font-size:10px; color:var(--muted2); text-align:right; line-height:1.5}
+
+  /* tables */
+  .tblwrap{background:var(--panel); border:1px solid var(--border); border-radius:11px; overflow:hidden}
+  .tblwrap .th{display:flex; align-items:center; padding:10px 14px; border-bottom:1px solid var(--border)}
+  .tblwrap .th b{font-size:12.5px}
+  .tblwrap .th .cnt{margin-left:auto; color:var(--muted); font-size:11.5px}
+  .tblwrap .th .cnt em{font-style:normal; color:var(--warn); font-weight:600}
+  .tscroll{max-height:300px; overflow:auto}
+  table.grp{border-collapse:collapse; width:100%; font-size:12px}
+  table.grp th{position:sticky; top:0; background:var(--panel2); color:var(--muted); font-weight:600;
+    padding:8px 6px; border-bottom:1px solid var(--border); font-size:10px; text-align:center; z-index:1}
+  table.grp th.nl{text-align:left; padding-left:14px}
+  table.grp td{border-bottom:1px solid #2c2e33; padding:0 6px; height:33px; text-align:center; color:#cfd4dc}
+  table.grp td.nl{text-align:left; padding-left:14px; max-width:170px}
+  table.grp td.nl .nm{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:500}
+  table.grp tr{cursor:pointer}
+  table.grp tr:hover td{background:var(--panel2)}
+  table.grp tr.unknown td{background:var(--warn-weak)}
+  table.grp tr.unknown td.nl{box-shadow:inset 3px 0 0 var(--warn)}
+  .cell{display:inline-block; width:15px;height:15px;border-radius:4px; vertical-align:middle}
+  .cell.on{background:var(--ok)} .cell.off{background:#34373d; box-shadow:inset 0 0 0 1px #43464d}
+  td.uk select{width:120px; padding:3px 4px; border:1px solid var(--warn); border-radius:5px;
+    background:#2b2413; color:#f0c66a; font-weight:600; font-size:11px}
+  td.uk .dash{color:var(--muted2)}
+  .pz{display:inline-block; padding:2px 8px; border-radius:9px; background:var(--panel3); color:#c3c8d0; font-size:10px}
+  .pz.proxy{background:var(--accent-weak); color:#9dbdf7}
+  table.mat{width:100%; border-collapse:collapse; font-size:11.5px}
+  table.mat th{position:sticky;top:0; background:var(--panel2); color:var(--muted); font-weight:600;
+    text-align:left; padding:7px 10px; border-bottom:1px solid var(--border); font-size:10px}
+  table.mat td{padding:6px 10px; border-bottom:1px solid #2c2e33; white-space:nowrap; color:#cfd4dc}
+  table.mat tr:hover td{background:var(--panel2)}
+  table.mat tr.unassigned td{color:var(--warn); background:var(--warn-weak); font-style:italic}
+  table.mat select{background:var(--panel2); color:var(--ink); border:1px solid var(--border-strong);
+    border-radius:5px; padding:2px 4px; font-size:10.5px}
+
+  /* PBR pipeline strip */
+  .pbrflow{display:flex; align-items:center; gap:14px; margin-bottom:14px}
+  .pbrflow .arrow{color:var(--muted2); font-size:20px}
+  .pbrcol{flex:1}
+  .pbrcol .lab{font-size:10.5px; color:var(--muted2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:7px}
+  .pbrmaps{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  .pbrmap{border-radius:8px; height:66px; border:1px solid var(--border); position:relative}
+  .pbrmap span{position:absolute; left:6px; bottom:5px; font-size:9.5px; color:#e7e9edcc;
+    background:#12131688; padding:1px 5px; border-radius:5px}
+  .srcmap{height:140px; border-radius:9px; border:1px solid var(--border); position:relative}
+  .srcmap span{position:absolute; left:8px; bottom:7px; font-size:10px; color:#e7e9edcc;
+    background:#12131688; padding:2px 6px; border-radius:5px}
+
+  /* ============================================================= SETTINGS */
+  .setwrap{flex:1; overflow-y:auto; padding:26px 34px; max-width:760px}
+  .setwrap h1{font-size:18px; font-weight:600; margin-bottom:4px}
+  .setwrap .lead{color:var(--muted); font-size:12.5px; margin-bottom:20px}
+
+  /* ============================================================= JOB STRIP */
+  .jobstrip{flex:0 0 34px; height:34px; display:flex; align-items:center; gap:14px; padding:0 14px;
+    background:linear-gradient(180deg,#25272c,#1e2024); border-top:1px solid var(--border); font-size:11.5px}
+  .jobstrip .jrun{display:flex; align-items:center; gap:9px; color:var(--muted)}
+  .jobstrip .jrun .spin{width:11px;height:11px;border-radius:50%;border:2px solid #3a4a6e;
+    border-top-color:var(--accent); animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .jobstrip .jbar{width:150px; height:6px; border-radius:4px; background:#15161a; overflow:hidden}
+  .jobstrip .jbar i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),#8fb4f7)}
+  .jobstrip .jname{color:#cfd4dc}
+  .jobstrip .spacer{flex:1}
+  .jchip{display:flex; align-items:center; gap:7px; padding:3px 10px; border-radius:11px; cursor:pointer;
+    border:1px solid var(--border)}
+  .jchip.diag{background:var(--warn-weak); color:var(--warn); border-color:#6a5320}
+  .jchip.diag.clean{background:var(--ok-weak); color:var(--ok); border-color:#2c5238}
+  .jchip.queue{background:var(--panel2); color:var(--muted)}
+  .jchip:hover{filter:brightness(1.12)}
+  .jchip .dotw{width:7px;height:7px;border-radius:50%;background:currentColor}
+
+  /* queue tray + diag popover */
+  .tray{position:fixed; right:14px; bottom:40px; width:400px; max-height:340px; background:var(--panel);
+    border:1px solid var(--border-strong); border-radius:11px; box-shadow:0 16px 50px rgba(0,0,0,.5);
+    overflow:hidden; z-index:60; opacity:0; visibility:hidden; transform:translateY(8px); transition:.15s;
+    display:flex; flex-direction:column}
+  .tray.show{opacity:1; visibility:visible; transform:none}
+  .tray .trh{padding:11px 14px; border-bottom:1px solid var(--border); font-weight:600; font-size:12.5px;
+    display:flex; align-items:center; gap:8px}
+  .tray .trlist{overflow-y:auto}
+  .jrow{display:flex; align-items:center; gap:10px; padding:10px 14px; border-bottom:1px solid #2c2e33; font-size:12px}
+  .jrow:last-child{border-bottom:none}
+  .jrow .jt{flex:1}
+  .jrow .jt b{display:block; font-size:12px; color:#dfe2e8}
+  .jrow .jt small{color:var(--muted2); font-size:10.5px}
+  .jrow .jst{font-size:11px; padding:2px 9px; border-radius:9px}
+  .jst.run{background:var(--accent-weak); color:#9dbdf7} .jst.done{background:var(--ok-weak); color:var(--ok)}
+  .jst.queued{background:var(--panel3); color:var(--muted)} .jst.warn{background:var(--warn-weak); color:var(--warn)}
+  .dg{display:flex; gap:10px; padding:11px 14px; border-bottom:1px solid #2c2e33; font-size:12px}
+  .dg:last-child{border-bottom:none}
+  .dg .sev{flex:0 0 auto; font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px; height:fit-content}
+  .sev.warn{background:var(--warn-weak); color:var(--warn)} .sev.info{background:var(--accent-weak); color:#9dbdf7}
+  .dg .txt b{display:block; font-size:10.5px; color:var(--muted); margin-bottom:2px}
+  .dg .txt span{color:#cfd4dc; line-height:1.5}
+
+  /* toast */
+  .toast{position:fixed; right:16px; bottom:46px; z-index:70; display:flex; align-items:center; gap:12px;
+    padding:12px 15px; min-width:290px; background:var(--panel); border:1px solid var(--border-strong);
+    border-left:4px solid var(--ok); border-radius:10px; box-shadow:0 14px 40px rgba(0,0,0,.5);
+    transform:translateX(150%); transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+  .toast.show{transform:none}
+  .toast .tk{width:26px;height:26px;border-radius:50%;background:var(--ok-weak);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;font-weight:700;flex:0 0 26px}
+  .toast b{font-size:12.5px} .toast span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ GLOBAL TITLEBAR ============ -->
+  <div class="titlebar">
+    <div class="logo"></div>
+    <b>CryEngine Texture Processor</b><span class="ver">Modules · v0.2</span>
+    <div class="crumb" id="crumb"><span class="cur">Home</span></div>
+    <div class="spacer"></div>
+    <button class="gearbtn" id="btnGear" title="Global settings">⚙</button>
+  </div>
+
+  <div class="stage">
+
+    <!-- ================================================= DASHBOARD ============ -->
+    <section class="screen on" id="s-home">
+      <div class="dash">
+        <h1>Workspace</h1>
+        <div class="lead">Project <b>KB3D_Encounter</b> · 132 texture groups · 3 FBX models · output <b>D:\Assets\KB3D\_cryengine</b></div>
+
+        <div class="cardgrid">
+
+          <!-- TEXTURE CONVERT (live progress) -->
+          <div class="modcard" data-goto="tex">
+            <div class="glow" style="background:#5b8def"></div>
+            <div class="chead">
+              <div class="mi" style="background:var(--accent-weak); color:#9dbdf7">🎨</div>
+              <div><h2>Texture Convert</h2><div class="csub">Import · classify · RC → DDS</div></div>
+            </div>
+            <div class="cardprog">
+              <div class="pbar"><i style="width:67%"></i></div>
+              <div class="pmeta"><span class="run">Converting… 88 / 132 groups</span><span>67%</span></div>
+            </div>
+            <div class="foot">
+              <div class="last"><span class="dotm" style="background:var(--accent)"></span>Running · adaptive pool 6 workers</div>
+              <span class="enter">Enter →</span>
+            </div>
+          </div>
+
+          <!-- MODEL EXPORT -->
+          <div class="modcard" data-goto="mdl">
+            <div class="glow" style="background:#a568f0"></div>
+            <div class="chead">
+              <div class="mi" style="background:#2b2140; color:#c39cf3">📦</div>
+              <div><h2>Model Export</h2><div class="csub">FBX → CryEngine CGF + .mtl</div></div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="num warn">1</div><div class="lbl">Unassigned slot</div></div>
+              <div class="stat"><div class="num">3</div><div class="lbl">FBX queued</div></div>
+            </div>
+            <div class="foot">
+              <div class="last"><span class="dotm" style="background:var(--warn)"></span>KB3D_Metal_Gate.fbx needs axis review</div>
+              <span class="enter">Enter →</span>
+            </div>
+          </div>
+
+          <!-- PROXY GENERATOR -->
+          <div class="modcard" data-goto="proxy">
+            <div class="glow" style="background:#4ade80"></div>
+            <div class="chead">
+              <div class="mi" style="background:var(--ok-weak); color:#6fe39a">🧊</div>
+              <div><h2>Proxy Generator</h2><div class="csub">Collision hulls · physicalize proxy_only</div></div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="num">2</div><div class="lbl">Proxies pending</div></div>
+              <div class="stat"><div class="num ok">14</div><div class="lbl">Hulls last run</div></div>
+            </div>
+            <div class="foot">
+              <div class="last"><span class="dotm" style="background:var(--ok)"></span>Last: KB3D_Barrier accepted (voxel 64)</div>
+              <span class="enter">Enter →</span>
+            </div>
+          </div>
+
+          <!-- PBR BUILDER -->
+          <div class="modcard" data-goto="pbr">
+            <div class="glow" style="background:#f5b13a"></div>
+            <div class="chead">
+              <div class="mi" style="background:var(--warn-weak); color:#f2c265">✨</div>
+              <div><h2>PBR Builder</h2><div class="csub">Diffuse → full PBR channel set</div></div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="num">7</div><div class="lbl">Diffuse-only</div></div>
+              <div class="stat"><div class="num ok">5</div><div class="lbl">Built today</div></div>
+            </div>
+            <div class="foot">
+              <div class="last"><span class="dotm" style="background:var(--muted2)"></span>Idle · last built KB3D_ENC_ConcreteWall</div>
+              <span class="enter">Enter →</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================= TEXTURE CONVERT ====== -->
+    <section class="screen" id="s-tex">
+      <div class="modbar">
+        <button class="backbtn" data-back><span class="arr">←</span>Back</button>
+        <div class="mtitle"><span class="ico" style="background:var(--accent-weak);color:#9dbdf7">🎨</span>Texture Convert</div>
+        <div class="mstat">132 groups · 5 need assignment · pool 6 workers</div>
+      </div>
+      <div class="modbody lay-tex">
+
+        <!-- left: import + list + multi-select delete -->
+        <aside class="col l">
+          <div class="toolrow">
+            <button class="btn sm" onclick="toast('Add Files','File picker (mock)')">Add Files…</button>
+            <button class="btn sm" onclick="toast('Add Folder','Scanned 132 groups (mock)')">Add Folder…</button>
+          </div>
+          <div class="dropzone">Drop textures here<br><b>Drag &amp; drop</b> KB3D_ENC_*.png files or a folder</div>
+          <div class="listbar">
+            <label class="check" style="padding:0"><input type="checkbox" id="selAll" onchange="toggleAll(this)">Select all</label>
+            <span class="grow"></span>
+            <button class="btn sm danger" onclick="delSel()">Delete (<span id="selCount">0</span>)</button>
+          </div>
+          <div class="lscroll"><div class="flist" id="texList"></div></div>
+        </aside>
+
+        <!-- center: material preview + group review table -->
+        <main class="col c">
+          <div class="cscroll">
+            <div class="ptitle" style="padding:2px 2px 8px">Material Preview <span style="color:var(--muted2);font-weight:400;text-transform:none;letter-spacing:0"> · new</span></div>
+            <div class="previewbox">
+              <div class="pv-visual">
+                <div class="pv-sphere" style="background:radial-gradient(circle at 36% 30%, #b8a184, #6b4f34 55%, #2c2016)"></div>
+                <div class="pv-tag">basecolor · 2048² sphere</div>
+              </div>
+              <div class="pv-side">
+                <div class="gname">KB3D_ENC_ConcreteWall</div>
+                <div class="gmeta">6 channels · albedo / ddna / spec / gloss / height / ao</div>
+                <div class="pv-swatches">
+                  <div class="sw" style="background:radial-gradient(circle at 40% 35%,#a49a8e,#4c463f)"><span>albedo</span></div>
+                  <div class="sw" style="background:linear-gradient(135deg,#8a8fd0,#5661a8)"><span>ddna</span></div>
+                  <div class="sw" style="background:linear-gradient(135deg,#3a3a3a,#101010)"><span>spec</span></div>
+                  <div class="sw" style="background:linear-gradient(135deg,#c9c9c9,#6b6b6b)"><span>gloss</span></div>
+                </div>
+                <div class="pv-badges">
+                  <span class="badge">diffuse</span><span class="badge">ddna</span>
+                  <span class="badge">spec</span><span class="badge">gloss</span><span class="badge">height</span><span class="badge">ao</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tblwrap">
+              <div class="th"><b>Detected texture groups</b>
+                <div class="cnt">132 total (showing 12) · <em>5 need assignment</em></div></div>
+              <div class="tscroll">
+                <table class="grp" id="grpTbl"><thead id="grpHead"></thead><tbody id="grpBody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- right: group settings + conversion + RC/DDS -->
+        <aside class="col r">
+          <div class="rscroll">
+            <div class="card2">
+              <div class="sec">Group Override<span class="tag">selected</span></div>
+              <div class="field"><label>Applies to</label>
+                <input type="text" value="KB3D_ENC_GlassClean (+4 glass groups)" readonly></div>
+              <div class="field"><label>Resolution override</label>
+                <select><option>Inherit (2048)</option><option>4096</option><option selected>1024</option><option>512</option></select></div>
+              <label class="check"><input type="checkbox" checked>Treat as alpha-blend group</label>
+            </div>
+
+            <div class="card2">
+              <div class="sec">Conversion</div>
+              <div class="field"><label>Output resolution</label>
+                <select><option>Original</option><option>4096</option><option selected>2048</option><option>1024</option><option>512</option></select></div>
+              <div class="field"><label>Diffuse format</label>
+                <select><option selected>albedo</option><option>diffuse_ao</option></select></div>
+              <label class="check"><input type="checkbox">Flip normal green channel</label>
+              <label class="check"><input type="checkbox" checked>Auto-generate missing Spec</label>
+            </div>
+
+            <details class="adv">
+              <summary><span class="chev">▶</span>Metal Gate (advanced)</summary>
+              <div class="body">
+                <label class="check"><input type="checkbox" checked>Process metallic workflow (Metallic → Albedo + Reflection)</label>
+                <div class="slider"><label>Gate threshold</label><input type="range" min="0" max="100" value="50" oninput="this.nextElementSibling.textContent=this.value"><span class="val">50</span></div>
+                <div class="slider"><label>Reflection floor</label><input type="range" min="0" max="100" value="4" oninput="this.nextElementSibling.textContent=this.value"><span class="val">4</span></div>
+                <div class="field" style="margin-top:8px"><label>ARM channel order</label>
+                  <select><option selected>AO / Roughness / Metallic</option><option>Roughness / Metallic / AO</option></select></div>
+              </div>
+            </details>
+
+            <div class="card2">
+              <div class="sec">RC / DDS</div>
+              <div class="field"><label>ResourceCompiler path</label>
+                <div class="row"><input type="text" value="C:\CRYENGINE\rc\rc.exe"><button class="btn sm">…</button></div></div>
+              <div class="field" style="margin-bottom:6px"><label>Adaptive worker pool</label>
+                <div class="slider" style="margin-bottom:0"><label style="flex:0 0 70px">Workers</label><input type="range" min="1" max="12" value="6" oninput="this.nextElementSibling.textContent=this.value"><span class="val">6</span></div>
+                <div class="hint">Pool auto-throttles on RAM pressure · currently 88/132 done</div></div>
+            </div>
+
+            <details class="adv">
+              <summary><span class="chev">▶</span>Post-export cleanup</summary>
+              <div class="body">
+                <label class="check"><input type="checkbox" checked>Delete intermediate .tif after DDS</label>
+                <label class="check"><input type="checkbox">Delete RC $tmp folders</label>
+                <label class="check"><input type="checkbox" checked>Remove source .png on success</label>
+              </div>
+            </details>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary wide" onclick="startJob('Texture Convert','132 groups')">Convert Batch</button>
+            <button class="btn" onclick="toast('Textures only','DDS written, no .mtl')">Textures Only</button>
+            <button class="btn" onclick="toast('Settings saved','Wrote settings.json')">Save Preset</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================================================= MODEL EXPORT ========= -->
+    <section class="screen" id="s-mdl">
+      <div class="modbar">
+        <button class="backbtn" data-back><span class="arr">←</span>Back</button>
+        <div class="mtitle"><span class="ico" style="background:#2b2140;color:#c39cf3">📦</span>Model Export</div>
+        <div class="mstat">KB3D_Metal_Gate.fbx · 16 materials · 1 unassigned</div>
+      </div>
+      <div class="modbody lay-mdl">
+
+        <!-- left: FBX batch list -->
+        <aside class="col l">
+          <div class="toolrow"><button class="btn sm" style="flex:2" onclick="toast('Add Models','FBX picker (mock)')">Add Models…</button></div>
+          <div class="lscroll"><div class="flist">
+            <div class="frow sel"><span class="ic" style="background:linear-gradient(135deg,#a568f0,#4a2f80)"></span><span class="fn">KB3D_Metal_Gate.fbx</span><span class="lk warn">axis?</span></div>
+            <div class="frow"><span class="ic" style="background:linear-gradient(135deg,#5b8def,#28407a)"></span><span class="fn">KB3D_Barrier_Concrete.fbx</span><span class="lk">14 mat</span></div>
+            <div class="frow"><span class="ic" style="background:linear-gradient(135deg,#4ade80,#1f6b3c)"></span><span class="fn">KB3D_Pipe_Cluster.fbx</span><span class="lk">9 mat</span></div>
+          </div></div>
+          <div class="listbar"><span class="grow">3 FBX in batch</span><button class="btn sm" onclick="toast('Batch export','Queued 3 FBX')">Batch all</button></div>
+        </aside>
+
+        <!-- center: model preview + material-slot table -->
+        <main class="col c">
+          <div class="cscroll">
+            <div class="ptitle" style="padding:2px 2px 8px">Model Preview <span style="color:var(--muted2);font-weight:400;text-transform:none;letter-spacing:0"> · new</span></div>
+            <div class="previewbox">
+              <div class="wire">
+                <div class="wirebox"><div class="wf top"></div><div class="wf h"></div></div>
+                <div class="tag">KB3D_Metal_Gate.fbx · 48.2k tris</div>
+                <div class="axis">forward −Z<br>up +Y</div>
+              </div>
+            </div>
+            <div class="tblwrap">
+              <div class="th"><b>Material slots</b><div class="cnt">16 slots · <em>1 unassigned</em></div></div>
+              <div class="tscroll">
+                <table class="mat">
+                  <thead><tr><th>#</th><th>Material</th><th>sub_index</th><th>physicalize</th></tr></thead>
+                  <tbody id="matBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- right: orientation / units / scene / export options -->
+        <aside class="col r">
+          <div class="rscroll">
+            <div class="card2">
+              <div class="sec">Orientation<span class="tag">auto-detected</span></div>
+              <div class="grid2">
+                <div class="field" style="margin:0"><label>Forward axis</label>
+                  <select><option>+X</option><option>−X</option><option>+Z</option><option selected>−Z</option></select></div>
+                <div class="field" style="margin:0"><label>Up axis</label>
+                  <select><option selected>+Y</option><option>−Y</option><option>+Z</option></select></div>
+              </div>
+              <div class="hint">Detected from FBX header · override if import looks rotated.</div>
+            </div>
+            <div class="card2">
+              <div class="sec">Units &amp; Scale</div>
+              <div class="grid2">
+                <div class="field" style="margin:0"><label>Source unit</label>
+                  <select><option selected>Centimeters</option><option>Meters</option><option>Inches</option></select></div>
+                <div class="field" style="margin:0"><label>Scale factor</label><input type="text" value="1.0"></div>
+              </div>
+            </div>
+            <div class="card2">
+              <div class="sec">Scene</div>
+              <label class="check"><input type="checkbox" checked>Merge child nodes into single CGF</label>
+              <div class="field" style="margin-top:8px"><label>Scene origin</label>
+                <select><option selected>Recenter to bounding-box floor</option><option>Keep FBX origin</option><option>World zero</option></select></div>
+            </div>
+            <div class="card2">
+              <div class="sec">Export Options</div>
+              <label class="check"><input type="checkbox" checked>Export textures alongside model</label>
+              <label class="check"><input type="checkbox" checked>Delete .json sidecar after export</label>
+              <label class="check"><input type="checkbox">Write .mtl only (skip geometry)</label>
+            </div>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary wide" onclick="startJob('Model Export','KB3D_Metal_Gate.fbx')">Export CGF + .mtl</button>
+            <button class="btn" onclick="toast('.mtl written','16 slots + 1 default')">Export .mtl</button>
+            <button class="btn" onclick="goto('proxy')">Proxy…</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================================================= PROXY GENERATOR ====== -->
+    <section class="screen" id="s-proxy">
+      <div class="modbar">
+        <button class="backbtn" data-back><span class="arr">←</span>Back</button>
+        <div class="mtitle"><span class="ico" style="background:var(--ok-weak);color:#6fe39a">🧊</span>Proxy Generator</div>
+        <div class="mstat">Source: KB3D_Barrier_Concrete.fbx · physicalize proxy_only</div>
+      </div>
+      <div class="modbody lay-proxy">
+
+        <!-- center: wireframe + generated hull overlay -->
+        <main class="col c">
+          <div class="cscroll">
+            <div class="previewbox">
+              <div class="wire" style="height:340px">
+                <div class="wirebox"><div class="wf top"></div><div class="wf h"></div></div>
+                <div class="proxyhull" id="hullGhost" style="opacity:.35"></div>
+                <div class="tag">Render mesh 48.2k tris · <span style="color:#6fe39a">proxy preview 1.1k tris</span></div>
+                <div class="axis">voxel 64³<br>14 hulls</div>
+              </div>
+            </div>
+            <div class="tblwrap">
+              <div class="th"><b>Generated collision hulls</b><div class="cnt" id="hullCnt">Preview — 14 hulls · 1,104 tris</div></div>
+              <div class="tscroll" style="max-height:150px">
+                <table class="mat">
+                  <thead><tr><th>Hull</th><th>Tris</th><th>Volume err</th><th>physicalize</th></tr></thead>
+                  <tbody>
+                    <tr><td>hull_00</td><td>92</td><td>1.8%</td><td><span class="pz proxy">proxy_only</span></td></tr>
+                    <tr><td>hull_01</td><td>76</td><td>2.4%</td><td><span class="pz proxy">proxy_only</span></td></tr>
+                    <tr><td>hull_02</td><td>140</td><td>0.9%</td><td><span class="pz proxy">proxy_only</span></td></tr>
+                    <tr><td>hull_03</td><td>88</td><td>3.1%</td><td><span class="pz proxy">proxy_only</span></td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- right: algorithm params + generate/preview/accept -->
+        <aside class="col r">
+          <div class="rscroll">
+            <div class="card2">
+              <div class="sec">Convex Decomposition<span class="tag">new tool</span></div>
+              <div class="slider"><label>Voxel resolution</label><input type="range" min="16" max="256" step="16" value="64" oninput="this.nextElementSibling.textContent=this.value+'³'"><span class="val">64³</span></div>
+              <div class="slider"><label>Max hull count</label><input type="range" min="1" max="64" value="14" oninput="this.nextElementSibling.textContent=this.value"><span class="val">14</span></div>
+              <div class="slider"><label>Shrink-wrap iters</label><input type="range" min="0" max="20" value="6" oninput="this.nextElementSibling.textContent=this.value"><span class="val">6</span></div>
+              <div class="slider"><label>Concavity</label><input type="range" min="0" max="100" value="18" oninput="this.nextElementSibling.textContent=this.value"><span class="val">18</span></div>
+            </div>
+            <div class="card2">
+              <div class="sec">Output</div>
+              <div class="field"><label>Physicalize as</label>
+                <select><option selected>proxy_only (no-draw)</option><option>proxy_only + obstruct</option><option>default</option></select></div>
+              <label class="check"><input type="checkbox" checked>Merge hulls into single $physics node</label>
+              <label class="check"><input type="checkbox">Snap hull verts to source silhouette</label>
+            </div>
+            <div class="hint" style="color:var(--muted2);font-size:11px;padding:0 2px">Generate builds hulls, Preview overlays them on the mesh, Accept writes them into the CGF as proxy geometry.</div>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary wide" onclick="genProxy()">Generate</button>
+            <button class="btn" onclick="previewProxy()">Preview</button>
+            <button class="btn" onclick="startJob('Proxy: KB3D_Barrier','14 hulls');toast('Proxy accepted','Written as proxy_only into CGF')">Accept</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================================================= PBR BUILDER ========== -->
+    <section class="screen" id="s-pbr">
+      <div class="modbar">
+        <button class="backbtn" data-back><span class="arr">←</span>Back</button>
+        <div class="mtitle"><span class="ico" style="background:var(--warn-weak);color:#f2c265">✨</span>PBR Builder</div>
+        <div class="mstat">Diffuse → albedo · normal · roughness · metallic · ao</div>
+      </div>
+      <div class="modbody lay-pbr">
+
+        <!-- left: diffuse-only sources -->
+        <aside class="col l">
+          <div class="ptitle">Diffuse-only sources</div>
+          <div class="lscroll"><div class="flist">
+            <div class="frow sel"><span class="ic" style="background:radial-gradient(circle at 40% 35%,#a49a8e,#4c463f)"></span><span class="fn">KB3D_ENC_ConcreteWall_diff.png</span></div>
+            <div class="frow"><span class="ic" style="background:radial-gradient(circle at 40% 35%,#b0563a,#3f1f16)"></span><span class="fn">KB3D_ENC_BrickWall_diff.png</span></div>
+            <div class="frow"><span class="ic" style="background:radial-gradient(circle at 40% 35%,#a9743f,#4a2f18)"></span><span class="fn">KB3D_ENC_WoodPlank_diff.png</span></div>
+            <div class="frow"><span class="ic" style="background:radial-gradient(circle at 40% 35%,#4b4d52,#232427)"></span><span class="fn">KB3D_ENC_Asphalt_diff.png</span></div>
+          </div></div>
+          <div class="listbar"><span class="grow">7 diffuse-only · 4 shown</span></div>
+        </aside>
+
+        <!-- center: before → after preview -->
+        <main class="col c">
+          <div class="cscroll">
+            <div class="pbrflow">
+              <div class="pbrcol">
+                <div class="lab">Source diffuse</div>
+                <div class="srcmap" style="background:radial-gradient(circle at 40% 35%,#a49a8e,#4c463f)"><span>KB3D_ENC_ConcreteWall_diff</span></div>
+              </div>
+              <div class="arrow">→</div>
+              <div class="pbrcol" style="flex:1.4">
+                <div class="lab">Generated PBR set</div>
+                <div class="pbrmaps">
+                  <div class="pbrmap" style="background:radial-gradient(circle at 40% 35%,#9a9188,#4a453e)"><span>albedo</span></div>
+                  <div class="pbrmap" style="background:linear-gradient(135deg,#8a8fd0,#5661a8)"><span>normal (from luminance)</span></div>
+                  <div class="pbrmap" style="background:linear-gradient(135deg,#d4d4d4,#5a5a5a)"><span>roughness</span></div>
+                  <div class="pbrmap" style="background:linear-gradient(135deg,#1c1c1c,#000)"><span>metallic</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="card2">
+              <div class="sec">Estimation report</div>
+              <div class="hint" style="font-size:11.5px;line-height:1.7">
+                Roughness derived from local contrast · mean 0.71 · metallic mask 3.2% of pixels above threshold ·
+                normal synthesized from luminance high-pass. Review before writing to the texture group.
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- right: converter params + run -->
+        <aside class="col r">
+          <div class="rscroll">
+            <div class="card2">
+              <div class="sec">Diffuse → PBR<span class="tag">new tool</span></div>
+              <div class="slider"><label>Roughness estimation</label><input type="range" min="0" max="100" value="72" oninput="this.nextElementSibling.textContent=this.value"><span class="val">72</span></div>
+              <div class="slider"><label>Metallic threshold</label><input type="range" min="0" max="100" value="38" oninput="this.nextElementSibling.textContent=this.value"><span class="val">38</span></div>
+              <div class="slider"><label>Detail strength</label><input type="range" min="0" max="100" value="55" oninput="this.nextElementSibling.textContent=this.value"><span class="val">55</span></div>
+              <label class="check"><input type="checkbox" checked>Generate normal from luminance</label>
+              <label class="check"><input type="checkbox" checked>Generate AO from cavity</label>
+              <label class="check"><input type="checkbox">Invert metallic mask</label>
+            </div>
+            <div class="card2">
+              <div class="sec">Output</div>
+              <div class="field"><label>Write into</label>
+                <select><option selected>Existing texture group (merge channels)</option><option>New group</option></select></div>
+              <label class="check"><input type="checkbox" checked>Feed result back to Texture Convert queue</label>
+            </div>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary wide" onclick="startJob('PBR Build: ConcreteWall','5 channels');toast('PBR built','albedo/normal/rough/metal/ao generated')">Run Builder</button>
+            <button class="btn wide" onclick="toast('Preview refreshed','Re-estimated with current params')">Refresh Preview</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ================================================= SETTINGS (gear) ====== -->
+    <section class="screen" id="s-set">
+      <div class="modbar">
+        <button class="backbtn" data-back><span class="arr">←</span>Back</button>
+        <div class="mtitle"><span class="ico" style="background:var(--panel3);color:var(--muted)">⚙</span>Global Settings</div>
+      </div>
+      <div class="setwrap">
+        <h1>Global Settings</h1>
+        <div class="lead">Shared across every module. Applies to all jobs launched from the dashboard.</div>
+
+        <div class="card2">
+          <div class="sec">Language &amp; Profile</div>
+          <div class="grid2">
+            <div class="field" style="margin:0"><label>Interface language</label>
+              <select><option selected>English</option><option>繁體中文 (台灣)</option></select></div>
+            <div class="field" style="margin:0"><label>Settings profile</label>
+              <select><option selected>KB3D_Encounter.settings.json</option><option>default.settings.json</option></select></div>
+          </div>
+          <div class="field" style="margin-top:12px;margin-bottom:0"><div class="row">
+            <button class="btn sm" onclick="toast('Profile loaded','KB3D_Encounter.settings.json')">Load Profile…</button>
+            <button class="btn sm" onclick="toast('Profile saved','Wrote settings.json')">Save Profile</button>
+          </div></div>
+        </div>
+
+        <div class="card2">
+          <div class="sec">Output Directories</div>
+          <div class="field"><label>Texture output</label>
+            <div class="row"><input type="text" value="D:\Assets\KB3D\_cryengine\textures"><button class="btn sm">…</button></div></div>
+          <div class="field" style="margin-bottom:0"><label>Model output</label>
+            <div class="row"><input type="text" value="D:\Assets\KB3D\_cryengine\objects"><button class="btn sm">…</button></div></div>
+        </div>
+
+        <div class="card2">
+          <div class="sec">ResourceCompiler</div>
+          <div class="field" style="margin-bottom:0"><label>RC executable path</label>
+            <div class="row"><input type="text" value="C:\CRYENGINE\rc\rc.exe"><button class="btn sm">…</button></div>
+            <div class="hint">Shared by Texture Convert (DDS) and Model Export (CGF).</div></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ============ PERSISTENT JOB / NOTIFICATION STRIP (all screens) ============ -->
+  <div class="jobstrip">
+    <div class="jrun"><span class="spin"></span><span class="jname" id="jRunName">Texture Convert</span></div>
+    <div class="jbar"><i id="jRunBar" style="width:67%"></i></div>
+    <span id="jRunPct" style="color:var(--muted)">67% · 88/132</span>
+    <div class="spacer"></div>
+    <div class="jchip queue" id="chipQueue">☰ Queue <span id="qCount">2</span></div>
+    <div class="jchip diag" id="chipDiag"><span class="dotw"></span><span id="diagLbl">6 diagnostics</span></div>
+  </div>
+</div>
+
+<!-- queue tray -->
+<div class="tray" id="trayQueue">
+  <div class="trh">☰ Job Queue</div>
+  <div class="trlist" id="qList">
+    <div class="jrow"><div class="jt"><b>Texture Convert · 132 groups</b><small>adaptive pool · 6 workers</small></div><span class="jst run">88/132</span></div>
+    <div class="jrow"><div class="jt"><b>PBR Build · BrickWall</b><small>queued behind convert</small></div><span class="jst queued">queued</span></div>
+    <div class="jrow"><div class="jt"><b>Model Export · KB3D_Metal_Gate</b><small>waiting on axis review</small></div><span class="jst warn">held</span></div>
+    <div class="jrow"><div class="jt"><b>Proxy · KB3D_Barrier</b><small>accepted 14 hulls</small></div><span class="jst done">done</span></div>
+  </div>
+</div>
+
+<!-- diagnostics tray -->
+<div class="tray" id="trayDiag">
+  <div class="trh">⚠ Diagnostics <span style="color:var(--muted);font-weight:400">(6)</span></div>
+  <div class="trlist">
+    <div class="dg"><span class="sev warn">WARN</span><div class="txt"><b>DEF-19 · KB3D_ENC_GlassClean</b><span>Type "refraction" has no CryEngine output channel; skipped in batch. Assign as alpha or diffuse.</span></div></div>
+    <div class="dg"><span class="sev warn">WARN</span><div class="txt"><b>AXIS-03 · KB3D_Metal_Gate.fbx</b><span>Forward axis ambiguous in FBX header; defaulted to −Z. Verify in Model Export.</span></div></div>
+    <div class="dg"><span class="sev info">INFO</span><div class="txt"><b>DEF-07 · KB3D_ENC_NeonSign</b><span>Emissive detected without spec/gloss; auto-generate Spec is on.</span></div></div>
+    <div class="dg"><span class="sev info">INFO</span><div class="txt"><b>PBR-02 · ConcreteWall</b><span>Metallic mask below 5%; treated as fully dielectric.</span></div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="tk">✓</div><div><b id="toastTitle">Done</b><span id="toastSub"></span></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const NAMES={home:'Home',tex:'Texture Convert',mdl:'Model Export',proxy:'Proxy Generator',pbr:'PBR Builder',set:'Global Settings'};
+
+/* ---------- screen navigation (cards -> module, back -> home) ---------- */
+function goto(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+  $('#s-'+id).classList.add('on');
+  $('#crumb').innerHTML = id==='home' ? '<span class="cur">Home</span>'
+    : '<span>Home</span><span class="sep">›</span><span class="cur">'+NAMES[id]+'</span>';
+  $('.stage').scrollTop=0;
+}
+document.querySelectorAll('[data-goto]').forEach(c=>c.onclick=()=>goto(c.dataset.goto));
+document.querySelectorAll('[data-back]').forEach(b=>b.onclick=()=>goto('home'));
+$('#btnGear').onclick=()=>goto('set');
+
+/* ---------- texture group review table (fake data w/ unknowns) ---------- */
+const TYPES=[['diff','Diff'],['normal','Nrm'],['spec','Spec'],['gloss','Gloss'],['metal','Metal'],['height','Disp'],['ao','AO'],['emissive','Emis']];
+const P=(...k)=>{const o={};k.forEach(x=>o[x]=1);return o;};
+const GROUPS=[
+  {n:'KB3D_ENC_AtlasA',t:P('diff','normal','spec','gloss','metal','height','ao')},
+  {n:'KB3D_ENC_GlassClean',t:P('diff','normal','gloss','spec'),uk:'refraction'},
+  {n:'KB3D_ENC_Water',t:P('diff','normal','gloss'),uk:'refraction'},
+  {n:'KB3D_ENC_StainedGlassGreen',t:P('diff','normal','emissive'),uk:'refraction'},
+  {n:'KB3D_ENC_GlassFrosted',t:P('diff','normal','gloss'),uk:'refraction'},
+  {n:'KB3D_ENC_ConcreteWall',t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_MetalPanel',t:P('diff','normal','spec','gloss','metal','ao')},
+  {n:'KB3D_ENC_BrickWall',t:P('diff','normal','spec','gloss','height','ao')},
+  {n:'KB3D_ENC_WoodPlank',t:P('diff','normal','gloss','height')},
+  {n:'KB3D_ENC_RustedPipe',t:P('diff','normal','spec','gloss','metal','ao'),uk:'cavity'},
+  {n:'KB3D_ENC_NeonSign',t:P('diff','normal','emissive')},
+  {n:'KB3D_ENC_Asphalt',t:P('diff','normal','gloss','height','ao')},
+];
+const ASSIGN=['diffuse','normal','specular','gloss','metallic','displ','ao','emissive','alpha','sss'];
+(function buildGrp(){
+  const h=$('#grpHead'); let hr='<tr><th class="nl">Group</th>';
+  TYPES.forEach(t=>hr+='<th>'+t[1]+'</th>'); hr+='<th>Unassigned</th></tr>'; h.innerHTML=hr;
+  const b=$('#grpBody'); b.innerHTML='';
+  GROUPS.forEach(g=>{
+    let r='<tr'+(g.uk?' class="unknown"':'')+'><td class="nl"><div class="nm">'+g.n+'</div></td>';
+    TYPES.forEach(t=>r+='<td><span class="cell '+(g.t[t[0]]?'on':'off')+'"></span></td>');
+    r+='<td class="uk">'+(g.uk?'<select><option>assign '+g.uk+'…</option>'+ASSIGN.map(a=>'<option>'+a+'</option>').join('')+'</select>':'<span class="dash">—</span>')+'</td></tr>';
+    b.insertAdjacentHTML('beforeend',r);
+  });
+})();
+
+/* ---------- texture left list + multi-select delete ---------- */
+const REL={ 'KB3D_ENC_GlassClean':'linked', 'KB3D_ENC_StainedGlassGreen':'linked' };
+(function buildList(){
+  const l=$('#texList');
+  GROUPS.forEach(g=>{
+    const warn=g.uk?'<span class="lk warn">'+g.uk+'?</span>':'';
+    const lk=REL[g.n]?'<span class="lk">linked</span>':'';
+    l.insertAdjacentHTML('beforeend',
+      '<div class="frow"><input type="checkbox" onchange="updSel()"><span class="ic" style="background:linear-gradient(135deg,#5b8def,#28407a)"></span><span class="fn">'+g.n+'</span>'+lk+warn+'</div>');
+  });
+})();
+function updSel(){ $('#selCount').textContent=document.querySelectorAll('#texList input:checked').length; }
+function toggleAll(cb){ document.querySelectorAll('#texList input').forEach(i=>i.checked=cb.checked); updSel(); }
+function delSel(){
+  const n=document.querySelectorAll('#texList input:checked').length;
+  if(!n){ toast('Nothing selected','Tick rows to delete'); return; }
+  document.querySelectorAll('#texList input:checked').forEach(i=>i.closest('.frow').remove());
+  $('#selAll').checked=false; updSel(); toast('Deleted '+n+' groups','Related linked textures kept');
+}
+
+/* ---------- model material slots ---------- */
+const MAT=['Metal_Frame','Gate_Bars','Rust_Overlay','Concrete_Base','Bolt_Steel','Chain_Links','Warning_Paint','Hinge_Iron','Panel_Sheet','Rivet','Cable','Rail_Guide','Latch','Grate','Trim_Alu','Weld_Seam'];
+const PHYS=['proxy_only','default','no_collide','obstruct'];
+(function buildMat(){
+  let rows=MAT.map((m,i)=>'<tr><td>'+i+'</td><td>'+m+'</td><td>'+i+'</td><td><span class="pz'+(i%4===0?' proxy':'')+'">'+PHYS[i%4]+'</span></td></tr>').join('');
+  rows+='<tr class="unassigned"><td>16</td><td>&lt;unassigned&gt;</td><td>—</td><td><select><option>proxy_only</option><option>default</option></select></td></tr>';
+  $('#matBody').innerHTML=rows;
+})();
+
+/* ---------- proxy generate / preview ---------- */
+function genProxy(){ $('#hullCnt').textContent='Generating hulls…'; toast('Generating proxy','Convex decomposition running');
+  setTimeout(()=>{$('#hullCnt').textContent='14 hulls · 1,104 tris'; toast('Proxy generated','14 hulls ready — press Preview');},700); }
+function previewProxy(){ const g=$('#hullGhost'); g.style.opacity= g.style.opacity==='1'?'0.35':'1'; toast('Proxy preview','Overlay '+(g.style.opacity==='1'?'on':'dimmed')); }
+
+/* ---------- persistent job strip + trays ---------- */
+function startJob(name,detail){
+  $('#jRunName').textContent=name; $('#jRunBar').style.width='0%'; $('#jRunPct').textContent='0%';
+  let p=0; const t=setInterval(()=>{ p+=Math.random()*16; if(p>=100){p=100;clearInterval(t);
+      $('#jRunPct').textContent='done'; toast(name+' finished',detail+' processed');}
+    else $('#jRunPct').textContent=Math.round(p)+'%';
+    $('#jRunBar').style.width=Math.min(p,100)+'%'; },230);
+  toast(name+' started',detail);
+}
+function tray(id,other){ const t=$(id),o=$(other); o.classList.remove('show'); t.classList.toggle('show'); }
+$('#chipQueue').onclick=()=>tray('#trayQueue','#trayDiag');
+$('#chipDiag').onclick=()=>tray('#trayDiag','#trayQueue');
+document.addEventListener('click',e=>{ if(!e.target.closest('.tray')&&!e.target.closest('.jchip')){
+  $('#trayQueue').classList.remove('show'); $('#trayDiag').classList.remove('show'); }});
+
+/* ---------- toast ---------- */
+function toast(title,sub){ $('#toastTitle').textContent=title; $('#toastSub').textContent=sub||'';
+  const t=$('#toast'); t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),2600); }
+</script>
+</body>
+</html>
