@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "ce-schema"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "converter"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "ce-schema",
  "clap",
@@ -2179,7 +2179,7 @@ dependencies = [
 
 [[package]]
 name = "texproc"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "ce-schema",
  "clap",
@@ -2192,7 +2192,7 @@ dependencies = [
 
 [[package]]
 name = "texproc-gui"
-version = "2.0.1"
+version = "2.1.0"
 dependencies = [
  "converter",
  "eframe",
