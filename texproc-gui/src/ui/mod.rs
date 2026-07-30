@@ -14,11 +14,12 @@ pub mod topbar;
 pub mod widgets;
 
 use std::collections::BTreeMap;
+use std::time::Instant;
 
 use eframe::egui::{self, Align2, FontId, Pos2, Sense, Stroke, Vec2};
 use serde_json::{json, Value};
 
-use widgets::{TaskCard, Toast};
+use widgets::{TaskCard, TaskState, Toast};
 
 /// Rail-selected working mode. Replaces the v1 `WorkflowTab` 1:1 (the rail
 /// also shows disabled Proxy/PBR placeholders that have no mode).
@@ -91,6 +92,125 @@ impl PanelMemory {
     }
 }
 
+// ---- work tracker (Phase B3) ------------------------------------------------
+
+/// Which background jobs are live this frame — a pure snapshot of the
+/// `WorkflowApp` worker state, so edge detection stays unit-testable without
+/// an egui context (SPEC §9/§10).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct JobSnapshot {
+    pub scan: bool,
+    pub process: bool,
+    /// The running process entered its RC/DDS phase.
+    pub dds: bool,
+    /// Pending FBX load receivers.
+    pub loads: usize,
+    pub export: bool,
+    pub batch: bool,
+    /// Loaded model count (measures how many FBX a load wave produced).
+    pub entries: usize,
+}
+
+/// Jobs whose completion edge fired this frame.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct FinishedJobs {
+    pub scan: bool,
+    pub process: bool,
+    /// The finished process had run its RC/DDS phase.
+    pub process_had_dds: bool,
+    /// `Some(n)` when the FBX load wave drained; `n` = models it added.
+    pub loads: Option<usize>,
+    pub export: bool,
+    pub batch: bool,
+}
+
+/// Prev-frame job snapshot for completion-transition detection. Lives entirely
+/// in the UI layer: `timeline::draw` feeds it a `JobSnapshot` every frame and
+/// turns the returned edges into stored task cards + completion toasts, so
+/// main.rs never has to signal "finished" explicitly.
+pub struct WorkTracker {
+    /// Session start. Task stamps are "+MM:SS" offsets from here — std has no
+    /// local wall-clock formatting and new deps are banned, so cards carry
+    /// session-relative times instead of HH:MM.
+    pub started: Instant,
+    pub scan_was_running: bool,
+    pub process_was_running: bool,
+    pub dds_was_active: bool,
+    pub loads_pending_prev: usize,
+    /// Model count when the current FBX load wave began.
+    pub entries_at_load_start: usize,
+    pub export_was_running: bool,
+    pub batch_was_running: bool,
+    // Last-seen live counters — the finished-card fallback when a job dies
+    // without leaving a summary behind.
+    pub prev_convert_done: usize,
+    pub prev_convert_total: usize,
+    pub prev_dds_done: usize,
+    pub prev_dds_total: usize,
+    /// Last non-idle session fraction; idle keeps showing it (SPEC §9).
+    pub last_session_fraction: f32,
+}
+
+impl Default for WorkTracker {
+    fn default() -> Self {
+        Self {
+            started: Instant::now(),
+            scan_was_running: false,
+            process_was_running: false,
+            dds_was_active: false,
+            loads_pending_prev: 0,
+            entries_at_load_start: 0,
+            export_was_running: false,
+            batch_was_running: false,
+            prev_convert_done: 0,
+            prev_convert_total: 0,
+            prev_dds_done: 0,
+            prev_dds_total: 0,
+            last_session_fraction: 0.0,
+        }
+    }
+}
+
+impl WorkTracker {
+    /// Compare this frame against the previous one, record the new snapshot,
+    /// and report which jobs finished on this edge.
+    pub fn finished_jobs(&mut self, now: JobSnapshot) -> FinishedJobs {
+        // A new load wave begins: remember how many models existed before it.
+        if self.loads_pending_prev == 0 && now.loads > 0 {
+            self.entries_at_load_start = now.entries;
+        }
+        let process_finished = self.process_was_running && !now.process;
+        let finished = FinishedJobs {
+            scan: self.scan_was_running && !now.scan,
+            process: process_finished,
+            process_had_dds: process_finished && self.dds_was_active,
+            loads: (self.loads_pending_prev > 0 && now.loads == 0)
+                .then(|| now.entries.saturating_sub(self.entries_at_load_start)),
+            export: self.export_was_running && !now.export,
+            batch: self.batch_was_running && !now.batch,
+        };
+        self.scan_was_running = now.scan;
+        self.process_was_running = now.process;
+        // The DDS flag latches while the process lives so the finish edge still
+        // knows a DDS phase ran; it resets once that edge has been reported.
+        if now.process {
+            self.dds_was_active = now.dds;
+        } else {
+            self.dds_was_active = false;
+        }
+        self.loads_pending_prev = now.loads;
+        self.export_was_running = now.export;
+        self.batch_was_running = now.batch;
+        finished
+    }
+
+    /// "+MM:SS" since session start, stamped onto finished task cards.
+    pub fn stamp(&self) -> String {
+        let seconds = self.started.elapsed().as_secs();
+        format!("+{:02}:{:02}", seconds / 60, seconds % 60)
+    }
+}
+
 /// Whole-chrome UI state, persisted through `prefs.ui_workspace`.
 pub struct UiState {
     pub mode: UiMode,
@@ -98,9 +218,10 @@ pub struct UiState {
     pub models: PanelMemory,
     pub toasts: Vec<Toast>,
     pub session_tasks: Vec<TaskCard>,
-    #[allow(dead_code)] // Phase B/C: task-capsule id allocation (SPEC §9).
     pub next_task_id: u64,
     pub diag_open: bool,
+    /// Job-completion edge detector + session progress memory (Phase B3).
+    pub work: WorkTracker,
 }
 
 impl Default for UiState {
@@ -113,6 +234,7 @@ impl Default for UiState {
             session_tasks: Vec::new(),
             next_task_id: 1,
             diag_open: false,
+            work: WorkTracker::default(),
         }
     }
 }
@@ -196,6 +318,29 @@ impl UiState {
         error: bool,
     ) {
         self.toasts.push(Toast::new(title, subtitle, error));
+    }
+
+    /// Store a finished task capsule on the timeline track (SPEC §9): newest
+    /// last, only the newest 8 kept.
+    pub fn push_finished_task(
+        &mut self,
+        title: impl Into<String>,
+        subtitle: impl Into<String>,
+        state: TaskState,
+    ) {
+        let id = self.next_task_id;
+        self.next_task_id += 1;
+        self.session_tasks.push(TaskCard {
+            id,
+            title: title.into(),
+            subtitle: subtitle.into(),
+            state,
+            progress: None,
+        });
+        let excess = self.session_tasks.len().saturating_sub(8);
+        if excess > 0 {
+            self.session_tasks.drain(..excess);
+        }
     }
 
     /// Serialize the persistent slice (panel memory only — toasts/tasks are
@@ -460,5 +605,55 @@ mod tests {
         assert!(fallback.is_open(UiMode::Textures, "tex.import"));
         let null = UiState::from_value(&Value::Null);
         assert_eq!(null.models.preset, "review");
+    }
+
+    // B3: work-tracker transition detection.
+    #[test]
+    fn work_tracker_detects_completion_edges() {
+        let mut tracker = WorkTracker::default();
+        let idle = JobSnapshot::default();
+        // Nothing ran, nothing finishes; the idle edge is not re-reported.
+        assert_eq!(tracker.finished_jobs(idle), FinishedJobs::default());
+        // Scan runs, then stops.
+        tracker.finished_jobs(JobSnapshot { scan: true, ..idle });
+        let finished = tracker.finished_jobs(idle);
+        assert!(finished.scan);
+        assert!(!finished.process && finished.loads.is_none());
+        // Convert that entered its DDS phase; the edge reports both, once.
+        tracker.finished_jobs(JobSnapshot { process: true, ..idle });
+        tracker.finished_jobs(JobSnapshot { process: true, dds: true, ..idle });
+        let finished = tracker.finished_jobs(idle);
+        assert!(finished.process && finished.process_had_dds);
+        assert_eq!(tracker.finished_jobs(idle), FinishedJobs::default());
+        // A later DDS-less convert must not inherit the old DDS flag.
+        tracker.finished_jobs(JobSnapshot { process: true, ..idle });
+        let finished = tracker.finished_jobs(idle);
+        assert!(finished.process && !finished.process_had_dds);
+        // FBX load wave: 2 pending over 1 existing model -> 3 total = +2.
+        tracker.finished_jobs(JobSnapshot { loads: 2, entries: 1, ..idle });
+        let finished = tracker.finished_jobs(JobSnapshot { entries: 3, ..idle });
+        assert_eq!(finished.loads, Some(2));
+        // Export and batch edges fire independently.
+        tracker.finished_jobs(JobSnapshot { export: true, batch: true, ..idle });
+        let finished = tracker.finished_jobs(idle);
+        assert!(finished.export && finished.batch);
+    }
+
+    // B3: stored capsules keep only the newest 8.
+    #[test]
+    fn finished_tasks_cap_at_eight() {
+        let mut state = UiState::default();
+        for index in 0..11 {
+            state.push_finished_task(
+                format!("task {index}"),
+                "sub",
+                widgets::TaskState::Done,
+            );
+        }
+        assert_eq!(state.session_tasks.len(), 8);
+        // Oldest evicted, newest kept, ids strictly increasing.
+        assert_eq!(state.session_tasks[0].title, "task 3");
+        assert_eq!(state.session_tasks[7].title, "task 10");
+        assert!(state.session_tasks.windows(2).all(|w| w[0].id < w[1].id));
     }
 }

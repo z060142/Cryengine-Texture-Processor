@@ -399,6 +399,8 @@ pub(crate) struct WorkflowApp {
     /// v2 chrome state: active mode, per-mode panel memory, toasts, session
     /// tasks, diagnostics popover flag. Persisted via `prefs.ui_workspace`.
     pub(crate) ui: ui::UiState,
+    /// Env-gated self-screenshot (visual QA); inert without TEXPROC_GUI_SHOT.
+    debug_shot: DebugShot,
 }
 
 impl WorkflowApp {
@@ -418,6 +420,7 @@ impl WorkflowApp {
             model: ModelState::default(),
             status: String::new(),
             ui: workspace,
+            debug_shot: DebugShot::from_env(),
         };
         app.status = app.t().status_ready.to_owned();
         if !initial_paths.is_empty() {
@@ -1543,6 +1546,71 @@ impl WorkflowApp {
     }
 }
 
+/// Env-gated self-screenshot for visual QA: with `TEXPROC_GUI_SHOT=<png path>`
+/// the app captures its own framebuffer after a settle period (default 40
+/// frames, override via `TEXPROC_GUI_SHOT_FRAMES`), writes it as PNG, then
+/// closes. Inert without the env var — never part of normal use.
+struct DebugShot {
+    path: Option<PathBuf>,
+    settle_frames: u32,
+    frames: u32,
+    requested: bool,
+}
+
+impl DebugShot {
+    fn from_env() -> Self {
+        let settle_frames = std::env::var("TEXPROC_GUI_SHOT_FRAMES")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(40);
+        Self {
+            path: std::env::var_os("TEXPROC_GUI_SHOT").map(PathBuf::from),
+            settle_frames,
+            frames: 0,
+            requested: false,
+        }
+    }
+
+    /// Drive the capture: keep frames coming, request the screenshot once the
+    /// settle period has passed, save it when it arrives, then close.
+    fn tick(&mut self, context: &egui::Context) {
+        let Some(path) = self.path.clone() else {
+            return;
+        };
+        context.request_repaint_after(Duration::from_millis(30));
+        self.frames += 1;
+        if self.frames == self.settle_frames && !self.requested {
+            self.requested = true;
+            context.send_viewport_cmd(egui::ViewportCommand::Screenshot(Default::default()));
+        }
+        let image = context.input(|input| {
+            input.events.iter().find_map(|event| match event {
+                egui::Event::Screenshot { image, .. } => Some(image.clone()),
+                _ => None,
+            })
+        });
+        if let Some(image) = image {
+            let pixels: Vec<u8> = image
+                .pixels
+                .iter()
+                .flat_map(|pixel| pixel.to_array())
+                .collect();
+            let result = image::save_buffer(
+                &path,
+                &pixels,
+                image.size[0] as u32,
+                image.size[1] as u32,
+                image::ColorType::Rgba8,
+            );
+            if let Err(error) = result {
+                append_crash_log(&format!("debug shot failed: {error}"));
+            }
+            self.path = None;
+            context.send_viewport_cmd(egui::ViewportCommand::Close);
+        }
+    }
+}
+
 impl eframe::App for WorkflowApp {
     fn update(&mut self, context: &egui::Context, _frame: &mut eframe::Frame) {
         let dropped = context.input(|input| input.raw.dropped_files.clone());
@@ -1555,6 +1623,7 @@ impl eframe::App for WorkflowApp {
         }
         self.poll_workers(context);
         ui::draw(self, context);
+        self.debug_shot.tick(context);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
