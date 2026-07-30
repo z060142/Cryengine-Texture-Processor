@@ -527,6 +527,30 @@ fn draw_stage(app: &mut crate::WorkflowApp, ctx: &egui::Context) {
                 FontId::proportional(11.0),
                 theme::MUTED2,
             );
+            // Stagebar gadget (SPEC §6.1): once an output exists, keep the
+            // open-output-folder link reachable outside the modals.
+            let output_dir = match mode {
+                UiMode::Textures => app
+                    .process_summary
+                    .as_ref()
+                    .map(|summary| summary.output_directory.clone()),
+                UiMode::Models => (app.model.export_cgf.is_some()
+                    || app.model.export_summary.is_some()
+                    || app.model.batch.is_some())
+                .then(|| std::path::PathBuf::from(&app.preferences.model_output_directory)),
+            };
+            if let Some(directory) = output_dir {
+                let link_rect = egui::Rect::from_min_max(
+                    Pos2::new(bar_rect.right() - 220.0, bar_rect.top()),
+                    Pos2::new(bar_rect.right() - 12.0, bar_rect.bottom()),
+                );
+                let mut link_ui = ui.new_child(
+                    egui::UiBuilder::new().max_rect(link_rect).layout(
+                        egui::Layout::right_to_left(egui::Align::Center),
+                    ),
+                );
+                link_ui.hyperlink_to(t.open_output_folder, crate::file_url(&directory));
+            }
             // Faint 44px grid over the viewport region.
             let viewport = ui.available_rect_before_wrap();
             paint_grid(&painter, viewport);
