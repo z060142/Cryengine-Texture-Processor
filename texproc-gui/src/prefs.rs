@@ -25,6 +25,9 @@ pub struct AppPreferences {
     pub conversion_scale: f64,
     /// GUI language code ("en" / "zh-cn"). Unknown values load back as "en".
     pub language: String,
+    /// v2 workspace memory (per-mode panel open state + preset), round-tripped
+    /// as opaque JSON so prefs stays schema-free (`Null` = first run/defaults).
+    pub ui_workspace: Value,
 }
 
 impl Default for AppPreferences {
@@ -45,6 +48,7 @@ impl Default for AppPreferences {
             conversion_unit: "file".to_owned(),
             conversion_scale: 1.0,
             language: "en".to_owned(),
+            ui_workspace: Value::Null,
         }
     }
 }
@@ -82,6 +86,7 @@ impl AppPreferences {
             .unwrap_or(preferences.conversion_scale);
         // Unknown / missing language codes fall back to "en".
         preferences.language = normalize_language(&string(&value, "language"));
+        preferences.ui_workspace = value.get("ui_workspace").cloned().unwrap_or(Value::Null);
         preferences
     }
 
@@ -107,6 +112,7 @@ impl AppPreferences {
             "conversion_unit": self.conversion_unit,
             "conversion_scale": self.conversion_scale,
             "language": self.language,
+            "ui_workspace": self.ui_workspace,
         });
         let text = serde_json::to_string_pretty(&value)
             .expect("application preference values are serializable");

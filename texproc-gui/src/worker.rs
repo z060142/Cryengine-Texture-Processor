@@ -597,6 +597,7 @@ fn available_ram_bytes() -> u64 {
 pub struct ModelReview {
     pub path: PathBuf,
     pub model: ConverterModel,
+    #[allow(dead_code)] // Phase B: polygon counts in the slot table (SPEC §6.3).
     pub assignments: Vec<Assignment>,
     pub material_slots: Vec<MaterialSlot>,
     pub diagnostics: Vec<ConverterDiagnostic>,

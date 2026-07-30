@@ -3,6 +3,7 @@
 mod file_dialog;
 mod i18n;
 mod prefs;
+mod ui;
 mod worker;
 
 use std::{
@@ -10,44 +11,40 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::AtomicBool,
         mpsc::{Receiver, TryRecvError},
         Arc,
     },
     time::Duration,
 };
 
-use converter::rc_policy::resolve_physicalize;
-use eframe::egui::{
-    self, Align2, Color32, ComboBox, Grid, Id, Modal, ProgressBar, RichText, ScrollArea, Sense,
-    Stroke, TextEdit, TextureHandle, ViewportBuilder,
-};
-use file_dialog::{
-    choose_file_open, choose_file_save, choose_files_multi, choose_folder, choose_rc_executable,
-};
+use eframe::egui::{self, TextureHandle, ViewportBuilder};
 use i18n::{fill, Language, Strings};
 use prefs::{embedded_texture_directory, AppPreferences};
 use texproc::{
-    load_texture_settings, save_texture_settings, ArmOrder, DiffFormat, FailedGroup,
-    OutputResolution, ScanEntry, ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
+    load_texture_settings, save_texture_settings, FailedGroup, OutputResolution, ScanEntry,
+    ScanGroup, ScanResult, Severity, SuffixTable, TextureSettings,
 };
 use texproc_gui::{
     axes_parallel, compose_forward_up, helper_node_count, parse_forward_up, ReviewDocument,
-    ASSIGNABLE_SOURCE_TYPES, AXIS_TOKENS,
+    AXIS_TOKENS,
 };
 use worker::{
     BatchExportEvent, DdsSummary, ModelEvent, ModelExportEvent, ModelJob, ModelReview,
     PreviewEvent, ProcessEvent, ProcessJob, RcExportOutcome, ScanEvent,
 };
 
-const APP_TITLE: &str = "CryEngine Texture Processor";
+pub(crate) const APP_TITLE: &str = "CryEngine Texture Processor";
 const DEFAULT_RC_EXE: &str = r"S:\Crytek\crytek\cryengine-57-lts\5.7.1\Tools\rc\rc.exe";
-const PHYSICALIZE_VALUES: [&str; 5] = ["no", "default", "obstruct", "no_collide", "proxy_only"];
+#[allow(dead_code)] // Phase B: material-slot physicalize combos (SPEC §6.3).
+pub(crate) const PHYSICALIZE_VALUES: [&str; 5] =
+    ["no", "default", "obstruct", "no_collide", "proxy_only"];
 /// Legal `unit_size` values for the Conversion Settings Unit dropdown. The RC
 /// import schema (output_formats/rc_import_schema.py) accepts unit_size as a
 /// free string; this mirrors the CryEngine Sandbox FBX-import unit choices,
 /// with `file` (use the FBX's own unit) as the native-car default.
-const UNIT_SIZE_VALUES: [&str; 6] = ["file", "mm", "cm", "m", "inch", "foot"];
+#[allow(dead_code)] // Phase B: Transform panel unit combo (SPEC §8).
+pub(crate) const UNIT_SIZE_VALUES: [&str; 6] = ["file", "mm", "cm", "m", "inch", "foot"];
 /// GUI default physicalize seed for every material (the practical golden flow is
 /// all `no`). Seeded as explicit metadata; a loaded manifest still wins.
 const DEFAULT_PHYSICALIZE: &str = "no";
@@ -55,7 +52,8 @@ const DEFAULT_PHYSICALIZE: &str = "no";
 /// Apply a click to a row-index multi-selection (shared by the texture list and
 /// the material table): plain = select only, Ctrl = toggle, Shift = range from
 /// the anchor.
-fn apply_click_selection(
+#[allow(dead_code)] // Phase B: list multi-select (unit-tested; SPEC §7/§8).
+pub(crate) fn apply_click_selection(
     selected: &mut BTreeSet<usize>,
     anchor: &mut Option<usize>,
     index: usize,
@@ -92,7 +90,8 @@ fn seed_default_physicalize<'a>(
 }
 
 /// A labeled ±X/±Y/±Z axis dropdown bound to `token`.
-fn axis_dropdown(ui: &mut egui::Ui, label: &str, id: &str, token: &mut String) {
+#[allow(dead_code)] // Phase B: Transform panel axis combos (SPEC §8).
+pub(crate) fn axis_dropdown(ui: &mut egui::Ui, label: &str, id: &str, token: &mut String) {
     ui.horizontal(|ui| {
         ui.label(label);
         egui::ComboBox::from_id_salt(id)
@@ -106,7 +105,8 @@ fn axis_dropdown(ui: &mut egui::Ui, label: &str, id: &str, token: &mut String) {
 }
 
 /// Bulk-set physicalize for the selected material rows in one action.
-fn apply_bulk_physicalize(
+#[allow(dead_code)] // Phase B: bulk physicalize row (unit-tested; SPEC §6.3).
+pub(crate) fn apply_bulk_physicalize(
     overrides: &mut BTreeMap<String, String>,
     names: &[&str],
     selected: &BTreeSet<usize>,
@@ -120,7 +120,8 @@ fn apply_bulk_physicalize(
 }
 /// Map-type columns shown in the groups table (source type, header). Ordered to
 /// match the demo3 blueprint's primary columns, then the remaining tracked types.
-const GROUP_COLUMNS: [(&str, &str); 12] = [
+#[allow(dead_code)] // Phase B: type-dot order in group rows (SPEC §7).
+pub(crate) const GROUP_COLUMNS: [(&str, &str); 12] = [
     ("diffuse", "Color"),
     ("normal", "Normal"),
     ("specular", "Spec"),
@@ -134,12 +135,11 @@ const GROUP_COLUMNS: [(&str, &str); 12] = [
     ("sss", "SSS"),
     ("arm", "ARM"),
 ];
-const GROUP_CELL_W: f32 = 38.0;
-const GROUP_UNKNOWN_W: f32 = 134.0;
-const GROUP_ROW_H: f32 = 26.0;
-const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr, hdr, tga, bmp, webp)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr;*.hdr;*.tga;*.bmp;*.webp\0All files (*.*)\0*.*\0";
-const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
-const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
+#[allow(dead_code)] // Phase B: Import panel file dialog (SPEC §7).
+pub(crate) const IMAGE_FILTER: &str = "Images (png, jpg, jpeg, tif, tiff, exr, hdr, tga, bmp, webp)\0*.png;*.jpg;*.jpeg;*.tif;*.tiff;*.exr;*.hdr;*.tga;*.bmp;*.webp\0All files (*.*)\0*.*\0";
+#[allow(dead_code)] // Phase B: FBX List panel file dialog (SPEC §8).
+pub(crate) const FBX_FILTER: &str = "FBX models (*.fbx)\0*.fbx\0All files (*.*)\0*.*\0";
+pub(crate) const JSON_FILTER: &str = "JSON files (*.json)\0*.json\0All files (*.*)\0*.*\0";
 
 fn main() -> eframe::Result {
     install_crash_logger();
@@ -162,6 +162,7 @@ fn main() -> eframe::Result {
         options,
         Box::new(move |creation| {
             install_cjk_font(&creation.egui_ctx);
+            ui::theme::apply_style(&creation.egui_ctx);
             Ok(Box::new(WorkflowApp::new(initial_paths)))
         }),
     )
@@ -242,12 +243,6 @@ fn append_crash_log_to(path: &Path, message: &str) {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum WorkflowTab {
-    Textures,
-    Model,
-}
-
 #[derive(Default)]
 struct TextureState {
     roots: Vec<PathBuf>,
@@ -259,6 +254,7 @@ struct TextureState {
     /// Anchor for Shift-range selection.
     selection_anchor: Option<usize>,
     selected_group: Option<usize>,
+    #[allow(dead_code)] // Phase B: Group Review search box (SPEC §7).
     group_search: String,
     review_only: bool,
     /// Set when a scan was triggered by auto-ingesting an FBX's textures, so the
@@ -279,6 +275,7 @@ struct PreviewState {
     loaded_path: Option<PathBuf>,
     texture: Option<TextureHandle>,
     dimensions: Option<(u32, u32)>,
+    #[allow(dead_code)] // Phase B: preview HUD chip (SPEC §6.2).
     source_type: String,
     error: Option<String>,
 }
@@ -323,11 +320,17 @@ struct ModelEntry {
     review: ModelReview,
     physicalize_overrides: BTreeMap<String, String>,
     conversion: ConversionSettings,
+    // Phase B reads these again in the material-slot workspace (SPEC §6.3).
+    #[allow(dead_code)]
     selected_material: Option<usize>,
+    #[allow(dead_code)]
     selected_materials: BTreeSet<usize>,
+    #[allow(dead_code)]
     material_selection_anchor: Option<usize>,
+    #[allow(dead_code)]
     bulk_physicalize: String,
     /// Meshless non-root scene nodes (RC helper/anchor nodes).
+    #[allow(dead_code)] // Phase B: FBX List sub-line + summary (SPEC §8).
     helper_nodes: usize,
     /// Lowercased absolute paths of textures ingested from this FBX — the origin
     /// set that "Export associated textures with model" processes for this model.
@@ -373,7 +376,9 @@ struct BatchState {
 struct ConversionSettings {
     /// RC `forward_up_axes` token as auto-detected from the FBX (for the
     /// "Detected: …" caption and override highlight).
+    #[allow(dead_code)] // Phase B: Transform panel "Detected:" caption (SPEC §8).
     detected_forward: String,
+    #[allow(dead_code)] // Phase B: Transform panel "Detected:" caption (SPEC §8).
     detected_up: String,
     forward: String,
     up: String,
@@ -381,18 +386,19 @@ struct ConversionSettings {
     scene_origin: bool,
 }
 
-struct WorkflowApp {
-    tab: WorkflowTab,
-    preferences: AppPreferences,
-    settings: TextureSettings,
-    texture: TextureState,
-    preview: PreviewState,
-    process: Option<ProcessState>,
-    process_summary: Option<ProcessSummary>,
-    process_modal_open: bool,
-    show_diagnostics: bool,
-    model: ModelState,
-    status: String,
+pub(crate) struct WorkflowApp {
+    pub(crate) preferences: AppPreferences,
+    pub(crate) settings: TextureSettings,
+    pub(crate) texture: TextureState,
+    pub(crate) preview: PreviewState,
+    pub(crate) process: Option<ProcessState>,
+    pub(crate) process_summary: Option<ProcessSummary>,
+    pub(crate) process_modal_open: bool,
+    pub(crate) model: ModelState,
+    pub(crate) status: String,
+    /// v2 chrome state: active mode, per-mode panel memory, toasts, session
+    /// tasks, diagnostics popover flag. Persisted via `prefs.ui_workspace`.
+    pub(crate) ui: ui::UiState,
 }
 
 impl WorkflowApp {
@@ -400,8 +406,8 @@ impl WorkflowApp {
         let preferences = AppPreferences::load();
         let settings = load_texture_settings(Path::new(&preferences.settings_path))
             .unwrap_or_else(|_| TextureSettings::default());
+        let workspace = ui::UiState::from_value(&preferences.ui_workspace);
         let mut app = Self {
-            tab: WorkflowTab::Textures,
             preferences,
             settings,
             texture: TextureState::default(),
@@ -409,9 +415,9 @@ impl WorkflowApp {
             process: None,
             process_summary: None,
             process_modal_open: false,
-            show_diagnostics: false,
             model: ModelState::default(),
             status: String::new(),
+            ui: workspace,
         };
         app.status = app.t().status_ready.to_owned();
         if !initial_paths.is_empty() {
@@ -422,7 +428,7 @@ impl WorkflowApp {
 
     /// The active language's string table. `&'static` — never borrows `self`, so
     /// it can be called and held while `self` is mutated in the same statement.
-    fn t(&self) -> &'static Strings {
+    pub(crate) fn t(&self) -> &'static Strings {
         Language::from_code(&self.preferences.language).strings()
     }
 
@@ -444,7 +450,7 @@ impl WorkflowApp {
         }
     }
 
-    fn add_texture_roots(&mut self, roots: Vec<PathBuf>) {
+    pub(crate) fn add_texture_roots(&mut self, roots: Vec<PathBuf>) {
         let mut seen = self
             .texture
             .roots
@@ -460,12 +466,13 @@ impl WorkflowApp {
             self.status = self.t().no_texture_files_found.to_owned();
             return;
         }
-        self.tab = WorkflowTab::Textures;
+        self.ui.mode = ui::UiMode::Textures;
         self.texture.scan_receiver = Some(worker::start_scan(self.texture.roots.clone()));
         self.status = self.t().scanning_grouping.to_owned();
     }
 
-    fn clear_textures(&mut self) {
+    #[allow(dead_code)] // Phase B: Import panel Clear All (SPEC §7).
+    pub(crate) fn clear_textures(&mut self) {
         self.texture = TextureState::default();
         self.preview = PreviewState::default();
         self.process_summary = None;
@@ -474,7 +481,7 @@ impl WorkflowApp {
 
     /// Start loading one or more FBX files; each completes into its own model-list
     /// entry (batch import). Existing entries are kept.
-    fn load_model_files(&mut self, paths: Vec<PathBuf>) {
+    pub(crate) fn load_model_files(&mut self, paths: Vec<PathBuf>) {
         let mut started = 0;
         for path in paths {
             if !path.is_file() {
@@ -490,19 +497,20 @@ impl WorkflowApp {
         if started == 0 {
             return;
         }
-        self.tab = WorkflowTab::Model;
+        self.ui.mode = ui::UiMode::Models;
         self.status = fill(self.t().loading_fbx, &[&started.to_string()]);
         self.save_preferences();
     }
 
     /// Index of the single selected model, or `None` when 0 or >1 are selected.
-    fn selected_entry_index(&self) -> Option<usize> {
+    pub(crate) fn selected_entry_index(&self) -> Option<usize> {
         (self.model.selected.len() == 1)
             .then(|| self.model.selected.iter().next().copied())
             .flatten()
     }
 
-    fn clear_models(&mut self) {
+    #[allow(dead_code)] // Phase B: FBX List Clear All (SPEC §8).
+    pub(crate) fn clear_models(&mut self) {
         self.model.entries.clear();
         self.model.selected.clear();
         self.model.selection_anchor = None;
@@ -511,7 +519,8 @@ impl WorkflowApp {
 
     /// Multi-select removal from the model list, mirroring Remove Selected on the
     /// texture list. Selection indices become stale after removal, so clear them.
-    fn remove_selected_models(&mut self) {
+    #[allow(dead_code)] // Phase B: FBX List Remove Selected (SPEC §8).
+    pub(crate) fn remove_selected_models(&mut self) {
         if self.model.selected.is_empty() {
             return;
         }
@@ -527,7 +536,7 @@ impl WorkflowApp {
         self.status = fill(self.t().removed_models, &[&removed.to_string()]);
     }
 
-    fn request_preview(&mut self, path: PathBuf, source_type: impl Into<String>) {
+    pub(crate) fn request_preview(&mut self, path: PathBuf, source_type: impl Into<String>) {
         if self.preview.requested_path.as_ref() == Some(&path)
             || self.preview.loaded_path.as_ref() == Some(&path)
         {
@@ -541,7 +550,7 @@ impl WorkflowApp {
         };
     }
 
-    fn start_texture_process(&mut self) {
+    pub(crate) fn start_texture_process(&mut self) {
         let Some(document) = &self.texture.document else {
             self.status = self.t().no_textures_ready.to_owned();
             return;
@@ -655,7 +664,8 @@ impl WorkflowApp {
         })
     }
 
-    fn start_model_export(&mut self) {
+    #[allow(dead_code)] // Phase B: Export Options primary action (SPEC §8).
+    pub(crate) fn start_model_export(&mut self) {
         let Some(index) = self.selected_entry_index() else {
             self.status = self.t().select_single_export.to_owned();
             return;
@@ -695,7 +705,7 @@ impl WorkflowApp {
     }
 
     /// Export All: iterate every loaded model sequentially in a worker.
-    fn start_batch_export(&mut self) {
+    pub(crate) fn start_batch_export(&mut self) {
         if self.model.entries.is_empty() {
             self.status = self.t().load_fbx_first.to_owned();
             return;
@@ -787,7 +797,8 @@ impl WorkflowApp {
     }
 
     /// Apply a click on an imported-texture row to the multi-selection.
-    fn apply_selection_click(&mut self, index: usize, ctrl: bool, shift: bool) {
+    #[allow(dead_code)] // Phase B: Import list multi-select (SPEC §7).
+    pub(crate) fn apply_selection_click(&mut self, index: usize, ctrl: bool, shift: bool) {
         apply_click_selection(
             &mut self.texture.selected_files,
             &mut self.texture.selection_anchor,
@@ -800,7 +811,8 @@ impl WorkflowApp {
     /// Multi-select: remove the selected imported textures and regroup. Roots are
     /// flattened to the surviving file paths so folder inputs cannot re-add the
     /// removed files on the next scan.
-    fn remove_selected_textures(&mut self) {
+    #[allow(dead_code)] // Phase B: Import panel Remove Selected (SPEC §7).
+    pub(crate) fn remove_selected_textures(&mut self) {
         if self.texture.selected_files.is_empty() {
             return;
         }
@@ -831,7 +843,8 @@ impl WorkflowApp {
     /// same group from disk. Each unique directory is read exactly once and
     /// candidates are matched by filename only — no image decode at candidate
     /// stage (owner's performance red line).
-    fn add_related_textures(&mut self) {
+    #[allow(dead_code)] // Phase B: Import panel Add Related (SPEC §7).
+    pub(crate) fn add_related_textures(&mut self) {
         let selected = self
             .texture
             .selected_files
@@ -887,7 +900,7 @@ impl WorkflowApp {
     /// into the texture groups. Shared by automatic ingestion on FBX load and
     /// the manual re-send button. Keeps the caller's tab; the scan-complete
     /// status honestly reports the FBX import via `pending_fbx_import`.
-    fn ingest_entry_textures(&mut self, entry_index: usize) {
+    pub(crate) fn ingest_entry_textures(&mut self, entry_index: usize) {
         let ingest = {
             let review = &self.model.entries[entry_index].review;
             extract_model_texture_paths(review)
@@ -897,7 +910,7 @@ impl WorkflowApp {
                 self.status = self.t().no_textures_in_fbx.to_owned();
             }
             Ok(ingest) => {
-                let tab = self.tab;
+                let mode = self.ui.mode;
                 self.texture.pending_fbx_import = Some((ingest.paths.len(), ingest.embedded));
                 // Record ingestion origin (on this model's entry) so "Export
                 // associated textures with model" can pick out exactly its groups.
@@ -908,7 +921,7 @@ impl WorkflowApp {
                         .map(|path| path.to_string_lossy().to_lowercase()),
                 );
                 self.add_texture_roots(ingest.paths);
-                self.tab = tab;
+                self.ui.mode = mode;
             }
             Err(error) => {
                 self.status = error;
@@ -1237,7 +1250,7 @@ impl WorkflowApp {
         // Select the newly added model so it drives the center panel.
         self.model.selected = BTreeSet::from([index]);
         self.model.selection_anchor = Some(index);
-        self.tab = WorkflowTab::Model;
+        self.ui.mode = ui::UiMode::Models;
         self.status = fill(
             self.t().fbx_loaded,
             &[&materials.to_string(), &references.to_string()],
@@ -1382,7 +1395,9 @@ impl WorkflowApp {
         }
     }
 
-    fn save_preferences(&mut self) {
+    pub(crate) fn save_preferences(&mut self) {
+        // Keep the workspace snapshot (panel memory + presets) in the same file.
+        self.preferences.ui_workspace = self.ui.to_value();
         if let Err(error) = self.preferences.save() {
             self.status = error;
         }
@@ -1390,7 +1405,10 @@ impl WorkflowApp {
 
     /// Unwrap a single-selection dialog result, surfacing API errors in the
     /// status area. User cancel (`Ok(None)`) is a silent no-op.
-    fn dialog_result(&mut self, result: Result<Option<PathBuf>, String>) -> Option<PathBuf> {
+    pub(crate) fn dialog_result(
+        &mut self,
+        result: Result<Option<PathBuf>, String>,
+    ) -> Option<PathBuf> {
         match result {
             Ok(value) => value,
             Err(error) => {
@@ -1400,7 +1418,7 @@ impl WorkflowApp {
         }
     }
 
-    fn save_settings(&mut self) {
+    pub(crate) fn save_settings(&mut self) {
         let path = PathBuf::from(self.preferences.settings_path.trim());
         match save_texture_settings(&path, &self.settings) {
             Ok(()) => {
@@ -1411,7 +1429,7 @@ impl WorkflowApp {
         }
     }
 
-    fn load_settings(&mut self) {
+    pub(crate) fn load_settings(&mut self) {
         let path = PathBuf::from(self.preferences.settings_path.trim());
         match load_texture_settings(&path) {
             Ok(settings) => {
@@ -1423,66 +1441,10 @@ impl WorkflowApp {
         }
     }
 
-    fn top_bar(&mut self, context: &egui::Context) {
-        let t = self.t();
-        egui::TopBottomPanel::top("top_bar").show(context, |ui| {
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                ui.heading(APP_TITLE);
-                ui.separator();
-                ui.label(t.subtitle);
-                if !self.model.entries.is_empty() {
-                    ui.separator();
-                    ui.weak(fill(t.models_loaded, &[&self.model.entries.len().to_string()]));
-                }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.weak(t.drop_hint);
-                });
-            });
-            ui.add_space(6.0);
-        });
-    }
-
-    fn status_bar(&mut self, context: &egui::Context) {
-        let t = self.t();
-        egui::TopBottomPanel::bottom("status_bar").show(context, |ui| {
-            ui.horizontal(|ui| {
-                ui.label(&self.status);
-                if self.texture.scan_receiver.is_some()
-                    || !self.model.load_receivers.is_empty()
-                    || self.model.export_receiver.is_some()
-                    || self.model.batch.as_ref().is_some_and(|batch| !batch.done)
-                    || self.process.is_some()
-                {
-                    ui.spinner();
-                }
-                // Right-aligned clickable diagnostics chip → popover.
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let count = self.diagnostics().len();
-                    let (color, text) = if count > 0 {
-                        (
-                            Color32::from_rgb(200, 130, 40),
-                            fill(t.diag_chip_some, &[&count.to_string()]),
-                        )
-                    } else {
-                        (Color32::from_rgb(70, 165, 95), t.diag_chip_none.to_owned())
-                    };
-                    if ui
-                        .add(egui::Button::new(RichText::new(text).color(color)).frame(false))
-                        .on_hover_text(t.show_diagnostics_hover)
-                        .clicked()
-                    {
-                        self.show_diagnostics = !self.show_diagnostics;
-                    }
-                });
-            });
-        });
-    }
-
-    /// Transient diagnostics surfaced in the status-bar popover: unresolved
+    /// Transient diagnostics surfaced in the topbar popover: unresolved
     /// texture unknowns, group conflict notes (DEF-19), RC fallback state, and
     /// FBX material-slot diagnostics.
-    fn diagnostics(&self) -> Vec<DiagItem> {
+    pub(crate) fn diagnostics(&self) -> Vec<DiagItem> {
         let t = self.t();
         let mut items = Vec::new();
         if let Some(document) = &self.texture.document {
@@ -1559,1511 +1521,10 @@ impl WorkflowApp {
         items
     }
 
-    fn diagnostics_popover(&mut self, context: &egui::Context) {
-        if !self.show_diagnostics {
-            return;
-        }
-        let t = self.t();
-        let items = self.diagnostics();
-        let mut open = true;
-        egui::Window::new(t.diagnostics_title)
-            .anchor(Align2::RIGHT_BOTTOM, [-8.0, -34.0])
-            .resizable(false)
-            .collapsible(false)
-            .open(&mut open)
-            .default_width(420.0)
-            .show(context, |ui| {
-                if items.is_empty() {
-                    ui.colored_label(Color32::from_rgb(70, 165, 95), t.no_diagnostics);
-                    return;
-                }
-                ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                    for item in &items {
-                        ui.horizontal_top(|ui| {
-                            let color = match item.severity {
-                                "Error" => Color32::from_rgb(210, 70, 65),
-                                "Warning" => Color32::from_rgb(200, 130, 40),
-                                _ => Color32::from_rgb(53, 87, 183),
-                            };
-                            ui.label(RichText::new(item.severity).small().strong().color(color));
-                            ui.vertical(|ui| {
-                                ui.strong(&item.title);
-                                ui.label(&item.message);
-                            });
-                        });
-                        ui.separator();
-                    }
-                });
-            });
-        self.show_diagnostics = open;
-    }
-
-    fn process_modal(&mut self, context: &egui::Context) {
-        if !self.process_modal_open {
-            return;
-        }
-        let t = self.t();
-        let mut cancel = false;
-        let mut close = false;
-        Modal::new(Id::new("process_modal")).show(context, |ui| {
-            ui.set_width(520.0);
-            if let Some(process) = &self.process {
-                ui.heading(t.processing_textures_heading);
-                ui.label(fill(
-                    t.processing_progress,
-                    &[
-                        &process.completed.to_string(),
-                        &process.total.to_string(),
-                        &process.current_group,
-                    ],
-                ));
-                let progress = if process.total == 0 {
-                    0.0
-                } else {
-                    process.completed as f32 / process.total as f32
-                };
-                ui.add(ProgressBar::new(progress).show_percentage());
-                if process.dds_active {
-                    ui.add_space(6.0);
-                    ui.label(fill(
-                        t.dds_compiling,
-                        &[
-                            &process.dds_completed.to_string(),
-                            &process.dds_total.to_string(),
-                            &process.dds_current,
-                            &process.dds_workers.to_string(),
-                        ],
-                    ));
-                    let dds_progress = if process.dds_total == 0 {
-                        0.0
-                    } else {
-                        process.dds_completed as f32 / process.dds_total as f32
-                    };
-                    ui.add(ProgressBar::new(dds_progress).show_percentage());
-                }
-                ui.add_space(6.0);
-                ScrollArea::vertical()
-                    .max_height(280.0)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for name in &process.group_names {
-                            ui.horizontal(|ui| {
-                                if process.completed_groups.contains(name) {
-                                    ui.colored_label(Color32::from_rgb(70, 165, 95), "✓");
-                                    ui.label(name);
-                                } else {
-                                    ui.weak("•");
-                                    ui.weak(name);
-                                }
-                            });
-                        }
-                    });
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    cancel = ui.button(t.cancel).clicked();
-                });
-            } else if let Some(summary) = &self.process_summary {
-                ui.heading(if summary.cancelled {
-                    t.processing_cancelled_heading
-                } else {
-                    t.processing_complete_heading
-                });
-                ui.label(fill(
-                    t.processing_summary,
-                    &[
-                        &summary.groups.to_string(),
-                        &summary.written.to_string(),
-                        &format!("{:.2}", summary.elapsed_seconds),
-                    ],
-                ));
-                if !summary.failed.is_empty() {
-                    ui.colored_label(
-                        Color32::from_rgb(210, 70, 65),
-                        fill(t.groups_failed_summary, &[&summary.failed.len().to_string()]),
-                    );
-                }
-                if let Some(dds) = &summary.dds {
-                    let color = if dds.failures.is_empty() {
-                        Color32::from_rgb(70, 165, 95)
-                    } else {
-                        Color32::from_rgb(200, 130, 40)
-                    };
-                    ui.colored_label(
-                        color,
-                        fill(
-                            t.dds_compiled_summary,
-                            &[&dds.succeeded.to_string(), &dds.total.to_string()],
-                        ),
-                    );
-                    if !dds.failures.is_empty() {
-                        ui.label(fill(t.dds_failed_note, &[&dds.failures.len().to_string()]));
-                    }
-                }
-                ui.add_space(6.0);
-                ui.hyperlink_to(t.open_output_folder, file_url(&summary.output_directory));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    close = ui.button(t.close).clicked();
-                });
-            } else {
-                close = true;
-            }
-        });
-        if cancel {
-            if let Some(process) = &self.process {
-                process.job.cancel.store(true, Ordering::Relaxed);
-                self.status = t.cancelling_process.to_owned();
-            }
-        }
-        if close {
-            self.process_modal_open = false;
-        }
-    }
-
-    fn export_modal(&mut self, context: &egui::Context) {
-        if !self.model.export_modal_open {
-            return;
-        }
-        let t = self.t();
-        let running = self.model.export_receiver.is_some();
-        let mut close = false;
-        Modal::new(Id::new("export_modal")).show(context, |ui| {
-            ui.set_width(520.0);
-            if running {
-                ui.heading(t.exporting_ce_model_heading);
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(&self.model.export_stage);
-                });
-                ui.add_space(6.0);
-                if self.preferences.export_associated_textures {
-                    ui.weak(t.export_pipeline_with_textures);
-                } else {
-                    ui.weak(t.export_pipeline);
-                }
-            } else if let Some(summary) = &self.model.export_summary {
-                ui.heading(t.ce_model_export);
-                ui.label(summary);
-                ui.add_space(6.0);
-                if let Some(cgf) = &self.model.export_cgf {
-                    ui.label(format!("CGF: {}", cgf.display()));
-                }
-                ui.hyperlink_to(
-                    t.open_output_folder,
-                    file_url(Path::new(&self.preferences.model_output_directory)),
-                );
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    close = ui.button(t.close).clicked();
-                });
-            } else {
-                close = true;
-            }
-        });
-        if close {
-            self.model.export_modal_open = false;
-        }
-    }
-
-    fn batch_modal(&mut self, context: &egui::Context) {
-        let t = self.t();
-        let Some(batch) = self.model.batch.as_ref() else {
-            return;
-        };
-        if !batch.modal_open {
-            return;
-        }
-        let mut cancel = false;
-        let mut close = false;
-        let model_output = self.preferences.model_output_directory.clone();
-        Modal::new(Id::new("batch_modal")).show(context, |ui| {
-            ui.set_width(560.0);
-            if !batch.done {
-                ui.heading(t.exporting_models_heading);
-                ui.label(fill(
-                    t.batch_model_progress,
-                    &[
-                        &batch.current.max(1).to_string(),
-                        &batch.total.to_string(),
-                        &batch.current_name,
-                    ],
-                ));
-                ui.label(&batch.stage);
-                let progress = if batch.total == 0 {
-                    0.0
-                } else {
-                    batch.current.saturating_sub(1) as f32 / batch.total as f32
-                };
-                ui.add(ProgressBar::new(progress).show_percentage());
-                ui.add_space(6.0);
-                ui.label(fill(
-                    t.batch_done_failed,
-                    &[&batch.succeeded.len().to_string(), &batch.failed.len().to_string()],
-                ));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    cancel = ui.button(t.cancel).clicked();
-                });
-            } else {
-                ui.heading(t.export_all_complete_heading);
-                ui.label(fill(
-                    t.succeeded_failed,
-                    &[&batch.succeeded.len().to_string(), &batch.failed.len().to_string()],
-                ));
-                ui.add_space(6.0);
-                ScrollArea::vertical().max_height(300.0).show(ui, |ui| {
-                    for ok in &batch.succeeded {
-                        ui.horizontal(|ui| {
-                            ui.colored_label(Color32::from_rgb(70, 165, 95), "✓");
-                            ui.label(ok);
-                        });
-                    }
-                    for (name, detail) in &batch.failed {
-                        ui.horizontal_top(|ui| {
-                            ui.colored_label(Color32::from_rgb(210, 70, 65), "✗");
-                            ui.label(format!("{name}: {detail}"));
-                        });
-                    }
-                });
-                ui.add_space(6.0);
-                ui.hyperlink_to(t.open_output_folder, file_url(Path::new(&model_output)));
-                ui.add_space(8.0);
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    close = ui.button(t.close).clicked();
-                });
-            }
-        });
-        if cancel {
-            if let Some(batch) = self.model.batch.as_ref() {
-                batch.cancel.store(true, Ordering::Relaxed);
-            }
-            self.status = t.cancelling_batch.to_owned();
-        }
-        if close {
-            if let Some(batch) = self.model.batch.as_mut() {
-                batch.modal_open = false;
-            }
-        }
-    }
-
-    fn left_panel(&mut self, context: &egui::Context) {
-        egui::SidePanel::left("imports")
-            .resizable(true)
-            .default_width(320.0)
-            .min_width(270.0)
-            .max_width(430.0)
-            .show(context, |ui| {
-                let t = self.t();
-                ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.tab, WorkflowTab::Textures, t.tab_texture_import);
-                    ui.selectable_value(&mut self.tab, WorkflowTab::Model, t.tab_model_import);
-                });
-                ui.separator();
-                match self.tab {
-                    WorkflowTab::Textures => self.texture_import_panel(ui),
-                    WorkflowTab::Model => self.model_import_panel(ui),
-                }
-            });
-    }
-
-    fn texture_import_panel(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.heading(t.texture_import);
-        ui.label(t.texture_import_desc);
-        ui.add_space(6.0);
-        ui.add(
-            TextEdit::singleline(&mut self.preferences.import_path).hint_text(t.texture_path_hint),
-        );
-        ui.horizontal_wrapped(|ui| {
-            if ui.button(t.add_files).clicked() {
-                match choose_files_multi(t.dlg_select_texture_files, IMAGE_FILTER) {
-                    Ok(files) if !files.is_empty() => self.add_texture_roots(files),
-                    Ok(_) => {}
-                    Err(error) => self.status = error,
-                }
-            }
-            if ui.button(t.add_folder).clicked() {
-                let initial = self.preferences.import_path.clone();
-                if let Some(folder) =
-                    self.dialog_result(choose_folder(t.dlg_select_texture_folder, &initial))
-                {
-                    self.add_texture_roots(vec![folder]);
-                }
-            }
-            if ui.button(t.add_path).clicked() {
-                let paths = split_paths(&self.preferences.import_path)
-                    .into_iter()
-                    .filter(|path| path.exists())
-                    .collect::<Vec<_>>();
-                self.add_texture_roots(paths);
-            }
-            if ui.button(t.clear_all).clicked() {
-                self.clear_textures();
-            }
-            let has_selection = !self.texture.selected_files.is_empty();
-            if ui
-                .add_enabled(has_selection, egui::Button::new(t.remove_selected))
-                .clicked()
-            {
-                self.remove_selected_textures();
-            }
-            if ui
-                .add_enabled(has_selection, egui::Button::new(t.add_related))
-                .on_hover_text(t.add_related_hover)
-                .clicked()
-            {
-                self.add_related_textures();
-            }
-        });
-        if self.texture.scan_receiver.is_some() {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(t.scanning);
-            });
-        }
-        ui.add_space(8.0);
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.strong(fill(
-                t.imported_textures_count,
-                &[
-                    &self.texture.files.len().to_string(),
-                    &self.texture.selected_files.len().to_string(),
-                ],
-            ));
-            ui.weak(t.multi_select_hint);
-            ui.separator();
-            let modifiers = ui.input(|input| input.modifiers);
-            let mut clicked = None;
-            ScrollArea::vertical()
-                .id_salt("imported_texture_list")
-                .max_height(ui.available_height() - 80.0)
-                .show(ui, |ui| {
-                    for (index, path) in self.texture.files.iter().enumerate() {
-                        let label = path
-                            .file_name()
-                            .and_then(|name| name.to_str())
-                            .unwrap_or_default();
-                        if ui
-                            .selectable_label(self.texture.selected_files.contains(&index), label)
-                            .on_hover_text(path.display().to_string())
-                            .clicked()
-                        {
-                            clicked = Some((index, path.clone()));
-                        }
-                    }
-                });
-            if let Some((index, path)) = clicked {
-                self.apply_selection_click(index, modifiers.ctrl, modifiers.shift);
-                let source_type = source_type_for_path(self.texture.document.as_ref(), &path);
-                self.request_preview(path, source_type);
-            }
-        });
-    }
-
-    fn model_import_panel(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.heading(t.model_import);
-        ui.label(t.model_import_desc);
-        ui.add_space(6.0);
-        ui.add(TextEdit::singleline(&mut self.preferences.model_path).hint_text(t.fbx_path_hint));
-        ui.horizontal_wrapped(|ui| {
-            if ui.button(t.add_fbx).clicked() {
-                match choose_files_multi(t.dlg_select_fbx_files, FBX_FILTER) {
-                    Ok(files) if !files.is_empty() => self.load_model_files(files),
-                    Ok(_) => {}
-                    Err(error) => self.status = error,
-                }
-            }
-            if ui.button(t.add_path).clicked() {
-                let paths = split_paths(&self.preferences.model_path)
-                    .into_iter()
-                    .filter(|path| path.exists())
-                    .collect::<Vec<_>>();
-                if paths.is_empty() {
-                    self.status = t.enter_fbx_path_first.to_owned();
-                } else {
-                    self.load_model_files(paths);
-                }
-            }
-            if ui.button(t.clear_all).clicked() {
-                self.clear_models();
-            }
-            let has_selection = !self.model.selected.is_empty();
-            if ui
-                .add_enabled(has_selection, egui::Button::new(t.remove_selected))
-                .clicked()
-            {
-                self.remove_selected_models();
-            }
-        });
-        if !self.model.load_receivers.is_empty() {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.label(fill(
-                    t.loading_models,
-                    &[&self.model.load_receivers.len().to_string()],
-                ));
-            });
-        }
-        ui.add_space(8.0);
-        // Model list — same visual pattern as the Imported Textures list.
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.strong(fill(
-                t.loaded_models_count,
-                &[
-                    &self.model.entries.len().to_string(),
-                    &self.model.selected.len().to_string(),
-                ],
-            ));
-            ui.weak(t.multi_select_hint);
-            ui.separator();
-            let modifiers = ui.input(|input| input.modifiers);
-            let mut clicked = None;
-            ScrollArea::vertical()
-                .id_salt("model_list")
-                .max_height(230.0)
-                .show(ui, |ui| {
-                    for (index, entry) in self.model.entries.iter().enumerate() {
-                        let name = entry
-                            .review
-                            .path
-                            .file_name()
-                            .and_then(|value| value.to_str())
-                            .unwrap_or("FBX");
-                        if ui
-                            .selectable_label(self.model.selected.contains(&index), name)
-                            .on_hover_text(entry.review.path.display().to_string())
-                            .clicked()
-                        {
-                            clicked = Some(index);
-                        }
-                        let diagnostics = entry.review.diagnostics.len();
-                        ui.horizontal(|ui| {
-                            ui.add_space(4.0);
-                            badge(
-                                ui,
-                                fill(t.badge_mat, &[&entry.review.material_slots.len().to_string()]),
-                                Color32::from_rgb(70, 110, 190),
-                            );
-                            badge(
-                                ui,
-                                fill(t.badge_diag, &[&diagnostics.to_string()]),
-                                if diagnostics > 0 {
-                                    Color32::from_rgb(200, 130, 40)
-                                } else {
-                                    Color32::from_rgb(110, 110, 115)
-                                },
-                            );
-                            badge(
-                                ui,
-                                fill(t.badge_helper, &[&entry.helper_nodes.to_string()]),
-                                Color32::from_rgb(110, 110, 115),
-                            );
-                        });
-                    }
-                });
-            if let Some(index) = clicked {
-                apply_click_selection(
-                    &mut self.model.selected,
-                    &mut self.model.selection_anchor,
-                    index,
-                    modifiers.ctrl,
-                    modifiers.shift,
-                );
-            }
-        });
-        ui.add_space(8.0);
-        if let Some(index) = self.selected_entry_index() {
-            self.model_summary(ui, index);
-            ui.add_space(8.0);
-            self.conversion_settings(ui, index);
-            ui.add_space(8.0);
-            if ui.button(t.resend_textures).clicked() {
-                self.ingest_entry_textures(index);
-            }
-        } else if self.model.entries.is_empty() {
-            ui.weak(t.no_models_loaded);
-        } else {
-            ui.weak(t.select_single_model);
-        }
-    }
-
-    /// Per-model summary shown under the list for the single selected model.
-    fn model_summary(&self, ui: &mut egui::Ui, index: usize) {
-        let t = self.t();
-        let entry = &self.model.entries[index];
-        let review = &entry.review;
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.strong(
-                review
-                    .path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .unwrap_or("FBX"),
-            );
-            ui.label(fill(t.summary_material_slots, &[&review.material_slots.len().to_string()]));
-            ui.label(fill(t.summary_meshes, &[&review.model.meshes.len().to_string()]));
-            ui.label(fill(t.summary_nodes, &[&review.model.node_count.to_string()]));
-            ui.label(fill(t.summary_helper_nodes, &[&entry.helper_nodes.to_string()]));
-            ui.label(fill(t.summary_diagnostics, &[&review.diagnostics.len().to_string()]));
-            let axes = &review.model.axes;
-            if axes.declared {
-                ui.label(axes.summary());
-            } else {
-                ui.colored_label(Color32::from_rgb(0xE0, 0xA0, 0x30), axes.summary())
-                    .on_hover_text(t.axes_undeclared_hover);
-            }
-        });
-    }
-
-    /// Conversion Settings panel (R9 item 2): Sandbox-mirror RC import fields for
-    /// the selected model. Forward/Up are per-model; Unit/Scale stay global prefs.
-    /// Manual values win over auto-detection when the request is built.
-    fn conversion_settings(&mut self, ui: &mut egui::Ui, index: usize) {
-        // Take the entry's conversion out so we can freely touch self.preferences
-        // (Unit/Scale + save) without a borrow conflict, then write it back.
-        let mut conv = std::mem::take(&mut self.model.entries[index].conversion);
-        let t = self.t();
-        ui.group(|ui| {
-            ui.set_width(ui.available_width());
-            ui.strong(t.conversion_settings_heading);
-
-            // Unit (persisted) + Scale (persisted).
-            ui.horizontal(|ui| {
-                ui.label(t.unit_label);
-                let mut unit_changed = false;
-                egui::ComboBox::from_id_salt("conversion_unit")
-                    .selected_text(&self.preferences.conversion_unit)
-                    .show_ui(ui, |ui| {
-                        for value in UNIT_SIZE_VALUES {
-                            if ui
-                                .selectable_value(
-                                    &mut self.preferences.conversion_unit,
-                                    value.to_owned(),
-                                    value,
-                                )
-                                .changed()
-                            {
-                                unit_changed = true;
-                            }
-                        }
-                    });
-                if unit_changed {
-                    self.save_preferences();
-                }
-            });
-            ui.horizontal(|ui| {
-                ui.label(t.scale_label);
-                if ui
-                    .add(
-                        egui::DragValue::new(&mut self.preferences.conversion_scale)
-                            .speed(0.01)
-                            .range(0.0001..=100_000.0),
-                    )
-                    .changed()
-                {
-                    self.save_preferences();
-                }
-            });
-
-            // Forward / Up (re-detected per FBX, not persisted). A value that
-            // differs from detection is marked as an override.
-            let detected = compose_forward_up(&conv.detected_forward, &conv.detected_up);
-            axis_dropdown(ui, t.forward_label, "conversion_forward", &mut conv.forward);
-            axis_dropdown(ui, t.up_label, "conversion_up", &mut conv.up);
-            let current = compose_forward_up(&conv.forward, &conv.up);
-            ui.horizontal(|ui| {
-                ui.weak(fill(t.detected_axes, &[&detected]));
-                if current != detected {
-                    ui.colored_label(
-                        Color32::from_rgb(0xE0, 0xA0, 0x30),
-                        fill(t.axis_override, &[&current]),
-                    );
-                }
-            });
-            if axes_parallel(&conv.forward, &conv.up) {
-                ui.colored_label(Color32::from_rgb(210, 70, 65), t.axes_parallel_warning);
-            }
-
-            ui.checkbox(&mut conv.merge_all_nodes, t.merge_all_nodes);
-            ui.checkbox(&mut conv.scene_origin, t.scene_origin);
-        });
-        self.model.entries[index].conversion = conv;
-    }
-
-    fn right_panel(&mut self, context: &egui::Context) {
-        egui::SidePanel::right("export_settings")
-            .resizable(true)
-            .default_width(380.0)
-            .min_width(340.0)
-            .max_width(480.0)
-            .show(context, |ui| {
-                // Action buttons stay pinned at the bottom; settings scroll above.
-                egui::TopBottomPanel::bottom("right_actions").show_inside(ui, |ui| {
-                    ui.add_space(6.0);
-                    self.right_actions(ui);
-                    ui.add_space(2.0);
-                });
-                egui::CentralPanel::default().show_inside(ui, |ui| {
-                    ui.add_space(4.0);
-                    ui.heading(self.t().output_settings_heading);
-                    ui.add_space(2.0);
-                    ScrollArea::vertical().show(ui, |ui| {
-                        self.language_selector(ui);
-                        ui.separator();
-                        self.output_directory_fields(ui);
-                        ui.separator();
-                        self.common_settings(ui);
-                        self.advanced_settings(ui);
-                        ui.separator();
-                        self.model_export_inputs(ui);
-                        ui.separator();
-                        self.settings_file_inputs(ui);
-                    });
-                });
-            });
-    }
-
-    fn right_actions(&mut self, ui: &mut egui::Ui) {
-        self.texture_actions(ui);
-        ui.add_space(6.0);
-        self.model_export_action(ui);
-        ui.separator();
-        let t = self.t();
-        ui.horizontal(|ui| {
-            if ui.button(t.save_settings_btn).clicked() {
-                self.save_settings();
-            }
-            if ui.button(t.load_settings_btn).clicked() {
-                self.load_settings();
-            }
-        });
-    }
-
-    /// Language combo. egui is immediate-mode, so a switch re-renders the whole
-    /// UI with the new strings on the next frame.
-    fn language_selector(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        let current = Language::from_code(&self.preferences.language);
-        ui.horizontal(|ui| {
-            ui.label(t.language_label);
-            ComboBox::from_id_salt("language")
-                .selected_text(current.endonym())
-                .show_ui(ui, |ui| {
-                    for language in [Language::En, Language::ZhCn] {
-                        if ui
-                            .selectable_label(language == current, language.endonym())
-                            .clicked()
-                        {
-                            self.preferences.language = language.code().to_owned();
-                            self.save_preferences();
-                        }
-                    }
-                });
-        });
-    }
-
-    fn output_directory_fields(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.strong(t.texture_output_dir);
-        let (mut changed, browse) = path_row(
-            ui,
-            "texture_output",
-            &mut self.preferences.texture_output_directory,
-            r"C:\output\textures",
-            t.browse,
-        );
-        if browse {
-            let initial = self.preferences.texture_output_directory.clone();
-            if let Some(folder) =
-                self.dialog_result(choose_folder(t.dlg_select_texture_output, &initial))
-            {
-                self.preferences.texture_output_directory = folder.to_string_lossy().into_owned();
-                changed = true;
-            }
-        }
-        if changed {
-            self.save_preferences();
-        }
-        ui.add_space(5.0);
-        ui.strong(t.model_output_dir);
-        let (mut changed, browse) = path_row(
-            ui,
-            "model_output",
-            &mut self.preferences.model_output_directory,
-            r"C:\output\model",
-            t.browse,
-        );
-        if browse {
-            let initial = self.preferences.model_output_directory.clone();
-            if let Some(folder) =
-                self.dialog_result(choose_folder(t.dlg_select_model_output, &initial))
-            {
-                self.preferences.model_output_directory = folder.to_string_lossy().into_owned();
-                changed = true;
-            }
-        }
-        if changed {
-            self.save_preferences();
-        }
-    }
-
-    fn common_settings(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        Grid::new("primary_texture_settings")
-            .num_columns(2)
-            .spacing([12.0, 6.0])
-            .show(ui, |ui| {
-                ui.label(t.output_resolution_label);
-                ComboBox::from_id_salt("resolution")
-                    .selected_text(resolution_label(self.settings.output_resolution))
-                    .show_ui(ui, |ui| {
-                        for (label, value) in [
-                            ("Original", OutputResolution::Original),
-                            ("4096", OutputResolution::Max(4096)),
-                            ("2048", OutputResolution::Max(2048)),
-                            ("1024", OutputResolution::Max(1024)),
-                            ("512", OutputResolution::Max(512)),
-                            ("256", OutputResolution::Max(256)),
-                        ] {
-                            ui.selectable_value(&mut self.settings.output_resolution, value, label);
-                        }
-                    });
-                ui.end_row();
-                ui.label(t.diffuse_format_label);
-                ComboBox::from_id_salt("diff_format")
-                    .selected_text(match self.settings.diff_format {
-                        DiffFormat::Albedo => "albedo",
-                        DiffFormat::DiffuseAo => "diffuse_ao",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            &mut self.settings.diff_format,
-                            DiffFormat::Albedo,
-                            "albedo",
-                        );
-                        ui.selectable_value(
-                            &mut self.settings.diff_format,
-                            DiffFormat::DiffuseAo,
-                            "diffuse_ao",
-                        );
-                    });
-                ui.end_row();
-            });
-        ui.checkbox(&mut self.settings.normal_flip_green, t.flip_normal_green);
-        ui.checkbox(&mut self.settings.process_metallic, t.convert_metallic);
-        ui.checkbox(&mut self.settings.generate_missing_spec, t.generate_missing_spec);
-        let rc_available = resolve_rc_path(&self.preferences.rc_path).path.is_some();
-        if rc_available {
-            if ui
-                .checkbox(&mut self.preferences.generate_dds, t.generate_dds)
-                .changed()
-            {
-                self.save_preferences();
-            }
-        } else {
-            self.preferences.generate_dds = false;
-            ui.add_enabled_ui(false, |ui| {
-                let mut off = false;
-                ui.checkbox(&mut off, t.generate_dds);
-            })
-            .response
-            .on_hover_text(t.rc_not_configured);
-        }
-        if ui
-            .checkbox(&mut self.preferences.delete_tif_after_dds, t.delete_tif)
-            .on_hover_text(t.delete_tif_hover)
-            .changed()
-        {
-            self.save_preferences();
-        }
-    }
-
-    fn advanced_settings(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.collapsing(t.advanced_heading, |ui| {
-            ui.strong(t.output_texture_types);
-            Grid::new("texture_type_toggles")
-                .num_columns(2)
-                .show(ui, |ui| {
-                    ui.checkbox(&mut self.settings.texture_types.diff, t.tt_diff);
-                    ui.checkbox(&mut self.settings.texture_types.spec, t.tt_spec);
-                    ui.end_row();
-                    ui.checkbox(&mut self.settings.texture_types.ddna, t.tt_ddna);
-                    ui.checkbox(&mut self.settings.texture_types.displ, t.tt_displ);
-                    ui.end_row();
-                    ui.checkbox(&mut self.settings.texture_types.emissive, t.tt_emissive);
-                    ui.checkbox(&mut self.settings.texture_types.sss, t.tt_sss);
-                    ui.end_row();
-                });
-            ui.add_space(6.0);
-            ui.checkbox(&mut self.settings.normalize_height, t.normalize_height);
-            ui.checkbox(&mut self.settings.dither, t.dither);
-            ui.checkbox(
-                &mut self.settings.generate_missing_emissive,
-                t.generate_missing_emissive,
-            );
-            ui.checkbox(&mut self.settings.generate_missing_sss, t.generate_missing_sss);
-            ui.checkbox(
-                &mut self.settings.generate_sss_from_diffuse,
-                t.generate_sss_from_diffuse,
-            );
-            ui.add_space(6.0);
-            // "Metal Gate" is a proper feature name — untranslated per policy.
-            ui.checkbox(&mut self.settings.metal_gate, "Metal Gate")
-                .on_hover_text(t.metal_gate_hover);
-            Grid::new("advanced_texture_settings")
-                .num_columns(2)
-                .show(ui, |ui| {
-                    ui.label(t.arm_order_label);
-                    ComboBox::from_id_salt("arm_order")
-                        .selected_text(match self.settings.arm_order {
-                            ArmOrder::Arm => "ARM",
-                            ArmOrder::Orm => "ORM",
-                            ArmOrder::Rma => "RMA",
-                        })
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.settings.arm_order, ArmOrder::Arm, "ARM");
-                            ui.selectable_value(&mut self.settings.arm_order, ArmOrder::Orm, "ORM");
-                            ui.selectable_value(&mut self.settings.arm_order, ArmOrder::Rma, "RMA");
-                        });
-                    ui.end_row();
-                    ui.label(t.height_normal_strength);
-                    ui.add(
-                        egui::DragValue::new(&mut self.settings.normal_from_height_strength)
-                            .speed(0.1)
-                            .range(0.0..=100.0),
-                    );
-                    ui.end_row();
-                    ui.label(t.emissive_brightness_label);
-                    ui.add(
-                        egui::DragValue::new(&mut self.settings.emissive_brightness)
-                            .speed(0.05)
-                            .range(0.0..=20.0),
-                    );
-                    ui.end_row();
-                    ui.label(t.sss_intensity_label);
-                    ui.add(
-                        egui::DragValue::new(&mut self.settings.sss_intensity)
-                            .speed(0.05)
-                            .range(0.0..=20.0),
-                    );
-                    ui.end_row();
-                    ui.label(t.sss_contrast_label);
-                    ui.add(
-                        egui::DragValue::new(&mut self.settings.sss_contrast)
-                            .speed(0.05)
-                            .range(0.0..=5.0),
-                    );
-                    ui.end_row();
-
-                    ui.add_enabled_ui(self.settings.metal_gate, |ui| {
-                        Grid::new("metal_gate_settings")
-                            .num_columns(2)
-                            .show(ui, |ui| {
-                                ui.label(t.mg_metallic_cut);
-                                ui.add(
-                                    egui::DragValue::new(
-                                        &mut self.settings.metal_gate_metallic_cut,
-                                    )
-                                    .speed(0.01)
-                                    .range(0.0..=1.0),
-                                );
-                                ui.end_row();
-                                ui.label(t.mg_spec_min);
-                                ui.add(
-                                    egui::DragValue::new(&mut self.settings.metal_gate_spec_min)
-                                        .speed(0.01)
-                                        .range(0.0..=1.0),
-                                );
-                                ui.end_row();
-                                ui.label(t.mg_gloss_cut);
-                                ui.add(
-                                    egui::DragValue::new(&mut self.settings.metal_gate_gloss_cut)
-                                        .speed(0.01)
-                                        .range(0.0..=1.0),
-                                );
-                                ui.end_row();
-                                ui.label(t.mg_transition);
-                                ui.add(
-                                    egui::DragValue::new(&mut self.settings.metal_gate_transition)
-                                        .speed(0.01)
-                                        .range(0.0..=0.5),
-                                );
-                                ui.end_row();
-                            });
-                    });
-                    ui.end_row();
-                });
-        });
-    }
-
-    fn settings_file_inputs(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.strong(t.settings_file_label);
-        let (_, browse) = path_row(
-            ui,
-            "settings_path",
-            &mut self.preferences.settings_path,
-            "texproc-settings.json",
-            t.browse,
-        );
-        if browse {
-            let initial = self.preferences.settings_path.clone();
-            if let Some(path) = self.dialog_result(choose_file_open(
-                t.dlg_select_settings,
-                JSON_FILTER,
-                &initial,
-            )) {
-                self.preferences.settings_path = path.to_string_lossy().into_owned();
-                self.load_settings();
-            }
-        }
-        if ui.button(t.save_as).clicked() {
-            let default_name = Path::new(self.preferences.settings_path.trim())
-                .file_name()
-                .and_then(|name| name.to_str())
-                .unwrap_or("texproc-settings.json")
-                .to_owned();
-            if let Some(path) = self.dialog_result(choose_file_save(
-                t.dlg_save_settings_as,
-                JSON_FILTER,
-                &default_name,
-            )) {
-                self.preferences.settings_path = path.to_string_lossy().into_owned();
-                self.save_settings();
-            }
-        }
-    }
-
-    fn texture_actions(&mut self, ui: &mut egui::Ui) {
-        let group_count = self
-            .texture
-            .document
-            .as_ref()
-            .map_or(0, |document| document.scan().groups.len());
-        let unknown = self
-            .texture
-            .document
-            .as_ref()
-            .map_or(0, ReviewDocument::unresolved_unknown_count);
-        let t = self.t();
-        ui.label(fill(
-            t.groups_unknown_count,
-            &[&group_count.to_string(), &unknown.to_string()],
-        ));
-        let processing = self.process.is_some();
-        if ui
-            .add_enabled(
-                !processing && group_count > 0,
-                egui::Button::new(RichText::new(t.process_textures_btn).strong().size(18.0))
-                    .min_size([ui.available_width(), 42.0].into()),
-            )
-            .clicked()
-        {
-            self.start_texture_process();
-        }
-        if processing && ui.button(t.show_progress).clicked() {
-            self.process_modal_open = true;
-        }
-        if let Some(summary) = &self.process_summary {
-            if !self.process_modal_open {
-                ui.hyperlink_to(t.open_output_folder, file_url(&summary.output_directory));
-            }
-        }
-    }
-
-    fn model_export_inputs(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.strong(t.ce_model_export);
-        ui.label(t.optional_manifest);
-        let (mut changed, browse) = path_row(
-            ui,
-            "manifest_path",
-            &mut self.preferences.manifest_path,
-            t.hint_manifest,
-            t.browse,
-        );
-        if browse {
-            let initial = self.preferences.manifest_path.clone();
-            if let Some(path) = self.dialog_result(choose_file_open(
-                t.dlg_select_manifest,
-                JSON_FILTER,
-                &initial,
-            )) {
-                self.preferences.manifest_path = path.to_string_lossy().into_owned();
-                changed = true;
-            }
-        }
-        ui.label(t.optional_overrides);
-        let (overrides_changed, overrides_browse) = path_row(
-            ui,
-            "overrides_path",
-            &mut self.preferences.overrides_path,
-            t.hint_overrides,
-            t.browse,
-        );
-        changed |= overrides_changed;
-        if overrides_browse {
-            let initial = self.preferences.overrides_path.clone();
-            if let Some(path) = self.dialog_result(choose_file_open(
-                t.dlg_select_overrides,
-                JSON_FILTER,
-                &initial,
-            )) {
-                self.preferences.overrides_path = path.to_string_lossy().into_owned();
-                changed = true;
-            }
-        }
-        if changed {
-            self.save_preferences();
-        }
-        if ui
-            .checkbox(&mut self.preferences.export_associated_textures, t.export_associated)
-            .on_hover_text(t.export_associated_hover)
-            .changed()
-        {
-            self.save_preferences();
-        }
-        if ui
-            .checkbox(&mut self.preferences.delete_request_json, t.delete_request_json)
-            .on_hover_text(t.delete_request_hover)
-            .changed()
-        {
-            self.save_preferences();
-        }
-        self.rc_path_field(ui);
-    }
-
-    fn model_export_action(&mut self, ui: &mut egui::Ui) {
-        let single_ok = self.selected_entry_index().is_some_and(|index| {
-            let conv = &self.model.entries[index].conversion;
-            !axes_parallel(&conv.forward, &conv.up)
-        });
-        let exporting = self.model.export_receiver.is_some()
-            || self.model.batch.as_ref().is_some_and(|batch| !batch.done);
-        let t = self.t();
-        if ui
-            .add_enabled(
-                single_ok && !exporting,
-                egui::Button::new(RichText::new(t.export_ce_model_btn).strong().size(16.0))
-                    .min_size([ui.available_width(), 36.0].into()),
-            )
-            .on_hover_text(t.export_ce_model_hover)
-            .clicked()
-        {
-            self.save_preferences();
-            self.start_model_export();
-        }
-        if ui
-            .add_enabled(
-                !self.model.entries.is_empty() && !exporting,
-                egui::Button::new(RichText::new(t.export_all_btn).strong().size(16.0))
-                    .min_size([ui.available_width(), 34.0].into()),
-            )
-            .on_hover_text(t.export_all_hover)
-            .clicked()
-        {
-            self.save_preferences();
-            self.start_batch_export();
-        }
-        if self.model.export_receiver.is_some() && ui.button(t.show_export_progress).clicked() {
-            self.model.export_modal_open = true;
-        }
-        if self.model.batch.is_some() && ui.button(t.show_batch_progress).clicked() {
-            if let Some(batch) = self.model.batch.as_mut() {
-                batch.modal_open = true;
-            }
-        }
-    }
-
-    fn rc_path_field(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.label(t.rc_path_label);
-        let resolution = resolve_rc_path(&self.preferences.rc_path);
-        let invalid = resolution.configured_invalid || resolution.path.is_none();
-        let stroke = if invalid {
-            Stroke::new(1.5, Color32::from_rgb(210, 70, 65))
-        } else {
-            ui.visuals().widgets.inactive.bg_stroke
-        };
-        let mut changed = false;
-        let mut browse = false;
-        ui.horizontal(|ui| {
-            egui::Frame::new()
-                .stroke(stroke)
-                .inner_margin(egui::Margin::same(2))
-                .show(ui, |ui| {
-                    changed = ui
-                        .add(
-                            TextEdit::singleline(&mut self.preferences.rc_path)
-                                .desired_width((ui.available_width() - 74.0).max(120.0))
-                                .hint_text(r"C:\CryEngine\Tools\rc\rc.exe"),
-                        )
-                        .changed();
-                });
-            browse = ui.button(t.browse).clicked();
-        });
-        if browse {
-            match choose_rc_executable(&self.preferences.rc_path) {
-                Ok(Some(path)) => {
-                    self.preferences.rc_path = path.to_string_lossy().into_owned();
-                    changed = true;
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    self.status = error;
-                }
-            }
-        }
-        if changed {
-            self.save_preferences();
-        }
-
-        let resolution = resolve_rc_path(&self.preferences.rc_path);
-        if resolution.configured_invalid {
-            ui.label(
-                RichText::new(match (&resolution.path, resolution.source) {
-                    (Some(path), source) => {
-                        fill(t.rc_invalid_using, &[source, &path.display().to_string()])
-                    }
-                    (None, _) => t.rc_not_configured_full.to_owned(),
-                })
-                .color(Color32::from_rgb(210, 70, 65)),
-            );
-        } else if let Some(path) = &resolution.path {
-            ui.weak(fill(t.rc_using, &[resolution.source, &path.display().to_string()]));
-        } else {
-            ui.label(RichText::new(t.rc_not_configured_full).color(Color32::from_rgb(210, 70, 65)));
-        }
-    }
-
-    fn central_panel(&mut self, context: &egui::Context) {
-        egui::CentralPanel::default().show(context, |ui| {
-            egui::TopBottomPanel::top("preview_pane")
-                .resizable(true)
-                .default_height(300.0)
-                .min_height(150.0)
-                .show_inside(ui, |ui| self.preview_panel(ui));
-            egui::CentralPanel::default().show_inside(ui, |ui| match self.tab {
-                WorkflowTab::Textures => self.groups_panel(ui),
-                WorkflowTab::Model => self.model_workspace(ui),
-            });
-        });
-    }
-
-    fn preview_panel(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        ui.add_space(4.0);
-        ui.horizontal(|ui| {
-            ui.strong(t.preview_heading);
-            if let Some(path) = self
-                .preview
-                .loaded_path
-                .as_ref()
-                .or(self.preview.requested_path.as_ref())
-            {
-                ui.separator();
-                ui.label(
-                    path.file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or_default(),
-                );
-                if !self.preview.source_type.is_empty() {
-                    ui.separator();
-                    ui.weak(&self.preview.source_type);
-                }
-                if let Some((width, height)) = self.preview.dimensions {
-                    ui.separator();
-                    ui.weak(format!("{width} × {height}"));
-                }
-            }
-            if self.preview.receiver.is_some() {
-                ui.spinner();
-            }
-        });
-        // Map badges for the selected group (which slots are filled).
-        if self.tab == WorkflowTab::Textures {
-            if let Some(group) = self
-                .texture
-                .selected_group
-                .zip(self.texture.document.as_ref())
-                .and_then(|(index, document)| document.scan().groups.get(index))
-            {
-                ui.horizontal_wrapped(|ui| {
-                    ui.strong(&group.base_name);
-                    for source_type in ASSIGNABLE_SOURCE_TYPES {
-                        if group.slots.contains_key(source_type) {
-                            ui.label(
-                                RichText::new(source_type)
-                                    .small()
-                                    .color(Color32::WHITE)
-                                    .background_color(Color32::from_rgb(70, 110, 190)),
-                            );
-                        }
-                    }
-                    if !group.unknown.is_empty() {
-                        ui.label(
-                            RichText::new(fill(t.unknown_badge, &[&group.unknown.len().to_string()]))
-                                .small()
-                                .strong()
-                                .color(Color32::WHITE)
-                                .background_color(Color32::from_rgb(200, 130, 40)),
-                        );
-                    }
-                });
-            }
-        }
-        ui.add_space(4.0);
-        let available = egui::vec2(
-            ui.available_width(),
-            (ui.available_height() - 6.0).max(120.0),
-        );
-        if let Some(texture) = &self.preview.texture {
-            let source = texture.size_vec2();
-            let scale = (available.x / source.x)
-                .min(available.y / source.y)
-                .min(1.0);
-            ui.allocate_ui_with_layout(
-                available,
-                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                |ui| {
-                    ui.add(egui::Image::new(texture).fit_to_exact_size(source * scale));
-                },
-            );
-        } else if let Some(error) = &self.preview.error {
-            ui.allocate_ui_with_layout(
-                available,
-                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                |ui| {
-                    ui.label(
-                        RichText::new(fill(t.preview_unavailable, &[error]))
-                            .color(Color32::from_rgb(210, 90, 75)),
-                    );
-                },
-            );
-        } else {
-            ui.allocate_ui_with_layout(
-                available,
-                egui::Layout::centered_and_justified(egui::Direction::TopDown),
-                |ui| {
-                    ui.weak(t.select_group_preview);
-                },
-            );
-        }
-    }
-
-    fn groups_panel(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        let Some(document) = &self.texture.document else {
-            ui.centered_and_justified(|ui| {
-                ui.weak(t.groups_empty);
-            });
-            return;
-        };
-        let groups = document.scan().groups.clone();
-        let query = self.texture.group_search.trim().to_lowercase();
-        let unknown_groups = groups.iter().filter(|g| !g.unknown.is_empty()).count();
-        ui.horizontal(|ui| {
-            ui.heading(t.detected_groups_heading);
-            ui.weak(fill(t.groups_paren_count, &[&groups.len().to_string()]));
-            if unknown_groups > 0 {
-                ui.colored_label(
-                    Color32::from_rgb(200, 130, 40),
-                    fill(t.to_assign, &[&unknown_groups.to_string()]),
-                );
-            }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.checkbox(&mut self.texture.review_only, t.unknown_only);
-                ui.add(
-                    TextEdit::singleline(&mut self.texture.group_search)
-                        .desired_width(160.0)
-                        .hint_text(t.search_groups_hint),
-                );
-            });
-        });
-        ui.add_space(4.0);
-
-        let visible = groups
-            .iter()
-            .enumerate()
-            .filter(|(_, group)| !(self.texture.review_only && group.unknown.is_empty()))
-            .filter(|(_, group)| {
-                query.is_empty() || group.base_name.to_lowercase().contains(&query)
-            })
-            .map(|(index, _)| index)
-            .collect::<Vec<_>>();
-
-        // One egui::Grid holds the header row AND every group row, so all
-        // columns share identical x positions regardless of name length. The
-        // name column is width-clamped + truncated so a long stem can never
-        // push the indicator columns out of alignment. Full-row selection /
-        // amber highlights are painted as a single rect behind each row.
-        let type_total = GROUP_CELL_W * GROUP_COLUMNS.len() as f32;
-        let name_w =
-            (ui.available_width() - type_total - GROUP_UNKNOWN_W - 30.0).clamp(150.0, 232.0);
-
-        let mut preview_request = None;
-        let mut assign = None;
-        ScrollArea::both()
-            .id_salt("group_table")
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                Grid::new("groups_grid")
-                    .num_columns(GROUP_COLUMNS.len() + 2)
-                    .spacing([2.0, 3.0])
-                    .min_row_height(GROUP_ROW_H)
-                    .show(ui, |ui| {
-                        // Header as the grid's first row → columns are aligned
-                        // with the rows by construction (deviation: the header
-                        // scrolls with the rows — the pre-approved fallback).
-                        fixed_cell(ui, name_w, GROUP_ROW_H, egui::Align::LEFT, |ui| {
-                            ui.strong(t.group_col);
-                        });
-                        for (_, label) in GROUP_COLUMNS {
-                            fixed_cell(ui, GROUP_CELL_W, GROUP_ROW_H, egui::Align::Center, |ui| {
-                                ui.label(RichText::new(label).small().strong());
-                            });
-                        }
-                        fixed_cell(ui, GROUP_UNKNOWN_W, GROUP_ROW_H, egui::Align::LEFT, |ui| {
-                            ui.strong(t.unassigned_col);
-                        });
-                        ui.end_row();
-
-                        for &index in &visible {
-                            let group = &groups[index];
-                            let selected = self.texture.selected_group == Some(index);
-                            let has_unknown = !group.unknown.is_empty();
-                            let was_unknown = self.texture.ever_unknown.contains(&group.key);
-                            let row_fill = match (selected, has_unknown) {
-                                (true, true) => Color32::from_rgba_unmultiplied(225, 155, 45, 90),
-                                (false, true) => Color32::from_rgba_unmultiplied(220, 150, 40, 45),
-                                (true, false) => Color32::from_rgba_unmultiplied(90, 140, 230, 65),
-                                (false, false) => Color32::TRANSPARENT,
-                            };
-                            // Reserve a shape slot before the cells so the row
-                            // background paints behind them; fill it once the
-                            // full-row rect is known (paints the row, not cells).
-                            let bg = ui.painter().add(egui::Shape::Noop);
-                            let mut row_rect = egui::Rect::NOTHING;
-
-                            row_rect = row_rect.union(fixed_cell(
-                                ui,
-                                name_w,
-                                GROUP_ROW_H,
-                                egui::Align::LEFT,
-                                |ui| {
-                                    let label =
-                                        egui::Label::new(RichText::new(&group.base_name).strong())
-                                            .truncate()
-                                            .sense(Sense::click());
-                                    if ui.add(label).on_hover_text(&group.base_name).clicked() {
-                                        self.texture.selected_group = Some(index);
-                                        preview_request = first_group_entry(group).map(|entry| {
-                                            (PathBuf::from(&entry.path), entry.source_type.clone())
-                                        });
-                                    }
-                                },
-                            ));
-                            for (source_type, _) in GROUP_COLUMNS {
-                                row_rect = row_rect.union(fixed_cell(
-                                    ui,
-                                    GROUP_CELL_W,
-                                    GROUP_ROW_H,
-                                    egui::Align::Center,
-                                    |ui| {
-                                        let entry = group.slots.get(source_type);
-                                        let sense = if entry.is_some() {
-                                            Sense::click()
-                                        } else {
-                                            Sense::hover()
-                                        };
-                                        let (rect, response) =
-                                            ui.allocate_exact_size([14.0, 14.0].into(), sense);
-                                        let color = if entry.is_some() {
-                                            Color32::from_rgb(80, 170, 100)
-                                        } else {
-                                            Color32::from_rgba_unmultiplied(130, 130, 135, 70)
-                                        };
-                                        ui.painter().rect_filled(rect, 3.0, color);
-                                        if let Some(entry) = entry {
-                                            if response.on_hover_text(source_type).clicked() {
-                                                self.texture.selected_group = Some(index);
-                                                preview_request = Some((
-                                                    PathBuf::from(&entry.path),
-                                                    source_type.to_owned(),
-                                                ));
-                                            }
-                                        }
-                                    },
-                                ));
-                            }
-                            row_rect = row_rect.union(fixed_cell(
-                                ui,
-                                GROUP_UNKNOWN_W,
-                                GROUP_ROW_H,
-                                egui::Align::LEFT,
-                                |ui| {
-                                    if has_unknown {
-                                        let mut pick = String::new();
-                                        ComboBox::from_id_salt(("assign", index))
-                                            .width(GROUP_UNKNOWN_W - 10.0)
-                                            .selected_text(
-                                                RichText::new(fill(
-                                                    t.assign_combo,
-                                                    &[&group.unknown.len().to_string()],
-                                                ))
-                                                .color(Color32::from_rgb(200, 130, 40)),
-                                            )
-                                            .show_ui(ui, |ui| {
-                                                for source_type in ASSIGNABLE_SOURCE_TYPES {
-                                                    let occupied =
-                                                        group.slots.contains_key(source_type);
-                                                    ui.add_enabled_ui(!occupied, |ui| {
-                                                        ui.selectable_value(
-                                                            &mut pick,
-                                                            source_type.to_owned(),
-                                                            source_type,
-                                                        )
-                                                        .on_disabled_hover_text(t.def19_hover);
-                                                    });
-                                                }
-                                            });
-                                        if !pick.is_empty() {
-                                            assign = Some((index, pick));
-                                        }
-                                    } else if was_unknown {
-                                        ui.colored_label(Color32::from_rgb(70, 165, 95), t.assigned_check);
-                                    } else {
-                                        ui.weak("—");
-                                    }
-                                },
-                            ));
-
-                            ui.end_row();
-
-                            if row_fill != Color32::TRANSPARENT && row_rect.is_finite() {
-                                let rect = row_rect.expand2(egui::vec2(2.0, 2.0));
-                                ui.painter()
-                                    .set(bg, egui::Shape::rect_filled(rect, 3.0, row_fill));
-                            }
-                        }
-                    });
-            });
-        if let Some((path, source_type)) = preview_request {
-            self.request_preview(path, source_type);
-        }
-        if let Some((index, source_type)) = assign {
-            self.assign_group_unknown(index, &source_type);
-        }
-    }
-
     /// Inline assignment from the groups table: assign the group's first
     /// unknown to `source_type`, updating the transient diagnostics count.
-    fn assign_group_unknown(&mut self, group_index: usize, source_type: &str) {
+    #[allow(dead_code)] // Phase B: Group Review "assign unknown" flow (SPEC §7).
+    pub(crate) fn assign_group_unknown(&mut self, group_index: usize, source_type: &str) {
         let Some(document) = &mut self.texture.document else {
             return;
         };
@@ -3080,243 +1541,6 @@ impl WorkflowApp {
             Err(error) => error,
         };
     }
-
-    fn model_workspace(&mut self, ui: &mut egui::Ui) {
-        let t = self.t();
-        let Some(index) = self.selected_entry_index() else {
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.heading(t.fbx_material_review_heading);
-                    if self.model.entries.is_empty() {
-                        ui.label(t.add_fbx_left);
-                    } else {
-                        ui.label(t.select_single_model_left);
-                    }
-                });
-            });
-            return;
-        };
-        let manifest_configured = !self.preferences.manifest_path.trim().is_empty();
-        let modifiers = ui.input(|input| input.modifiers);
-        // Take the entry's mutable working state out so we can borrow `review`
-        // immutably for the whole render without a self.model borrow conflict.
-        let mut phys = std::mem::take(&mut self.model.entries[index].physicalize_overrides);
-        let mut selected_material = self.model.entries[index].selected_material;
-        let mut selected_materials =
-            std::mem::take(&mut self.model.entries[index].selected_materials);
-        let mut selection_anchor = self.model.entries[index].material_selection_anchor;
-        let mut bulk = std::mem::take(&mut self.model.entries[index].bulk_physicalize);
-        {
-            let review = &self.model.entries[index].review;
-            ui.horizontal(|ui| {
-                ui.heading(
-                    review
-                        .path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or("FBX"),
-                );
-                ui.separator();
-                ui.label(fill(t.material_slots_count, &[&review.material_slots.len().to_string()]));
-                ui.separator();
-                ui.label(fill(t.diagnostics_count, &[&review.diagnostics.len().to_string()]));
-            });
-            ui.separator();
-            ScrollArea::vertical().show(ui, |ui| {
-                ui.group(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.strong(t.rc_material_slots);
-                    ui.weak(t.multi_select_fbx_hint);
-                    let selected_count = selected_materials.len();
-                    if selected_count > 0 {
-                        ui.horizontal(|ui| {
-                            ComboBox::from_id_salt("bulk_physicalize")
-                                .selected_text(&bulk)
-                                .show_ui(ui, |ui| {
-                                    for value in PHYSICALIZE_VALUES {
-                                        ui.selectable_value(&mut bulk, value.to_owned(), value);
-                                    }
-                                });
-                            if ui
-                                .button(fill(t.set_physicalize_btn, &[&selected_count.to_string()]))
-                                .clicked()
-                            {
-                                let names: Vec<&str> = review
-                                    .material_slots
-                                    .iter()
-                                    .map(|slot| slot.name.as_str())
-                                    .collect();
-                                apply_bulk_physicalize(
-                                    &mut phys,
-                                    &names,
-                                    &selected_materials,
-                                    &bulk,
-                                );
-                            }
-                        });
-                    }
-                    Grid::new("model_materials")
-                        .num_columns(6)
-                        .striped(true)
-                        .spacing([12.0, 5.0])
-                        .show(ui, |ui| {
-                            // "FBX" and "Physicalize" are proper terms — untranslated.
-                            ui.strong("FBX");
-                            ui.strong(t.col_sub);
-                            ui.strong(t.col_material);
-                            ui.strong("Physicalize");
-                            ui.strong(t.col_polygons);
-                            ui.strong(t.col_textures);
-                            ui.end_row();
-                            for (row, slot) in review.material_slots.iter().enumerate() {
-                                let selected = selected_materials.contains(&row);
-                                if ui
-                                    .selectable_label(
-                                        selected,
-                                        slot.fbx_material_id
-                                            .and_then(|id| id.checked_sub(1))
-                                            .map_or_else(
-                                                || "—".to_owned(),
-                                                |value| value.to_string(),
-                                            ),
-                                    )
-                                    .clicked()
-                                {
-                                    apply_click_selection(
-                                        &mut selected_materials,
-                                        &mut selection_anchor,
-                                        row,
-                                        modifiers.ctrl,
-                                        modifiers.shift,
-                                    );
-                                    selected_material = Some(row);
-                                }
-                                ui.label(slot.sub_index.to_string());
-                                ui.label(&slot.name);
-                                // Default physicalize is "no" (item 1). A configured
-                                // manifest still wins, so with a manifest the default
-                                // is the policy-inferred value and only user changes
-                                // become overrides; without a manifest every material
-                                // carries an explicit seeded value.
-                                let default_value = if manifest_configured {
-                                    resolve_physicalize(
-                                        slot.physicalize
-                                            .as_deref()
-                                            .map(|value| ("physicalize", value)),
-                                        &slot.name,
-                                    )
-                                    .value
-                                    .as_str()
-                                    .to_owned()
-                                } else {
-                                    DEFAULT_PHYSICALIZE.to_owned()
-                                };
-                                let mut physicalize = phys
-                                    .get(&slot.name)
-                                    .cloned()
-                                    .unwrap_or_else(|| default_value.clone());
-                                ComboBox::from_id_salt(("physicalize", row))
-                                    .selected_text(&physicalize)
-                                    .show_ui(ui, |ui| {
-                                        for value in PHYSICALIZE_VALUES {
-                                            ui.selectable_value(
-                                                &mut physicalize,
-                                                value.to_owned(),
-                                                value,
-                                            );
-                                        }
-                                    });
-                                if manifest_configured && physicalize == default_value {
-                                    phys.remove(&slot.name);
-                                } else {
-                                    phys.insert(slot.name.clone(), physicalize);
-                                }
-                                let assignment = slot.source_order.and_then(|source_order| {
-                                    review
-                                        .assignments
-                                        .iter()
-                                        .find(|assignment| assignment.source_order == source_order)
-                                });
-                                ui.label(
-                                    assignment
-                                        .and_then(|assignment| assignment.polygon_count)
-                                        .unwrap_or(0)
-                                        .to_string(),
-                                );
-                                let textures = slot
-                                    .source_order
-                                    .and_then(|source_order| {
-                                        review.model.materials.get(source_order)
-                                    })
-                                    .map_or(0, |material| material.textures.len());
-                                ui.label(textures.to_string());
-                                ui.end_row();
-                            }
-                        });
-                });
-                ui.add_space(8.0);
-                if let Some(selected) = selected_material {
-                    if let Some(slot) = review.material_slots.get(selected) {
-                        ui.group(|ui| {
-                            ui.set_width(ui.available_width());
-                            ui.strong(fill(t.material_details, &[&slot.name]));
-                            ui.label(fill(
-                                t.assignment_source,
-                                &[slot.assignment_reason.as_deref().unwrap_or("slot projection")],
-                            ));
-                            if let Some(material) = slot
-                                .source_order
-                                .and_then(|source_order| review.model.materials.get(source_order))
-                            {
-                                if material.textures.is_empty() {
-                                    ui.weak(t.no_texture_references);
-                                }
-                                for texture in &material.textures {
-                                    ui.horizontal_wrapped(|ui| {
-                                        ui.label(RichText::new(&texture.shader_prop).strong());
-                                        ui.label(if texture.embedded {
-                                            fill(
-                                                t.embedded_texture,
-                                                &[
-                                                    &texture.filename,
-                                                    &texture.content_size.to_string(),
-                                                ],
-                                            )
-                                        } else {
-                                            texture.absolute_filename.clone()
-                                        });
-                                    });
-                                }
-                            }
-                        });
-                    }
-                }
-                ui.add_space(8.0);
-                ui.group(|ui| {
-                    ui.set_width(ui.available_width());
-                    ui.strong(t.material_slot_diagnostics);
-                    if review.diagnostics.is_empty() {
-                        ui.label(
-                            RichText::new(t.no_material_diagnostics)
-                                .color(Color32::from_rgb(70, 165, 95)),
-                        );
-                    }
-                    for diagnostic in &review.diagnostics {
-                        ui.label(format!(
-                            "[{}] {} · {}",
-                            diagnostic.severity, diagnostic.material, diagnostic.message
-                        ));
-                    }
-                });
-            });
-        }
-        let entry = &mut self.model.entries[index];
-        entry.physicalize_overrides = phys;
-        entry.selected_material = selected_material;
-        entry.selected_materials = selected_materials;
-        entry.material_selection_anchor = selection_anchor;
-        entry.bulk_physicalize = bulk;
-    }
 }
 
 impl eframe::App for WorkflowApp {
@@ -3330,69 +1554,13 @@ impl eframe::App for WorkflowApp {
             self.receive_paths(paths);
         }
         self.poll_workers(context);
-        self.top_bar(context);
-        self.status_bar(context);
-        self.left_panel(context);
-        self.right_panel(context);
-        self.central_panel(context);
-        self.diagnostics_popover(context);
-        self.process_modal(context);
-        self.export_modal(context);
-        self.batch_modal(context);
+        ui::draw(self, context);
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.preferences.ui_workspace = self.ui.to_value();
         let _ = self.preferences.save();
     }
-}
-
-/// A single-line path field with a trailing `Browse…` button.
-/// Returns `(text_changed, browse_clicked)`.
-fn path_row(
-    ui: &mut egui::Ui,
-    salt: &str,
-    value: &mut String,
-    hint: &str,
-    browse_label: &str,
-) -> (bool, bool) {
-    let mut changed = false;
-    let mut browse = false;
-    ui.push_id(salt, |ui| {
-        ui.horizontal(|ui| {
-            changed = ui
-                .add(
-                    TextEdit::singleline(value)
-                        .desired_width((ui.available_width() - 74.0).max(120.0))
-                        .hint_text(hint),
-                )
-                .changed();
-            browse = ui.button(browse_label).clicked();
-        });
-    });
-    (changed, browse)
-}
-
-/// A fixed-width, vertically centred grid cell so the groups-table header and
-/// rows line up column-for-column regardless of content. Width is clamped
-/// (min == max) so a long label truncates instead of expanding the cell and
-/// pushing later columns out of alignment. Returns the allocated cell rect so
-/// the caller can paint a full-row background behind the whole row.
-fn fixed_cell(
-    ui: &mut egui::Ui,
-    width: f32,
-    height: f32,
-    main_align: egui::Align,
-    add: impl FnOnce(&mut egui::Ui),
-) -> egui::Rect {
-    let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_align(main_align);
-    ui.allocate_ui_with_layout(egui::vec2(width, height), layout, |ui| {
-        ui.set_min_width(width);
-        ui.set_max_width(width);
-        ui.set_min_height(height);
-        add(ui);
-    })
-    .response
-    .rect
 }
 
 fn is_fbx(path: &Path) -> bool {
@@ -3411,17 +1579,8 @@ fn entry_name(entry: &ModelEntry) -> String {
         .to_owned()
 }
 
-/// A small colored pill label, matching the badges used for texture map types.
-fn badge(ui: &mut egui::Ui, text: impl Into<String>, color: Color32) {
-    ui.label(
-        RichText::new(text.into())
-            .small()
-            .color(Color32::WHITE)
-            .background_color(color),
-    );
-}
-
-fn split_paths(text: &str) -> Vec<PathBuf> {
+#[allow(dead_code)] // Phase B: Add Path multi-path fields (SPEC §7/§8).
+pub(crate) fn split_paths(text: &str) -> Vec<PathBuf> {
     text.split(['\n', ';'])
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -3434,7 +1593,8 @@ fn optional_path(text: &str) -> Option<PathBuf> {
     (!path.as_os_str().is_empty()).then_some(path)
 }
 
-fn source_type_for_path(document: Option<&ReviewDocument>, path: &Path) -> String {
+#[allow(dead_code)] // Phase B: preview request from the Import list (SPEC §7).
+pub(crate) fn source_type_for_path(document: Option<&ReviewDocument>, path: &Path) -> String {
     let key = path.to_string_lossy();
     document
         .into_iter()
@@ -3454,7 +1614,7 @@ fn group_contains_ingested(group: &ScanGroup, ingested: &BTreeSet<String>) -> bo
         .any(|entry| ingested.contains(&entry.path.to_lowercase()))
 }
 
-fn first_group_entry(group: &ScanGroup) -> Option<&ScanEntry> {
+pub(crate) fn first_group_entry(group: &ScanGroup) -> Option<&ScanEntry> {
     group
         .slots
         .values()
@@ -3469,14 +1629,15 @@ fn severity_label(severity: Severity) -> &'static str {
     }
 }
 
-fn resolution_label(value: OutputResolution) -> String {
+#[allow(dead_code)] // Phase B: Conversion Settings resolution combo (SPEC §7).
+pub(crate) fn resolution_label(value: OutputResolution) -> String {
     match value {
         OutputResolution::Original => "Original".to_owned(),
         OutputResolution::Max(maximum) => maximum.to_string(),
     }
 }
 
-fn file_url(path: &Path) -> String {
+pub(crate) fn file_url(path: &Path) -> String {
     format!("file:///{}", path.to_string_lossy().replace('\\', "/"))
 }
 
@@ -3559,7 +1720,7 @@ struct RcPathResolution {
     configured_invalid: bool,
 }
 
-fn resolve_rc_path(configured: &str) -> RcPathResolution {
+pub(crate) fn resolve_rc_path(configured: &str) -> RcPathResolution {
     let environment = std::env::var_os("CE_RC_EXE").map(PathBuf::from);
     resolve_rc_path_candidates(
         configured,

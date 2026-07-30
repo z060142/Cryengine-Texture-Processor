@@ -185,6 +185,7 @@ mod win {
     #[derive(Clone, Copy)]
     pub(super) enum Mode {
         OpenSingle,
+        #[allow(dead_code)] // Phase B: multi-select open (choose_files_multi).
         OpenMulti,
         Save,
     }
@@ -396,9 +397,11 @@ mod win {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)] // Phase B: RC path browse (SPEC §7).
 const RC_FILTER: &str = "CryEngine Resource Compiler (rc.exe)\0rc.exe\0Executable files (*.exe)\0*.exe\0All files (*.*)\0*.*\0";
 
 #[cfg(windows)]
+#[allow(dead_code)] // Phase B: Add Files / Add Models dialogs (SPEC §7/§8).
 pub fn choose_files_multi(title: &str, filter: &str) -> Result<Vec<PathBuf>, String> {
     Ok(win::run_dialog(title, filter, "", "", win::Mode::OpenMulti)?.unwrap_or_default())
 }
@@ -435,6 +438,7 @@ pub fn choose_file_save(
 }
 
 #[cfg(windows)]
+#[allow(dead_code)] // Phase B: RC path browse (SPEC §7).
 pub fn choose_rc_executable(initial_path: &str) -> Result<Option<PathBuf>, String> {
     choose_file_open(
         "Select CryEngine Resource Compiler",
@@ -444,6 +448,7 @@ pub fn choose_rc_executable(initial_path: &str) -> Result<Option<PathBuf>, Strin
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)] // Phase B: Add Files / Add Models dialogs (SPEC §7/§8).
 pub fn choose_files_multi(_title: &str, _filter: &str) -> Result<Vec<PathBuf>, String> {
     Ok(Vec::new())
 }
@@ -472,6 +477,7 @@ pub fn choose_file_save(
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)] // Phase B: RC path browse (SPEC §7).
 pub fn choose_rc_executable(_initial_path: &str) -> Result<Option<PathBuf>, String> {
     Ok(None)
 }

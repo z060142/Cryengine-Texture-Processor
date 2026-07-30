@@ -74,6 +74,9 @@ pub fn fill(template: &str, args: &[&str]) -> String {
 }
 
 /// One `&'static str` per UI string. Parameterized entries hold a `{}` template.
+// dead_code allowed during the v2 migration: Phase B decides which v1 keys
+// survive and deletes the rest (SPEC §11 compile-error-driven cleanup).
+#[allow(dead_code)]
 pub struct Strings {
     // top bar
     pub subtitle: &'static str,
@@ -350,6 +353,43 @@ pub struct Strings {
     pub settings_loaded: &'static str,
     pub cancelling_process: &'static str,
     pub cancelling_batch: &'static str,
+    // v2 chrome (Phase A): rail modes
+    pub mode_textures: &'static str,
+    pub mode_models: &'static str,
+    pub mode_proxy: &'static str,
+    pub mode_pbr: &'static str,
+    pub planned_tooltip: &'static str,
+    pub help_toast_title: &'static str,
+    pub help_toast_body: &'static str,
+    // v2 chrome: right stack head + workspace presets
+    pub stack_title_textures: &'static str,
+    pub stack_title_models: &'static str,
+    pub workspace_label: &'static str,
+    pub preset_minimal: &'static str,
+    pub preset_review: &'static str,
+    pub preset_export: &'static str,
+    pub preset_custom: &'static str,
+    // v2 chrome: bottom timeline
+    pub work_center: &'static str,
+    pub session_label: &'static str,
+    pub convert_all: &'static str,
+    pub export_all_verb: &'static str,
+    // v2 chrome: topbar
+    pub out_tex_label: &'static str,
+    pub out_mdl_label: &'static str,
+    pub profile_btn: &'static str,
+    pub profile_load: &'static str,
+    pub profile_save: &'static str,
+    pub profile_save_as: &'static str,
+    pub diag_chip_n: &'static str,
+    pub diag_chip_ok: &'static str,
+    // v2 chrome: panels + stage + toasts
+    pub reset_to_defaults: &'static str,
+    pub stage_sub_texture_preview: &'static str,
+    pub stage_sub_material_slots: &'static str,
+    pub toast_task_done: &'static str,
+    pub toast_task_failed: &'static str,
+    pub toast_reset: &'static str,
 }
 
 /// English — MUST reproduce the current literals verbatim (English mode is
@@ -614,6 +654,38 @@ pub const EN: Strings = Strings {
     settings_loaded: "Settings loaded: {}",
     cancelling_process: "Cancelling; groups already in progress will finish safely.",
     cancelling_batch: "Cancelling batch export; the current stage will stop.",
+    mode_textures: "Textures",
+    mode_models: "Models",
+    mode_proxy: "Proxy",
+    mode_pbr: "PBR",
+    planned_tooltip: "Planned — not in this build",
+    help_toast_title: "Workspace tips",
+    help_toast_body: "Presets set the panel layout · badges flag modified panels",
+    stack_title_textures: "Texture Parameters",
+    stack_title_models: "Model Parameters",
+    workspace_label: "WORKSPACE",
+    preset_minimal: "Minimal",
+    preset_review: "Review",
+    preset_export: "Export",
+    preset_custom: "Custom",
+    work_center: "WORK CENTER",
+    session_label: "Session",
+    convert_all: "Convert All",
+    export_all_verb: "Export All",
+    out_tex_label: "OUT · TEX",
+    out_mdl_label: "OUT · MDL",
+    profile_btn: "Profile",
+    profile_load: "Load…",
+    profile_save: "Save",
+    profile_save_as: "Save As…",
+    diag_chip_n: "{} diagnostics",
+    diag_chip_ok: "No issues",
+    reset_to_defaults: "Reset to defaults",
+    stage_sub_texture_preview: "texture preview",
+    stage_sub_material_slots: "material slots",
+    toast_task_done: "Task complete",
+    toast_task_failed: "Task failed",
+    toast_reset: "Panel values restored",
 };
 
 /// Simplified Chinese. Technical terms stay verbatim per T-018 policy.
@@ -873,6 +945,38 @@ pub const ZH_CN: Strings = Strings {
     settings_loaded: "设置已加载：{}",
     cancelling_process: "正在取消；已在进行中的组会安全完成。",
     cancelling_batch: "正在取消批量导出；当前阶段将停止。",
+    mode_textures: "贴图",
+    mode_models: "模型",
+    mode_proxy: "Proxy",
+    mode_pbr: "PBR",
+    planned_tooltip: "规划中——本版未包含",
+    help_toast_title: "工作区提示",
+    help_toast_body: "预设决定面板布局 · 徽章标记已修改的面板",
+    stack_title_textures: "贴图参数",
+    stack_title_models: "模型参数",
+    workspace_label: "工作区",
+    preset_minimal: "极简",
+    preset_review: "审查",
+    preset_export: "导出",
+    preset_custom: "自定义",
+    work_center: "工作中心",
+    session_label: "会话",
+    convert_all: "全部转换",
+    export_all_verb: "全部导出",
+    out_tex_label: "OUT · TEX",
+    out_mdl_label: "OUT · MDL",
+    profile_btn: "配置",
+    profile_load: "加载…",
+    profile_save: "保存",
+    profile_save_as: "另存为…",
+    diag_chip_n: "{} 项诊断",
+    diag_chip_ok: "无问题",
+    reset_to_defaults: "重置为默认",
+    stage_sub_texture_preview: "贴图预览",
+    stage_sub_material_slots: "材质槽",
+    toast_task_done: "任务完成",
+    toast_task_failed: "任务失败",
+    toast_reset: "面板值已恢复默认",
 };
 
 #[cfg(test)]
