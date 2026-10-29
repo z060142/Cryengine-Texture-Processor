@@ -234,23 +234,27 @@ impl ReviewDocument {
         let group = self
             .scan
             .groups
-            .get_mut(group_index)
+            .get(group_index)
             .ok_or_else(|| format!("group index {group_index} is out of range"))?;
-        if let Some(existing) = group.slots.get(source_type) {
+        let candidate = group.unknown.get(unknown_index).ok_or_else(|| {
+            format!("unknown index {unknown_index} is out of range for group `{}`", group.base_name)
+        })?;
+        let base = texproc::grouping::parse_base_name(&candidate.filename, &texproc::SuffixTable::default());
+        let target_index = self.scan.groups.iter().position(|target| target.key.eq_ignore_ascii_case(&base)).unwrap_or(group_index);
+        if let Some(existing) = self.scan.groups[target_index].slots.get(source_type) {
             return Err(format!(
                 "DEF-19 conflict: `{source_type}` is already occupied by {}",
                 existing.filename
             ));
         }
-        if unknown_index >= group.unknown.len() {
-            return Err(format!(
-                "unknown index {unknown_index} is out of range for group `{}`",
-                group.base_name
-            ));
-        }
-        let mut entry = group.unknown.remove(unknown_index);
+        let mut entry = self.scan.groups[group_index].unknown.remove(unknown_index);
         entry.source_type = source_type.to_owned();
-        group.slots.insert(source_type.to_owned(), entry);
+        let target = &mut self.scan.groups[target_index];
+        entry.base_name = target.base_name.clone();
+        target.slots.insert(source_type.to_owned(), entry);
+        if target_index != group_index && self.scan.groups[group_index].slots.is_empty() && self.scan.groups[group_index].unknown.is_empty() {
+            self.scan.groups.remove(group_index);
+        }
         self.dirty = true;
         Ok(())
     }
@@ -324,6 +328,32 @@ mod tests {
             "texproc-gui-{label}-{}-{nonce}.json",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn assignment_merges_legacy_split_groups_and_checks_destination_conflicts() {
+        for (suffix, kind, conflict) in [("rough", "roughness", false), ("nor_gl", "normal", true)] {
+            let mut input = scan();
+            let base = format!("Stone_{suffix}_4k");
+            let mut unknown = entry(&format!("{base}.exr"), "unknown");
+            unknown.base_name = base.clone();
+            input.groups.push(ScanGroup {
+                key: base.to_lowercase(), base_name: base, slots: BTreeMap::new(),
+                unknown: vec![unknown], diagnostics: Vec::new(),
+            });
+            let mut document = ReviewDocument::from_scan(PathBuf::from("groups.json"), input.clone()).unwrap();
+            let result = document.assign_unknown(1, 0, kind);
+            if conflict {
+                assert!(result.unwrap_err().contains("DEF-19"));
+                assert_eq!(document.scan(), &input);
+                assert!(!document.is_dirty());
+            } else {
+                result.unwrap();
+                assert_eq!(document.scan().groups.len(), 1);
+                assert_eq!(document.scan().groups[0].slots[kind].base_name, "Stone");
+                assert!(document.is_dirty());
+            }
+        }
     }
 
     #[test]

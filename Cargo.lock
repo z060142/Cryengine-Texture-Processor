@@ -371,6 +371,7 @@ dependencies = [
  "quick-xml",
  "serde",
  "serde_json",
+ "texproc",
  "ufbx",
 ]
 
@@ -698,6 +699,7 @@ dependencies = [
  "miniz_oxide",
  "num-complex",
  "pulp",
+ "rayon-core",
  "smallvec",
  "zune-inflate",
 ]
@@ -2183,6 +2185,7 @@ version = "2.1.0"
 dependencies = [
  "ce-schema",
  "clap",
+ "exr",
  "image",
  "rayon",
  "serde",

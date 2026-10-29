@@ -170,6 +170,8 @@ fn unknown_only_group_uses_exit_three_and_allow_unknown_overrides_it() {
         "{}",
         String::from_utf8_lossy(&allowed.stderr)
     );
+    assert!(!output.join("mystery_spec.tif").exists());
+    assert!(String::from_utf8_lossy(&allowed.stderr).contains("skipped unassigned texture"));
 }
 
 #[test]

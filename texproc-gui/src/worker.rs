@@ -12,6 +12,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::broker::{BrokerBatchItem, BrokerSession};
 use converter::{
     convert::ConvertOutputs,
     diagnostic::Diagnostic as ConverterDiagnostic,
@@ -85,7 +86,7 @@ pub enum PreviewEvent {
 pub fn start_preview(path: PathBuf) -> Receiver<PreviewEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
-        let result = (|| {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let original = decode_image(&path).map_err(|error| error.to_string())?;
             let width = original.width;
             let height = original.height;
@@ -105,7 +106,7 @@ pub fn start_preview(path: PathBuf) -> Receiver<PreviewEvent> {
                     &rgba,
                 ),
             })
-        })();
+        })).unwrap_or_else(|_| Err(format!("preview decoder panicked: {}", path.display())));
         let event = match result {
             Ok(image) => PreviewEvent::Completed(image),
             Err(error) => PreviewEvent::Failed {
@@ -190,6 +191,7 @@ pub fn start_process(
     settings: TextureSettings,
     output_root: PathBuf,
     rc_exe: Option<PathBuf>,
+    broker_exe: Option<PathBuf>,
     delete_tif: bool,
 ) -> ProcessJob {
     let (sender, receiver) = mpsc::channel();
@@ -209,12 +211,14 @@ pub fn start_process(
                 });
             })
             .map_err(|error| error.to_string());
+        let broker = broker_session_for(rc_exe.as_deref(), broker_exe.as_deref());
         let complete = report.map(|report| {
             let dds = match &rc_exe {
                 Some(rc_exe) if !report.cancelled => {
                     let tifs = dds_jobs(&report);
                     Some(run_dds_pool(
                         rc_exe,
+                        broker.as_ref(),
                         &tifs,
                         &output_root,
                         delete_tif,
@@ -238,6 +242,16 @@ pub fn start_process(
         let _ = sender.send(ProcessEvent::Finished(complete));
     });
     ProcessJob { receiver, cancel }
+}
+
+/// Try to stand up a broker session for this job; `None` (broker not
+/// configured, or it failed to come up) means every RC call below falls back
+/// to a direct `rc.exe` spawn — the broker is a pure scheduling layer.
+fn broker_session_for(rc_exe: Option<&Path>, broker_exe: Option<&Path>) -> Option<BrokerSession> {
+    match (rc_exe, broker_exe) {
+        (Some(rc_exe), Some(broker_exe)) => BrokerSession::start(broker_exe, rc_exe),
+        _ => None,
+    }
 }
 
 /// Collect the RC → DDS jobs from a batch report — one per produced file. TIFFs
@@ -334,6 +348,7 @@ fn rc_max_from(raw: Option<&str>) -> usize {
 #[allow(clippy::too_many_arguments)]
 fn run_dds_pool(
     rc_exe: &Path,
+    broker: Option<&BrokerSession>,
     jobs: &[PathBuf],
     output_root: &Path,
     delete_tif: bool,
@@ -341,6 +356,14 @@ fn run_dds_pool(
     mut on_progress: impl FnMut(usize, usize, &str),
     mut on_workers: impl FnMut(usize, usize),
 ) -> DdsSummary {
+    // The broker manages its own internal concurrency (batching into a few
+    // long-lived rc.exe children); our external adaptive N-worker pool below
+    // is only for the direct-spawn fallback path.
+    if let Some(broker) = broker {
+        on_workers(0, 0);
+        return run_dds_batch_via_broker(broker, rc_exe, jobs, output_root, delete_tif, cancel, &mut on_progress);
+    }
+
     let total = jobs.len();
     let mut succeeded = 0;
     let mut failures = Vec::new();
@@ -464,6 +487,109 @@ fn run_dds_pool(
         succeeded,
         failures,
         n_trajectory: trajectory,
+    }
+}
+
+/// DDS batch via the broker: submit every job in one synchronous batch call
+/// (the broker internally funnels these into a few long-lived rc.exe
+/// children), then sequentially direct-spawn anything it didn't accept
+/// (`handled == 0`, or the call itself was rejected). Per the accepted
+/// trade-off, a submitted batch is not cancellable mid-flight — `cancel` is
+/// only honored between fallback items.
+#[allow(clippy::too_many_arguments)]
+fn run_dds_batch_via_broker(
+    broker: &BrokerSession,
+    rc_exe: &Path,
+    jobs: &[PathBuf],
+    output_root: &Path,
+    delete_tif: bool,
+    cancel: &AtomicBool,
+    on_progress: &mut impl FnMut(usize, usize, &str),
+) -> DdsSummary {
+    let total = jobs.len();
+    let mut succeeded = 0usize;
+    let mut failures = Vec::new();
+    let mut completed = 0usize;
+
+    let mut valid: Vec<(usize, BrokerBatchItem)> = Vec::with_capacity(total);
+    for (index, tif) in jobs.iter().enumerate() {
+        match BrokerBatchItem::rc_dds(tif, output_root) {
+            Some(item) => valid.push((index, item)),
+            None => {
+                completed += 1;
+                let name = file_name_of(tif);
+                failures.push(format!("{name}: invalid path for RC broker"));
+                on_progress(completed, total, &name);
+            }
+        }
+    }
+
+    let mut fallback: Vec<PathBuf> = Vec::new();
+    if !valid.is_empty() {
+        let items: Vec<&BrokerBatchItem> = valid.iter().map(|(_, item)| item).collect();
+        match broker.invoke_batch_rc(&items) {
+            Some(results) if results.len() == valid.len() => {
+                for ((index, _), result) in valid.iter().zip(results.iter()) {
+                    let tif = &jobs[*index];
+                    let name = file_name_of(tif);
+                    if result.handled != 0 {
+                        completed += 1;
+                        let dds = tif.with_extension("dds");
+                        if result.exit_code == 0 && dds.is_file() {
+                            succeeded += 1;
+                            if delete_tif {
+                                let _ = fs::remove_file(tif);
+                            }
+                        } else {
+                            failures.push(format!(
+                                "{name}: RC exited with {}, DDS was not produced",
+                                result.exit_code
+                            ));
+                        }
+                        on_progress(completed, total, &name);
+                    } else {
+                        fallback.push(tif.clone());
+                    }
+                }
+            }
+            _ => {
+                // The batch call itself was rejected: every valid item needs the
+                // direct-spawn fallback below.
+                fallback.extend(valid.iter().map(|(index, _)| jobs[*index].clone()));
+            }
+        }
+    }
+
+    for tif in fallback {
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let name = file_name_of(&tif);
+        completed += 1;
+        match spawn_rc(rc_exe, &tif, output_root).and_then(|mut child| child.wait()) {
+            Ok(status) => {
+                let dds = tif.with_extension("dds");
+                if status.success() && dds.is_file() {
+                    succeeded += 1;
+                    if delete_tif {
+                        let _ = fs::remove_file(&tif);
+                    }
+                } else {
+                    let code = status.code().unwrap_or(-1);
+                    failures.push(format!("{name}: RC exited with {code}, DDS was not produced"));
+                }
+            }
+            Err(error) => failures.push(format!("{name}: failed to start RC: {error}")),
+        }
+        on_progress(completed, total, &name);
+    }
+
+    DdsSummary {
+        total,
+        succeeded,
+        failures,
+        // Broker-managed concurrency; there is no external N to trend.
+        n_trajectory: vec![0],
     }
 }
 
@@ -695,6 +821,7 @@ pub struct AssociatedTexturesReport {
     pub groups: usize,
     pub written: usize,
     pub dds: Option<DdsSummary>,
+    pub failures: Vec<String>,
 }
 
 pub enum RcExportOutcome {
@@ -714,15 +841,18 @@ pub enum RcExportOutcome {
 pub fn start_model_export(
     job: ModelJob,
     rc_exe: Option<PathBuf>,
+    broker_exe: Option<PathBuf>,
     output_dir: PathBuf,
     delete_request_json: bool,
 ) -> Receiver<ModelExportEvent> {
     let (sender, receiver) = mpsc::channel();
     thread::spawn(move || {
         let cancel = AtomicBool::new(false);
+        let broker = broker_session_for(rc_exe.as_deref(), broker_exe.as_deref());
         let result = export_one_model(
             &job,
             rc_exe.as_deref(),
+            broker.as_ref(),
             &output_dir,
             delete_request_json,
             &cancel,
@@ -744,6 +874,7 @@ pub fn start_model_export(
 pub fn start_batch_export(
     jobs: Vec<ModelJob>,
     rc_exe: Option<PathBuf>,
+    broker_exe: Option<PathBuf>,
     output_dir: PathBuf,
     delete_request_json: bool,
 ) -> BatchExportJob {
@@ -752,6 +883,9 @@ pub fn start_batch_export(
     let worker_cancel = Arc::clone(&cancel);
     thread::spawn(move || {
         let total = jobs.len();
+        // One broker session for the whole batch — reused across every model
+        // rather than spawned per model.
+        let broker = broker_session_for(rc_exe.as_deref(), broker_exe.as_deref());
         for (position, job) in jobs.into_iter().enumerate() {
             if worker_cancel.load(Ordering::Relaxed) {
                 break;
@@ -762,6 +896,7 @@ pub fn start_batch_export(
             let result = export_one_model(
                 &job,
                 rc_exe.as_deref(),
+                broker.as_ref(),
                 &output_dir,
                 delete_request_json,
                 &worker_cancel,
@@ -787,7 +922,7 @@ pub fn start_batch_export(
 
 /// (ok, one-line detail) for a model's batch summary line.
 fn summarize_model_report(report: &ModelExportReport) -> (bool, String) {
-    match &report.rc {
+    let (ok, mut detail) = match &report.rc {
         RcExportOutcome::Succeeded { cgf, return_code } => (
             true,
             format!("CGF {} (RC exit {return_code})", cgf.display()),
@@ -797,15 +932,29 @@ fn summarize_model_report(report: &ModelExportReport) -> (bool, String) {
             "intermediates exported (RC not configured)".to_owned(),
         ),
         RcExportOutcome::Failed { error, .. } => (false, format!("RC failed: {error}")),
+    };
+    for diagnostic in &report.outputs.material_diagnostics {
+        if diagnostic.severity != "info" {
+            detail.push_str(&format!("; {}: {}", diagnostic.material, diagnostic.message));
+        }
     }
+    if let Some(textures) = &report.textures {
+        if !textures.failures.is_empty() {
+            detail.push_str(&format!("; texture errors (successful outputs preserved): {}", textures.failures.join("; ")));
+            return (false, detail);
+        }
+    }
+    (ok, detail)
 }
 
 /// Run one model's export through convert → RC → optional associated-texture DDS.
 /// Stages are reported via `on_stage`; `cancel` stops between stages and kills the
 /// in-flight RC. Shared by single and batch export so their behavior is identical.
+#[allow(clippy::too_many_arguments)]
 fn export_one_model(
     job: &ModelJob,
     rc_exe: Option<&Path>,
+    broker: Option<&BrokerSession>,
     output_dir: &Path,
     delete_request_json: bool,
     cancel: &AtomicBool,
@@ -851,7 +1000,7 @@ fn export_one_model(
     let rc = match rc_exe {
         Some(rc_exe) if !cancel.load(Ordering::Relaxed) => {
             on_stage("Running Resource Compiler (CGF)…");
-            run_resource_compiler(rc_exe, &job.input, &outputs, output_dir, cancel)
+            run_resource_compiler(rc_exe, broker, &job.input, &outputs, output_dir, cancel)
         }
         _ => RcExportOutcome::NotConfigured,
     };
@@ -874,6 +1023,7 @@ fn export_one_model(
                 let tifs = dds_jobs(&report);
                 Some(run_dds_pool(
                     rc_exe,
+                    broker,
                     &tifs,
                     &assoc.output_dir,
                     assoc.delete_tif,
@@ -888,6 +1038,9 @@ fn export_one_model(
             groups: report.groups.len(),
             written,
             dds,
+            failures: report.groups.iter().flat_map(|group| {
+                group.failures.iter().map(|failure| format!("{}: {failure}", group.base_name))
+            }).chain(report.failed.iter().map(|group| format!("{}: {}", group.base_name, group.message))).collect(),
         }
     });
 
@@ -901,6 +1054,7 @@ fn export_one_model(
 
 fn run_resource_compiler(
     rc_exe: &Path,
+    broker: Option<&BrokerSession>,
     input: &Path,
     outputs: &ConvertOutputs,
     output_dir: &Path,
@@ -937,6 +1091,30 @@ fn run_resource_compiler(
             return_code: None,
         };
     };
+
+    // Broker first (not cancellable mid-call, per the accepted trade-off — a
+    // single CGF conversion is short); `None` (unavailable or the request was
+    // rejected) falls through to the direct spawn below unchanged.
+    if let Some(broker) = broker {
+        let options = format!(
+            "/overwriteextension=fbx /overwritesourcefile=\"{}\" /overwritefilename=\"{}\"",
+            input.display(),
+            cgf_name.to_string_lossy()
+        );
+        if let Some(exit_code) = broker.invoke_legacy_rc(&outputs.request, &options, output_dir, 1) {
+            return if exit_code == 0 && cgf.is_file() {
+                RcExportOutcome::Succeeded {
+                    cgf,
+                    return_code: exit_code,
+                }
+            } else {
+                RcExportOutcome::Failed {
+                    error: format!("RC (broker) exited with {exit_code}, CGF was not produced"),
+                    return_code: Some(exit_code),
+                }
+            };
+        }
+    }
 
     let mut command = Command::new(rc_exe);
     command
@@ -1058,6 +1236,7 @@ mod tests {
             TextureSettings::default(),
             output.clone(),
             Some(rc.clone()),
+            None, // broker_exe
             true, // delete_tif
         );
         let mut complete = None;
@@ -1256,7 +1435,7 @@ mod tests {
             conversion: ConversionOverrides::default(),
             associated: Some(associated),
         };
-        let receiver = start_model_export(job, Some(rc), model_out.clone(), false);
+        let receiver = start_model_export(job, Some(rc), None, model_out.clone(), false);
 
         let mut report = None;
         while let Ok(event) = receiver.recv() {
@@ -1334,6 +1513,7 @@ mod tests {
                 base_name: "Group".to_owned(),
                 written: written.into_iter().map(PathBuf::from).collect(),
                 elapsed_seconds: 0.0,
+                failures: Vec::new(),
             }],
             failed: Vec::new(),
             cancelled: false,
@@ -1346,7 +1526,7 @@ mod tests {
 
     #[test]
     fn dds_jobs_selects_tiff_and_staged_hdr_outputs() {
-        let report = report(vec![
+        let mut report = report(vec![
             r"C:\out\Stone_diff.tif",
             r"C:\out\Stone_ddna.TIF",
             r"C:\out\Sky_env.hdr", // T-015 staged env map → RC cubemap-HDR
@@ -1354,6 +1534,7 @@ mod tests {
             r"C:\out\Stone_diff.dds",
             r"C:\out\notes.txt",
         ]);
+        report.groups[0].failures.push("Stone_rough.exr: corrupt source".to_owned());
         let jobs = dds_jobs(&report);
         assert_eq!(jobs.len(), 4);
         assert!(jobs.iter().all(|path| path
@@ -1503,7 +1684,8 @@ mod tests {
                 None => std::env::remove_var("TEXPROC_RC_MAX"),
             }
             let start = Instant::now();
-            let summary = run_dds_pool(&rc, &tifs, &out, false, &cancel, |_, _, _| {}, |_, _| {});
+            let summary =
+                run_dds_pool(&rc, None, &tifs, &out, false, &cancel, |_, _, _| {}, |_, _| {});
             (start.elapsed(), summary)
         };
 
@@ -1582,6 +1764,7 @@ mod tests {
         let handle = thread::spawn(move || {
             run_dds_pool(
                 &rc_clone,
+                None,
                 &tifs_clone,
                 &out_clone,
                 false,
@@ -1646,6 +1829,7 @@ mod tests {
             TextureSettings::default(),
             out.clone(),
             Some(rc),
+            None, // broker_exe
             false,
         );
         let mut complete = None;
@@ -1737,7 +1921,7 @@ mod tests {
             job("KB3D_ENC_PropAxe_A_grp.fbx", &propaxe),
             job("KB3D_ENC_BldgSmWindmill_A_grp.fbx", &kb3d),
         ];
-        let batch = start_batch_export(jobs, Some(rc.clone()), batch_dir.clone(), false);
+        let batch = start_batch_export(jobs, Some(rc.clone()), None, batch_dir.clone(), false);
         let mut ok_count = 0;
         while let Ok(event) = batch.receiver.recv() {
             match event {
@@ -1773,7 +1957,7 @@ mod tests {
 
         // Re-export car alone (single worker) with identical job parameters.
         let receiver =
-            start_model_export(job("car.fbx", &car), Some(rc), single_dir.clone(), false);
+            start_model_export(job("car.fbx", &car), Some(rc), None, single_dir.clone(), false);
         let mut single = None;
         while let Ok(event) = receiver.recv() {
             match event {

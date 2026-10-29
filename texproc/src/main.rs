@@ -59,7 +59,7 @@ struct ProcessArgs {
     /// Output directory for TIFF/LZW textures.
     #[arg(long, required = true)]
     out: PathBuf,
-    /// Permit unknown-only groups instead of exiting 3.
+    /// Skip unassigned textures with a warning (other groups always run).
     #[arg(long)]
     allow_unknown: bool,
     /// Inputs to scan when --groups is not supplied.
@@ -117,7 +117,7 @@ fn run_process(args: ProcessArgs) -> ExitCode {
         Ok(value) => value,
         Err(error) => return fail(2, error),
     };
-    let scan = if let Some(path) = args.groups {
+    let mut scan = if let Some(path) = args.groups {
         match read_groups(&path) {
             Ok(value) => value,
             Err(error) => return fail(2, error),
@@ -142,7 +142,19 @@ fn run_process(args: ProcessArgs) -> ExitCode {
                 group.unknown.len()
             );
         }
-        return ExitCode::from(3);
+    }
+    if args.allow_unknown {
+        for group in &mut scan.groups {
+            group.unknown.retain(|entry| {
+                if texproc::is_passthrough_path(Path::new(&entry.path)) {
+                    true
+                } else {
+                    eprintln!("warning: skipped unassigned texture {} (--allow-unknown)", entry.path);
+                    false
+                }
+            });
+        }
+        scan.groups.retain(|group| !group.slots.is_empty() || !group.unknown.is_empty());
     }
 
     let output_root = &args.out;
@@ -152,6 +164,9 @@ fn run_process(args: ProcessArgs) -> ExitCode {
         Err(error) => return fail(1, error),
     };
     for group in &report.groups {
+        for failure in &group.failures {
+            eprintln!("PARTIAL group `{}`: {failure}", group.base_name);
+        }
         eprintln!(
             "processed {}: {} output(s), {:.3}s",
             group.base_name,
@@ -173,8 +188,12 @@ fn run_process(args: ProcessArgs) -> ExitCode {
         report.elapsed_seconds,
         report.rayon_threads
     );
-    if !report.failed.is_empty() {
-        eprintln!("error: {} group(s) failed", report.failed.len());
+    if !args.allow_unknown && scan.unknown_only_groups().next().is_some() {
+        return ExitCode::from(3);
+    }
+    if !report.failed.is_empty() || report.groups.iter().any(|group| !group.failures.is_empty()) {
+        let partial = report.groups.iter().filter(|group| !group.failures.is_empty()).count();
+        eprintln!("error: {} group(s) failed, {partial} group(s) partially completed", report.failed.len());
         return ExitCode::from(1);
     }
     ExitCode::SUCCESS

@@ -232,6 +232,19 @@ pub fn write_mtl(
                 ),
             ),
         };
+        if textures.is_empty() && diagnostic.texture_source.as_deref() == Some("synthesized") {
+            if let Some(source) = source_by_name.get(material.name.as_str()) {
+                if !source.textures.is_empty() {
+                    let base = crate::texture_resolver::resolve_base_name(source)
+                        .unwrap_or_else(|| "<unresolved>".to_owned());
+                    diagnostics.push(texture_diagnostic(
+                        "warning", "mtl_processed_textures_missing", &material.name,
+                        Some("synthesized"),
+                        &format!("Material has source texture references, but no processed textures were found for base `{base}` in {}. Check texture processing results and the texture output directory.", texture_dir.display()),
+                    ));
+                }
+            }
+        }
         diagnostics.push(diagnostic);
         cryasset_materials.push((
             material.name.clone(),
@@ -839,6 +852,28 @@ mod tests {
             animation: None,
             joint_physics_data: Vec::new(),
         }
+    }
+
+    #[test]
+    fn missing_processed_textures_warn_but_untextured_materials_do_not() {
+        let root = temp_dir("missing-processed");
+        let mut model = model(&["M_Trim", "M_Glass"]);
+        model.materials[0].textures[0].filename = "plywood_nor_gl_4k.exr".to_owned();
+        model.materials[1].textures.clear();
+        let request = request(&["M_Trim", "M_Glass"]);
+        let out = root.join("test.mtl");
+        let diagnostics = write_mtl(&model, &request, None, &root, None, &out).unwrap();
+        let missing = diagnostics.iter().filter(|diagnostic| diagnostic.code == "mtl_processed_textures_missing").collect::<Vec<_>>();
+        assert_eq!(missing.len(), 1);
+        assert_eq!(missing[0].material, "M_Trim");
+        assert!(missing[0].message.contains("`plywood`"));
+        assert_eq!(missing[0].severity, "warning");
+        fs::write(root.join("plywood_diff.dds"), b"fixture").unwrap();
+        let diagnostics = write_mtl(&model, &request, None, &root, None, &out).unwrap();
+        assert!(!diagnostics.iter().any(|diagnostic| diagnostic.code == "mtl_processed_textures_missing"));
+        let xml = fs::read_to_string(&out).unwrap();
+        assert!(xml.contains("File=\"./plywood_diff.dds\""));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

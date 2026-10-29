@@ -1,6 +1,7 @@
 pub mod batch;
 pub mod constants;
 pub mod error;
+mod exr_io;
 pub mod grouping;
 pub mod io;
 pub mod ops;

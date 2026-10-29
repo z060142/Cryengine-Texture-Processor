@@ -9,7 +9,7 @@ use std::{
 use rayon::prelude::*;
 
 use crate::{
-    decode_image, process_and_write_stage2, process_stage1, OutputTextures, Result, ScanEntry,
+    decode_image, OutputTextures, Result, ScanEntry,
     ScanGroup, ScanResult, SourceImage, SourceTextures, TexprocError, TextureGroup,
     TextureSettings,
 };
@@ -19,6 +19,8 @@ pub struct ProcessedGroup {
     pub base_name: String,
     pub written: Vec<PathBuf>,
     pub elapsed_seconds: f64,
+    /// Individual sources/outputs skipped; successful outputs remain usable.
+    pub failures: Vec<String>,
 }
 
 /// A group that could not be processed (a Stage 1/2 error or a caught panic).
@@ -147,43 +149,60 @@ pub fn process_scan_group(
     }
     let started = Instant::now();
 
-    // T-015: `.hdr`/`.exr` inputs skip the TIF pipeline and are staged into the
+    // Unclassified `.hdr`/`.exr` environment maps skip the TIF pipeline and are staged into the
     // output directory as Radiance `.hdr` for RC's cubemap-HDR path. They arrive
     // as `unknown` entries (env maps carry no type suffix); branch on extension.
     let mut written = Vec::new();
-    let mut passthrough_count = 0;
+    let mut failures = Vec::new();
     for entry in &scan_group.unknown {
         if crate::passthrough::is_passthrough_path(Path::new(&entry.path)) {
-            written.push(crate::passthrough::stage_passthrough(
+            match catch_unwind(AssertUnwindSafe(|| crate::passthrough::stage_passthrough(
                 Path::new(&entry.path),
                 output_root,
-            )?);
-            passthrough_count += 1;
+            ))) {
+                Ok(Ok(path)) => written.push(path),
+                Ok(Err(error)) => failures.push(format!("{}: {error}", entry.path)),
+                Err(panic) => failures.push(format!("{}: {}", entry.path, panic_message(panic))),
+            }
+        } else {
+            failures.push(format!("{}: skipped unassigned texture", entry.path));
         }
     }
 
     // Run Stage 1/2 unless the group is nothing but passthrough files — a pure
     // env-map group must not emit a fallback spec TIF.
-    let pipeline_work =
-        !scan_group.slots.is_empty() || passthrough_count != scan_group.unknown.len();
+    let pipeline_work = !scan_group.slots.is_empty();
     if pipeline_work {
-        let sources = load_sources(&scan_group.slots, settings)?;
+        let (sources, loaded) = load_sources(&scan_group.slots, settings, &mut failures)?;
         let mut group = TextureGroup {
             base_name: scan_group.base_name.clone(),
             sources,
             intermediate: Default::default(),
             output: OutputTextures::default(),
         };
-        process_stage1(&mut group, &settings.intermediate_settings())?;
-        // Stream each Stage 2 output to disk and drop it, instead of accumulating
-        // all six in `group.output` before writing.
-        written.extend(process_and_write_stage2(&group, settings, output_root)?);
+        if loaded > 0 || failures.is_empty() {
+            let stage1 = crate::pipeline::process_stage1_resilient(
+                &mut group, &settings.intermediate_settings(),
+            )?;
+            failures.extend(stage1.diagnostics.into_iter()
+                .filter(|diagnostic| diagnostic.code == "SOURCE_PROCESS_FAILED")
+                .map(|diagnostic| diagnostic.message));
+            // Stream each output and preserve successes if another output fails.
+            written.extend(crate::output::process_and_write_stage2_resilient(
+                &group, settings, output_root, &mut failures,
+            )?);
+        }
+    }
+
+    if written.is_empty() && !failures.is_empty() {
+        return Err(TexprocError::new(failures.join("; ")));
     }
 
     Ok(ProcessedGroup {
         base_name: scan_group.base_name.clone(),
         written,
         elapsed_seconds: started.elapsed().as_secs_f64(),
+        failures,
     })
 }
 
@@ -311,13 +330,32 @@ fn physical_memory_bytes() -> Option<u64> {
 fn load_sources(
     slots: &BTreeMap<String, ScanEntry>,
     settings: &TextureSettings,
-) -> Result<SourceTextures> {
+    failures: &mut Vec<String>,
+) -> Result<(SourceTextures, usize)> {
     let mut sources = SourceTextures::default();
+    let mut loaded = 0;
     for (source_type, entry) in slots {
         if !source_is_required(source_type, settings) {
             continue;
         }
-        let source = SourceImage::new(&entry.filename, decode_image(&entry.path)?);
+        let decoded = catch_unwind(AssertUnwindSafe(|| decode_image(&entry.path)));
+        let image = match decoded {
+            Ok(Ok(image)) => image,
+            Ok(Err(error)) => {
+                failures.push(format!("{} ({source_type}): {error}", entry.path));
+                continue;
+            }
+            Err(panic) => {
+                failures.push(format!("{} ({source_type}): {}", entry.path, panic_message(panic)));
+                continue;
+            }
+        };
+        if matches!(source_type.as_str(), "normal" | "arm") && image.channels() < 3 {
+            failures.push(format!("{} ({source_type}): requires at least 3 channels, got {}", entry.path, image.channels()));
+            continue;
+        }
+        let source = SourceImage::new(&entry.filename, image);
+        loaded += 1;
         match source_type.as_str() {
             "diffuse" => sources.diffuse = Some(source),
             "normal" => sources.normal = Some(source),
@@ -338,7 +376,7 @@ fn load_sources(
             }
         }
     }
-    Ok(sources)
+    Ok((sources, loaded))
 }
 
 fn source_is_required(source_type: &str, settings: &TextureSettings) -> bool {
@@ -366,6 +404,61 @@ fn source_is_required(source_type: &str, settings: &TextureSettings) -> bool {
 mod tests {
     use super::*;
     use crate::grouping::HeaderRecord;
+
+    #[test]
+    fn partial_exr_group_keeps_outputs_after_source_and_output_failures() {
+        use crate::exr_io::tests::write_channels;
+        use exr::prelude::{Encoding, FlatSamples};
+        let root = std::env::temp_dir().join(format!("texproc-partial-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let input = root.join("in");
+        let output = root.join("out");
+        std::fs::create_dir_all(&input).unwrap();
+        std::fs::create_dir_all(output.join("Mat_diff.tif")).unwrap(); // One output cannot be written.
+        image::RgbImage::from_pixel(2, 2, image::Rgb([100, 100, 100])).save(input.join("Mat_diff.png")).unwrap();
+        image::RgbImage::new(2, 2).save(input.join("Other_diff.png")).unwrap();
+        write_channels(&input.join("Mat_nor_gl_4k.exr"), &[
+            ("R", FlatSamples::F32(vec![0.5; 4])), ("G", FlatSamples::F32(vec![0.2; 4])),
+            ("B", FlatSamples::F32(vec![1.0; 4])),
+        ], Encoding::default());
+        write_channels(&input.join("Mat_rough_4k.exr"), &[("Y", FlatSamples::F32(vec![0.25; 4]))], Encoding::default());
+        write_channels(&input.join("Mat_metal_4k.exr"), &[("R", FlatSamples::F32(vec![0.0; 4]))], Encoding::default());
+        for name in ["Mat_ao.png", "Broken_normal.exr", "unassigned.png"] {
+            std::fs::write(input.join(name), b"broken image").unwrap();
+        }
+        let scan = crate::scan_inputs(&[input], &crate::SuffixTable::default()).unwrap();
+        let mat = scan.groups.iter().find(|group| group.base_name == "Mat").unwrap();
+        assert!(mat.slots.contains_key("ao"), "corruption must not destroy suffix classification");
+        let report = process_scan_parallel(&scan, &TextureSettings::default(), &output, &AtomicBool::new(false), |_| {}).unwrap();
+        let partial = report.groups.iter().find(|group| group.base_name == "Mat").unwrap();
+        assert_eq!(partial.failures.len(), 2, "{:?}", partial.failures);
+        assert!(partial.failures.iter().any(|error| error.contains("Mat_ao.png")));
+        assert!(partial.failures.iter().any(|error| error.contains("output diff")));
+        assert!(partial.written.iter().all(|path| path.is_file()));
+        assert!(partial.written.contains(&output.join("Mat_ddna.tif")));
+        assert!(partial.written.contains(&output.join("Mat_spec.tif")));
+        assert!(output.join("Other_diff.tif").is_file());
+        assert_eq!(report.failed.len(), 2);
+        assert!(!output.join("Broken_spec.tif").exists(), "all-broken group must not masquerade as fallback success");
+        assert!(!output.join("unassigned_spec.tif").exists());
+        let ddna = decode_image(output.join("Mat_ddna.tif")).unwrap();
+        assert!((ddna.planes[1][0] - 0.8).abs() < 1.0 / 255.0, "OpenGL green must be converted once");
+        assert!((ddna.planes[3][0] - 0.75).abs() < 1.0 / 255.0, "scalar roughness must drive gloss alpha");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn malformed_arm_does_not_abort_valid_sources() {
+        let mut group = TextureGroup {
+            base_name: "Mat".into(), sources: SourceTextures::default(),
+            intermediate: Default::default(), output: Default::default(),
+        };
+        group.sources.arm = Some(SourceImage::new("Mat_arm.exr", crate::PlanarImage::new(1, 1, vec![vec![0.2]]).unwrap()));
+        group.sources.diffuse = Some(SourceImage::new("Mat_diff.png", crate::PlanarImage::new(1, 1, vec![vec![0.5]; 3]).unwrap()));
+        let report = crate::pipeline::process_stage1_resilient(&mut group, &TextureSettings::default().intermediate_settings()).unwrap();
+        assert!(group.intermediate.albedo.is_some());
+        assert!(report.diagnostics.iter().any(|entry| entry.code == "SOURCE_PROCESS_FAILED"));
+    }
 
     fn entry(source_type: &str, width: u32, height: u32, channels: u8) -> ScanEntry {
         ScanEntry {
@@ -469,7 +562,7 @@ mod tests {
     #[test]
     fn mixed_suffix_source_formats_scan_into_one_group_and_process() {
         use image::codecs::webp::WebPEncoder;
-        use image::{ExtendedColorType, ImageEncoder, ImageFormat, RgbImage};
+        use image::{ExtendedColorType, ImageFormat, RgbImage};
 
         use crate::{scan_inputs, SuffixTable};
 

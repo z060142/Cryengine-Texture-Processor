@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod broker;
 mod file_dialog;
 mod i18n;
 mod prefs;
@@ -23,7 +24,8 @@ use eframe::egui::{
     Stroke, TextEdit, TextureHandle, ViewportBuilder,
 };
 use file_dialog::{
-    choose_file_open, choose_file_save, choose_files_multi, choose_folder, choose_rc_executable,
+    choose_file_open, choose_file_save, choose_files_multi, choose_folder,
+    choose_rc_broker_executable, choose_rc_executable,
 };
 use i18n::{fill, Language, Strings};
 use prefs::{embedded_texture_directory, AppPreferences};
@@ -307,6 +309,7 @@ struct ProcessSummary {
     dds: Option<DdsSummary>,
     /// Groups that errored or panicked during the batch (batch continued).
     failed: Vec<FailedGroup>,
+    texture_failures: Vec<String>,
 }
 
 /// One line in the status-bar diagnostics popover.
@@ -546,18 +549,6 @@ impl WorkflowApp {
             self.status = self.t().no_textures_ready.to_owned();
             return;
         };
-        if let Some((index, blocked)) = document
-            .scan()
-            .groups
-            .iter()
-            .enumerate()
-            .find(|(_, group)| group.slots.is_empty() && !group.unknown.is_empty())
-        {
-            self.texture.selected_group = Some(index);
-            self.texture.review_only = true;
-            self.status = fill(self.t().assign_before_processing, &[&blocked.base_name]);
-            return;
-        }
         let output = PathBuf::from(self.preferences.texture_output_directory.trim());
         if output.as_os_str().is_empty() {
             self.status = self.t().set_texture_output_first.to_owned();
@@ -580,12 +571,18 @@ impl WorkflowApp {
             .generate_dds
             .then(|| resolve_rc_path(&self.preferences.rc_path).path)
             .flatten();
+        let broker_exe = self
+            .preferences
+            .generate_dds
+            .then(|| resolve_broker_path(&self.preferences.broker_path).path)
+            .flatten();
         self.process = Some(ProcessState {
             job: worker::start_process(
                 scan,
                 self.settings,
                 output,
                 rc_exe,
+                broker_exe,
                 self.preferences.delete_tif_after_dds,
             ),
             completed: 0,
@@ -681,9 +678,11 @@ impl WorkflowApp {
         }
         let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
         self.model.rc_missing_warning = rc_resolution.path.is_none();
+        let broker_exe = resolve_broker_path(&self.preferences.broker_path).path;
         self.model.export_receiver = Some(worker::start_model_export(
             job,
             rc_resolution.path,
+            broker_exe,
             output,
             self.preferences.delete_request_json,
         ));
@@ -722,9 +721,11 @@ impl WorkflowApp {
         let total = jobs.len();
         let rc_resolution = resolve_rc_path(&self.preferences.rc_path);
         self.model.rc_missing_warning = rc_resolution.path.is_none();
+        let broker_exe = resolve_broker_path(&self.preferences.broker_path).path;
         let job = worker::start_batch_export(
             jobs,
             rc_resolution.path,
+            broker_exe,
             output,
             self.preferences.delete_request_json,
         );
@@ -1126,11 +1127,17 @@ impl WorkflowApp {
                     )
                 });
                 let failed = report.failed.clone();
-                let failed_note = if failed.is_empty() {
+                let texture_failures = report.groups.iter().flat_map(|group| {
+                    group.failures.iter().map(|failure| format!("{}: {failure}", group.base_name))
+                }).collect::<Vec<_>>();
+                let mut failed_note = if failed.is_empty() {
                     String::new()
                 } else {
                     fill(strings.status_failed_note, &[&failed.len().to_string()])
                 };
+                if !texture_failures.is_empty() {
+                    failed_note.push_str(&fill(strings.texture_failures_note, &[&texture_failures.len().to_string()]));
+                }
                 let budget_mb = report.memory_budget_bytes / (1024 * 1024);
                 self.status = if report.cancelled {
                     fill(
@@ -1158,6 +1165,7 @@ impl WorkflowApp {
                     output_directory: output,
                     dds,
                     failed,
+                    texture_failures,
                 });
             }
             Err(error) => {
@@ -1301,12 +1309,17 @@ impl WorkflowApp {
                 };
                 let textures_line = match &report.textures {
                     Some(textures) => {
-                        let dds = textures.dds.as_ref().map_or_else(String::new, |dds| {
+                        let mut dds = textures.dds.as_ref().map_or_else(String::new, |dds| {
                             fill(
                                 strings.assoc_dds_note,
                                 &[&dds.succeeded.to_string(), &dds.total.to_string()],
                             )
                         });
+                        if !textures.failures.is_empty() {
+                            dds.push_str(&fill(strings.texture_failures_note, &[&textures.failures.len().to_string()]));
+                            dds.push('\n');
+                            dds.push_str(&textures.failures.join("\n"));
+                        }
                         fill(
                             strings.assoc_textures_line,
                             &[&textures.groups.to_string(), &textures.written.to_string(), &dds],
@@ -1314,7 +1327,7 @@ impl WorkflowApp {
                     }
                     None => String::new(),
                 };
-                let summary = fill(
+                let mut summary = fill(
                     strings.export_summary_template,
                     &[
                         &report.outputs.mtl.display().to_string(),
@@ -1324,6 +1337,11 @@ impl WorkflowApp {
                         &report.outputs.material_diagnostics.len().to_string(),
                     ],
                 );
+                for diagnostic in &report.outputs.material_diagnostics {
+                    if diagnostic.severity != "info" {
+                        summary.push_str(&format!("\n{}: {}", diagnostic.material, diagnostic.message));
+                    }
+                }
                 self.model.export_summary = Some(summary);
             }
             ModelExportEvent::Failed(error) => {
@@ -1530,6 +1548,11 @@ impl WorkflowApp {
             }
         }
         if let Some(summary) = self.process_summary.as_ref() {
+            for failure in &summary.texture_failures {
+                items.push(DiagItem {
+                    severity: "Error", title: failure.clone(), message: String::new(),
+                });
+            }
             for failed in &summary.failed {
                 items.push(DiagItem {
                     severity: "Error",
@@ -1681,6 +1704,10 @@ impl WorkflowApp {
                         Color32::from_rgb(210, 70, 65),
                         fill(t.groups_failed_summary, &[&summary.failed.len().to_string()]),
                     );
+                }
+                if !summary.texture_failures.is_empty() {
+                    ui.colored_label(Color32::from_rgb(200, 130, 40),
+                        fill(t.texture_failures_note, &[&summary.texture_failures.len().to_string()]));
                 }
                 if let Some(dds) = &summary.dds {
                     let color = if dds.failures.is_empty() {
@@ -2636,6 +2663,7 @@ impl WorkflowApp {
             self.save_preferences();
         }
         self.rc_path_field(ui);
+        self.broker_path_field(ui);
     }
 
     fn model_export_action(&mut self, ui: &mut egui::Ui) {
@@ -2738,6 +2766,60 @@ impl WorkflowApp {
             ui.weak(fill(t.rc_using, &[resolution.source, &path.display().to_string()]));
         } else {
             ui.label(RichText::new(t.rc_not_configured_full).color(Color32::from_rgb(210, 70, 65)));
+        }
+    }
+
+    fn broker_path_field(&mut self, ui: &mut egui::Ui) {
+        let t = self.t();
+        ui.label(t.broker_path_label);
+        let resolution = resolve_broker_path(&self.preferences.broker_path);
+        let stroke = if resolution.configured_invalid {
+            Stroke::new(1.5, Color32::from_rgb(210, 70, 65))
+        } else {
+            ui.visuals().widgets.inactive.bg_stroke
+        };
+        let mut changed = false;
+        let mut browse = false;
+        ui.horizontal(|ui| {
+            egui::Frame::new()
+                .stroke(stroke)
+                .inner_margin(egui::Margin::same(2))
+                .show(ui, |ui| {
+                    changed = ui
+                        .add(
+                            TextEdit::singleline(&mut self.preferences.broker_path)
+                                .desired_width((ui.available_width() - 74.0).max(120.0))
+                                .hint_text(r"C:\CryEngine\Tools\rc\rc_broker.exe"),
+                        )
+                        .changed();
+                });
+            browse = ui.button(t.browse).clicked();
+        });
+        if browse {
+            match choose_rc_broker_executable(&self.preferences.broker_path) {
+                Ok(Some(path)) => {
+                    self.preferences.broker_path = path.to_string_lossy().into_owned();
+                    changed = true;
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.status = error;
+                }
+            }
+        }
+        if changed {
+            self.save_preferences();
+        }
+
+        let resolution = resolve_broker_path(&self.preferences.broker_path);
+        if resolution.configured_invalid {
+            ui.label(
+                RichText::new(t.broker_invalid_using).color(Color32::from_rgb(210, 70, 65)),
+            );
+        } else if let Some(path) = &resolution.path {
+            ui.weak(fill(t.broker_using, &[&path.display().to_string()]));
+        } else {
+            ui.weak(t.broker_not_configured);
         }
     }
 
@@ -3067,14 +3149,20 @@ impl WorkflowApp {
         let Some(document) = &mut self.texture.document else {
             return;
         };
-        let base_name = document
+        let assigned_path = document
             .scan()
             .groups
             .get(group_index)
-            .map_or_else(String::new, |group| group.base_name.clone());
+            .and_then(|group| group.unknown.first())
+            .map(|entry| entry.path.clone());
         self.status = match document.assign_unknown(group_index, 0, source_type) {
             Ok(()) => {
-                self.texture.selected_group = Some(group_index);
+                self.texture.selected_group = document.scan().groups.iter().position(|group| {
+                    group.slots.values().any(|entry| Some(&entry.path) == assigned_path.as_ref())
+                });
+                let base_name = self.texture.selected_group
+                    .map(|index| document.scan().groups[index].base_name.clone())
+                    .unwrap_or_default();
                 fill(self.t().assigned_status, &[source_type, &base_name])
             }
             Err(error) => error,
@@ -3605,6 +3693,36 @@ fn resolve_rc_path_candidates(
         path: None,
         source: "",
         configured_invalid,
+    }
+}
+
+struct BrokerPathResolution {
+    path: Option<PathBuf>,
+    configured_invalid: bool,
+}
+
+/// The broker is an optional acceleration layer: an empty configuration is
+/// not an error, it just means direct RC calls are used. Only a non-empty
+/// path that fails to resolve to a file is flagged.
+fn resolve_broker_path(configured: &str) -> BrokerPathResolution {
+    let configured = configured.trim();
+    if configured.is_empty() {
+        return BrokerPathResolution {
+            path: None,
+            configured_invalid: false,
+        };
+    }
+    let path = PathBuf::from(configured);
+    if path.is_file() {
+        BrokerPathResolution {
+            path: Some(path),
+            configured_invalid: false,
+        }
+    } else {
+        BrokerPathResolution {
+            path: None,
+            configured_invalid: true,
+        }
     }
 }
 

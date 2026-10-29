@@ -52,6 +52,14 @@ pub fn probe_header(path: impl AsRef<Path>) -> Result<HeaderInfo> {
 
 pub fn decode_image(path: impl AsRef<Path>) -> Result<PlanarImage> {
     let path = path.as_ref();
+    if extension_hint(path).as_deref() == Some("exr") {
+        return crate::exr_io::decode_material(path);
+    }
+    if extension_hint(path).as_deref() == Some("hdr") {
+        return dynamic_to_planar(ImageReader::with_format(
+            BufReader::new(File::open(path)?), ImageFormat::Hdr,
+        ).decode()?);
+    }
     let file = File::open(path).map_err(|error| {
         TexprocError::new(format!("failed to open image {}: {error}", path.display()))
     })?;
@@ -60,7 +68,7 @@ pub fn decode_image(path: impl AsRef<Path>) -> Result<PlanarImage> {
         SupportedFormat::Png => ImageFormat::Png,
         SupportedFormat::Jpeg => ImageFormat::Jpeg,
         SupportedFormat::Tiff => ImageFormat::Tiff,
-        SupportedFormat::Exr => ImageFormat::OpenExr,
+        SupportedFormat::Exr => return crate::exr_io::decode_material(path),
         SupportedFormat::Tga => ImageFormat::Tga,
         SupportedFormat::Bmp => ImageFormat::Bmp,
         SupportedFormat::WebP => ImageFormat::WebP,
@@ -522,7 +530,7 @@ fn probe_exr<R: Read>(reader: &mut R) -> Result<HeaderInfo> {
 
 fn parse_exr_channels(payload: &[u8]) -> Result<(u8, u8)> {
     let mut cursor = Cursor::new(payload);
-    let mut channel_count = 0_u8;
+    let mut channel_names = Vec::new();
     let mut bit_depth = 0_u8;
     while usize::try_from(cursor.position()).unwrap_or(usize::MAX) < payload.len() {
         let name = read_c_string(&mut cursor, 255)?;
@@ -541,15 +549,13 @@ fn parse_exr_channels(payload: &[u8]) -> Result<(u8, u8)> {
         };
         let mut sampling = [0_u8; 12];
         cursor.read_exact(&mut sampling)?;
-        channel_count = channel_count
-            .checked_add(1)
-            .ok_or_else(|| TexprocError::new("too many OpenEXR channels"))?;
+        channel_names.push(name);
         bit_depth = bit_depth.max(depth);
     }
-    if channel_count == 0 {
+    if channel_names.is_empty() {
         return Err(TexprocError::new("OpenEXR channel list is empty"));
     }
-    Ok((channel_count, bit_depth))
+    Ok((crate::exr_io::select_channels(&channel_names)?.len() as u8, bit_depth))
 }
 
 fn parse_exr_data_window(payload: &[u8]) -> Result<(u32, u32)> {

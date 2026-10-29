@@ -126,14 +126,23 @@ const OUTPUT_RULES: &[OutputRule] = &[
     },
 ];
 
-pub fn strip_known_texture_suffix(stem: &str) -> &str {
+pub fn strip_known_texture_suffix(stem: &str) -> String {
+    static SUFFIXES: std::sync::OnceLock<texproc::SuffixTable> = std::sync::OnceLock::new();
+    let suffixes = SUFFIXES.get_or_init(texproc::SuffixTable::default);
+    // Use exactly the importer's qualifier/ARM/CE suffix rules. Add a dummy
+    // extension because this API receives a stem, possibly containing dots.
+    let base = texproc::parse_base_name(&format!("{stem}.texture"), suffixes);
+    if base != stem {
+        return base;
+    }
+    // Preserve converter-only legacy aliases for existing callers.
     let lower = stem.to_ascii_lowercase();
     for suffix in KNOWN_TEXTURE_SUFFIXES {
         if lower.ends_with(suffix) {
-            return &stem[..stem.len() - suffix.len()];
+            return stem[..stem.len() - suffix.len()].to_owned();
         }
     }
-    stem
+    stem.to_owned()
 }
 
 pub fn resolve_base_name(material: &MaterialRecord) -> Option<String> {
@@ -314,6 +323,32 @@ mod tests {
             std::env::temp_dir().join(format!("converter-texture-resolver-{label}-{unique}"));
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn qualified_fbx_references_match_import_groups_and_resolve_outputs() {
+        let root = temp_dir("qualified");
+        for (filename, base) in [
+            (r"corridor_scene.fbm\plywood_nor_gl_4k.exr", "plywood"),
+            ("beige_wall_001_diff_4k.jpg", "beige_wall_001"),
+            ("industrial_wall_sconce_bulb_nor_dx_4k.jpg", "industrial_wall_sconce_bulb"),
+            ("wood_table_arm_4k.jpg", "wood_table"),
+            ("modern_ceiling_lamp_01_metal_4k.exr", "modern_ceiling_lamp_01"),
+            ("Wall.v2-rough-8K.exr", "Wall.v2"),
+        ] {
+            let material = material(&[filename]);
+            assert_eq!(resolve_base_name(&material).as_deref(), Some(base));
+            let basename = filename.rsplit(['/', '\\']).next().unwrap();
+            assert_eq!(resolve_base_name(&material).unwrap(),
+                texproc::parse_base_name(basename, &texproc::SuffixTable::default()));
+            for suffix in ["diff", "ddna", "spec"] {
+                fs::write(root.join(format!("{base}_{suffix}.dds")), b"fixture").unwrap();
+            }
+            let resolved = resolve_material_textures(&material, &root, &root);
+            assert_eq!(resolved.len(), 3, "{filename}");
+            assert!(resolved.iter().any(|texture| texture.ce_map == "Diffuse" && texture.mtl_file == format!("./{base}_diff.dds")));
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

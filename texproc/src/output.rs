@@ -236,28 +236,40 @@ pub fn process_and_write_stage2(
     settings: &TextureSettings,
     output_directory: impl AsRef<Path>,
 ) -> Result<Vec<PathBuf>> {
+    let mut failures = Vec::new();
+    let written = process_and_write_stage2_resilient(group, settings, output_directory.as_ref(), &mut failures)?;
+    if !failures.is_empty() {
+        return Err(TexprocError::new(failures.join("; ")));
+    }
+    Ok(written)
+}
+
+pub(crate) fn process_and_write_stage2_resilient(
+    group: &TextureGroup,
+    settings: &TextureSettings,
+    directory: &Path,
+    failures: &mut Vec<String>,
+) -> Result<Vec<PathBuf>> {
     validate_settings(settings)?;
-    let directory = output_directory.as_ref();
     fs::create_dir_all(directory)?;
     let mut written = Vec::new();
     let types = settings.texture_types;
-    if types.diff {
-        write_optional(directory, export_diff(group, settings)?, &mut written)?;
-    }
-    if types.spec {
-        write_optional(directory, export_spec(group, settings)?, &mut written)?;
-    }
-    if types.ddna {
-        write_optional(directory, export_ddna(group, settings)?, &mut written)?;
-    }
-    if types.displ {
-        write_optional(directory, export_displ(group, settings)?, &mut written)?;
-    }
-    if types.emissive {
-        write_optional(directory, export_emissive(group, settings)?, &mut written)?;
-    }
-    if types.sss {
-        write_optional(directory, export_sss(group, settings)?, &mut written)?;
+    type Exporter = fn(&TextureGroup, &TextureSettings) -> Result<Option<OutputImage>>;
+    let outputs: [(bool, &str, Exporter); 6] = [
+        (types.diff, "diff", export_diff), (types.spec, "spec", export_spec),
+        (types.ddna, "ddna", export_ddna), (types.displ, "displ", export_displ),
+        (types.emissive, "emissive", export_emissive), (types.sss, "sss", export_sss),
+    ];
+    for (enabled, slot, export) in outputs {
+        if !enabled { continue; }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            write_optional(directory, export(group, settings)?, &mut written)
+        }));
+        match result {
+            Ok(Ok(())) => {},
+            Ok(Err(error)) => failures.push(format!("output {slot}: {error}")),
+            Err(_) => failures.push(format!("output {slot}: processing panicked")),
+        }
     }
     Ok(written)
 }

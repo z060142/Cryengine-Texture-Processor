@@ -12,8 +12,8 @@ use crate::{
 };
 
 const DEFAULT_SUFFIXES: &str = include_str!("../data/suffix_settings.json");
-// `hdr`/`exr` are HDR passthrough formats (T-015): accepted by the scanner so
-// they never trip DEF-20, then staged straight to RC instead of the TIF pipeline.
+// HDR and unclassified EXR environment maps use the passthrough path;
+// EXR files with material suffixes use the material pipeline.
 const SUPPORTED_EXTENSIONS: &[&str] =
     &["png", "jpg", "jpeg", "tif", "tiff", "exr", "hdr", "tga", "bmp", "webp"];
 const SOURCE_TYPES: &[&str] = &[
@@ -192,8 +192,8 @@ pub struct ScanResult {
 
 impl ScanResult {
     pub fn unknown_only_groups(&self) -> impl Iterator<Item = &ScanGroup> {
-        // HDR passthrough entries (`.hdr`/`.exr`, T-015) are unclassified by
-        // design but are handled by the process stage, so a group that is only
+        // Unclassified HDR/EXR environment maps are handled by the process
+        // stage, so a group that is only
         // passthrough files must not trip the exit-3 grouping gate.
         self.groups.iter().filter(|group| {
             group.slots.is_empty()
@@ -343,14 +343,18 @@ fn classify_path(
         return unknown_entry(path, &filename, raw_stem, None);
     }
 
-    // T-015: `.hdr`/`.exr` are HDR passthrough formats. Branch on extension
-    // *before* any header probe or type classification: they carry no type
-    // suffix (env maps), Radiance HDR is not a probe-able format here, and the
-    // owner's ruling routes every `.exr` to RC rather than the TIF pipeline
-    // regardless of suffix. They land as `unknown` and the process stage stages
-    // them to RC (see `passthrough` / `batch::process_scan_group`).
-    if crate::passthrough::is_passthrough_ext(&extension) {
+    // Radiance remains an environment-map input. EXR material maps must use
+    // the same suffix classification and grouping as PNG/JPEG material maps.
+    if extension == "hdr" {
         return unknown_entry(path, &filename, raw_stem, None);
+    }
+    if extension == "exr" {
+        let inferred = classify_name(path, &filename, raw_stem, suffixes, None, &mut Vec::new());
+        let candidate = peel_qualifiers(raw_stem, &suffixes.removable).0;
+        let ambiguous = ["a", "d"].iter().any(|suffix| strip_terminal(&candidate, suffix).is_some());
+        if inferred.source_type == "unknown" && !ambiguous {
+            return unknown_entry(path, &filename, raw_stem, None);
+        }
     }
 
     let header = match probe_header(path) {
@@ -363,9 +367,20 @@ fn classify_path(
                 Some(path),
                 None,
             ));
-            return unknown_entry(path, &filename, raw_stem, None);
+            return classify_name(path, &filename, raw_stem, suffixes, None, diagnostics);
         }
     };
+    classify_name(path, &filename, raw_stem, suffixes, header, diagnostics)
+}
+
+fn classify_name(
+    path: &Path,
+    filename: &str,
+    raw_stem: &str,
+    suffixes: &SuffixTable,
+    header: Option<HeaderRecord>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> ScanEntry {
     let (candidate, _qualifiers) = peel_qualifiers(raw_stem, &suffixes.removable);
 
     if let Some((base, alias)) = match_arm_alias(&candidate) {
@@ -444,10 +459,9 @@ fn expand_inputs(inputs: &[PathBuf]) -> Result<Vec<PathBuf>> {
         } else if input.is_dir() {
             visit_directory(input, &mut output)?;
         } else {
-            return Err(TexprocError::new(format!(
-                "input does not exist: {}",
-                input.display()
-            )));
+            // Keep explicit missing files so classification can report their
+            // individual probe failure without aborting all other imports.
+            output.push(input.clone());
         }
     }
     output.sort_by_key(|path| path.to_string_lossy().to_lowercase());
@@ -598,6 +612,39 @@ fn diagnostic(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exr_material_maps_join_their_material_and_environment_stays_passthrough() {
+        let dir = std::env::temp_dir().join(format!("texproc-exr-group-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        fs::create_dir_all(&dir).unwrap();
+        for base in ["beige_wall_001", "industrial_wall_sconce", "industrial_wall_sconce_bulb", "modern_ceiling_lamp_01", "plywood", "wood_table"] {
+            image::RgbImage::new(2, 2).save(dir.join(format!("{base}_diff_4k.png"))).unwrap();
+            for suffix in ["nor_gl", "rough", "metal"] {
+                let pixels = image::Rgb32FImage::from_pixel(2, 2, image::Rgb([0.5, 0.5, 1.0]));
+                image::DynamicImage::ImageRgb32F(pixels).save(dir.join(format!("{base}_{suffix}_4k.exr"))).unwrap();
+            }
+        }
+        fs::write(dir.join("studio_4k.exr"), b"environment bypasses material probe").unwrap();
+        let table = SuffixTable::default();
+        let scan = scan_inputs(&[dir.clone()], &table).unwrap();
+        assert_eq!(scan.groups.len(), 7);
+        for group in &scan.groups {
+            if group.base_name == "studio_4k" {
+                assert!(group.slots.is_empty());
+                assert_eq!(group.unknown.len(), 1);
+            } else {
+                assert!(group.unknown.is_empty());
+                for kind in ["diffuse", "normal", "roughness", "metallic"] {
+                    let entry = &group.slots[kind];
+                    assert_eq!(entry.base_name, group.base_name);
+                    assert_eq!(parse_base_name(&entry.filename, &table), group.base_name);
+                    assert!(entry.header.is_some());
+                }
+            }
+        }
+        assert!(scan.diagnostics.is_empty(), "{:?}", scan.diagnostics);
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     /// Folder expansion silently drops unrelated extensions, while an
     /// explicitly listed unsupported file still surfaces as a DEF-20 unknown.

@@ -148,6 +148,21 @@ pub fn process_stage1(
     group: &mut TextureGroup,
     settings: &IntermediateSettings,
 ) -> Result<Stage1Report> {
+    process_stage1_impl(group, settings, false)
+}
+
+pub(crate) fn process_stage1_resilient(
+    group: &mut TextureGroup,
+    settings: &IntermediateSettings,
+) -> Result<Stage1Report> {
+    process_stage1_impl(group, settings, true)
+}
+
+fn process_stage1_impl(
+    group: &mut TextureGroup,
+    settings: &IntermediateSettings,
+    continue_on_error: bool,
+) -> Result<Stage1Report> {
     if !settings.normal_from_height_strength.is_finite() {
         return Err(TexprocError::new(
             "normal_from_height_strength must be finite",
@@ -156,30 +171,46 @@ pub fn process_stage1(
 
     let mut intermediate = group.intermediate.clone();
     let mut report = Stage1Report::default();
+    let mut failures = Vec::new();
+    macro_rules! attempt {
+        ($stage:literal, $work:expr) => {{
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| $work))
+                .unwrap_or_else(|_| Err(TexprocError::new(concat!($stage, " panicked"))));
+            match result {
+                Ok(value) => Some(value),
+                Err(error) if continue_on_error => {
+                    failures.push(Stage1Diagnostic { code: "SOURCE_PROCESS_FAILED", message: format!("{}: {error}", $stage) });
+                    None
+                }
+                Err(error) => return Err(error),
+            }
+        }};
+    }
 
     report.trace.push(Stage1Step::Arm);
-    process_arm(&group.sources, &mut intermediate, settings, &mut report)?;
+    attempt!("arm", process_arm(&group.sources, &mut intermediate, settings, &mut report));
 
     report.trace.push(Stage1Step::Albedo);
-    intermediate.albedo = process_albedo(&group.sources, &intermediate, settings)?;
+    intermediate.albedo = attempt!("albedo", process_albedo(&group.sources, &intermediate, settings)).flatten();
 
     report.trace.push(Stage1Step::Normal);
-    intermediate.normal = process_normal(&group.sources, settings)?;
+    intermediate.normal = attempt!("normal", process_normal(&group.sources, settings)).flatten();
 
     report.trace.push(Stage1Step::Gloss);
-    intermediate.glossiness = process_gloss(&group.sources, &intermediate);
+    intermediate.glossiness = attempt!("gloss", Ok(process_gloss(&group.sources, &intermediate))).flatten();
 
     report.trace.push(Stage1Step::Reflection);
     intermediate.reflection =
-        process_reflection(&group.sources, &intermediate, settings, &mut report)?;
+        attempt!("reflection", process_reflection(&group.sources, &intermediate, settings, &mut report)).flatten();
 
     report.trace.push(Stage1Step::Height);
-    intermediate.height = process_height(&group.sources);
+    intermediate.height = attempt!("height", Ok(process_height(&group.sources))).flatten();
 
     report.trace.push(Stage1Step::Ao);
-    process_ao(&group.sources, &mut intermediate);
+    attempt!("ao", { process_ao(&group.sources, &mut intermediate); Ok(()) });
 
     group.intermediate = intermediate;
+    report.diagnostics.extend(failures);
     Ok(report)
 }
 
@@ -347,6 +378,10 @@ enum NormalConvention {
 }
 
 fn normal_convention(filename: &str) -> NormalConvention {
+    let stem = terminal_stem(filename);
+    if ["nor_gl", "nor_opengl"].iter().any(|suffix| has_terminal_token(&stem, suffix)) {
+        return NormalConvention::OpenGl;
+    }
     let filename = filename.to_ascii_lowercase();
     let direct_x_patterns = [
         "_normaldirectx",

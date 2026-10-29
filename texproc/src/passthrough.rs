@@ -1,6 +1,6 @@
 //! HDR/EXR passthrough staging (T-015).
 //!
-//! `.hdr` and `.exr` inputs skip the TIF pipeline entirely and are staged into
+//! Unclassified `.hdr` and `.exr` environment maps are staged into
 //! the output directory as Radiance `.hdr`, so RC can treat them as its special
 //! cubemap-HDR case in CryEngine. `.hdr` is copied byte-for-byte; `.exr` is
 //! decoded (full HDR range preserved — the `PlanarImage` path clamps to `0..=1`
@@ -9,11 +9,11 @@
 
 use std::{
     fs::File,
-    io::{BufReader, BufWriter},
+    io::BufWriter,
     path::{Path, PathBuf},
 };
 
-use image::{codecs::hdr::HdrEncoder, ImageFormat, ImageReader, Rgb};
+use image::{codecs::hdr::HdrEncoder, Rgb};
 
 use crate::error::{Result, TexprocError};
 
@@ -65,15 +65,14 @@ pub fn stage_passthrough(src: &Path, output_dir: &Path) -> Result<PathBuf> {
 /// Decode an OpenEXR and write it as Radiance `.hdr`, preserving the HDR range
 /// (values above 1.0 survive — no `PlanarImage` clamp).
 fn exr_to_hdr(src: &Path, dest: &Path) -> Result<()> {
-    let reader = ImageReader::with_format(
-        BufReader::new(File::open(src).map_err(|error| {
-            TexprocError::new(format!("failed to open {}: {error}", src.display()))
-        })?),
-        ImageFormat::OpenExr,
-    );
-    let rgb = reader.decode()?.to_rgb32f();
-    let (width, height) = (rgb.width(), rgb.height());
-    let pixels = rgb.pixels().copied().collect::<Vec<Rgb<f32>>>();
+    let source = crate::exr_io::read_pixels(src)?;
+    let (width, height) = (source.width, source.height);
+    let pixels = (0..source.planes[0].len()).map(|index| {
+        Rgb(std::array::from_fn(|channel| {
+            let plane = if source.planes.len() >= 3 { channel } else { 0 };
+            source.planes[plane][index].max(0.0)
+        }))
+    }).collect::<Vec<_>>();
     let writer = BufWriter::new(File::create(dest).map_err(|error| {
         TexprocError::new(format!("failed to create {}: {error}", dest.display()))
     })?);
@@ -83,6 +82,7 @@ fn exr_to_hdr(src: &Path, dest: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufReader;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     use image::codecs::{hdr::HdrDecoder, openexr::OpenExrEncoder};

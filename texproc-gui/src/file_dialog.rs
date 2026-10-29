@@ -399,6 +399,9 @@ mod win {
 const RC_FILTER: &str = "CryEngine Resource Compiler (rc.exe)\0rc.exe\0Executable files (*.exe)\0*.exe\0All files (*.*)\0*.*\0";
 
 #[cfg(windows)]
+const RC_BROKER_FILTER: &str = "RC Broker (rc_broker.exe)\0rc_broker.exe\0Executable files (*.exe)\0*.exe\0All files (*.*)\0*.*\0";
+
+#[cfg(windows)]
 pub fn choose_files_multi(title: &str, filter: &str) -> Result<Vec<PathBuf>, String> {
     Ok(win::run_dialog(title, filter, "", "", win::Mode::OpenMulti)?.unwrap_or_default())
 }
@@ -443,6 +446,11 @@ pub fn choose_rc_executable(initial_path: &str) -> Result<Option<PathBuf>, Strin
     )
 }
 
+#[cfg(windows)]
+pub fn choose_rc_broker_executable(initial_path: &str) -> Result<Option<PathBuf>, String> {
+    choose_file_open("Select RC Broker", RC_BROKER_FILTER, initial_path)
+}
+
 #[cfg(not(windows))]
 pub fn choose_files_multi(_title: &str, _filter: &str) -> Result<Vec<PathBuf>, String> {
     Ok(Vec::new())
@@ -473,6 +481,11 @@ pub fn choose_file_save(
 
 #[cfg(not(windows))]
 pub fn choose_rc_executable(_initial_path: &str) -> Result<Option<PathBuf>, String> {
+    Ok(None)
+}
+
+#[cfg(not(windows))]
+pub fn choose_rc_broker_executable(_initial_path: &str) -> Result<Option<PathBuf>, String> {
     Ok(None)
 }
 
